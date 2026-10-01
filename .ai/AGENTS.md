@@ -89,6 +89,9 @@ installing browsers), `deploy` about 2 minutes.
 - **Right after a push, GitHub can still report the PR's previous head commit.** A watcher using
   `--pr` then watched the cancelled run of the old commit. Watch by the commit you just pushed.
 
+- **Run watchers from a copy of the script**, e.g. in a scratch directory. Bash reads a script while
+  running it, so editing or checking out `scripts/watch-*.sh` under a running watcher corrupts it.
+
 ### Shell
 
 - **A pipe hides the exit code.** `pnpm lint | tail` succeeds even when lint fails, and a commit

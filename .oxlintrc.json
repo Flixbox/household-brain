@@ -20,6 +20,7 @@
   },
   "rules": {
     "react/rules-of-hooks": "error",
+    "react/forbid-component-props": ["error", { "forbid": [{ "propName": "className", "allowedFor": ["Link"] }] }], // router links are styled like anchors
     "import/consistent-type-specifier-style": "off", // fights no-import-type-side-effects; verbatimModuleSyntax already enforces correct type imports
     "eslint/sort-imports": ["error", { "ignoreDeclarationSort": true }], // members stay sorted; module order is left to the author
     "eslint/new-cap": ["error", { "capIsNewExceptions": ["VitePWA"] }],
@@ -196,6 +197,16 @@
       ],
       "rules": {
         "import/unambiguous": "off"
+      }
+    },
+    {
+      // Test fakes implement async interfaces without needing to await anything, and a test is a
+      // linear script: splitting it to satisfy size limits would hide the steps it checks.
+      "files": ["**/*.test.ts", "tests/**", "e2e/**"],
+      "rules": {
+        "eslint/require-await": "off",
+        "eslint/max-statements": "off",
+        "eslint/max-lines-per-function": "off"
       }
     }
   ]

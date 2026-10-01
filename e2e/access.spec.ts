@@ -1,13 +1,6 @@
-import { type Page, expect, test } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 import { allowlist, resetEmulators } from './emulators'
-
-declare global {
-  interface Window {
-    e2eSignIn: (email: string) => Promise<unknown>
-  }
-}
-
-const signInAs = (page: Page, email: string) => page.evaluate(address => window.e2eSignIn(address), email)
+import { signInAs } from './session'
 
 test.beforeEach(async () => {
   await resetEmulators()
