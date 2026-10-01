@@ -8,7 +8,8 @@ export const END_TIME = '17:15:00'
 /** A start or end: timed (`dateTime`) or, for all-day events made in Google Calendar, a `date`. */
 export interface EventTime {
   dateTime?: string
-  date?: string
+  /** Null in a patch clears it (needed when turning an all-day event into a timed one). */
+  date?: string | null
   timeZone?: string
 }
 
@@ -20,6 +21,12 @@ export interface CalendarEvent {
   start?: EventTime
   end?: EventTime
   reminders?: { useDefault: boolean, overrides?: { method: string, minutes: number }[] }
+  /** When Google last changed the event (RFC 3339, UTC). */
+  updated?: string
+  /** Set on the first event of a repeating series. */
+  recurrence?: string[]
+  /** Set on a single occurrence of a repeating series. */
+  recurringEventId?: string
   extendedProperties?: { private?: Record<string, string> }
   etag?: string
   /** "confirmed", "tentative", or "cancelled" for a deleted event. */

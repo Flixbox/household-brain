@@ -4,15 +4,29 @@ import type { ItemDraft } from './model'
 
 const PREFIX = /^\[(?<label>[^\]]+)\]\s*(?<rest>.*)$/u
 
-/** The category and title of an event: from `hb.category`, else from a `[Label]` title prefix. */
-function categoryAndTitle(event: CalendarEvent, categories: readonly Category[]): { category: string, title: string } {
-  const summary = event.summary ?? ''
-  const { label = '', rest = '' } = PREFIX.exec(summary)?.groups ?? {}
-  const fromPrefix = categories.find(category => label !== '' && category.label.toLowerCase() === label.trim().toLowerCase())
-  const title = label !== '' && (fromPrefix || event.extendedProperties?.private?.['hb.category']) ? rest : summary
-  const stored = event.extendedProperties?.private?.['hb.category']
-  return { category: stored ?? fromPrefix?.slug ?? 'uncategorised', title }
+function prefixCategory(event: CalendarEvent, categories: readonly Category[]) {
+  const { label = '', rest = '' } = PREFIX.exec(event.summary ?? '')?.groups ?? {}
+  const category = categories.find(entry => label !== '' && entry.label.toLowerCase() === label.trim().toLowerCase())
+  return { category, rest }
 }
+
+/**
+ * The category and title of an event: from `hb.category`, else from a `[Label]` title prefix. A
+ * leading `[…]` is only treated as a prefix when it names a category, so "[Draft] Foo" stays whole.
+ */
+function categoryAndTitle(event: CalendarEvent, categories: readonly Category[]): { category: string, title: string } {
+  const { category, rest } = prefixCategory(event, categories)
+  const stored = event.extendedProperties?.private?.['hb.category']
+  return { category: stored ?? category?.slug ?? 'uncategorised', title: category ? rest : event.summary ?? '' }
+}
+
+/** An event someone put into the calendar by hand, without the app's category or a category prefix. */
+export function isForeign(event: CalendarEvent, categories: readonly Category[]): boolean {
+  return !event.extendedProperties?.private?.['hb.category'] && !prefixCategory(event, categories).category
+}
+
+/** Repeating events aren't supported yet: they are left alone entirely. */
+export const isRecurring = (event: CalendarEvent) => Boolean(event.recurrence?.length || event.recurringEventId)
 
 /** The calendar date an event falls on, as `YYYY-MM-DD` (its local date for timed events). */
 export function dueDateOf(event: CalendarEvent): string {
@@ -42,8 +56,9 @@ function timeFix(event: CalendarEvent, draft: ItemDraft, timeZone: string): Cale
   return isAt(event.start, DUE_TIME, timeZone) && isAt(event.end, END_TIME, timeZone)
     ? {}
     : {
-      end: { dateTime: `${draft.dueDate}T${END_TIME}`, timeZone },
-      start: { dateTime: `${draft.dueDate}T${DUE_TIME}`, timeZone },
+      // `date: null` clears an all-day date; Google rejects an event with both.
+      end: { date: null, dateTime: `${draft.dueDate}T${END_TIME}`, timeZone },
+      start: { date: null, dateTime: `${draft.dueDate}T${DUE_TIME}`, timeZone },
     }
 }
 
@@ -64,9 +79,14 @@ function categoryFix(event: CalendarEvent, draft: ItemDraft, categories: readonl
  * reminders, and a category with its title prefix and colour.
  */
 export function normalisationFor(event: CalendarEvent, draft: ItemDraft, context: EventContext): CalendarEvent | null {
+  // Events put into the calendar by hand (a birthday, an appointment) are shown but never rewritten.
+  if (isForeign(event, context.categories) || isRecurring(event)) {
+    return null
+  }
   const patch: CalendarEvent = {
     ...timeFix(event, draft, context.timeZone),
-    ...event.reminders?.useDefault === true ? {} : { reminders: { useDefault: true } },
+    // Overrides must be cleared explicitly: Google rejects default reminders next to overrides.
+    ...event.reminders?.useDefault === true ? {} : { reminders: { overrides: [], useDefault: true } },
     ...categoryFix(event, draft, context.categories),
   }
   return Object.keys(patch).length > 0 ? patch : null

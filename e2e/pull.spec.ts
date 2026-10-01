@@ -21,11 +21,12 @@ const pullUntil = (page: Page, check: () => Promise<number>, expected: number) =
 
 test('events made, changed and deleted in Google Calendar show up in the app', async ({ page }) => {
   const { google } = await mockGoogle(page)
+  // All day, with its own reminders: both need clearing explicitly, or Google rejects the patch.
   google.create({
-    end: { dateTime: '2026-12-01T09:30:00+01:00', timeZone: 'Europe/Berlin' },
+    end: { date: '2026-12-02' },
     id: 'madeingoogle1',
     reminders: { overrides: [{ method: 'popup', minutes: 10 }], useDefault: false },
-    start: { dateTime: '2026-12-01T09:00:00+01:00', timeZone: 'Europe/Berlin' },
+    start: { date: '2026-12-01' },
     summary: '[Membership] Gym',
   })
   await signInAllowlisted(page, 'owner@household-brain.test')
@@ -39,10 +40,11 @@ test('events made, changed and deleted in Google Calendar show up in the app', a
   // The event was brought into shape: due 17:00, default reminders, category recorded.
   await expect.poll(() => google.live()[0]).toMatchObject({
     extendedProperties: { private: { 'hb.category': 'membership' } },
-    reminders: { useDefault: true },
+    reminders: { overrides: [], useDefault: true },
     start: { dateTime: '2026-12-01T17:00:00', timeZone: 'Europe/Berlin' },
     summary: '[Membership] Gym',
   })
+  expect(google.live()[0].start).not.toHaveProperty('date')
 
   google.edit('madeingoogle1', { summary: '[Membership] Gym (renewed)' })
   await pullUntil(page, () => page.getByRole('link', { name: /Gym \(renewed\)/u }).count(), 1)
@@ -74,4 +76,36 @@ test('a local edit waiting to be sent keeps its fields, and takes the others fro
     extendedProperties: { private: { 'hb.code': 'POPCORN' } },
     start: { dateTime: '2026-12-27T17:00:00' },
   })
+})
+
+test('events put in by hand show as uncategorised and are left alone; repeating events are ignored', async ({ page }) => {
+  const { google } = await mockGoogle(page)
+  const birthday = google.create({ end: { date: '2026-12-11' }, id: 'birthday1', reminders: { useDefault: false }, start: { date: '2026-12-10' }, summary: 'Grandma' })
+  google.create({ end: { date: '2020-05-02' }, id: 'series1', recurrence: ['RRULE:FREQ=YEARLY'], start: { date: '2020-05-01' }, summary: '[Coupon] Yearly' })
+  await signInAllowlisted(page, 'owner@household-brain.test')
+  await page.getByRole('button', { name: 'Sync now' }).click()
+
+  await expect(page.getByRole('region', { name: 'Uncategorised' }).getByRole('link', { name: /Grandma/u })).toContainText('2026-12-10')
+  await expect(page.getByRole('link', { name: /Yearly/u })).toHaveCount(0)
+  expect(google.live().find(event => event.id === 'birthday1')).toEqual(birthday)
+})
+
+test('an entry edited here while it was deleted in Google comes back with the edit', async ({ page }) => {
+  const { google } = await mockGoogle(page)
+  await signInAllowlisted(page, 'owner@household-brain.test')
+  await page.getByRole('button', { name: 'Sync now' }).click()
+  await page.getByRole('link', { name: 'Add Coupon' }).click()
+  await page.getByLabel('Title').fill('Bakery')
+  await page.getByLabel('Due date (17:00)').fill('2026-12-05')
+  await page.getByRole('button', { name: 'Save' }).click()
+  await expect.poll(() => google.live().length).toBe(1)
+  const [{ id }] = google.live() as [{ id: string }]
+
+  google.delete(id)
+  await page.getByRole('link', { name: /Bakery/u }).click()
+  await page.getByLabel('Code').fill('CROISSANT')
+  await page.getByRole('button', { name: 'Save' }).click()
+
+  await expect.poll(() => google.live()[0]).toMatchObject({ extendedProperties: { private: { 'hb.code': 'CROISSANT' } }, id, status: 'confirmed' })
+  await expect(page.getByRole('link', { name: /Bakery/u })).toHaveCount(1)
 })

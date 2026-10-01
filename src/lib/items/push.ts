@@ -67,8 +67,12 @@ async function recover(context: PushContext, { item, target, changes }: Attempt,
   if (!isStatus(error, 412)) {
     throw error
   }
-  const { etag = '' } = await context.api.getEvent(target.calendarId, item.id)
-  return context.api.patchEvent(target, changes, etag)
+  const current = await context.api.getEvent(target.calendarId, item.id)
+  // Deleted in Google while edited here: the local edit wins and brings the whole event back.
+  if (current.status === 'cancelled') {
+    return restore(context, item, target)
+  }
+  return context.api.patchEvent(target, changes, current.etag ?? '')
 }
 
 async function patch(context: PushContext, item: Item, etag: string): Promise<CalendarEvent> {

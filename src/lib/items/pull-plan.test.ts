@@ -52,6 +52,15 @@ describe('decidePull', () => {
     expect(decide({ entry: null, event: cancelled })).toEqual({ kind: 'skip' })
   })
 
+  it('ignores a listing older than what the entry already has', () => {
+    expect(decide({ entry: { ...entry, googleUpdated: '2026-10-01T10:00:05Z' }, event: { ...event, updated: '2026-10-01T10:00:04Z' } })).toEqual({ kind: 'skip' })
+  })
+
+  it('leaves repeating events alone until repeating entries exist', () => {
+    expect(decide({ entry: null, event: { ...event, recurrence: ['RRULE:FREQ=YEARLY'] } })).toEqual({ kind: 'skip' })
+    expect(decide({ entry: null, event: { ...event, recurringEventId: 'series1' } })).toEqual({ kind: 'skip' })
+  })
+
   it('leaves an entry waiting to be deleted alone', () => {
     expect(decide({ entry: { ...entry, pendingOp: 'delete', sync: 'pending' } })).toEqual({ kind: 'skip' })
   })

@@ -7,7 +7,7 @@ const pushed = { etags: {}, id: 'evt1', rev: 'r1' } as unknown as Item
 describe('recordFor', () => {
   it('marks an unchanged entry synced and stores the etag for this user', () => {
     expect(recordFor({ latest: pushed, outcome: { event: { etag: '"v1"' }, kind: 'synced' }, pushed, remote: null, uid: 'owner' })).toEqual({
-      fields: { 'dirty': [], 'etags.owner': '"v1"', 'pendingOp': null, 'sync': 'synced', 'syncError': null },
+      fields: { 'dirty': [], 'etags.owner': '"v1"', 'googleUpdated': '', 'pendingOp': null, 'sync': 'synced', 'syncError': null },
       kind: 'update',
     })
   })

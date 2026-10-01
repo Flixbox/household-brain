@@ -22,6 +22,8 @@ export interface Item {
    * tell whether the entry changed meanwhile (a server timestamp can't: it is still empty locally).
    */
   rev: string
+  /** Google's `updated` time of the event this entry last matched; older listings are ignored. */
+  googleUpdated?: string
   updatedAt?: unknown
   /** Uid of the person who made the last local change. */
   updatedBy?: string

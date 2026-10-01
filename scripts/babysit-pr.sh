@@ -22,6 +22,9 @@ REPO=${REPO:-Flixbox/household-brain}
 WORKFLOW=${WORKFLOW:-ci.yml}
 # The agent runs this as its bot: GH=agent-gh (see .ai/AGENTS.md). Defaults to plain gh.
 GH=${GH:-gh}
+# Comments are read with the owner's login: a pending (unsubmitted) review is only visible to its
+# author, and the owner leaves those. Override with ACTIVITY_GH.
+ACTIVITY_GH=${ACTIVITY_GH:-gh}
 pr=$1
 limit=$(( ${2:-20} * 60 ))
 hours=${3:-12}
@@ -43,11 +46,11 @@ report() { # report <key> <message...>: print and exit unless this key was repor
 }
 
 activity() { # one line per item: "<kind> <id> <author> <text>"
-  "$GH" api --paginate "repos/$REPO/issues/$pr/comments" \
+  "$ACTIVITY_GH" api --paginate "repos/$REPO/issues/$pr/comments" \
     --jq '.[] | "comment \(.id) \(.user.login): \((.body // "") | gsub("\\s+"; " ") | .[0:200])"' &&
-  "$GH" api --paginate "repos/$REPO/pulls/$pr/reviews" \
+  "$ACTIVITY_GH" api --paginate "repos/$REPO/pulls/$pr/reviews" \
     --jq '.[] | "review \(.id) \(.user.login) \(.state): \((.body // "") | gsub("\\s+"; " ") | .[0:200])"' &&
-  "$GH" api --paginate "repos/$REPO/pulls/$pr/comments" \
+  "$ACTIVITY_GH" api --paginate "repos/$REPO/pulls/$pr/comments" \
     --jq '.[] | "review-comment \(.id) \(.user.login) \(.path): \((.body // "") | gsub("\\s+"; " ") | .[0:200])"'
 }
 
@@ -62,8 +65,8 @@ check_activity() {
   echo "ACTIVITY on PR #$pr:"
   while read -r kind id; do
     grep -m1 "^$kind $id " <<<"$now" || echo "$kind $id"
-    # A pending review's comments are only visible to its author, the account these scripts use.
-    [[ $kind == review ]] && "$GH" api "repos/$REPO/pulls/$pr/reviews/$id/comments" \
+    # A pending review's comments are only visible to its author: read with the owner's login.
+    [[ $kind == review ]] && "$ACTIVITY_GH" api "repos/$REPO/pulls/$pr/reviews/$id/comments" \
       --jq '.[] | "  \(.path):\(.line // .original_line // "file"): \((.body // "") | gsub("\\s+"; " ") | .[0:400])"'
   done <<<"$new"
   exit 0
@@ -78,14 +81,18 @@ check_run() { # check_run <sha> <label>: report a finished or slow CI run of tha
   [[ -z ${run:-} ]] && return
   local jobs
   jobs=$("$GH" run view "$run" --repo "$REPO" --json jobs --jq '.jobs[] | "  \(.name): \(.status) \(.conclusion // "")"')
+  # report() returns when the event was already reported, so every branch ends in `return`.
   if [[ $status == completed ]]; then
-    if [[ $label == deploy ]]; then
-      [[ $conclusion == success ]] && report "deployed $sha" "DEPLOYED: PR #$pr is live (run $run)" "$jobs"
+    if [[ $label == deploy && $conclusion == success ]]; then
+      report "deployed $sha" "DEPLOYED: PR #$pr is live (run $run)" "$jobs"
+    elif [[ $label == deploy ]]; then
       report "deploy-failed $sha" "DEPLOY_FAILED: run $run on main ended $conclusion: open a follow-up PR" "$jobs"
+    elif [[ $conclusion == success ]]; then
+      report "ci-passed $sha" "CI_PASSED for ${sha:0:7} (run $run)" "$jobs"
+    elif [[ $conclusion != cancelled ]]; then # cancelled: superseded by a newer push
+      report "ci-failed $sha" "CI_FAILED for ${sha:0:7} (run $run): $conclusion. gh run view $run --repo $REPO --log-failed" "$jobs"
     fi
-    [[ $conclusion == success ]] && report "ci-passed $sha" "CI_PASSED for ${sha:0:7} (run $run)" "$jobs"
-    [[ $conclusion == cancelled ]] && return # superseded by a newer push
-    report "ci-failed $sha" "CI_FAILED for ${sha:0:7} (run $run): $conclusion. gh run view $run --repo $REPO --log-failed" "$jobs"
+    return
   fi
   age=$(( $(date +%s) - $(date -d "$created" +%s) ))
   (( age > limit )) && report "ci-slow $run" "CI_SLOW: run $run ($label, ${sha:0:7}) still $status after $(( age / 60 )) min. Cancel it and read the logs." "$jobs"

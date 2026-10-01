@@ -1,6 +1,6 @@
 import type { Category } from '../categories'
 import type { CalendarEvent } from './event'
-import { draftFrom } from './from-event'
+import { draftFrom, isRecurring } from './from-event'
 import { EDITABLE_FIELDS, type Item, type ItemDraft } from './model'
 
 /** What to do with one event from Google Calendar. */
@@ -35,27 +35,35 @@ function deleted({ entry }: PullInput): PullDecision {
  * - an entry waiting to be deleted: skip (the delete is pushed);
  * - otherwise: Google's version replaces the entry.
  */
+function merged(entry: Item, draft: ItemDraft, version: Record<string, string>): PullDecision {
+  const theirs = EDITABLE_FIELDS.filter(field => !entry.dirty.includes(field))
+  const fields = { ...Object.fromEntries(theirs.map(field => [field, draft[field]])), ...version }
+  return { draft, fields, kind: 'update', normalise: false }
+}
+
 function changed({ entry, event, uid, categories }: PullInput): PullDecision {
   const draft = draftFrom(event, categories)
   const etag = event.etag ?? ''
+  const googleUpdated = event.updated ?? ''
+  const synced = { dirty: [], googleUpdated, pendingOp: null, sync: 'synced', syncError: null }
   if (!entry) {
-    return {
-      draft,
-      fields: { ...draft, dirty: [], etags: { [uid]: etag }, id: event.id, pendingOp: null, sync: 'synced', syncError: null },
-      kind: 'create',
-    }
+    return { draft, fields: { ...draft, ...synced, etags: { [uid]: etag }, id: event.id }, kind: 'create' }
   }
   if (hasLocalEdits(entry)) {
-    const theirs = EDITABLE_FIELDS.filter(field => !entry.dirty.includes(field))
-    const fields = { ...Object.fromEntries(theirs.map(field => [field, draft[field]])), [`etags.${uid}`]: etag }
-    return { draft, fields, kind: 'update', normalise: false }
+    return merged(entry, draft, { [`etags.${uid}`]: etag, googleUpdated })
   }
-  const fields = { ...draft, [`etags.${uid}`]: etag, dirty: [], pendingOp: null, sync: 'synced', syncError: null }
-  return { draft, fields, kind: 'update', normalise: true }
+  return { draft, fields: { ...draft, ...synced, [`etags.${uid}`]: etag }, kind: 'update', normalise: true }
 }
+
+/** The entry already reflects this version or a newer one (a listing can be older than a push). */
+const isStale = (entry: Item | null, event: CalendarEvent) =>
+  Boolean(entry?.googleUpdated && event.updated && event.updated <= entry.googleUpdated)
 
 export function decidePull(input: PullInput): PullDecision {
   const { entry, event, uid } = input
+  if (isRecurring(event) || isStale(entry, event)) {
+    return { kind: 'skip' }
+  }
   if (event.status === 'cancelled') {
     return deleted(input)
   }

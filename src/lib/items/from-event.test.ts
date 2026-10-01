@@ -25,6 +25,10 @@ describe('draftFrom', () => {
     expect(draft).toMatchObject({ category: 'membership', dueDate: '2026-12-01', status: 'open', title: 'Gym' })
   })
 
+  it('keeps a bracketed title that is not a category, even on an app entry', () => {
+    expect(draftFrom({ ...appEvent, summary: '[Draft] Foo' }, DEFAULT_CATEGORIES).title).toBe('[Draft] Foo')
+  })
+
   it('files an event without a known prefix as uncategorised, keeping its whole title', () => {
     expect(draftFrom({ start: { date: '2026-12-01' }, summary: '[Party] Bring cake' }, DEFAULT_CATEGORIES))
       .toMatchObject({ category: 'uncategorised', title: '[Party] Bring cake' })
@@ -39,10 +43,17 @@ describe('normalisationFor', () => {
   it('moves a 09:00 or all-day event to 17:00–17:15 on the same date and restores default reminders', () => {
     const moved: CalendarEvent = { ...appEvent, reminders: { overrides: [{ method: 'popup', minutes: 10 }], useDefault: false }, start: { date: '2026-11-04' } }
     expect(normalisationFor(moved, draftFrom(moved, DEFAULT_CATEGORIES), context)).toEqual({
-      end: { dateTime: '2026-11-04T17:15:00', timeZone: 'Europe/Berlin' },
-      reminders: { useDefault: true },
-      start: { dateTime: '2026-11-04T17:00:00', timeZone: 'Europe/Berlin' },
+      end: { date: null, dateTime: '2026-11-04T17:15:00', timeZone: 'Europe/Berlin' },
+      reminders: { overrides: [], useDefault: true },
+      start: { date: null, dateTime: '2026-11-04T17:00:00', timeZone: 'Europe/Berlin' },
     })
+  })
+
+  it('never rewrites events put in by hand, or repeating events', () => {
+    const birthday: CalendarEvent = { reminders: { useDefault: false }, start: { date: '2026-12-01' }, summary: 'Grandma' }
+    expect(normalisationFor(birthday, draftFrom(birthday, DEFAULT_CATEGORIES), context)).toBeNull()
+    const yearly: CalendarEvent = { ...appEvent, recurrence: ['RRULE:FREQ=YEARLY'], start: { date: '2020-01-01' } }
+    expect(normalisationFor(yearly, draftFrom(yearly, DEFAULT_CATEGORIES), context)).toBeNull()
   })
 
   it('gives an event made in Google Calendar its category, prefix and colour', () => {

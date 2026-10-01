@@ -285,8 +285,9 @@ keeps "pull before every write" cheap even when several edits happen in a row.
         colour if the category changed), and `If-Match: <etags[myUid]>`.
       - Deleted item: `events.delete`, where 404 and 410 count as success. Then delete the
         Firestore doc.
-   3. On success: set `etags.<myUid>` from the response, `sync: "synced"`, and `dirty: []`. The dot
-      disappears on both devices.
+   3. On success: copy every field of Google's reply into the entry (it includes changes made in
+      Google meanwhile), set `etags.<myUid>`, `googleUpdated`, `sync: "synced"` and `dirty: []`. The
+      dot disappears on both devices.
    4. If a `412` still happens (someone edited between the pull and the push): run another pull,
       which merges, then retry the push once.
 
@@ -336,9 +337,15 @@ for 3 seconds, so a burst of triggers causes one pull.
   | changed | `synced` or missing | Map the event to an item, normalise it (below), and write it |
   | changed | `pending` upsert | Merge: `dirty` fields keep the local value, all others take Google's. Update `etags.<myUid>`. Stays `pending` |
   | `cancelled` | `synced` | Delete the doc |
-  | `cancelled` | `pending` upsert | The local edit wins: restore the event by patching `status: "confirmed"` plus the full item |
+  | `cancelled` | `pending` upsert | Skip. The push then finds the event cancelled (on 404/410, or on a 412 whose re-read shows `status: "cancelled"`) and restores it: insert, or patch `status: "confirmed"` plus the full item |
   | `cancelled` | `pending` delete | Delete the doc |
 
+- **Not touched at all:** repeating events (`recurrence` or `recurringEventId`), until repeating
+  entries exist; and events older than what the entry already has (`updated` ≤ `googleUpdated`).
+- **Events put in by hand** (no `hb.category` and no `[Label]` prefix naming a category, e.g. a
+  birthday) are shown under **Uncategorised** but never rewritten in Google.
+- **One event that can't be adjusted** (say Google rejects the patch) is reported in the sync bar and
+  skipped; the rest of the pull, and the sync token, go ahead.
 - **Normalisation:** events created or changed directly in Google Calendar are brought back into
   shape with one etag-guarded `events.patch` per event:
   - The start is not 17:00 Europe/Berlin, or it is an all-day event: keep the date, set

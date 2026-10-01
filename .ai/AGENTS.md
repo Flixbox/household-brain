@@ -24,7 +24,8 @@ that work with the owner's account.
   ```
 
 - **Pull requests and comments:** `agent-gh pr create …`, `agent-gh pr comment …`.
-- **Babysitter:** `GH=agent-gh /tmp/babysit-pr.sh <number>`.
+- **Babysitter:** `GH=agent-gh /tmp/babysit-pr.sh <number>`. It still reads comments with the owner's
+  login, because only the owner's account can see the owner's pending (unsubmitted) reviews.
 - **What the bot can't do**, on purpose: change repository settings or rulesets, merge past checks,
   or approve. Settings changes the owner asks for are made with the owner's `gh` login. Merging is
   the owner's auto-merge.
@@ -75,8 +76,8 @@ docs. Only wait in the foreground for something whose result you need for the ve
 | Event | What to do |
 | --- | --- |
 | `CI_PASSED` | Report it; the owner merges with auto-merge. Start the babysitter again. |
-| `CI_FAILED` | Read the failing job (`gh run view <run> --log-failed`), reproduce locally, fix, push once. |
-| `CI_SLOW` | More than 20 minutes: something hangs. Cancel the run (`gh run cancel <run>`), read the logs (`gh api repos/Flixbox/household-brain/actions/jobs/<job-id>/logs`), fix the hang **and** the missing time limit. A flaky download can just be re-run (`gh run rerun <run> --failed`). |
+| `CI_FAILED` | Read the failing job (`agent-gh run view <run> --log-failed`), reproduce locally, fix, push once. |
+| `CI_SLOW` | More than 20 minutes: something hangs. Cancel the run (`gh run cancel <run>`: the bot can only read Actions, so this uses the owner's login), read the logs (`agent-gh api repos/Flixbox/household-brain/actions/jobs/<job-id>/logs`), fix the hang **and** the missing time limit. A flaky download can just be re-run (`gh run rerun <run> --failed`, owner's login again). |
 | `CONFLICT` | Rebase on `main`, run the checks, push once, reply on the PR. |
 | `ACTIVITY` | Answer every comment (section 4), including those of a pending review. |
 | `DEPLOYED` | Wait one minute, then check the live app in the browser (section 5). Report, and only now start the next PR. |

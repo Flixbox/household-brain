@@ -38,7 +38,7 @@ export async function mockGoogle(page: Page, calendarId = 'household@group.calen
   let version = 0
   const stored = (id: string, event: object) => {
     version += 1
-    events.set(id, { ...event, etag: `"v${version}"`, id })
+    events.set(id, { ...event, etag: `"v${version}"`, id, updated: updatedAt(version) })
     return events.get(id)
   }
   const reply = (route: Route, status: number, body: unknown) => (status === 204
@@ -107,8 +107,9 @@ async function handleEvent({ request, path, body, events, stored, reply }: Event
     return
   }
   const found = events.get(eventId)
-  // Like Google: a deleted event can't be read or deleted again, but can be revived with a patch.
-  const reachable = found && (found.status !== 'cancelled' || request.method() === 'PATCH')
+  // Like Google: a deleted event can still be read (status "cancelled") and revived with a patch,
+  // but not deleted again.
+  const reachable = found && (found.status !== 'cancelled' || request.method() !== 'DELETE')
   const existing = reachable ? found : null
   const method = request.method()
   if (method === 'POST') {
@@ -120,11 +121,45 @@ async function handleEvent({ request, path, body, events, stored, reply }: Event
     await reply(200, existing)
   } else if (method === 'PATCH') {
     const ifMatch = request.headers()['if-match']
-    await (ifMatch && ifMatch !== existing.etag
-      ? reply(412, { error: { message: 'Precondition Failed' } })
-      : reply(200, stored(eventId, { ...existing, ...body as object })))
+    if (ifMatch && ifMatch !== existing.etag) {
+      await reply(412, { error: { message: 'Precondition Failed' } })
+      return
+    }
+    const next = patched(existing, body as Record<string, unknown>)
+    const invalid = invalidEvent(next)
+    await (invalid ? reply(400, { error: { message: invalid } }) : reply(200, stored(eventId, next)))
   } else {
-    events.set(eventId, { ...existing, etag: `"deleted-${eventId}"`, status: 'cancelled' })
+    stored(eventId, { ...existing, status: 'cancelled' })
     await reply(204, null)
   }
+}
+
+/** A deterministic RFC 3339 `updated` time that grows with every write. */
+function updatedAt(version: number): string {
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `2026-10-01T${pad(10 + Math.floor(version / 3600))}:${pad(Math.floor(version / 60) % 60)}:${pad(version % 60)}Z`
+}
+
+const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
+
+/** Google's patch semantics: nested objects merge, arrays are replaced, null removes a field. */
+function patched(existing: Record<string, unknown>, changes: Record<string, unknown>): Record<string, unknown> {
+  const merged = Object.entries(changes).map(([key, value]): [string, unknown] => {
+    const before = existing[key]
+    return [key, isObject(value) && isObject(before) ? patched(before, value) : value]
+  })
+  return Object.fromEntries([...Object.entries(existing), ...merged].filter(([key, value]) => value !== null && (key in changes ? changes[key] !== null : true)))
+}
+
+/** The two combinations Google rejects, which normalisation must avoid. */
+function invalidEvent(event: Record<string, unknown>): string | null {
+  const start = event.start as Record<string, unknown> | undefined
+  const reminders = event.reminders as { useDefault?: boolean, overrides?: unknown[] } | undefined
+  if (start?.date && start.dateTime) {
+    return 'Invalid start time: both date and dateTime'
+  }
+  if (reminders?.useDefault && (reminders.overrides?.length ?? 0) > 0) {
+    return 'Cannot specify both default reminders and overrides at the same time.'
+  }
+  return null
 }

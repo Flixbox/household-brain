@@ -34,7 +34,9 @@ export function recordFor({ latest, pushed, outcome, uid, remote }: PushResult):
   // Google's reply holds the whole event: the fields just written, plus anything changed in Google
   // meanwhile. Taking all of it keeps the entry identical to the event.
   return {
-    fields: unchanged ? { ...remote, ...etag, dirty: [], pendingOp: null, sync: 'synced', syncError: null } : etag,
+    fields: unchanged
+      ? { ...remote, ...etag, dirty: [], googleUpdated: outcome.event.updated ?? '', pendingOp: null, sync: 'synced', syncError: null }
+      : etag,
     kind: 'update',
   }
 }
