@@ -82,7 +82,7 @@ docs. Only wait in the foreground for something whose result you need for the ve
 | `CI_SLOW` | More than 20 minutes: something hangs. Cancel the run (`gh run cancel <run>`: the bot can only read Actions, so this uses the owner's login), read the logs (`agent-gh api repos/Flixbox/household-brain/actions/jobs/<job-id>/logs`), fix the hang **and** the missing time limit. A flaky download can just be re-run (`gh run rerun <run> --failed`, owner's login again). |
 | `CONFLICT` | Rebase on `main`, run the checks, push once, reply on the PR. |
 | `ACTIVITY` | Answer every comment (section 4), including those of a pending review. |
-| `DEPLOYED` | Wait one minute, then check the live app in the browser (section 5). Report, and only now start the next PR. |
+| `DEPLOYED` | Report it and start the next PR. Optionally, a minute later, check the live app in the browser (section 5); never wait on that check. |
 | `DEPLOY_FAILED` | Fix it in a follow-up PR (never push to `main`). |
 | `MAIN_FAILED` / `MAIN_SLOW` | `main` is broken or hanging, whichever PR caused it. That comes first: fix it in a follow-up PR, or re-run a flaky job, before continuing. |
 
@@ -113,8 +113,9 @@ installing browsers), `deploy` about 2 minutes.
   `DEPLOYED` or `DEPLOY_FAILED`.
 - **If the deploy fails, open a follow-up pull request** with the fix. Never push to `main`
   directly; it only accepts PRs with green CI.
-- **One minute after every deploy, check the live app in the browser** (Claude in Chrome), not just
-  that the URL answers:
+- **Optional: one minute after a deploy, check the live app in the browser** (Claude in Chrome). It
+  is a nice extra, never a gate: don't hold up the next PR for it, and if the browser doesn't
+  cooperate, skip it and say so. When you do it:
   1. Open `https://household-brain-sf.web.app` and **reload** it, so the new service worker and build
      are the ones running. If an "update available" prompt appears, take it.
   2. Check that the page renders, sign-in or the signed-in screen works, and the browser console
@@ -169,6 +170,13 @@ installing browsers), `deploy` about 2 minutes.
   `set -o pipefail`, or don't pipe a command whose exit code matters.
 
 ### Toolchain
+
+- **The repo is an Nx workspace** (pnpm workspaces): `apps/web` is the app, `packages/*` are
+  features and shared code, consumed as TypeScript source (`exports: ./src/index.ts`, no build
+  step). A new feature, e.g. a shopping list, becomes its own `packages/<name>` with an `index.ts`,
+  and `apps/web` routes render what it exports. Packages never import from `apps/web`.
+- Run tasks through Nx at the root: `pnpm typecheck`, `pnpm test` (`nx run-many`), `pnpm build`
+  (`nx run @household-brain/web:build`). Nx caches results, so unchanged projects are skipped.
 
 - **oxlint loads `@stylistic/eslint-plugin` through `jsPlugins`.** There is no ESLint here.
   `.oxlintrc.json` is JSONC, so each disabled rule carries its reason as a comment.

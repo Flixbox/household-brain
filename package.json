@@ -1,5 +1,5 @@
 {
-  "name": "household-brain",
+  "name": "household-brain-workspace",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -9,16 +9,14 @@
     "node": "26.10.0"
   },
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview",
-    "lint": "oxlint --max-warnings=0 && npmPkgJsonLint -c npmpackagejsonlint.config.ts .",
-    "lint:fix": "oxlint --fix && npmPkgJsonLint -c npmpackagejsonlint.config.ts --fix .",
-    "typecheck": "tsc -b",
-    "test": "vitest run",
+    "dev": "pnpm --filter @household-brain/web dev",
+    "build": "nx run @household-brain/web:build",
+    "lint": "oxlint --max-warnings=0 && npmPkgJsonLint -c npmpackagejsonlint.config.ts . apps/web packages/calendar packages/firebase",
+    "lint:fix": "oxlint --fix && npmPkgJsonLint -c npmpackagejsonlint.config.ts --fix . apps/web packages/calendar packages/firebase",
+    "typecheck": "tsc -p tsconfig.json && nx run-many -t typecheck",
+    "test": "nx run-many -t test",
     "test:rules": "vitest run --config vitest.rules.config.ts",
-    "test:e2e": "vite build --mode e2e && playwright test",
-    "test:emulated": "firebase emulators:exec --only auth,firestore --project demo-household-brain \"pnpm test:rules && pnpm test:e2e\"",
+    "test:emulated": "firebase emulators:exec --only auth,firestore --project demo-household-brain \"pnpm test:rules && pnpm --filter @household-brain/web test:e2e\"",
     "emulators": "firebase emulators:start --only auth,firestore --project demo-household-brain"
   },
   "dependencies": {
@@ -40,6 +38,7 @@
     "@vitejs/plugin-react": "6.1.1",
     "firebase-tools": "15.32.0",
     "npm-package-json-lint": "11.0.0",
+    "nx": "23.2.1",
     "oxlint": "1.86.0",
     "tailwindcss": "4.3.3",
     "typescript": "7.0.2",

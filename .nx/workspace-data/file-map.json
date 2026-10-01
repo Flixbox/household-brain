@@ -1,0 +1,488 @@
+{
+  "version": "6.0",
+  "nxVersion": "23.2.1",
+  "pathMappings": {},
+  "nxJsonPlugins": [],
+  "fileMap": {
+    "nonProjectFiles": [
+      {
+        "file": "firestore.indexes.json",
+        "hash": "2048261650710551311"
+      },
+      {
+        "file": "tsconfig.json",
+        "hash": "7333453456347738851"
+      },
+      {
+        "file": "scripts/babysit-pr.sh",
+        "hash": "2692225291346822880"
+      },
+      {
+        "file": "AGENTS.md",
+        "hash": "7366274572475214546"
+      },
+      {
+        "file": "firestore.rules",
+        "hash": "10607589180383538802"
+      },
+      {
+        "file": "CLAUDE.md",
+        "hash": "7366274572475214546"
+      },
+      {
+        "file": ".firebaserc",
+        "hash": "12451154746798822055"
+      },
+      {
+        "file": "pnpm-workspace.yaml",
+        "hash": "15820312572114523431"
+      },
+      {
+        "file": ".gitignore",
+        "hash": "7304733339661916558"
+      },
+      {
+        "file": "package.json",
+        "hash": "12699245027549358133"
+      },
+      {
+        "file": ".github/workflows/ci.yml",
+        "hash": "15631899191893398937"
+      },
+      {
+        "file": "firebase.json",
+        "hash": "12226940339291232930"
+      },
+      {
+        "file": ".ai/AGENTS.md",
+        "hash": "162990327808173261"
+      },
+      {
+        "file": ".gitleaks.toml",
+        "hash": "5847224747155161850"
+      },
+      {
+        "file": "LICENSE",
+        "hash": "15598910314814648805"
+      },
+      {
+        "file": "README.md",
+        "hash": "10441334533349630549"
+      },
+      {
+        "file": "nx.json",
+        "hash": "13003853363193718527"
+      },
+      {
+        "file": ".github/dependabot.yml",
+        "hash": "6728141416095729572"
+      },
+      {
+        "file": "npmpackagejsonlint.config.ts",
+        "hash": "12037554772232857944"
+      },
+      {
+        "file": "pnpm-lock.yaml",
+        "hash": "18409394143055382758"
+      },
+      {
+        "file": "tests/rules/firestore.rules.test.ts",
+        "hash": "1624434705932594323"
+      },
+      {
+        "file": ".oxlintrc.json",
+        "hash": "8412280592069121179"
+      },
+      {
+        "file": "vitest.rules.config.ts",
+        "hash": "2749282362777379499"
+      }
+    ],
+    "projectFileMap": {
+      "@household-brain/firebase": [
+        {
+          "file": "packages/firebase/package.json",
+          "hash": "17492739901285935744",
+          "deps": [
+            "npm:firebase"
+          ]
+        },
+        {
+          "file": "packages/firebase/src/env.d.ts",
+          "hash": "17759081117373147898"
+        },
+        {
+          "file": "packages/firebase/src/env.test.ts",
+          "hash": "7138771529458692675"
+        },
+        {
+          "file": "packages/firebase/src/env.ts",
+          "hash": "11994660990598078357"
+        },
+        {
+          "file": "packages/firebase/src/firebase.ts",
+          "hash": "15078955412614294443"
+        },
+        {
+          "file": "packages/firebase/src/index.ts",
+          "hash": "5952448001868278975"
+        },
+        {
+          "file": "packages/firebase/tsconfig.json",
+          "hash": "868725107549637126"
+        }
+      ],
+      "@household-brain/web": [
+        {
+          "file": "apps/web/.env.e2e",
+          "hash": "633347965206550917"
+        },
+        {
+          "file": "apps/web/.env.production",
+          "hash": "18286920429522894411"
+        },
+        {
+          "file": "apps/web/e2e/access.spec.ts",
+          "hash": "13891141449356287059"
+        },
+        {
+          "file": "apps/web/e2e/calendar-setup.spec.ts",
+          "hash": "3232203190787893624"
+        },
+        {
+          "file": "apps/web/e2e/emulators.ts",
+          "hash": "2327210346778284347"
+        },
+        {
+          "file": "apps/web/e2e/entries.spec.ts",
+          "hash": "1643682553574981854"
+        },
+        {
+          "file": "apps/web/e2e/google-mocks.ts",
+          "hash": "9104767706759949392"
+        },
+        {
+          "file": "apps/web/e2e/pull.spec.ts",
+          "hash": "1049801392024038486"
+        },
+        {
+          "file": "apps/web/e2e/session.ts",
+          "hash": "18430044011224239408"
+        },
+        {
+          "file": "apps/web/index.html",
+          "hash": "8940915221981651473"
+        },
+        {
+          "file": "apps/web/package.json",
+          "hash": "14514694844302955447",
+          "deps": [
+            "@household-brain/calendar",
+            "@household-brain/firebase",
+            "npm:@tanstack/react-router",
+            "npm:firebase",
+            "npm:react",
+            "npm:react-dom"
+          ]
+        },
+        {
+          "file": "apps/web/playwright.config.ts",
+          "hash": "12079450428889614219"
+        },
+        {
+          "file": "apps/web/public/icon.svg",
+          "hash": "9136742962770241654"
+        },
+        {
+          "file": "apps/web/pwa-assets.config.ts",
+          "hash": "8959305471238047321"
+        },
+        {
+          "file": "apps/web/src/components/AccessGate.tsx",
+          "hash": "6851846042827386968"
+        },
+        {
+          "file": "apps/web/src/components/ReloadPrompt.tsx",
+          "hash": "12672344879148811827"
+        },
+        {
+          "file": "apps/web/src/index.css",
+          "hash": "10589609165218260488"
+        },
+        {
+          "file": "apps/web/src/lib/access.ts",
+          "hash": "15867529750257105107"
+        },
+        {
+          "file": "apps/web/src/lib/session.ts",
+          "hash": "8720121206610919283"
+        },
+        {
+          "file": "apps/web/src/lib/sign-in-errors.test.ts",
+          "hash": "10471246145037366426"
+        },
+        {
+          "file": "apps/web/src/lib/sign-in-errors.ts",
+          "hash": "4080576406873944053"
+        },
+        {
+          "file": "apps/web/src/main.tsx",
+          "hash": "587682292772147785"
+        },
+        {
+          "file": "apps/web/src/routeTree.gen.ts",
+          "hash": "15010948938231573581"
+        },
+        {
+          "file": "apps/web/src/routes/__root.tsx",
+          "hash": "6362763098538031849"
+        },
+        {
+          "file": "apps/web/src/routes/index.tsx",
+          "hash": "9644874115564542332"
+        },
+        {
+          "file": "apps/web/src/routes/items.$itemId.tsx",
+          "hash": "9780110377773525482"
+        },
+        {
+          "file": "apps/web/src/routes/items.new.tsx",
+          "hash": "18446402085387621930"
+        },
+        {
+          "file": "apps/web/src/routes/settings.tsx",
+          "hash": "7536186599607160649"
+        },
+        {
+          "file": "apps/web/src/vite-env.d.ts",
+          "hash": "12946363841406869089"
+        },
+        {
+          "file": "apps/web/test-results/.last-run.json",
+          "hash": "11141884120100644736"
+        },
+        {
+          "file": "apps/web/tsconfig.app.json",
+          "hash": "350891953244837220"
+        },
+        {
+          "file": "apps/web/tsconfig.json",
+          "hash": "2365188958523842680"
+        },
+        {
+          "file": "apps/web/tsconfig.node.json",
+          "hash": "8523001958033392695"
+        },
+        {
+          "file": "apps/web/vite.config.ts",
+          "hash": "1442561491941409086"
+        },
+        {
+          "file": "apps/web/vitest.config.ts",
+          "hash": "7079196636442500316"
+        }
+      ],
+      "@household-brain/calendar": [
+        {
+          "file": "packages/calendar/package.json",
+          "hash": "1162103041560077703",
+          "deps": [
+            "@household-brain/firebase",
+            "npm:@tanstack/react-router",
+            "npm:firebase",
+            "npm:react"
+          ]
+        },
+        {
+          "file": "packages/calendar/src/components/OutboxRunner.tsx",
+          "hash": "5150931341302805428"
+        },
+        {
+          "file": "packages/calendar/src/components/SyncBar.tsx",
+          "hash": "2789102475590376653"
+        },
+        {
+          "file": "packages/calendar/src/components/items/EditForm.tsx",
+          "hash": "7396970148537845590"
+        },
+        {
+          "file": "packages/calendar/src/components/items/Field.tsx",
+          "hash": "15549257866213371669"
+        },
+        {
+          "file": "packages/calendar/src/components/items/ItemForm.tsx",
+          "hash": "2996700726036794206"
+        },
+        {
+          "file": "packages/calendar/src/components/items/ItemList.tsx",
+          "hash": "7935795671783094146"
+        },
+        {
+          "file": "packages/calendar/src/components/items/ItemRow.tsx",
+          "hash": "13845727622826307019"
+        },
+        {
+          "file": "packages/calendar/src/components/settings/CalendarSection.tsx",
+          "hash": "12906211796175927629"
+        },
+        {
+          "file": "packages/calendar/src/components/settings/ShareSection.tsx",
+          "hash": "17225229893971540607"
+        },
+        {
+          "file": "packages/calendar/src/components/settings/StatusLine.tsx",
+          "hash": "11482680139492417499"
+        },
+        {
+          "file": "packages/calendar/src/components/settings/styles.ts",
+          "hash": "7079352961230376940"
+        },
+        {
+          "file": "packages/calendar/src/index.ts",
+          "hash": "4404984505362589279"
+        },
+        {
+          "file": "packages/calendar/src/lib/calendar/api.test.ts",
+          "hash": "11344794352942926618"
+        },
+        {
+          "file": "packages/calendar/src/lib/calendar/api.ts",
+          "hash": "1444777614151658069"
+        },
+        {
+          "file": "packages/calendar/src/lib/calendar/connect.ts",
+          "hash": "14829263487763708311"
+        },
+        {
+          "file": "packages/calendar/src/lib/calendar/setup.test.ts",
+          "hash": "9464860856257001646"
+        },
+        {
+          "file": "packages/calendar/src/lib/calendar/setup.ts",
+          "hash": "4857090831969027151"
+        },
+        {
+          "file": "packages/calendar/src/lib/calendar/store.ts",
+          "hash": "17952703179793787351"
+        },
+        {
+          "file": "packages/calendar/src/lib/calendar/use-household.ts",
+          "hash": "13602311296830581151"
+        },
+        {
+          "file": "packages/calendar/src/lib/categories.ts",
+          "hash": "966214035792427690"
+        },
+        {
+          "file": "packages/calendar/src/lib/google-token.test.ts",
+          "hash": "15115818576390469013"
+        },
+        {
+          "file": "packages/calendar/src/lib/google-token.ts",
+          "hash": "17516027562687999674"
+        },
+        {
+          "file": "packages/calendar/src/lib/items/event.test.ts",
+          "hash": "17579755531868049783"
+        },
+        {
+          "file": "packages/calendar/src/lib/items/event.ts",
+          "hash": "3002435724608851396"
+        },
+        {
+          "file": "packages/calendar/src/lib/items/from-event.test.ts",
+          "hash": "17347305184705074569"
+        },
+        {
+          "file": "packages/calendar/src/lib/items/from-event.ts",
+          "hash": "7887813096890869015"
+        },
+        {
+          "file": "packages/calendar/src/lib/items/ids.ts",
+          "hash": "11871368631798201265"
+        },
+        {
+          "file": "packages/calendar/src/lib/items/model.ts",
+          "hash": "12406839275239565008"
+        },
+        {
+          "file": "packages/calendar/src/lib/items/outbox-api.ts",
+          "hash": "3488716954800238735"
+        },
+        {
+          "file": "packages/calendar/src/lib/items/outbox.ts",
+          "hash": "15301634232931702322"
+        },
+        {
+          "file": "packages/calendar/src/lib/items/pull-plan.test.ts",
+          "hash": "14890128973012581756"
+        },
+        {
+          "file": "packages/calendar/src/lib/items/pull-plan.ts",
+          "hash": "9347556978508573968"
+        },
+        {
+          "file": "packages/calendar/src/lib/items/pull-store.ts",
+          "hash": "13296048579001600309"
+        },
+        {
+          "file": "packages/calendar/src/lib/items/puller.ts",
+          "hash": "3809183744978103749"
+        },
+        {
+          "file": "packages/calendar/src/lib/items/push.test.ts",
+          "hash": "6498851166092351820"
+        },
+        {
+          "file": "packages/calendar/src/lib/items/push.ts",
+          "hash": "7064813614838269011"
+        },
+        {
+          "file": "packages/calendar/src/lib/items/record.test.ts",
+          "hash": "10413097740535332464"
+        },
+        {
+          "file": "packages/calendar/src/lib/items/record.ts",
+          "hash": "5966396294213572888"
+        },
+        {
+          "file": "packages/calendar/src/lib/items/store.ts",
+          "hash": "7382746232213346944"
+        },
+        {
+          "file": "packages/calendar/src/lib/items/transient.test.ts",
+          "hash": "17856282148229665148"
+        },
+        {
+          "file": "packages/calendar/src/lib/items/transient.ts",
+          "hash": "10215341894625766387"
+        },
+        {
+          "file": "packages/calendar/src/lib/items/use-entry.ts",
+          "hash": "4776883617405069561"
+        },
+        {
+          "file": "packages/calendar/src/lib/items/use-items.ts",
+          "hash": "13518391386475995994"
+        },
+        {
+          "file": "packages/calendar/src/lib/items/use-outbox.ts",
+          "hash": "6012023134866734455"
+        },
+        {
+          "file": "packages/calendar/src/lib/items/write-failures.ts",
+          "hash": "4338005264370385329"
+        },
+        {
+          "file": "packages/calendar/src/lib/use-task.ts",
+          "hash": "4487034546125804319"
+        },
+        {
+          "file": "packages/calendar/tsconfig.json",
+          "hash": "12587626241159003473"
+        }
+      ]
+    }
+  },
+  "externalNodesHash": "9953262091777348017"
+}
