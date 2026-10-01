@@ -51,7 +51,7 @@ docs. Only wait in the foreground for something whose result you need for the ve
 | `CI_SLOW` | More than 20 minutes: something hangs. Cancel the run (`gh run cancel <run>`), read the logs (`gh api repos/Flixbox/household-brain/actions/jobs/<job-id>/logs`), fix the hang **and** the missing time limit. A flaky download can just be re-run (`gh run rerun <run> --failed`). |
 | `CONFLICT` | Rebase on `main`, run the checks, push once, reply on the PR. |
 | `ACTIVITY` | Answer every comment (section 4), including those of a pending review. |
-| `DEPLOYED` | Check the live site responds, report, and only now start the next PR. |
+| `DEPLOYED` | Wait one minute, then check the live app in the browser (section 5). Report, and only now start the next PR. |
 | `DEPLOY_FAILED` | Fix it in a follow-up PR (never push to `main`). |
 | `MAIN_FAILED` / `MAIN_SLOW` | `main` is broken or hanging, whichever PR caused it. That comes first: fix it in a follow-up PR, or re-run a flaky job, before continuing. |
 
@@ -78,7 +78,15 @@ installing browsers), `deploy` about 2 minutes.
   `DEPLOYED` or `DEPLOY_FAILED`.
 - **If the deploy fails, open a follow-up pull request** with the fix. Never push to `main`
   directly; it only accepts PRs with green CI.
-- Finally, check the live site (`https://household-brain-sf.web.app`) responds, and report.
+- **One minute after every deploy, check the live app in the browser** (Claude in Chrome), not just
+  that the URL answers:
+  1. Open `https://household-brain-sf.web.app` and **reload** it, so the new service worker and build
+     are the ones running. If an "update available" prompt appears, take it.
+  2. Check that the page renders, sign-in or the signed-in screen works, and the browser console
+     shows no errors.
+  3. Exercise what the PR changed, where that is safe on real data. Never create, change or delete
+     real entries, or touch the real Google Calendar, just to test.
+  4. Report what you saw. If it is broken, open a follow-up PR right away.
 
 ## Lessons learned
 
