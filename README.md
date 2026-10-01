@@ -64,7 +64,7 @@ Items are grouped by **category**, and within each category they are **sorted by
 | Notifications | Each person's default notifications on the shared calendar (§4.1) |
 | Hosting | Firebase Hosting |
 
-**Stack:** **Vite + React + TypeScript** as a plain single-page app, with **`vite-plugin-pwa`**
+**Stack:** **Vite + React + TypeScript** (pnpm, Node through Volta, §9) as a plain single-page app, with **`vite-plugin-pwa`**
 (Workbox: manifest, precaching, an "update available" prompt), **TanStack Router** (board, item
 sheet, settings), Firebase JS SDK v11+ (`firebase/auth`, `firebase/firestore`), Google Identity
 Services (the GIS token client), `rrule` (computing the next occurrence of repeating items),
@@ -459,7 +459,57 @@ scheduled jobs.
 
 ---
 
-## 9. Project layout
+## 9. Toolchain
+
+| Tool | Role | Install |
+| --- | --- | --- |
+| **Homebrew** | Installs all machine-level software | [brew.sh](https://brew.sh) |
+| **Volta** | Node.js version management | `brew install volta` |
+| **pnpm** | Package manager (no npm or yarn in this repo) | `volta install pnpm` |
+| **Google Cloud CLI** | One-time project setup (APIs, Workload Identity Federation) | `brew install --cask gcloud-cli` |
+| **Firebase CLI** | Deploys, emulators | A project dev dependency (`firebase-tools`), so it runs as `pnpm firebase …` |
+
+**Machine setup (once)**
+
+```sh
+brew install volta
+volta install node@lts pnpm
+brew install --cask gcloud-cli     # works on macOS and on Linuxbrew (WSL)
+gcloud init                        # log in with the owner account, pick the Firebase project
+```
+
+**Version pinning in `package.json`**
+
+```jsonc
+{
+  "packageManager": "pnpm@<version>", // pnpm switches to this version on its own
+  "volta": { "node": "<version>" }      // Volta switches Node when you cd into the repo
+}
+```
+
+- pnpm is pinned through `packageManager`, not `volta.pnpm`. Volta only honours `volta.pnpm` when
+  the experimental `VOLTA_FEATURE_PNPM=1` is set, while pnpm reads `packageManager` itself.
+- Only `pnpm-lock.yaml` is committed. `package-lock.json` and `yarn.lock` are gitignored.
+
+**Everyday commands**
+
+```sh
+pnpm install
+pnpm dev                 # Vite dev server on http://localhost:5173
+pnpm build               # → dist/
+pnpm lint && pnpm typecheck && pnpm test
+pnpm firebase emulators:start --only auth,firestore,hosting
+pnpm firebase deploy --only hosting,firestore:rules,firestore:indexes   # manual fallback for CI
+```
+
+**CI:** `actions/setup-node` with `node-version-file: package.json` reads the `volta.node` pin. Then
+`npm install -g pnpm` installs a bootstrap pnpm, which switches to the `packageManager` version.
+Third-party setup actions like `pnpm/action-setup` are deliberately not used: the allowed-actions
+policy only permits GitHub-owned actions and `google-github-actions/*` (§8).
+
+---
+
+## 10. Project layout
 
 ```
 household-brain/
@@ -490,12 +540,14 @@ household-brain/
 ├─ firebase.json                  # hosting: dist/, rewrite ** → /index.html, no-cache for sw.js + index.html
 ├─ .env.production                # public Firebase web config
 ├─ .github/workflows/ci.yml, deploy.yml
-└─ .github/dependabot.yml          # github-actions + npm updates (keeps SHA pins current)
+├─ .github/dependabot.yml          # github-actions + npm ecosystem (covers pnpm) updates
+├─ package.json                   # packageManager: pnpm@…, volta.node
+└─ pnpm-lock.yaml
 ```
 
 ---
 
-## 10. Milestones
+## 11. Milestones
 
 1. **Setup:** create the Firebase project, enable Calendar API, Auth and Firestore, write the rules
    and allowlist doc, set up the OAuth client, and get Hosting deploying from CI through WIF.
@@ -514,7 +566,7 @@ household-brain/
 
 ---
 
-## 11. Decisions
+## 12. Decisions
 
 - No custom domain: the app is served at `<project>.web.app`.
 - Licence: Unlicense.
