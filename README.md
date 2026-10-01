@@ -493,7 +493,7 @@ scheduled jobs.
 
 ```sh
 brew install volta
-volta install node@lts pnpm
+volta install node@26 pnpm
 brew install --cask gcloud-cli     # works on macOS and on Linuxbrew (WSL)
 gcloud init                        # log in with the owner account, pick the Firebase project
 ```
@@ -517,6 +517,8 @@ gcloud init                        # log in with the owner account, pick the Fir
   - Dependabot bumps the pins.
 - Dependency install scripts are denied by default (`allowBuilds` in `pnpm-workspace.yaml`).
 - TypeScript 7 (the native compiler).
+- Node 26, pinned in `package.json` (`volta.node`). `@types/node` uses the same major, so Dependabot
+  skips major `@types/node` updates and both get bumped together.
 
 **Everyday commands**
 
@@ -531,6 +533,7 @@ pnpm test               # unit tests (Vitest)
 pnpm test:emulated      # boots the Auth + Firestore emulators, then rules tests + Playwright e2e
 pnpm emulators          # emulators only, for running pnpm test:e2e or test:rules against them
 scripts/watch-ci.sh --commit HEAD   # watch this commit's CI run, alert after 20 minutes (.ai/AGENTS.md)
+scripts/watch-pr.sh <n>             # wait for the next comment, review, merge or close on a PR
 pnpm exec firebase deploy --only hosting,firestore:rules,firestore:indexes   # manual fallback for CI
 ```
 
