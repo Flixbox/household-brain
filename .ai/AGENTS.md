@@ -101,8 +101,12 @@ installing browsers), `deploy` about 2 minutes.
 
 ### 5. Merge and deploy
 
-- The owner merges by enabling **auto-merge**. It merges by itself once both required checks are
-  green. Owner-authored PRs can't be approved by the owner, so there is no approval step.
+- **Merging:** once the owner has **approved** the PR and you consider it well reviewed, enable
+  auto-merge yourself (`agent-gh pr merge <n> --auto --squash`); it merges once the required checks
+  are green. "Well reviewed": the reviewer agent's findings are fixed and the fixes themselves were
+  looked at. One review round is usually enough; **four rounds is the soft cap**. Past that, stop and
+  tell the owner what is still open instead of going around again. Without the owner's approval,
+  never enable auto-merge.
 - After the merge, the same babysitter follows the `main` run through `deploy` and reports
   `DEPLOYED` or `DEPLOY_FAILED`.
 - **If the deploy fails, open a follow-up pull request** with the fix. Never push to `main`
