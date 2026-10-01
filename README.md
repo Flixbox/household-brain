@@ -439,7 +439,7 @@ scheduled jobs.
 - **Nothing in the repo is secret:**
   - The Firebase web config (`apiKey`, `projectId`, …) is public by design and protected by the
     rules. It is supplied at build time as `VITE_FIREBASE_*` so forks can point it at their
-    own project. Defaults live in `.env.production`, which is fine to commit.
+    own project. Defaults live in `apps/web/.env.production`, which is fine to commit.
   - The browser API key is additionally **restricted in Google Cloud**:
     - Websites: only `https://household-brain-sf.web.app/*`, `https://household-brain-sf.firebaseapp.com/*`,
       `http://localhost:5173/*` and `http://localhost/*`.
@@ -549,7 +549,7 @@ pnpm lint:fix
 pnpm typecheck          # nx run-many: every project
 pnpm test               # unit tests (Vitest)
 pnpm test:emulated      # boots the Auth + Firestore emulators, then rules tests + Playwright e2e
-pnpm emulators          # emulators only, for running pnpm test:e2e or test:rules against them
+pnpm emulators          # emulators only, for running pnpm test:rules or pnpm --filter @household-brain/web test:e2e against them
 scripts/babysit-pr.sh <n>           # wait for the next CI result, slow run, conflict, comment or deploy (.ai/AGENTS.md)
 pnpm exec firebase deploy --only hosting,firestore:rules,firestore:indexes   # manual fallback for CI
 ```
@@ -585,7 +585,7 @@ pnpm exec firebase deploy --only hosting,firestore:rules,firestore:indexes   # m
   signs in with an unsigned emulator token. Production builds don't contain that hook or any emulator wiring:
   - The emulator branch is compared inline, so Vite removes it.
   - `vite.config.ts` refuses a production build that has `VITE_USE_EMULATORS=true`.
-  - CI fails if `dist/` mentions `e2eSignIn` or an emulator address.
+  - CI fails if `apps/web/dist/` mentions `e2eSignIn` or an emulator address.
 
 **CI:** `actions/setup-node` with `node-version-file: package.json` reads the `volta.node` pin. Then
 `npm install -g "$(node -p "require('./package.json').packageManager")"` installs exactly the pnpm version

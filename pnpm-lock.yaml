@@ -166,18 +166,9 @@ importers:
 
   .:
     dependencies:
-      '@tanstack/react-router':
-        specifier: 1.170.40
-        version: 1.170.40(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       firebase:
         specifier: 12.19.0
         version: 12.19.0
-      react:
-        specifier: 19.3.0
-        version: 19.3.0
-      react-dom:
-        specifier: 19.3.0
-        version: 19.3.0(react@19.3.0)
     devDependencies:
       '@firebase/rules-unit-testing':
         specifier: 5.0.2

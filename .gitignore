@@ -144,11 +144,14 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
 
-# Playwright
-/test-results/
-/playwright-report/
-/blob-report/
-/playwright/.cache/
+# Playwright (in apps/web)
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+# Nx: local cache and workspace data
+.nx/
 
 # Firebase
 .firebase/

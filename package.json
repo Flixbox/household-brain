@@ -11,8 +11,8 @@
   "scripts": {
     "dev": "pnpm --filter @household-brain/web dev",
     "build": "nx run @household-brain/web:build",
-    "lint": "oxlint --max-warnings=0 && npmPkgJsonLint -c npmpackagejsonlint.config.ts . apps/web packages/calendar packages/firebase",
-    "lint:fix": "oxlint --fix && npmPkgJsonLint -c npmpackagejsonlint.config.ts --fix . apps/web packages/calendar packages/firebase",
+    "lint": "oxlint --max-warnings=0 && npmPkgJsonLint -c npmpackagejsonlint.config.ts . 'apps/*' 'packages/*'",
+    "lint:fix": "oxlint --fix && npmPkgJsonLint -c npmpackagejsonlint.config.ts --fix . 'apps/*' 'packages/*'",
     "typecheck": "tsc -p tsconfig.json && nx run-many -t typecheck",
     "test": "nx run-many -t test",
     "test:rules": "vitest run --config vitest.rules.config.ts",
@@ -20,10 +20,7 @@
     "emulators": "firebase emulators:start --only auth,firestore --project demo-household-brain"
   },
   "dependencies": {
-    "@tanstack/react-router": "1.170.40",
-    "firebase": "12.19.0",
-    "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "firebase": "12.19.0"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "5.0.2",

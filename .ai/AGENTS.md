@@ -175,6 +175,8 @@ installing browsers), `deploy` about 2 minutes.
   features and shared code, consumed as TypeScript source (`exports: ./src/index.ts`, no build
   step). A new feature, e.g. a shopping list, becomes its own `packages/<name>` with an `index.ts`,
   and `apps/web` routes render what it exports. Packages never import from `apps/web`.
+  A new package also goes into the `workspace:*` exceptions in `npmpackagejsonlint.config.ts`
+  (exceptions are exact names), and gets its own `package.json`, `tsconfig.json` and `index.ts`.
 - Run tasks through Nx at the root: `pnpm typecheck`, `pnpm test` (`nx run-many`), `pnpm build`
   (`nx run @household-brain/web:build`). Nx caches results, so unchanged projects are skipped.
 

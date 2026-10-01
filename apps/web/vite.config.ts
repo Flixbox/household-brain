@@ -6,7 +6,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig(({ mode }) => {
   if (mode === 'production' && loadEnv(mode, process.cwd()).VITE_USE_EMULATORS === 'true') {
-    throw new Error('VITE_USE_EMULATORS=true in a production build: check .env.local and .env.production.local')
+    throw new Error('VITE_USE_EMULATORS=true in a production build: check apps/web/.env.local and apps/web/.env.production.local')
   }
   return {
     plugins: [
