@@ -3,9 +3,13 @@ import { type Category, DEFAULT_CATEGORIES } from '../categories'
 import type { CalendarApi, CalendarListEntry, Reminder } from './api'
 import { CALENDAR_NAME, DEFAULT_REMINDERS, type HouseholdConfig, type HouseholdStore, TIME_ZONE, createHousehold, joinHousehold } from './setup'
 
-function fakeApi(listEntries: Record<string, CalendarListEntry> = {}) {
+function fakeApi(listEntries: Record<string, CalendarListEntry> = {}, owned: CalendarListEntry[] = []) {
   const calls: string[] = []
   const api: CalendarApi = {
+    findOwnedCalendars: async summary => {
+      calls.push(`find ${summary}`)
+      return owned
+    },
     getListEntry: async id => {
       calls.push(`get ${id}`)
       return listEntries[id] ?? null
@@ -14,16 +18,13 @@ function fakeApi(listEntries: Record<string, CalendarListEntry> = {}) {
       calls.push(`create ${calendar.summary} ${calendar.timeZone}`)
       return { id: 'cal-1' }
     },
-    insertListEntry: async id => {
-      calls.push(`add ${id}`)
-      listEntries[id] = { id }
+    insertListEntry: async (id, reminders: Reminder[]) => {
+      calls.push(`add ${id} ${reminders.map(reminder => reminder.minutes).join(',')}`)
+      listEntries[id] = { defaultReminders: reminders, id }
       return listEntries[id]
     },
     setDefaultReminders: async (id, reminders: Reminder[]) => {
       calls.push(`reminders ${id} ${reminders.map(reminder => reminder.minutes).join(',')}`)
-    },
-    shareCalendar: async (id, email) => {
-      calls.push(`share ${id} ${email}`)
     },
   }
   return { api, calls }
@@ -54,7 +55,17 @@ describe('createHousehold', () => {
     expect(config).toEqual({ calendarId: 'cal-1', ownerUid: 'owner-uid', timeZone: TIME_ZONE })
     expect(state.config).toEqual(config)
     expect(state.categories).toEqual(DEFAULT_CATEGORIES)
-    expect(calls).toEqual([`create ${CALENDAR_NAME} Europe/Berlin`, 'get cal-1', 'add cal-1', 'reminders cal-1 2880,1440'])
+    expect(calls).toEqual([`find ${CALENDAR_NAME}`, `create ${CALENDAR_NAME} Europe/Berlin`, 'get cal-1', 'add cal-1 2880,1440'])
+  })
+
+  it('adopts a Household Brain calendar left by an earlier attempt instead of creating a second one', async () => {
+    const { api, calls } = fakeApi({}, [{ accessRole: 'owner', id: 'cal-old', summary: CALENDAR_NAME }])
+    const { state, store } = fakeStore()
+
+    await createHousehold(api, store, 'owner-uid')
+
+    expect(state.config?.calendarId).toBe('cal-old')
+    expect(calls).toEqual([`find ${CALENDAR_NAME}`, 'get cal-old', 'add cal-old 2880,1440'])
   })
 
   it('reuses an existing calendar and leaves edited categories alone', async () => {
@@ -76,7 +87,7 @@ describe('joinHousehold', () => {
   it('adds the shared calendar to the member list and sets their reminders', async () => {
     const { api, calls } = fakeApi()
     expect(await joinHousehold(api, config)).toBe(true)
-    expect(calls).toEqual(['get cal-1', 'add cal-1', 'reminders cal-1 2880,1440'])
+    expect(calls).toEqual(['get cal-1', 'add cal-1 2880,1440'])
   })
 
   it('resets reminders that someone changed', async () => {

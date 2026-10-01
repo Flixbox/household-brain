@@ -31,7 +31,10 @@ export interface HouseholdStore {
 export async function createHousehold(api: CalendarApi, store: HouseholdStore, ownerUid: string): Promise<HouseholdConfig> {
   let config = await store.config()
   if (!config) {
-    const calendar = await api.insertCalendar({
+    // Reuse a calendar left by an earlier attempt (a retry after a failure, or a second tab), so the
+    // Owner never ends up with two "Household Brain" calendars.
+    const [existing] = await api.findOwnedCalendars(CALENDAR_NAME)
+    const calendar = existing ?? await api.insertCalendar({
       description: 'Due dates kept by the Household Brain app. Entries are due at 17:00.',
       summary: CALENDAR_NAME,
       timeZone: TIME_ZONE,
@@ -56,15 +59,14 @@ const sameReminders = (actual: readonly Reminder[] | undefined) =>
  * Calendar, so the owner's settings never notify anyone else. Returns whether anything changed.
  */
 export async function joinHousehold(api: CalendarApi, config: HouseholdConfig): Promise<boolean> {
-  let changed = false
-  let entry = await api.getListEntry(config.calendarId)
+  const entry = await api.getListEntry(config.calendarId)
   if (!entry) {
-    entry = await api.insertListEntry(config.calendarId)
-    changed = true
+    await api.insertListEntry(config.calendarId, [...DEFAULT_REMINDERS])
+    return true
   }
-  if (!sameReminders(entry.defaultReminders)) {
-    await api.setDefaultReminders(config.calendarId, [...DEFAULT_REMINDERS])
-    changed = true
+  if (sameReminders(entry.defaultReminders)) {
+    return false
   }
-  return changed
+  await api.setDefaultReminders(config.calendarId, [...DEFAULT_REMINDERS])
+  return true
 }

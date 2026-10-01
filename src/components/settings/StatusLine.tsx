@@ -1,11 +1,18 @@
 import type { TaskStatus } from '../../lib/use-task'
 
+const tone = {
+  busy: 'text-stone-500',
+  done: 'text-green-700 dark:text-green-400',
+  failed: 'text-red-700 dark:text-red-400',
+  idle: '',
+} as const
+
+/** Always present, so screen readers announce every change of the message. */
 export function StatusLine({ status }: { status: TaskStatus }) {
-  if (status.kind === 'done') {
-    return <p role="status" className="text-sm text-green-700 dark:text-green-400">{status.message}</p>
-  }
-  if (status.kind === 'failed') {
-    return <p role="alert" className="text-sm text-red-700 dark:text-red-400">{status.message}</p>
-  }
-  return null
+  const message = status.kind === 'done' || status.kind === 'failed' ? status.message : ''
+  return (
+    <p role="status" aria-live="polite" className={`min-h-5 text-sm ${tone[status.kind]}`}>
+      {status.kind === 'busy' ? 'Working…' : message}
+    </p>
+  )
 }

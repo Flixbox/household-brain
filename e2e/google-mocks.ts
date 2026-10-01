@@ -48,21 +48,21 @@ export async function mockGoogle(page: Page, calendarId = 'household@group.calen
     requests.push({ body, method: request.method(), path })
 
     const listPrefix = '/users/me/calendarList/'
-    if (request.method() === 'POST' && path === '/calendars') {
+    if (request.method() === 'GET' && path === '/users/me/calendarList') {
+      await reply(route, 200, { items: [] })
+    } else if (request.method() === 'POST' && path === '/calendars') {
       await reply(route, 200, { id: calendarId, ...body as object })
     } else if (request.method() === 'GET' && path.startsWith(listPrefix)) {
       const entry = calendarList.get(path.slice(listPrefix.length))
       await (entry ? reply(route, 200, entry) : reply(route, 404, { error: { message: 'Not Found' } }))
     } else if (request.method() === 'POST' && path === '/users/me/calendarList') {
-      const { id } = body as { id: string }
-      calendarList.set(id, { id })
-      await reply(route, 200, { id })
+      const entry = body as { id: string }
+      calendarList.set(entry.id, entry)
+      await reply(route, 200, entry)
     } else if (request.method() === 'PATCH' && path.startsWith(listPrefix)) {
       const id = path.slice(listPrefix.length)
       calendarList.set(id, { ...calendarList.get(id), ...body as object })
       await reply(route, 200, calendarList.get(id))
-    } else if (request.method() === 'POST' && path.endsWith('/acl')) {
-      await reply(route, 200, { id: 'user:shared', ...body as object })
     } else {
       await reply(route, 501, { error: { message: `Not mocked: ${request.method()} ${path}` } })
     }
