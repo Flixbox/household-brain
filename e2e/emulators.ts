@@ -23,13 +23,13 @@ export async function allowlist(uid: string) {
   }
 }
 
-/** Writes a document as the console would (bypassing the rules). Only string fields are needed so far. */
-export async function seedDocument(path: string, fields: Record<string, string>) {
+/** Writes a document as the console would (bypassing the rules). Strings and integers are supported. */
+export async function seedDocument(path: string, fields: Record<string, string | number>) {
   const [collection, id] = path.split('/')
   const response = await fetch(
     `${FIRESTORE}/v1/projects/${PROJECT}/databases/(default)/documents/${collection}?documentId=${encodeURIComponent(id)}`,
     {
-      body: JSON.stringify({ fields: Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, { stringValue: value }])) }),
+      body: JSON.stringify({ fields: Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, typeof value === 'number' ? { integerValue: String(value) } : { stringValue: value }])) }),
       headers: { 'Authorization': 'Bearer owner', 'Content-Type': 'application/json' },
       method: 'POST',
     },

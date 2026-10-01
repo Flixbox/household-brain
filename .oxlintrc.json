@@ -20,6 +20,7 @@
   },
   "rules": {
     "react/rules-of-hooks": "error",
+    "eslint/capitalized-comments": ["error", "always", { "ignoreConsecutiveComments": true }], // continuation lines of a comment stay lowercase
     "react/forbid-component-props": ["error", { "forbid": [{ "propName": "className", "allowedFor": ["Link"] }] }], // router links are styled like anchors
     "import/consistent-type-specifier-style": "off", // fights no-import-type-side-effects; verbatimModuleSyntax already enforces correct type imports
     "eslint/sort-imports": ["error", { "ignoreDeclarationSort": true }], // members stay sorted; module order is left to the author

@@ -7,7 +7,7 @@ export interface CalendarRequest {
 }
 
 const CORS = {
-  'access-control-allow-headers': 'authorization, content-type',
+  'access-control-allow-headers': 'authorization, content-type, if-match',
   'access-control-allow-methods': 'GET, POST, PATCH, DELETE',
   'access-control-allow-origin': '*',
 }
@@ -34,8 +34,16 @@ export async function mockGoogle(page: Page, calendarId = 'household@group.calen
 
   const requests: CalendarRequest[] = []
   const calendarList = new Map<string, Record<string, unknown>>()
-  const reply = (route: Route, status: number, body: unknown) =>
-    route.fulfill({ body: JSON.stringify(body), contentType: 'application/json', headers: CORS, status })
+  const events = new Map<string, Record<string, unknown>>()
+  let version = 0
+  const stored = (id: string, event: object) => {
+    version += 1
+    events.set(id, { ...event, etag: `"v${version}"`, id })
+    return events.get(id)
+  }
+  const reply = (route: Route, status: number, body: unknown) => (status === 204
+    ? route.fulfill({ headers: CORS, status })
+    : route.fulfill({ body: JSON.stringify(body), contentType: 'application/json', headers: CORS, status }))
 
   await page.route('https://www.googleapis.com/calendar/v3/**', async route => {
     const request = route.request()
@@ -63,9 +71,43 @@ export async function mockGoogle(page: Page, calendarId = 'household@group.calen
       const id = path.slice(listPrefix.length)
       calendarList.set(id, { ...calendarList.get(id), ...body as object })
       await reply(route, 200, calendarList.get(id))
+    } else if (path.includes('/events')) {
+      await handleEvent({ body, events, path, reply: (status, json) => reply(route, status, json), request, stored })
     } else {
       await reply(route, 501, { error: { message: `Not mocked: ${request.method()} ${path}` } })
     }
   })
-  return requests
+  return { events, requests }
+}
+
+interface EventCall {
+  request: { method: () => string, headers: () => Record<string, string> }
+  path: string
+  body: unknown
+  events: Map<string, Record<string, unknown>>
+  stored: (id: string, event: object) => Record<string, unknown> | undefined
+  reply: (status: number, body: unknown) => Promise<void>
+}
+
+/** Insert, get, patch (honouring If-Match) and delete for the fake calendar's events. */
+async function handleEvent({ request, path, body, events, stored, reply }: EventCall) {
+  const eventId = path.split('/events/')[1] ?? ''
+  const existing = events.get(eventId)
+  const method = request.method()
+  if (method === 'POST') {
+    const { id } = body as { id: string }
+    await (events.has(id) ? reply(409, { error: { message: 'duplicate' } }) : reply(200, stored(id, body as object)))
+  } else if (!existing) {
+    await reply(404, { error: { message: 'Not Found' } })
+  } else if (method === 'GET') {
+    await reply(200, existing)
+  } else if (method === 'PATCH') {
+    const ifMatch = request.headers()['if-match']
+    await (ifMatch && ifMatch !== existing.etag
+      ? reply(412, { error: { message: 'Precondition Failed' } })
+      : reply(200, stored(eventId, { ...existing, ...body as object })))
+  } else {
+    events.delete(eventId)
+    await reply(204, null)
+  }
 }

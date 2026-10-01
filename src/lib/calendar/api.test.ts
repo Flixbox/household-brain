@@ -77,3 +77,15 @@ describe('createCalendarApi', () => {
       .rejects.toMatchObject({ name: 'CalendarApiError', status: 403 })
   })
 })
+
+describe('event calls', () => {
+  it('patches with If-Match and treats a missing event as already deleted', async () => {
+    const { fetchFn, requests } = respond({ body: { etag: '"v2"' }, status: 200 }, { status: 410 })
+    const api = createCalendarApi(tokens('t').access, fetchFn)
+    await api.patchEvent({ calendarId: 'cal-1', eventId: 'evt1' }, { summary: 'x' }, '"v1"')
+    await api.deleteEvent('cal-1', 'evt1')
+    expect(new Headers(requests[0].init.headers).get('If-Match')).toBe('"v1"')
+    expect(requests[0].url).toBe('https://www.googleapis.com/calendar/v3/calendars/cal-1/events/evt1')
+    expect(requests[1].init.method).toBe('DELETE')
+  })
+})

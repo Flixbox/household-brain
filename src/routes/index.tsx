@@ -1,5 +1,7 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
+import { ItemList } from '../components/items/ItemList'
 import { useHousehold } from '../lib/calendar/use-household'
+import { useCategories, useItems } from '../lib/items/use-items'
 import { auth } from '../lib/firebase'
 import { signOutOfApp } from '../lib/session'
 
@@ -10,6 +12,8 @@ export const Route = createFileRoute('/')({
 function Home() {
   const user = auth.currentUser
   const household = useHousehold()
+  const items = useItems()
+  const categories = useCategories()
   return (
     <section className="space-y-6">
       <div className="flex items-baseline justify-between">
@@ -30,6 +34,8 @@ function Home() {
           .
         </p>
       )}
+      <Link to="/items/new" className="inline-block rounded-lg bg-orange-600 px-4 py-2 font-semibold text-white hover:bg-orange-700">Add entry</Link>
+      {items && <ItemList items={items} categories={categories} />}
       <button
         type="button"
         className="rounded-lg border border-stone-300 px-4 py-2 font-medium dark:border-stone-700"
