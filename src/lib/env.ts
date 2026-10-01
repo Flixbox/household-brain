@@ -2,10 +2,10 @@ import type { FirebaseOptions } from 'firebase/app'
 
 const REQUIRED = {
   apiKey: 'VITE_FIREBASE_API_KEY',
-  authDomain: 'VITE_FIREBASE_AUTH_DOMAIN',
-  projectId: 'VITE_FIREBASE_PROJECT_ID',
-  messagingSenderId: 'VITE_FIREBASE_MESSAGING_SENDER_ID',
   appId: 'VITE_FIREBASE_APP_ID',
+  authDomain: 'VITE_FIREBASE_AUTH_DOMAIN',
+  messagingSenderId: 'VITE_FIREBASE_MESSAGING_SENDER_ID',
+  projectId: 'VITE_FIREBASE_PROJECT_ID',
 } as const satisfies Record<string, keyof ImportMetaEnv>
 
 /** Builds the Firebase options from the Vite env, failing loudly when a value is missing. */

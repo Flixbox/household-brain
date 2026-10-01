@@ -1,4 +1,4 @@
-import { createRootRoute, Outlet } from '@tanstack/react-router'
+import { Outlet, createRootRoute } from '@tanstack/react-router'
 import { ReloadPrompt } from '../components/ReloadPrompt'
 
 export const Route = createRootRoute({

@@ -533,6 +533,22 @@ pnpm emulators          # emulators only, for running pnpm test:e2e or test:rule
 pnpm exec firebase deploy --only hosting,firestore:rules,firestore:indexes   # manual fallback for CI
 ```
 
+**Code rules**
+
+- **`Date` is banned. Use `Temporal`.**
+  - Due dates are calendar dates at 17:00 in `Europe/Berlin`, which is exactly what
+    `Temporal.PlainDate` and `Temporal.ZonedDateTime` model. `Date` silently mixes UTC, local time
+    and daylight-saving offsets.
+  - oxlint enforces the ban with `no-restricted-globals`.
+  - Until every browser we target ships Temporal natively, the app loads `temporal-polyfill`.
+  - Convert at the edges only: Google Calendar's RFC 3339 strings go in and out through
+    `Temporal.ZonedDateTime.from(...)` and `.toString()`.
+- **oxlint runs every category as an error:** correctness, nursery, pedantic, perf, restriction,
+  style and suspicious.
+  - Individual rules are switched off only where they contradict each other or modern TypeScript.
+    Each one carries its reason as a comment in `.oxlintrc.json`.
+  - A rule is turned off there, with a reason, never with inline `oxlint-disable` comments.
+
 **Emulators and end-to-end tests:**
 - The Firestore emulator needs **Java 21**: install it with `brew install openjdk@21`. Playwright's
   browser comes from `pnpm exec playwright install chromium`.

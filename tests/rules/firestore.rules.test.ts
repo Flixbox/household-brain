@@ -1,20 +1,11 @@
 import { readFileSync } from 'node:fs'
-import {
-  assertFails,
-  assertSucceeds,
-  initializeTestEnvironment,
-  type RulesTestEnvironment,
-} from '@firebase/rules-unit-testing'
+import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebase/rules-unit-testing'
 import { deleteDoc, doc, getDoc, setDoc } from 'firebase/firestore'
-import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest'
+import { afterAll, beforeEach, describe, it } from 'vitest'
 
-let env: RulesTestEnvironment
-
-beforeAll(async () => {
-  env = await initializeTestEnvironment({
-    projectId: 'demo-household-brain',
-    firestore: { rules: readFileSync('firestore.rules', 'utf8') },
-  })
+const env = await initializeTestEnvironment({
+  firestore: { rules: readFileSync('firestore.rules', 'utf8') },
+  projectId: 'demo-household-brain',
 })
 
 afterAll(() => env.cleanup())

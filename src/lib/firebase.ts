@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app'
-import { connectAuthEmulator, getAuth, GoogleAuthProvider, signInWithCredential } from 'firebase/auth'
+import { GoogleAuthProvider, connectAuthEmulator, getAuth, signInWithCredential } from 'firebase/auth'
 import {
   connectFirestoreEmulator,
   initializeFirestore,
@@ -22,10 +22,10 @@ if (usesEmulators(import.meta.env)) {
   // Google ID token. Only present in emulator builds.
   Object.assign(window, {
     e2eSignIn: (email: string) => signInWithCredential(auth, GoogleAuthProvider.credential(JSON.stringify({
-      sub: email,
       email,
       email_verified: true,
       name: email.split('@')[0],
+      sub: email,
     }))),
   })
 }

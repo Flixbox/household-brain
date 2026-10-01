@@ -13,9 +13,9 @@ export async function allowlist(uid: string) {
   const response = await fetch(
     `${FIRESTORE}/v1/projects/${PROJECT}/databases/(default)/documents/allowlist?documentId=${encodeURIComponent(uid)}`,
     {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer owner', 'Content-Type': 'application/json' },
       body: JSON.stringify({ fields: { name: { stringValue: 'E2E' } } }),
+      headers: { 'Authorization': 'Bearer owner', 'Content-Type': 'application/json' },
+      method: 'POST',
     },
   )
   if (!response.ok) {

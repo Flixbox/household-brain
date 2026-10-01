@@ -1,4 +1,4 @@
-import { onAuthStateChanged, type User } from 'firebase/auth'
+import { type User, onAuthStateChanged } from 'firebase/auth'
 import { doc, getDocFromServer } from 'firebase/firestore'
 import { useEffect, useState } from 'react'
 import { auth, db } from './firebase'
@@ -27,7 +27,7 @@ export function useAccess(): Access {
       const entry = await getDocFromServer(doc(db, 'allowlist', user.uid))
       setAccess(entry.exists() ? { state: 'allowed', user } : { state: 'denied', user })
     } catch (error) {
-      setAccess({ state: 'error', user, message: error instanceof Error ? error.message : String(error) })
+      setAccess({ message: error instanceof Error ? error.message : String(error), state: 'error', user })
     }
   }), [])
 

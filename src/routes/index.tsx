@@ -39,14 +39,14 @@ function Home() {
             Hello,
             {' '}
             {access.user.displayName ?? access.user.email}
-            . You're on the allowlist.
+            . You&apos;re on the allowlist.
           </p>
           <button type="button" className={secondaryButton} onClick={() => signOut(auth)}>Sign out</button>
         </div>
       )}
       {access.state === 'error' && (
         <div role="alert" className="space-y-3">
-          <p className="font-semibold">Couldn't check access.</p>
+          <p className="font-semibold">Couldn&apos;t check access.</p>
           <p className="text-sm text-stone-500">{access.message}</p>
           <button type="button" className={secondaryButton} onClick={() => signOut(auth)}>Sign out</button>
         </div>

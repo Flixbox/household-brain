@@ -11,17 +11,25 @@
   ],
   "categories": {
     "correctness": "error",
-    "suspicious": "warn"
+    "nursery": "error",
+    "pedantic": "error",
+    "perf": "error",
+    "restriction": "error",
+    "style": "error",
+    "suspicious": "error"
   },
   "rules": {
     "react/rules-of-hooks": "error",
+    "import/consistent-type-specifier-style": "off", // fights no-import-type-side-effects; verbatimModuleSyntax already enforces correct type imports
+    "eslint/sort-imports": ["error", { "ignoreDeclarationSort": true }], // members stay sorted; module order is left to the author
+    "eslint/new-cap": ["error", { "capIsNewExceptions": ["VitePWA"] }],
     "react/only-export-components": [
       "warn",
       {
         "allowConstantExport": true
       }
     ],
-    "react/react-in-jsx-scope": "off",
+    "react/react-in-jsx-scope": "off", // the automatic JSX runtime needs no React import
     "@stylistic/indent": [
       "error",
       2
@@ -105,6 +113,43 @@
           "**/*.css"
         ]
       }
+    ],
+    "no-restricted-globals": [
+      "error",
+      {
+        "name": "Date",
+        "message": "Date is banned: use Temporal (README section 9)."
+      }
+    ],
+    "oxc/no-async-await": "off", // async/await is the normal way to write async code
+    "oxc/no-rest-spread-properties": "off", // object spread is standard since ES2018
+    "import/no-named-export": "off", // named exports are the convention (conflicts with no-default-export)
+    "import/prefer-default-export": "off", // conflicts with no-default-export
+    "import/group-exports": "off", // exports stay next to what they export
+    "import/exports-last": "off", // exports stay next to what they export
+    "import/no-relative-parent-imports": "off", // the src tree is small, parent imports are fine
+    "react/jsx-no-literals": "off", // no i18n layer, plain text in JSX is fine
+    "react/jsx-max-depth": "off", // layout depth is a design choice, not a defect
+    "eslint/no-undef": "off", // TypeScript already checks undefined names
+    "eslint/func-style": "off", // declarations and arrow functions are both used deliberately
+    "eslint/one-var": "off", // one declaration per variable is clearer
+    "eslint/no-magic-numbers": "off", // too noisy for ports, sizes and timeouts
+    "eslint/no-ternary": "off", // ternaries are fine for simple branches
+    "typescript/explicit-function-return-type": "off", // return types are inferred
+    "typescript/explicit-module-boundary-types": "off", // return types are inferred
+    "react/jsx-filename-extension": [
+      "error",
+      {
+        "extensions": [
+          ".tsx"
+        ]
+      }
+    ],
+    "eslint/no-use-before-define": [
+      "error",
+      {
+        "functions": false
+      }
     ]
   },
   "ignorePatterns": [
@@ -120,6 +165,36 @@
       ],
       "rules": {
         "react/only-export-components": "off"
+      }
+    },
+    {
+      "files": [
+        "*.config.ts",
+        "vite.config.ts",
+        "playwright.config.ts",
+        "vitest*.config.ts",
+        "pwa-assets.config.ts"
+      ],
+      "rules": {
+        "import/no-default-export": "off",
+        "import/no-nodejs-modules": "off"
+      }
+    },
+    {
+      "files": [
+        "tests/**",
+        "e2e/**"
+      ],
+      "rules": {
+        "import/no-nodejs-modules": "off"
+      }
+    },
+    {
+      "files": [
+        "**/*.d.ts"
+      ],
+      "rules": {
+        "import/unambiguous": "off"
       }
     }
   ]

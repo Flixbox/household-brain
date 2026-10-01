@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { type Page, expect, test } from '@playwright/test'
 import { allowlist, resetEmulators } from './emulators'
 
 declare global {
@@ -23,7 +23,7 @@ test('the sign-in button opens the Google sign-in popup', async ({ page }) => {
   await page.goto('/')
   const popup = page.waitForEvent('popup')
   await page.getByRole('button', { name: 'Sign in with Google' }).click()
-  await expect((await popup)).toHaveURL(/\/emulator\/auth\/handler.*providerId=google\.com/)
+  await expect((await popup)).toHaveURL(/\/emulator\/auth\/handler.*providerId=google\.com/u)
 })
 
 test('an account that is not on the allowlist is turned away and shown its user id', async ({ page }) => {
@@ -38,9 +38,11 @@ test('an allowlisted account gets in, and can sign out again', async ({ page }) 
   await page.goto('/')
   await signInAs(page, 'owner@example.com')
   const uid = await page.getByTestId('uid').textContent()
-  expect(uid).toBeTruthy()
+  if (!uid) {
+    throw new Error('The no-access screen showed no user id')
+  }
 
-  await allowlist(uid!)
+  await allowlist(uid)
   await page.reload()
   await expect(page.getByText("Hello, owner. You're on the allowlist.")).toBeVisible()
 
