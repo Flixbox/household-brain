@@ -17,6 +17,7 @@ jobs:
   checks:
     name: Lint, typecheck, unit tests, build, secret scan
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -45,6 +46,7 @@ jobs:
   e2e:
     name: Security rules and end-to-end tests (Firebase emulators)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -61,6 +63,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium webkit
       - run: pnpm test:emulated
+        timeout-minutes: 10
       - if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -73,6 +76,7 @@ jobs:
   deploy:
     name: Deploy to Firebase
     needs: [checks, e2e]
+    timeout-minutes: 10
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     # Google only accepts tokens from this repository, refs/heads/main and this environment.

@@ -11,14 +11,13 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "build:e2e": "vite build --mode e2e",
     "preview": "vite preview",
     "lint": "oxlint --max-warnings=0 && npmPkgJsonLint -c npmpackagejsonlint.config.ts .",
     "lint:fix": "oxlint --fix && npmPkgJsonLint -c npmpackagejsonlint.config.ts --fix .",
     "typecheck": "tsc -b",
     "test": "vitest run",
     "test:rules": "vitest run --config vitest.rules.config.ts",
-    "test:e2e": "playwright test",
+    "test:e2e": "vite build --mode e2e && playwright test",
     "test:emulated": "firebase emulators:exec --only auth,firestore --project demo-household-brain \"pnpm test:rules && pnpm test:e2e\"",
     "emulators": "firebase emulators:start --only auth,firestore --project demo-household-brain"
   },
