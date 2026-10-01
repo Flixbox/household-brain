@@ -29,11 +29,14 @@ describe('decidePull', () => {
 
   it('creates an entry for an event made in Google Calendar', () => {
     const decision = decide({ entry: null })
-    expect(decision).toMatchObject({ fields: { 'code': 'NEW', 'etags': { owner: '"g2"' }, 'id': 'evt1', 'sync': 'synced', 'title': 'Amazon (from Google)' }, kind: 'create' })
+    expect(decision).toMatchObject({ fields: { 'code': 'NEW', 'etags': {}, 'id': 'evt1', 'sync': 'synced', 'title': 'Amazon (from Google)' }, kind: 'create' })
   })
 
   it('takes Google\'s version of an entry without local edits', () => {
-    expect(decide({})).toMatchObject({ fields: { 'code': 'NEW', 'dueDate': '2026-11-03', 'etags.owner': '"g2"', 'sync': 'synced' }, kind: 'update', normalise: true })
+    const replaced = decide({})
+    expect(replaced).toMatchObject({ fields: { 'code': 'NEW', 'dueDate': '2026-11-03', 'sync': 'synced' }, kind: 'update', normalise: true })
+    // Recorded only after the event was adjusted, so an interrupted pull adjusts it again.
+    expect((replaced as { fields: object }).fields).not.toHaveProperty('etags.owner')
   })
 
   it('keeps fields edited locally and takes Google\'s for the rest', () => {

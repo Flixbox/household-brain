@@ -63,6 +63,7 @@ test('a local edit waiting to be sent keeps its fields, and takes the others fro
   await page.getByLabel('Due date (17:00)').fill('2026-12-24')
   await page.getByRole('button', { name: 'Save' }).click()
   await expect.poll(() => google.live().length).toBe(1)
+  await expect(page.getByText('not yet in Google Calendar')).toHaveCount(0)
   const [{ id }] = google.live() as [{ id: string }]
 
   // Google: someone moves the date. Here: the code is edited, which pulls first, then pushes.

@@ -44,12 +44,14 @@ function changed({ entry, event, uid, categories }: PullInput): PullDecision {
   const googleUpdated = event.updated ?? ''
   const synced = { dirty: [], googleUpdated, pendingOp: null, sync: 'synced', syncError: null }
   if (!entry) {
-    return { draft, fields: { ...draft, ...synced, etags: { [uid]: etag }, id: event.id }, kind: 'create' }
+    // The etag for this person is recorded only after the event is adjusted (or found fine), so a
+    // pull interrupted in between adjusts it again instead of taking it as already handled.
+    return { draft, fields: { ...draft, ...synced, etags: {}, id: event.id }, kind: 'create' }
   }
   if (hasLocalEdits(entry)) {
     return merged(entry, draft, { [`etags.${uid}`]: etag, googleUpdated })
   }
-  return { draft, fields: { ...draft, ...synced, [`etags.${uid}`]: etag }, kind: 'update', normalise: true }
+  return { draft, fields: { ...draft, ...synced }, kind: 'update', normalise: true }
 }
 
 /** RFC 3339 UTC times compare as text once fractional seconds are always present ("…:05Z" → "…:05.000Z"). */

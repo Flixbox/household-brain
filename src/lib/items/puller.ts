@@ -43,8 +43,16 @@ async function applyEvent(context: PushContext, event: CalendarEvent): Promise<s
   const { categories, config, uid } = context
   const decision = await applyPulled(event, entry => decidePull({ categories, entry, event, uid }))
   const fresh = decision.kind === 'create' || (decision.kind === 'update' && decision.normalise)
-  const patch = fresh ? normalisationFor(event, decision.draft, { categories, timeZone: config.timeZone }) : null
-  return patch ? normalise(context, event, patch) : null
+  // Created and replaced entries get this person's etag only here, after the adjustment.
+  if (!fresh) {
+    return null
+  }
+  const patch = normalisationFor(event, decision.draft, { categories, timeZone: config.timeZone })
+  if (patch) {
+    return normalise(context, event, patch)
+  }
+  await recordEtag(event.id ?? '', uid, event)
+  return null
 }
 
 interface Listing {
