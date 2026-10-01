@@ -75,7 +75,9 @@ docs. Only wait in the foreground for something whose result you need for the ve
 
 | Event | What to do |
 | --- | --- |
-| `CI_PASSED` | Report it; the owner merges with auto-merge. Start the babysitter again. |
+| `CI_PASSED` | Report it and start the babysitter again. |
+| `APPROVED` | The owner approved. If the PR is well reviewed (section 5), enable auto-merge now: `agent-gh pr merge <n> --auto --squash`. Don't wait for anything else. |
+| `READY_TO_MERGE` | Approved and green, but auto-merge is off: enable it, unless review findings are still open (then fix them first, within the four-round cap). |
 | `CI_FAILED` | Read the failing job (`agent-gh run view <run> --log-failed`), reproduce locally, fix, push once. |
 | `CI_SLOW` | More than 20 minutes: something hangs. Cancel the run (`gh run cancel <run>`: the bot can only read Actions, so this uses the owner's login), read the logs (`agent-gh api repos/Flixbox/household-brain/actions/jobs/<job-id>/logs`), fix the hang **and** the missing time limit. A flaky download can just be re-run (`gh run rerun <run> --failed`, owner's login again). |
 | `CONFLICT` | Rebase on `main`, run the checks, push once, reply on the PR. |
@@ -104,9 +106,9 @@ installing browsers), `deploy` about 2 minutes.
 - **Merging:** once the owner has **approved** the PR and you consider it well reviewed, enable
   auto-merge yourself (`agent-gh pr merge <n> --auto --squash`); it merges once the required checks
   are green. "Well reviewed": the reviewer agent's findings are fixed and the fixes themselves were
-  looked at. One review round is usually enough; **four rounds is the soft cap**. Past that, stop and
-  tell the owner what is still open instead of going around again. Without the owner's approval,
-  never enable auto-merge.
+  looked at. One review round is usually enough; **four rounds is the soft cap**: after the fourth,
+  fix what it found and merge (with the owner's approval) rather than reviewing again, and say in the
+  PR what was not re-reviewed. Without the owner's approval, never enable auto-merge.
 - After the merge, the same babysitter follows the `main` run through `deploy` and reports
   `DEPLOYED` or `DEPLOY_FAILED`.
 - **If the deploy fails, open a follow-up pull request** with the fix. Never push to `main`

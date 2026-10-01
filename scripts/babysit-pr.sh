@@ -5,6 +5,8 @@
 #   CI_SLOW                   a CI run (PR or deploy) has been going for more than the limit
 #   MAIN_FAILED / MAIN_SLOW   the newest CI run on main failed or hangs, whichever PR caused it
 #   CONFLICT                  the PR conflicts with its base branch: rebase it
+#   APPROVED                  the owner approved the PR (enable auto-merge once it is well reviewed)
+#   READY_TO_MERGE            approved, CI green for the current head, auto-merge still off
 #   ACTIVITY                  new comments, reviews (including a pending review's comments), review comments
 #   DEPLOYED / DEPLOY_FAILED  the PR was merged and the deploy run on main finished
 #   CLOSED                    closed without merging
@@ -121,15 +123,20 @@ if [[ ! -e $state_dir/started ]]; then
 fi
 
 while true; do
-  read -r state mergeable head merge_sha < <("$GH" pr view "$pr" --repo "$REPO" --json state,mergeable,headRefOid,mergeCommit \
-    --jq '"\(.state) \(.mergeable) \(.headRefOid) \(.mergeCommit.oid // "-")"') || { sleep 30; continue; }
+  read -r state mergeable head merge_sha decision auto < <("$GH" pr view "$pr" --repo "$REPO" \
+    --json state,mergeable,headRefOid,mergeCommit,reviewDecision,autoMergeRequest \
+    --jq '"\(.state) \(.mergeable) \(.headRefOid) \(.mergeCommit.oid // "-") \(.reviewDecision // "-") \(if .autoMergeRequest then "on" else "off" end)"') \
+    || { sleep 30; continue; }
   check_main
   case $state in
     MERGED) check_run "$merge_sha" deploy ;;
     CLOSED) report "closed" "CLOSED: PR #$pr was closed without merging" ;;
     *)
       [[ $mergeable == CONFLICTING ]] && report "conflict $head" "CONFLICT: PR #$pr conflicts with its base branch at ${head:0:7}: rebase on main"
+      [[ $decision == APPROVED ]] && report "approved" "APPROVED: the owner approved PR #$pr. Once it is well reviewed, enable auto-merge: agent-gh pr merge $pr --auto --squash"
       check_run "$head" pr
+      [[ $decision == APPROVED && $auto == off ]] && grep -qxF "ci-passed $head" "$reported" \
+        && report "ready $head" "READY_TO_MERGE: PR #$pr is approved and CI is green at ${head:0:7}, but auto-merge is off. Enable it: agent-gh pr merge $pr --auto --squash"
       check_activity
       ;;
   esac
