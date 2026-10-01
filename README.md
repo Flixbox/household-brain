@@ -510,6 +510,13 @@ gcloud init                        # log in with the owner account, pick the Fir
 - pnpm is pinned through `packageManager`, not `volta.pnpm`. Volta only honours `volta.pnpm` when
   the experimental `VOLTA_FEATURE_PNPM=1` is set, while pnpm reads `packageManager` itself.
 - Only `pnpm-lock.yaml` is committed. `package-lock.json` and `yarn.lock` are gitignored.
+- **Every dependency is pinned to an exact version**, with no `^` or `~`:
+  - `npm-package-json-lint` enforces it, configured in `npmpackagejsonlint.config.ts` and run as
+    part of `pnpm lint`.
+  - `pnpm-workspace.yaml` sets `savePrefix: ''`, so `pnpm add` writes exact versions.
+  - Dependabot bumps the pins.
+- Dependency install scripts are denied by default (`allowBuilds` in `pnpm-workspace.yaml`).
+- TypeScript 7 (the native compiler).
 
 **Everyday commands**
 
@@ -517,7 +524,7 @@ gcloud init                        # log in with the owner account, pick the Fir
 pnpm install
 pnpm dev                 # Vite dev server on http://localhost:5173
 pnpm build               # → dist/
-pnpm lint               # oxlint, including @stylistic rules loaded as an oxlint JS plugin (no ESLint)
+pnpm lint               # oxlint (with @stylistic as an oxlint JS plugin, no ESLint) + npm-package-json-lint
 pnpm lint:fix
 pnpm typecheck
 pnpm test               # unit tests (Vitest)

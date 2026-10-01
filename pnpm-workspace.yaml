@@ -1,3 +1,6 @@
+# Dependencies are pinned to exact versions (enforced by npmpackagejsonlint.config.ts).
+savePrefix: ''
+
 # Dependency install scripts are denied unless a package actually needs one.
 allowBuilds:
   '@firebase/util': false
