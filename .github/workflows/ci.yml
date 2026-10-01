@@ -46,14 +46,28 @@ jobs:
   e2e:
     name: Security rules and end-to-end tests (Firebase emulators)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
+    # Microsoft's Playwright image already contains the browsers and every system package they need,
+    # so nothing is installed per run (installing them took 3+ minutes and once hung for 15).
+    # Its version must equal @playwright/test in package.json; the first step checks that.
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
+    env:
+      PLAYWRIGHT_IMAGE_VERSION: 1.63.0
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Playwright image matches @playwright/test
+        run: |
+          wanted=$(node -p "require('./package.json').devDependencies['@playwright/test']")
+          if [ "$wanted" != "$PLAYWRIGHT_IMAGE_VERSION" ]; then
+            echo "::error::@playwright/test is $wanted but the CI image is $PLAYWRIGHT_IMAGE_VERSION: update container.image in ci.yml"
+            exit 1
+          fi
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version-file: package.json
+          node-version-file: package.json # reads volta.node; the image's own Node is older
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
@@ -61,9 +75,13 @@ jobs:
       - name: Install pnpm (version from packageManager)
         run: npm install -g "$(node -p "require('./package.json').packageManager")"
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium webkit
+      - name: Cache the Firebase emulator downloads
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ hashFiles('pnpm-lock.yaml') }}
       - run: pnpm test:emulated
-        timeout-minutes: 10
+        timeout-minutes: 8
       - if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

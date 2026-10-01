@@ -92,6 +92,12 @@ installing browsers), `deploy` about 2 minutes.
 - **Run watchers from a copy of the script**, e.g. in a scratch directory. Bash reads a script while
   running it, so editing or checking out `scripts/watch-*.sh` under a running watcher corrupts it.
 
+- **The e2e job runs in Microsoft's Playwright image**, which already has the browsers and their system
+  packages. Installing them per run took over 3 minutes and once hung for 15. The image version must
+  equal `@playwright/test`: when Dependabot bumps the package, CI's first e2e step fails with a
+  message, and `container.image` in `ci.yml` needs the matching tag and digest
+  (`docker pull mcr.microsoft.com/playwright:vX.Y.Z-noble`, then `docker inspect` for the digest).
+
 ### Shell
 
 - **A pipe hides the exit code.** `pnpm lint | tail` succeeds even when lint fails, and a commit
