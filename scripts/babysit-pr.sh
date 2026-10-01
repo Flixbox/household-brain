@@ -20,6 +20,8 @@ set -uo pipefail
 
 REPO=${REPO:-Flixbox/household-brain}
 WORKFLOW=${WORKFLOW:-ci.yml}
+# The agent runs this as its bot: GH=agent-gh (see .ai/AGENTS.md). Defaults to plain gh.
+GH=${GH:-gh}
 pr=$1
 limit=$(( ${2:-20} * 60 ))
 hours=${3:-12}
@@ -41,11 +43,11 @@ report() { # report <key> <message...>: print and exit unless this key was repor
 }
 
 activity() { # one line per item: "<kind> <id> <author> <text>"
-  gh api --paginate "repos/$REPO/issues/$pr/comments" \
+  "$GH" api --paginate "repos/$REPO/issues/$pr/comments" \
     --jq '.[] | "comment \(.id) \(.user.login): \((.body // "") | gsub("\\s+"; " ") | .[0:200])"' &&
-  gh api --paginate "repos/$REPO/pulls/$pr/reviews" \
+  "$GH" api --paginate "repos/$REPO/pulls/$pr/reviews" \
     --jq '.[] | "review \(.id) \(.user.login) \(.state): \((.body // "") | gsub("\\s+"; " ") | .[0:200])"' &&
-  gh api --paginate "repos/$REPO/pulls/$pr/comments" \
+  "$GH" api --paginate "repos/$REPO/pulls/$pr/comments" \
     --jq '.[] | "review-comment \(.id) \(.user.login) \(.path): \((.body // "") | gsub("\\s+"; " ") | .[0:200])"'
 }
 
@@ -61,7 +63,7 @@ check_activity() {
   while read -r kind id; do
     grep -m1 "^$kind $id " <<<"$now" || echo "$kind $id"
     # A pending review's comments are only visible to its author, the account these scripts use.
-    [[ $kind == review ]] && gh api "repos/$REPO/pulls/$pr/reviews/$id/comments" \
+    [[ $kind == review ]] && "$GH" api "repos/$REPO/pulls/$pr/reviews/$id/comments" \
       --jq '.[] | "  \(.path):\(.line // .original_line // "file"): \((.body // "") | gsub("\\s+"; " ") | .[0:400])"'
   done <<<"$new"
   exit 0
@@ -70,12 +72,12 @@ check_activity() {
 check_run() { # check_run <sha> <label>: report a finished or slow CI run of that commit
   local sha=$1 label=$2 run status conclusion created age
   # startedAt is the current attempt's start, so a re-run is timed from when it actually began.
-  read -r run created status conclusion < <(gh run list --repo "$REPO" --workflow "$WORKFLOW" --commit "$sha" \
+  read -r run created status conclusion < <("$GH" run list --repo "$REPO" --workflow "$WORKFLOW" --commit "$sha" \
     --json databaseId,startedAt,status,conclusion \
     --jq '.[0] // empty | "\(.databaseId) \(.startedAt) \(.status) \(if (.conclusion // "") == "" then "-" else .conclusion end)"') || return
   [[ -z ${run:-} ]] && return
   local jobs
-  jobs=$(gh run view "$run" --repo "$REPO" --json jobs --jq '.jobs[] | "  \(.name): \(.status) \(.conclusion // "")"')
+  jobs=$("$GH" run view "$run" --repo "$REPO" --json jobs --jq '.jobs[] | "  \(.name): \(.status) \(.conclusion // "")"')
   if [[ $status == completed ]]; then
     if [[ $label == deploy ]]; then
       [[ $conclusion == success ]] && report "deployed $sha" "DEPLOYED: PR #$pr is live (run $run)" "$jobs"
@@ -91,7 +93,7 @@ check_run() { # check_run <sha> <label>: report a finished or slow CI run of tha
 
 check_main() { # the newest CI run on main, whichever PR it came from
   local run started status conclusion age
-  read -r run started status conclusion < <(gh run list --repo "$REPO" --workflow "$WORKFLOW" --branch main --event push --limit 1 \
+  read -r run started status conclusion < <("$GH" run list --repo "$REPO" --workflow "$WORKFLOW" --branch main --event push --limit 1 \
     --json databaseId,startedAt,status,conclusion \
     --jq '.[0] // empty | "\(.databaseId) \(.startedAt) \(.status) \(if (.conclusion // "") == "" then "-" else .conclusion end)"') || return
   [[ -z ${run:-} ]] && return
@@ -111,7 +113,7 @@ if [[ ! -e $state_dir/started ]]; then
 fi
 
 while true; do
-  read -r state mergeable head merge_sha < <(gh pr view "$pr" --repo "$REPO" --json state,mergeable,headRefOid,mergeCommit \
+  read -r state mergeable head merge_sha < <("$GH" pr view "$pr" --repo "$REPO" --json state,mergeable,headRefOid,mergeCommit \
     --jq '"\(.state) \(.mergeable) \(.headRefOid) \(.mergeCommit.oid // "-")"') || { sleep 30; continue; }
   check_main
   case $state in

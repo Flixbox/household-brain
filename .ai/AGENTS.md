@@ -3,6 +3,34 @@
 The README is the spec and the source of truth for architecture, toolchain and code rules. This file
 holds what agents working in this repo have learned the hard way. Add to it when something bites.
 
+## Working as the bot
+
+The agent pushes, opens and updates pull requests, comments, and reads CI as **`flixbox-ai-agent[bot]`**
+(the private GitHub App "Flixbox [AI Agent]", installed only on this repository). It never does
+that work with the owner's account.
+
+- **Tokens:** `agent-gh-token` (in `~/.local/bin`) signs a JWT with the app's private key
+  (`~/.config/household-brain-agent/app.pem`, App ID in `app-id` next to it) and prints a 1-hour
+  installation token, cached for 50 minutes. `agent-gh` is `gh` with that token. The key is never
+  committed, pasted or sent anywhere except GitHub's token endpoint.
+- **Each worktree**, once after creating it:
+
+  ```sh
+  git config user.name 'flixbox-ai-agent[bot]'
+  git config user.email '336689584+flixbox-ai-agent[bot]@users.noreply.github.com'
+  git config credential.https://github.com.helper ''
+  git config --add credential.https://github.com.helper \
+    '!f() { test "$1" = get || exit 0; echo username=x-access-token; echo "password=$(agent-gh-token)"; }; f'
+  ```
+
+- **Pull requests and comments:** `agent-gh pr create …`, `agent-gh pr comment …`.
+- **Babysitter:** `GH=agent-gh /tmp/babysit-pr.sh <number>`.
+- **What the bot can't do**, on purpose: change repository settings or rulesets, merge past checks,
+  or approve. Settings changes the owner asks for are made with the owner's `gh` login. Merging is
+  the owner's auto-merge.
+- **Revoking or rotating:** suspend or uninstall the app in GitHub's settings; for a new key,
+  generate one on the app's page, replace `app.pem`, and delete the old key on GitHub.
+
 ## Babysitting a pull request
 
 You own a pull request from the moment you open it until it is merged and deployed. "Pushed" is not
