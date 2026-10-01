@@ -119,8 +119,12 @@ service cloud.firestore {
       return request.auth != null
         && exists(/databases/$(db)/documents/allowlist/$(request.auth.uid));
     }
+    // Read-only from the app: allowlist entries are managed only in the Firebase console.
     match /allowlist/{uid} { allow read: if request.auth != null && request.auth.uid == uid; }
-    match /{document=**}    { allow read, write: if allowed(); }
+    // Everything else, but never the allowlist (rules are OR'd, so the catch-all must exclude it).
+    match /{collection}/{document=**} {
+      allow read, write: if collection != 'allowlist' && allowed();
+    }
   }
 }
 ```
@@ -129,6 +133,9 @@ service cloud.firestore {
   **created by hand in the Firebase console**. Her uid appears in Firebase Auth → Users after her
   first sign-in. That way no email address or uid sits in the public repo, and a fork deploying these
   rules locks out everyone until its owner adds their own uids.
+- **The app can't change the allowlist.** No rule allows writing to `allowlist`, so even an
+  allowlisted account, if hijacked, can't add another user. Only the console, which bypasses the
+  rules, can.
 - If a signed-in user is not on the allowlist, the app shows "This account has no access".
 - Optional hardening: **App Check** with reCAPTCHA v3, so other origins can't burn Firestore quota.
 
@@ -436,8 +443,11 @@ scheduled jobs.
   Identity Federation**:
   - The deploy job has `permissions: { id-token: write, contents: read }`.
     `google-github-actions/auth` exchanges the GitHub OIDC token for a short-lived token of a
-    deploy service account. That account has only the Firebase Hosting Admin and Firebase Rules
-    Admin roles.
+    deploy service account. That account has exactly four roles:
+    - Firebase Hosting Admin
+    - Firebase Rules Admin
+    - Cloud Datastore Index Admin (`firebase deploy --only firestore:indexes`)
+    - Service Usage Consumer (the Firebase CLI checks enabled APIs)
   - The WIF provider's attribute condition only accepts tokens with
     `assertion.repository_id == "<numeric id>"`, `assertion.ref == "refs/heads/main"` and
     `assertion.environment == "production"`. The numeric repository id survives renames and can't
