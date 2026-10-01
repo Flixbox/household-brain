@@ -70,6 +70,7 @@ web_modules/
 .env.*
 !.env.example
 !/.env.production
+!/.env.e2e
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
@@ -142,3 +143,18 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
+# Firebase
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# TanStack Router plugin cache
+.tanstack/
