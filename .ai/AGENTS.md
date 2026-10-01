@@ -23,7 +23,7 @@ You own a pull request from the moment you open it until it is merged and deploy
 2. **Start one watcher in the background, with a deadline**, and let its exit wake you:
 
    ```sh
-   scripts/watch-ci.sh --pr <number>        # alerts after 20 minutes
+   scripts/watch-ci.sh --commit "$(git rev-parse HEAD)"   # alerts after 20 minutes
    ```
 
    Don't poll by hand alongside it, and don't start a second watcher for the same run.
@@ -53,7 +53,7 @@ installing browsers), `deploy` about 2 minutes.
 - The owner merges by enabling **auto-merge**. It merges by itself once both required checks are
   green. Owner-authored PRs can't be approved by the owner, so there is no approval step.
 - After the merge, **watch the `main` run, including `deploy`**, with the same watcher:
-  `scripts/watch-ci.sh <run-id>`.
+  `scripts/watch-ci.sh --commit <merge-commit-sha>` (`gh pr view <n> --json mergeCommit`).
 - **If the deploy fails, open a follow-up pull request** with the fix. Never push to `main`
   directly; it only accepts PRs with green CI.
 - Finally, check the live site (`https://household-brain-sf.web.app`) responds, and report.
@@ -74,6 +74,12 @@ installing browsers), `deploy` about 2 minutes.
   Batch fixes into one push, or no run ever finishes.
 - **Pushing anything under `.github/workflows/` needs the `workflow` scope** on the GitHub token
   (`gh auth refresh -h github.com -s workflow`).
+
+- **A commit triggers more than CI.** A merge to `main` also starts Dependabot runs, and the first run
+  listed for a commit was a Dependabot one, so a watcher reported "success" before the deploy had
+  even started. Always filter by workflow (`--workflow ci.yml`).
+- **Right after a push, GitHub can still report the PR's previous head commit.** A watcher using
+  `--pr` then watched the cancelled run of the old commit. Watch by the commit you just pushed.
 
 ### Shell
 
