@@ -28,8 +28,9 @@ limit=$(( ${1:-20} * 60 ))
 jobs() { gh run view "$run" --repo "$REPO" --json jobs --jq '.jobs[] | "  \(.name): \(.status) \(.conclusion // "")"'; }
 
 while true; do
-  read -r status conclusion created < <(gh run view "$run" --repo "$REPO" --json status,conclusion,createdAt \
-    --jq '"\(.status) \(.conclusion // "-") \(.createdAt)"')
+  # A running job reports conclusion as "", not null, so default it explicitly; fields stay aligned.
+  read -r created status conclusion < <(gh run view "$run" --repo "$REPO" --json status,conclusion,createdAt \
+    --jq '"\(.createdAt) \(.status) \(if (.conclusion // "") == "" then "-" else .conclusion end)"')
   age=$(( $(date +%s) - $(date -d "$created" +%s) ))
   if [[ $status == completed ]]; then
     echo "Run $run finished after $(( age / 60 )) min: $conclusion"
