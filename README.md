@@ -443,7 +443,7 @@ scheduled jobs.
   | Job | What it runs |
   | --- | --- |
   | `checks` | oxlint (with `@stylistic`), typecheck, unit tests (Vitest), `vite build`, and `gitleaks` over the whole history |
-  | `e2e` | The Firebase Auth and Firestore emulators, then Firestore security-rules tests (`@firebase/rules-unit-testing`), then Playwright end-to-end tests against an emulator build of the app |
+  | `e2e` | Runs in Microsoft's Playwright container image (browsers preinstalled). The Firebase Auth and Firestore emulators, then Firestore security-rules tests (`@firebase/rules-unit-testing`), then Playwright end-to-end tests against an emulator build of the app |
   | `deploy` | Only on `push` to `main`, after both other jobs pass. Uses `environment: production` and `id-token: write`, and runs `firebase deploy --only hosting,firestore:rules,firestore:indexes` |
   - **Never use the `pull_request_target` or `workflow_run` triggers.** Both run code with the base
     repository's privileges.
