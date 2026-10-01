@@ -13,8 +13,8 @@ export function signInErrorMessage(error: unknown): string | null {
       return 'The sign-in window was blocked. Allow pop-ups for this site and try again.'
     }
     case 'auth/admin-restricted-operation': {
-      return 'New accounts are switched off in Firebase Authentication. Turn "Enable create (sign-up)" '
-        + 'back on under Settings → User actions; the allowlist decides who gets in.'
+      return 'Sign-up is switched off for this app, so no new account can sign in. Ask the owner to turn on '
+        + '"Enable create (sign-up)" in Firebase Authentication (Settings → User actions).'
     }
     case 'auth/unauthorized-domain': {
       return 'This address is not an authorised sign-in domain for the Firebase project.'
