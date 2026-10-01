@@ -1,5 +1,5 @@
 import { type User, onAuthStateChanged } from 'firebase/auth'
-import { doc, getDocFromServer } from 'firebase/firestore'
+import { doc, onSnapshot } from 'firebase/firestore'
 import { useEffect, useState } from 'react'
 import { auth, db } from './firebase'
 
@@ -11,25 +11,42 @@ export type Access =
   | { state: 'error', user: User, message: string }
 
 /**
- * Whether the signed-in account is on the allowlist. The allowlist is checked against the server,
- * never the offline cache, so a stale cached answer can't grant or withhold access.
+ * Whether the signed-in account is on the allowlist, kept live: the entry is watched, so access
+ * follows changes made in the console, works offline from the cached entry, and re-checks once the
+ * connection returns. A missing entry only counts as "denied" once the server has confirmed it, never
+ * from the cache alone. Each sign-in gets its own listener, torn down on sign-out or account switch,
+ * so a slow answer for one account can never be shown for another.
  */
 export function useAccess(): Access {
   const [access, setAccess] = useState<Access>({ state: 'loading' })
 
-  useEffect(() => onAuthStateChanged(auth, async user => {
-    if (!user) {
-      setAccess({ state: 'signed-out' })
-      return
+  useEffect(() => {
+    let stopWatchingEntry = () => {}
+    const stopWatchingAuth = onAuthStateChanged(auth, user => {
+      stopWatchingEntry()
+      if (!user) {
+        setAccess({ state: 'signed-out' })
+        return
+      }
+      setAccess({ state: 'loading' })
+      stopWatchingEntry = onSnapshot(
+        doc(db, 'allowlist', user.uid),
+        { includeMetadataChanges: true },
+        entry => {
+          if (entry.exists()) {
+            setAccess({ state: 'allowed', user })
+          } else if (!entry.metadata.fromCache) {
+            setAccess({ state: 'denied', user })
+          }
+        },
+        error => setAccess({ message: error.message, state: 'error', user }),
+      )
+    })
+    return () => {
+      stopWatchingAuth()
+      stopWatchingEntry()
     }
-    setAccess({ state: 'loading' })
-    try {
-      const entry = await getDocFromServer(doc(db, 'allowlist', user.uid))
-      setAccess(entry.exists() ? { state: 'allowed', user } : { state: 'denied', user })
-    } catch (error) {
-      setAccess({ message: error instanceof Error ? error.message : String(error), state: 'error', user })
-    }
-  }), [])
+  }, [])
 
   return access
 }

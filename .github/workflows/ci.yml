@@ -32,10 +32,15 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+      - name: Production build has no emulator wiring
+        run: |
+          if grep -rlE 'e2eSignIn|127\.0\.0\.1:(9099|8080)' dist/; then
+            echo '::error::The production build contains emulator code'; exit 1
+          fi
       - name: Scan history for secrets (gitleaks)
         run: |
           docker run --rm -u "$(id -u):$(id -g)" -v "$PWD:/repo" -w /repo \
-            ghcr.io/gitleaks/gitleaks:v8.30.1 git --config .gitleaks.toml --redact --no-banner --verbose .
+            ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f git --config .gitleaks.toml --redact --no-banner --verbose .
 
   e2e:
     name: Security rules and end-to-end tests (Firebase emulators)
@@ -89,7 +94,7 @@ jobs:
         run: npm install -g "$(node -p "require('./package.json').packageManager")"
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
-      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.DEPLOY_SA }}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { firebaseOptionsFrom, usesEmulators } from './env'
+import { firebaseOptionsFrom } from './env'
 
 const complete = {
   VITE_FIREBASE_API_KEY: 'key',
@@ -24,13 +24,5 @@ describe('firebaseOptionsFrom', () => {
     const { VITE_FIREBASE_APP_ID: _omitted, ...withoutAppId } = complete
     expect(() => firebaseOptionsFrom({ ...withoutAppId, VITE_FIREBASE_API_KEY: '' }))
       .toThrow('Missing Firebase config: VITE_FIREBASE_API_KEY, VITE_FIREBASE_APP_ID')
-  })
-})
-
-describe('usesEmulators', () => {
-  it('is only true for the literal string "true"', () => {
-    expect(usesEmulators({ VITE_USE_EMULATORS: 'true' })).toBe(true)
-    expect(usesEmulators({ VITE_USE_EMULATORS: '1' })).toBe(false)
-    expect(usesEmulators({})).toBe(false)
   })
 })

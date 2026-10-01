@@ -540,7 +540,8 @@ pnpm exec firebase deploy --only hosting,firestore:rules,firestore:indexes   # m
     `Temporal.PlainDate` and `Temporal.ZonedDateTime` model. `Date` silently mixes UTC, local time
     and daylight-saving offsets.
   - oxlint enforces the ban with `no-restricted-globals`.
-  - Until every browser we target ships Temporal natively, the app loads `temporal-polyfill`.
+  - The first code that handles dates adds `temporal-polyfill`, pinned exactly, and loads it until
+    every browser we target ships Temporal natively.
   - Convert at the edges only: Google Calendar's RFC 3339 strings go in and out through
     `Temporal.ZonedDateTime.from(...)` and `.toString()`.
 - **oxlint runs every category as an error:** correctness, nursery, pedantic, perf, restriction,
@@ -555,10 +556,14 @@ pnpm exec firebase deploy --only hosting,firestore:rules,firestore:indexes   # m
 - The emulators run as the `demo-household-brain` project. The `demo-` prefix makes them refuse
   to reach any real Google service.
 - The emulator build of the app reads `.env.e2e` and adds a `window.e2eSignIn(email)` hook that
-  signs in with an unsigned emulator token. Production builds don't have that hook.
+  signs in with an unsigned emulator token. Production builds don't contain that hook or any emulator wiring:
+  - The emulator branch is compared inline, so Vite removes it.
+  - `vite.config.ts` refuses a production build that has `VITE_USE_EMULATORS=true`.
+  - CI fails if `dist/` mentions `e2eSignIn` or an emulator address.
 
 **CI:** `actions/setup-node` with `node-version-file: package.json` reads the `volta.node` pin. Then
-`npm install -g pnpm` installs a bootstrap pnpm, which switches to the `packageManager` version.
+`npm install -g "$(node -p "require('./package.json').packageManager")"` installs exactly the pnpm version
+pinned in `packageManager`.
 Third-party setup actions like `pnpm/action-setup` are deliberately not used: the allowed-actions
 policy only permits GitHub-owned actions and `google-github-actions/*` (§8).
 

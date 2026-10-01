@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebase/rules-unit-testing'
-import { deleteDoc, doc, getDoc, setDoc } from 'firebase/firestore'
+import { collection, deleteDoc, doc, getDoc, getDocs, setDoc } from 'firebase/firestore'
 import { afterAll, beforeEach, describe, it } from 'vitest'
 
 const env = await initializeTestEnvironment({
@@ -49,5 +49,11 @@ describe('allowlist', () => {
     await assertFails(setDoc(doc(as('alice'), 'allowlist/alice'), { name: 'Changed' }))
     await assertFails(deleteDoc(doc(as('alice'), 'allowlist/alice')))
     await assertFails(setDoc(doc(as('mallory'), 'allowlist/mallory'), { name: 'Mallory' }))
+    await assertFails(setDoc(doc(as('alice'), 'allowlist/alice/notes/1'), { text: 'x' }))
+  })
+
+  it('is closed to signed-out visitors and cannot be listed', async () => {
+    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), 'allowlist/alice')))
+    await assertFails(getDocs(collection(as('alice'), 'allowlist')))
   })
 })

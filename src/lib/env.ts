@@ -18,7 +18,3 @@ export function firebaseOptionsFrom(env: Partial<Record<string, string | undefin
     Object.entries(REQUIRED).map(([option, key]) => [option, env[key]]),
   ) as FirebaseOptions
 }
-
-export function usesEmulators(env: Partial<Record<string, string | undefined>>): boolean {
-  return env.VITE_USE_EMULATORS === 'true'
-}

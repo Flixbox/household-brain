@@ -15,7 +15,8 @@ export default defineConfig({
   },
   webServer: {
     command: 'pnpm build:e2e && pnpm preview --port 4173 --strictPort',
-    reuseExistingServer: !process.env.CI,
+    // Never attach to some other server on 4173, e.g. a production `pnpm preview`.
+    reuseExistingServer: false,
     timeout: 120_000,
     url: 'http://localhost:4173',
   },

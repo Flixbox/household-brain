@@ -123,6 +123,7 @@
     ],
     "oxc/no-async-await": "off", // async/await is the normal way to write async code
     "oxc/no-rest-spread-properties": "off", // object spread is standard since ES2018
+    "oxc/no-optional-chaining": "off", // optional chaining is standard since ES2020
     "import/no-named-export": "off", // named exports are the convention (conflicts with no-default-export)
     "import/prefer-default-export": "off", // conflicts with no-default-export
     "import/group-exports": "off", // exports stay next to what they export
