@@ -27,7 +27,7 @@ state_dir=${STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/babysit-pr/${REPO//
 mkdir -p "$state_dir"
 reported=$state_dir/reported   # one line per event already reported
 seen=$state_dir/seen           # ids of comments and reviews already reported
-touch "$reported" "$seen"
+touch "$reported" "$seen"  # "started" marks that existing items were recorded
 started=$(date +%s)
 
 report() { # report <key> <message...>: print and exit unless this key was reported before
@@ -48,15 +48,17 @@ activity() { # one line per item: "<kind> <id> <author> <text>"
     --jq '.[] | "review-comment \(.id) \(.user.login) \(.path): \((.body // "") | gsub("\\s+"; " ") | .[0:200])"'
 }
 
+ids() { awk 'NF >= 2 { print $1, $2 }' | sort -u; }
+
 check_activity() {
   local now new
   now=$(activity) || return
-  new=$(awk '{ print $1, $2 }' <<<"$now" | grep -vxF -f "$seen" | grep . || true)
+  new=$(comm -13 <(sort -u "$seen") <(ids <<<"$now"))
   [[ -z $new ]] && return
   echo "$new" >>"$seen"
   echo "ACTIVITY on PR #$pr:"
   while read -r kind id; do
-    grep -m1 "^$kind $id " <<<"$now"
+    grep -m1 "^$kind $id " <<<"$now" || echo "$kind $id"
     # A pending review's comments are only visible to its author, the account these scripts use.
     [[ $kind == review ]] && gh api "repos/$REPO/pulls/$pr/reviews/$id/comments" \
       --jq '.[] | "  \(.path):\(.line // .original_line // "file"): \((.body // "") | gsub("\\s+"; " ") | .[0:400])"'
@@ -86,8 +88,10 @@ check_run() { # check_run <sha> <label>: report a finished or slow CI run of tha
 }
 
 # Comments that existed before the first run are not news.
-if [[ ! -s $seen ]]; then
-  activity | awk '{ print $1, $2 }' >>"$seen"
+if [[ ! -e $state_dir/started ]]; then
+  until existing=$(activity); do sleep 30; done
+  ids <<<"$existing" >"$seen"
+  touch "$state_dir/started"
 fi
 
 while true; do
