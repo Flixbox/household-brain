@@ -1,5 +1,5 @@
 import { type User, onAuthStateChanged } from 'firebase/auth'
-import { doc, onSnapshot } from 'firebase/firestore'
+import { type Unsubscribe, doc, onSnapshot } from 'firebase/firestore'
 import { useEffect, useState } from 'react'
 import { auth, db } from './firebase'
 
@@ -21,9 +21,9 @@ export function useAccess(): Access {
   const [access, setAccess] = useState<Access>({ state: 'loading' })
 
   useEffect(() => {
-    let stopWatchingEntry = () => {}
+    let stopWatchingEntry: Unsubscribe | null = null
     const stopWatchingAuth = onAuthStateChanged(auth, user => {
-      stopWatchingEntry()
+      stopWatchingEntry?.()
       if (!user) {
         setAccess({ state: 'signed-out' })
         return
@@ -44,7 +44,7 @@ export function useAccess(): Access {
     })
     return () => {
       stopWatchingAuth()
-      stopWatchingEntry()
+      stopWatchingEntry?.()
     }
   }, [])
 
