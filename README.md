@@ -288,8 +288,9 @@ keeps "pull before every write" cheap even when several edits happen in a row.
    3. On success: copy every field of Google's reply into the entry (it includes changes made in
       Google meanwhile), set `etags.<myUid>`, `googleUpdated`, `sync: "synced"` and `dirty: []`. The
       dot disappears on both devices.
-   4. If a `412` still happens (someone edited between the pull and the push): run another pull,
-      which merges, then retry the push once.
+   4. If a `412` still happens (someone edited between the pull and the push): re-read the event and
+      patch once more against its current etag; the local edits win, and recording Google's reply
+      (step 3) brings in the rest. If the re-read shows the event was deleted in Google, restore it.
 
 **Outbox worker details**
 
@@ -353,8 +354,9 @@ for 3 seconds, so a burst of triggers causes one pull.
   - The event has its own reminder overrides instead of `useDefault: true`: reset it. This only
     affects the reminders of the user whose device runs the pull, because reminders are per user.
     The other person's are fixed when their device pulls.
-  - There is no `hb.category`: parse the `[Prefix]` in the title. If none matches, use
-    `uncategorised`, and add the prefix and colour.
+  - There is no `hb.category` but the title starts with a `[Label]` naming a category: record that
+    category and add its colour. Without such a prefix the event is one added by hand: it is shown
+    as uncategorised and not adjusted at all.
 
   Before writing, these fixes are applied to the mapped item, so the UI never shows the
   un-normalised state.

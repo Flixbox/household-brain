@@ -88,6 +88,16 @@ test('events put in by hand show as uncategorised and are left alone; repeating 
   await expect(page.getByRole('region', { name: 'Uncategorised' }).getByRole('link', { name: /Grandma/u })).toContainText('2026-12-10')
   await expect(page.getByRole('link', { name: /Yearly/u })).toHaveCount(0)
   expect(google.live().find(event => event.id === 'birthday1')).toEqual(birthday)
+
+  // Moving it in the app turns it into a timed event on the new date, and still adds no category.
+  await page.getByRole('link', { name: /Grandma/u }).click()
+  await page.getByLabel('Due date (17:00)').fill('2026-12-12')
+  await page.getByRole('button', { name: 'Save' }).click()
+  await expect.poll(() => google.live().find(event => event.id === 'birthday1')).toMatchObject({
+    start: { dateTime: '2026-12-12T17:00:00', timeZone: 'Europe/Berlin' },
+    summary: 'Grandma',
+  })
+  expect(google.live().find(event => event.id === 'birthday1')).not.toHaveProperty('extendedProperties')
 })
 
 test('an entry edited here while it was deleted in Google comes back with the edit', async ({ page }) => {
@@ -101,11 +111,15 @@ test('an entry edited here while it was deleted in Google comes back with the ed
   await expect.poll(() => google.live().length).toBe(1)
   const [{ id }] = google.live() as [{ id: string }]
 
+  // Without listings, no pull can see the deletion before the edit is saved (a pull in between would
+  // rightly remove the then-unedited entry). The push itself still finds the event deleted.
+  google.refuseListings(true)
   google.delete(id)
   await page.getByRole('link', { name: /Bakery/u }).click()
   await page.getByLabel('Code').fill('CROISSANT')
   await page.getByRole('button', { name: 'Save' }).click()
 
   await expect.poll(() => google.live()[0]).toMatchObject({ extendedProperties: { private: { 'hb.code': 'CROISSANT' } }, id, status: 'confirmed' })
+  google.refuseListings(false)
   await expect(page.getByRole('link', { name: /Bakery/u })).toHaveCount(1)
 })

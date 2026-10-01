@@ -27,11 +27,15 @@ async function insert(context: PushContext, item: Item): Promise<CalendarEvent> 
   try {
     return await api.insertEvent(config.calendarId, eventFor(item, eventContext(context)))
   } catch (error) {
-    // 409: an earlier attempt already created it (the id is ours), so the insert did succeed.
+    // 409: an earlier attempt already created it (the id is ours), so the insert did succeed. If it
+    // was deleted in Google since, the entry still exists here: bring it back.
     if (!isStatus(error, 409)) {
       throw error
     }
-    return api.getEvent(config.calendarId, item.id)
+    const existing = await api.getEvent(config.calendarId, item.id)
+    return existing.status === 'cancelled'
+      ? restore(context, item, { calendarId: config.calendarId, eventId: item.id })
+      : existing
   }
 }
 

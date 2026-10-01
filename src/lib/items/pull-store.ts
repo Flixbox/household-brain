@@ -1,4 +1,4 @@
-import { type Timestamp, doc, getDoc, getDocs, query, runTransaction, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore'
+import { type Timestamp, doc, getDoc, getDocFromServer, getDocs, query, runTransaction, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore'
 import { db } from '../firebase'
 import type { CalendarEvent } from './event'
 import type { Item } from './model'
@@ -30,8 +30,9 @@ export function applyPulled(event: CalendarEvent, decide: (entry: Item | null) =
   })
 }
 
-export function recordEtag(id: string, uid: string, etag: string): Promise<void> {
-  return updateDoc(itemDoc(id), { [`etags.${uid}`]: etag })
+/** After the app adjusted an event: its etag and version, so the next pull sees it as our own. */
+export function recordEtag(id: string, uid: string, event: CalendarEvent): Promise<void> {
+  return updateDoc(itemDoc(id), { [`etags.${uid}`]: event.etag ?? '', googleUpdated: event.updated ?? '' })
 }
 
 /**
@@ -54,6 +55,12 @@ export async function removeVanished(eventIds: ReadonlySet<string>, listedSince:
 export async function readSyncToken(uid: string): Promise<string | null> {
   const snapshot = await getDoc(syncStateDoc(uid))
   return snapshot.exists() ? (snapshot.data() as { syncToken: string }).syncToken : null
+}
+
+/** The server's clock, not this device's: written to syncState/{uid} and read back. */
+export async function serverNow(uid: string): Promise<Timestamp> {
+  await setDoc(syncStateDoc(uid), { listingStartedAt: serverTimestamp() }, { merge: true })
+  return (await getDocFromServer(syncStateDoc(uid))).get('listingStartedAt') as Timestamp
 }
 
 export function saveSyncToken(uid: string, syncToken: string): Promise<void> {

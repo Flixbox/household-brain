@@ -35,6 +35,7 @@ export async function mockGoogle(page: Page, calendarId = 'household@group.calen
   const requests: CalendarRequest[] = []
   const calendarList = new Map<string, Record<string, unknown>>()
   const events = new Map<string, Record<string, unknown>>()
+  const listing = { refused: false }
   let version = 0
   const stored = (id: string, event: object) => {
     version += 1
@@ -72,7 +73,7 @@ export async function mockGoogle(page: Page, calendarId = 'household@group.calen
       calendarList.set(id, { ...calendarList.get(id), ...body as object })
       await reply(route, 200, calendarList.get(id))
     } else if (path.includes('/events')) {
-      await handleEvent({ body, events, path, reply: (status, json) => reply(route, status, json), request, stored })
+      await handleEvent({ body, events, listing, path, reply: (status, json) => reply(route, status, json), request, stored })
     } else {
       await reply(route, 501, { error: { message: `Not mocked: ${request.method()} ${path}` } })
     }
@@ -84,6 +85,10 @@ export async function mockGoogle(page: Page, calendarId = 'household@group.calen
     edit: (id: string, changes: Record<string, unknown>) => stored(id, { ...events.get(id), ...changes }),
     /** Events that exist (Google keeps deleted ones as "cancelled"). */
     live: () => [...events.values()].filter(event => event.status !== 'cancelled'),
+    /** Makes event listings fail with 503 (the app retries later), to control when pulls see changes. */
+    refuseListings: (refused: boolean) => {
+      listing.refused = refused
+    },
   }
   return { events, google, requests }
 }
@@ -93,13 +98,18 @@ interface EventCall {
   path: string
   body: unknown
   events: Map<string, Record<string, unknown>>
+  listing: { refused: boolean }
   stored: (id: string, event: object) => Record<string, unknown> | undefined
   reply: (status: number, body: unknown) => Promise<void>
 }
 
 /** Insert, get, patch (honouring If-Match) and delete for the fake calendar's events. */
-async function handleEvent({ request, path, body, events, stored, reply }: EventCall) {
+async function handleEvent({ request, path, body, events, listing, stored, reply }: EventCall) {
   const eventId = path.split('/events/')[1] ?? ''
+  if (request.method() === 'GET' && !eventId && listing.refused) {
+    await reply(503, { error: { message: 'Backend Error' } })
+    return
+  }
   if (request.method() === 'GET' && !eventId) {
     // A list: everything every time, deleted events included, with a sync token. Real incremental
     // listings return less, but the app treats both the same way.

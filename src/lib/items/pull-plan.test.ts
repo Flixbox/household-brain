@@ -52,8 +52,14 @@ describe('decidePull', () => {
     expect(decide({ entry: null, event: cancelled })).toEqual({ kind: 'skip' })
   })
 
-  it('ignores a listing older than what the entry already has', () => {
-    expect(decide({ entry: { ...entry, googleUpdated: '2026-10-01T10:00:05Z' }, event: { ...event, updated: '2026-10-01T10:00:04Z' } })).toEqual({ kind: 'skip' })
+  it('ignores a listing older than what the entry already has, whatever the precision', () => {
+    expect(decide({ entry: { ...entry, googleUpdated: '2026-10-01T10:00:05Z' }, event: { ...event, updated: '2026-10-01T10:00:04.999Z' } })).toEqual({ kind: 'skip' })
+  })
+
+  it('only remembers this person\'s etag for the version the entry already holds', () => {
+    const decision = decide({ entry: { ...entry, googleUpdated: '2026-10-01T10:00:05.000Z' }, event: { ...event, updated: '2026-10-01T10:00:05Z' } })
+    expect(decision).toMatchObject({ fields: { 'etags.owner': '"g2"' }, kind: 'update', normalise: false })
+    expect(Object.keys((decision as { fields: object }).fields)).toEqual(['etags.owner'])
   })
 
   it('leaves repeating events alone until repeating entries exist', () => {

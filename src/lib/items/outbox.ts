@@ -167,6 +167,10 @@ async function continueAfterStep(): Promise<void> {
   publish()
   const again = pullRequested
   pullRequested = false
+  if (again) {
+    // The pull that just ran started before the request: don't let its reuse window swallow it.
+    pulledAt = Number.NEGATIVE_INFINITY
+  }
   if (again || nextToPush()) {
     await run(again)
   }

@@ -54,7 +54,8 @@ function apply(item: Item, decide: (latest: Item | null) => PushRecord): Promise
     if (record.kind === 'delete') {
       transaction.delete(ref)
     } else if (record.kind === 'update') {
-      transaction.update(ref, record.fields)
+      // Becoming "synced" counts as a change: a full sync running meanwhile must not drop the entry.
+      transaction.update(ref, record.fields.sync === 'synced' ? { ...record.fields, updatedAt: serverTimestamp() } : record.fields)
     }
     return record.kind !== 'nothing'
   })

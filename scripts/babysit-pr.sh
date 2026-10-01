@@ -107,6 +107,7 @@ check_main() { # the newest CI run on main, whichever PR it came from
   if [[ $status == completed ]]; then
     [[ $conclusion == success || $conclusion == cancelled ]] && return
     report "main-failed $run" "MAIN_FAILED: CI run $run on main ended $conclusion. Fix main first (follow-up PR). gh run view $run --repo $REPO --log-failed"
+    return
   fi
   age=$(( $(date +%s) - $(date -d "$started" +%s) ))
   (( age > limit )) && report "main-slow $run" "MAIN_SLOW: CI run $run on main still $status after $(( age / 60 )) min. Cancel it and read the logs."
