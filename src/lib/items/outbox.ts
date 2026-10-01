@@ -55,6 +55,7 @@ const PULL_EVERY_MS = 60_000
 let pulling: Promise<void> | null = null
 let pulledAt = Number.NEGATIVE_INFINITY
 let pullProblem: string | null = null
+let pullRequested = false
 const describe = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
 function publish() {
@@ -117,8 +118,8 @@ function pullNow(context: PushContext): Promise<void> {
     return Promise.resolve()
   }
   pulling ??= pullChanges(context)
-    .then(() => {
-      pullProblem = null
+    .then(problems => {
+      pullProblem = problems.length > 0 ? problems.join(' · ') : null
     }, (error: unknown) => {
       pullProblem = isTransient(error) ? pullProblem : describe(error)
     })
@@ -148,14 +149,30 @@ async function step(context: PushContext): Promise<void> {
 
 async function run(alwaysPull = false): Promise<void> {
   publish()
+  if (busy) {
+    // A pull asked for during a push (Sync now, foreground, timer) runs right after it.
+    pullRequested ||= alwaysPull
+    return
+  }
   const context = readyContext()
-  if (busy || !context || (!alwaysPull && !nextToPush())) {
+  if (!context || (!alwaysPull && !nextToPush())) {
     return
   }
   await step(context)
+  await continueAfterStep()
+}
+
+/** Runs the next step if entries still wait, or if a pull was asked for while this one was busy. */
+async function continueAfterStep(): Promise<void> {
   publish()
-  if (nextToPush()) {
-    await run()
+  const again = pullRequested
+  pullRequested = false
+  if (again) {
+    // The pull that just ran started before the request: don't let its reuse window swallow it.
+    pulledAt = Number.NEGATIVE_INFINITY
+  }
+  if (again || nextToPush()) {
+    await run(again)
   }
 }
 

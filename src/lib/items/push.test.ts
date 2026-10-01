@@ -89,6 +89,30 @@ describe('pushItem', () => {
     ])
   })
 
+  it('brings back an event deleted in Google when it was edited here meanwhile', async () => {
+    const { calls, context } = fakeApi({ insert: [409], patch: [412] })
+    const cancelledGet = context().api.getEvent
+    let gets = 0
+    const ctx = { ...context(), api: { ...context().api, getEvent: async (calendarId: string, eventId: string) => {
+      gets += 1
+      return { ...await cancelledGet(calendarId, eventId), ...gets === 1 ? { status: 'cancelled' } : {} }
+    } } }
+    await pushItem(ctx, { ...base, dirty: ['code'], etags: { owner: '"v1"' } })
+    expect(calls).toEqual([
+      'patch evt1 extendedProperties if "v1"',
+      'get evt1',
+      'insert evt1 [Coupon] Amazon',
+      'get evt1',
+      'patch evt1 colorId,description,end,extendedProperties,reminders,start,status,summary if "current"',
+    ])
+  })
+
+  it('patches local edits onto an existing event even when no etag was ever recorded here', async () => {
+    const { calls, context } = fakeApi({ insert: [409] })
+    await pushItem(context(), { ...base, dirty: ['code'], etags: {} })
+    expect(calls).toEqual(['insert evt1 [Coupon] Amazon', 'get evt1', 'patch evt1 extendedProperties if "current"'])
+  })
+
   it('deletes, and other failures surface', async () => {
     const { calls, context } = fakeApi({ insert: [500] })
     expect(await pushItem(context(), { ...base, pendingOp: 'delete' })).toEqual({ kind: 'deleted' })

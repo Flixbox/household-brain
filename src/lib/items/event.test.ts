@@ -48,8 +48,8 @@ describe('eventFor', () => {
 describe('patchFor', () => {
   it('sends only what the changed fields affect', () => {
     expect(patchFor(item, ['dueDate'], context)).toEqual({
-      end: { dateTime: '2026-11-03T17:15:00', timeZone: 'Europe/Berlin' },
-      start: { dateTime: '2026-11-03T17:00:00', timeZone: 'Europe/Berlin' },
+      end: { date: null, dateTime: '2026-11-03T17:15:00', timeZone: 'Europe/Berlin' },
+      start: { date: null, dateTime: '2026-11-03T17:00:00', timeZone: 'Europe/Berlin' },
     })
     expect(Object.keys(patchFor(item, ['category'], context)).toSorted()).toEqual(['colorId', 'extendedProperties', 'summary'])
     expect(patchFor(item, [], context)).toEqual({})

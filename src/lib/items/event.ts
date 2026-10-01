@@ -8,7 +8,8 @@ export const END_TIME = '17:15:00'
 /** A start or end: timed (`dateTime`) or, for all-day events made in Google Calendar, a `date`. */
 export interface EventTime {
   dateTime?: string
-  date?: string
+  /** Null in a patch clears it (needed when turning an all-day event into a timed one). */
+  date?: string | null
   timeZone?: string
 }
 
@@ -20,6 +21,12 @@ export interface CalendarEvent {
   start?: EventTime
   end?: EventTime
   reminders?: { useDefault: boolean, overrides?: { method: string, minutes: number }[] }
+  /** When Google last changed the event (RFC 3339, UTC). */
+  updated?: string
+  /** Set on the first event of a repeating series. */
+  recurrence?: string[]
+  /** Set on a single occurrence of a repeating series. */
+  recurringEventId?: string
   extendedProperties?: { private?: Record<string, string> }
   etag?: string
   /** "confirmed", "tentative", or "cancelled" for a deleted event. */
@@ -44,7 +51,8 @@ export function summaryOf(item: Pick<Item, 'title' | 'category'>, categories: re
 function privateProperties(item: Item): Record<string, string> {
   return {
     'hb.amount': item.amount,
-    'hb.category': item.category,
+    // An uncategorised entry (an event added by hand) stays without one, so it stays untouched.
+    ...item.category === 'uncategorised' ? {} : { 'hb.category': item.category },
     'hb.code': item.code,
     'hb.status': item.status,
     'hb.url': item.url,
@@ -54,8 +62,10 @@ function privateProperties(item: Item): Record<string, string> {
 
 const groups = {
   date: (item: Item, { timeZone }: EventContext): CalendarEvent => ({
-    end: { dateTime: `${item.dueDate}T${END_TIME}`, timeZone },
-    start: { dateTime: `${item.dueDate}T${DUE_TIME}`, timeZone },
+    // `date: null` turns an all-day event (e.g. one added by hand) into a timed one; Google rejects
+    // an event with both.
+    end: { date: null, dateTime: `${item.dueDate}T${END_TIME}`, timeZone },
+    start: { date: null, dateTime: `${item.dueDate}T${DUE_TIME}`, timeZone },
   }),
   notes: (item: Item): CalendarEvent => ({ description: item.notes }),
   properties: (item: Item): CalendarEvent => ({ extendedProperties: { private: privateProperties(item) } }),
@@ -78,11 +88,14 @@ const GROUP_OF: Record<EditableField, (keyof typeof groups)[]> = {
 
 /** The full event for a new entry: due 17:00–17:15, and each person's default reminders apply. */
 export function eventFor(item: Item, context: EventContext): CalendarEvent {
+  // A new event has no all-day date to clear, so the patch-only `date: null` is left out.
+  const { start, end } = groups.date(item, context)
   return {
     id: item.id,
     ...groups.title(item, context),
     ...groups.notes(item),
-    ...groups.date(item, context),
+    end: { dateTime: end?.dateTime, timeZone: end?.timeZone },
+    start: { dateTime: start?.dateTime, timeZone: start?.timeZone },
     ...groups.properties(item),
     reminders: { useDefault: true },
   }

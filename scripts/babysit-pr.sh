@@ -5,6 +5,8 @@
 #   CI_SLOW                   a CI run (PR or deploy) has been going for more than the limit
 #   MAIN_FAILED / MAIN_SLOW   the newest CI run on main failed or hangs, whichever PR caused it
 #   CONFLICT                  the PR conflicts with its base branch: rebase it
+#   APPROVED                  the owner approved the PR (enable auto-merge once it is well reviewed)
+#   READY_TO_MERGE            approved, CI green for the current head, auto-merge still off
 #   ACTIVITY                  new comments, reviews (including a pending review's comments), review comments
 #   DEPLOYED / DEPLOY_FAILED  the PR was merged and the deploy run on main finished
 #   CLOSED                    closed without merging
@@ -22,6 +24,9 @@ REPO=${REPO:-Flixbox/household-brain}
 WORKFLOW=${WORKFLOW:-ci.yml}
 # The agent runs this as its bot: GH=agent-gh (see .ai/AGENTS.md). Defaults to plain gh.
 GH=${GH:-gh}
+# Comments are read with the owner's login: a pending (unsubmitted) review is only visible to its
+# author, and the owner leaves those. Override with ACTIVITY_GH.
+ACTIVITY_GH=${ACTIVITY_GH:-gh}
 pr=$1
 limit=$(( ${2:-20} * 60 ))
 hours=${3:-12}
@@ -43,11 +48,11 @@ report() { # report <key> <message...>: print and exit unless this key was repor
 }
 
 activity() { # one line per item: "<kind> <id> <author> <text>"
-  "$GH" api --paginate "repos/$REPO/issues/$pr/comments" \
+  "$ACTIVITY_GH" api --paginate "repos/$REPO/issues/$pr/comments" \
     --jq '.[] | "comment \(.id) \(.user.login): \((.body // "") | gsub("\\s+"; " ") | .[0:200])"' &&
-  "$GH" api --paginate "repos/$REPO/pulls/$pr/reviews" \
+  "$ACTIVITY_GH" api --paginate "repos/$REPO/pulls/$pr/reviews" \
     --jq '.[] | "review \(.id) \(.user.login) \(.state): \((.body // "") | gsub("\\s+"; " ") | .[0:200])"' &&
-  "$GH" api --paginate "repos/$REPO/pulls/$pr/comments" \
+  "$ACTIVITY_GH" api --paginate "repos/$REPO/pulls/$pr/comments" \
     --jq '.[] | "review-comment \(.id) \(.user.login) \(.path): \((.body // "") | gsub("\\s+"; " ") | .[0:200])"'
 }
 
@@ -62,8 +67,8 @@ check_activity() {
   echo "ACTIVITY on PR #$pr:"
   while read -r kind id; do
     grep -m1 "^$kind $id " <<<"$now" || echo "$kind $id"
-    # A pending review's comments are only visible to its author, the account these scripts use.
-    [[ $kind == review ]] && "$GH" api "repos/$REPO/pulls/$pr/reviews/$id/comments" \
+    # A pending review's comments are only visible to its author: read with the owner's login.
+    [[ $kind == review ]] && "$ACTIVITY_GH" api "repos/$REPO/pulls/$pr/reviews/$id/comments" \
       --jq '.[] | "  \(.path):\(.line // .original_line // "file"): \((.body // "") | gsub("\\s+"; " ") | .[0:400])"'
   done <<<"$new"
   exit 0
@@ -78,14 +83,18 @@ check_run() { # check_run <sha> <label>: report a finished or slow CI run of tha
   [[ -z ${run:-} ]] && return
   local jobs
   jobs=$("$GH" run view "$run" --repo "$REPO" --json jobs --jq '.jobs[] | "  \(.name): \(.status) \(.conclusion // "")"')
+  # report() returns when the event was already reported, so every branch ends in `return`.
   if [[ $status == completed ]]; then
-    if [[ $label == deploy ]]; then
-      [[ $conclusion == success ]] && report "deployed $sha" "DEPLOYED: PR #$pr is live (run $run)" "$jobs"
+    if [[ $label == deploy && $conclusion == success ]]; then
+      report "deployed $sha" "DEPLOYED: PR #$pr is live (run $run)" "$jobs"
+    elif [[ $label == deploy ]]; then
       report "deploy-failed $sha" "DEPLOY_FAILED: run $run on main ended $conclusion: open a follow-up PR" "$jobs"
+    elif [[ $conclusion == success ]]; then
+      report "ci-passed $sha" "CI_PASSED for ${sha:0:7} (run $run)" "$jobs"
+    elif [[ $conclusion != cancelled ]]; then # cancelled: superseded by a newer push
+      report "ci-failed $sha" "CI_FAILED for ${sha:0:7} (run $run): $conclusion. gh run view $run --repo $REPO --log-failed" "$jobs"
     fi
-    [[ $conclusion == success ]] && report "ci-passed $sha" "CI_PASSED for ${sha:0:7} (run $run)" "$jobs"
-    [[ $conclusion == cancelled ]] && return # superseded by a newer push
-    report "ci-failed $sha" "CI_FAILED for ${sha:0:7} (run $run): $conclusion. gh run view $run --repo $REPO --log-failed" "$jobs"
+    return
   fi
   age=$(( $(date +%s) - $(date -d "$created" +%s) ))
   (( age > limit )) && report "ci-slow $run" "CI_SLOW: run $run ($label, ${sha:0:7}) still $status after $(( age / 60 )) min. Cancel it and read the logs." "$jobs"
@@ -100,6 +109,7 @@ check_main() { # the newest CI run on main, whichever PR it came from
   if [[ $status == completed ]]; then
     [[ $conclusion == success || $conclusion == cancelled ]] && return
     report "main-failed $run" "MAIN_FAILED: CI run $run on main ended $conclusion. Fix main first (follow-up PR). gh run view $run --repo $REPO --log-failed"
+    return
   fi
   age=$(( $(date +%s) - $(date -d "$started" +%s) ))
   (( age > limit )) && report "main-slow $run" "MAIN_SLOW: CI run $run on main still $status after $(( age / 60 )) min. Cancel it and read the logs."
@@ -113,15 +123,20 @@ if [[ ! -e $state_dir/started ]]; then
 fi
 
 while true; do
-  read -r state mergeable head merge_sha < <("$GH" pr view "$pr" --repo "$REPO" --json state,mergeable,headRefOid,mergeCommit \
-    --jq '"\(.state) \(.mergeable) \(.headRefOid) \(.mergeCommit.oid // "-")"') || { sleep 30; continue; }
+  read -r state mergeable head merge_sha decision auto < <("$GH" pr view "$pr" --repo "$REPO" \
+    --json state,mergeable,headRefOid,mergeCommit,reviewDecision,autoMergeRequest \
+    --jq '"\(.state) \(.mergeable) \(.headRefOid) \(.mergeCommit.oid // "-") \(.reviewDecision // "-") \(if .autoMergeRequest then "on" else "off" end)"') \
+    || { sleep 30; continue; }
   check_main
   case $state in
     MERGED) check_run "$merge_sha" deploy ;;
     CLOSED) report "closed" "CLOSED: PR #$pr was closed without merging" ;;
     *)
       [[ $mergeable == CONFLICTING ]] && report "conflict $head" "CONFLICT: PR #$pr conflicts with its base branch at ${head:0:7}: rebase on main"
+      [[ $decision == APPROVED ]] && report "approved" "APPROVED: the owner approved PR #$pr. Once it is well reviewed, enable auto-merge: agent-gh pr merge $pr --auto --squash"
       check_run "$head" pr
+      [[ $decision == APPROVED && $auto == off ]] && grep -qxF "ci-passed $head" "$reported" \
+        && report "ready $head" "READY_TO_MERGE: PR #$pr is approved and CI is green at ${head:0:7}, but auto-merge is off. Enable it: agent-gh pr merge $pr --auto --squash"
       check_activity
       ;;
   esac

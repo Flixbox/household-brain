@@ -31,10 +31,15 @@ export function recordFor({ latest, pushed, outcome, uid, remote }: PushResult):
     return unchanged ? { kind: 'delete' } : { kind: 'nothing' }
   }
   const etag = { [`etags.${uid}`]: outcome.event.etag ?? '' }
+  // Changed meanwhile: fields that were just pushed and haven't changed since are in Google now, so
+  // they are no longer unsent changes; a later push must not send them again over newer values.
+  const stillDirty = () => latest.dirty.filter(field => !(pushed.dirty.includes(field) && latest[field] === pushed[field]))
   // Google's reply holds the whole event: the fields just written, plus anything changed in Google
   // meanwhile. Taking all of it keeps the entry identical to the event.
   return {
-    fields: unchanged ? { ...remote, ...etag, dirty: [], pendingOp: null, sync: 'synced', syncError: null } : etag,
+    fields: unchanged
+      ? { ...remote, ...etag, dirty: [], googleUpdated: outcome.event.updated ?? '', pendingOp: null, sync: 'synced', syncError: null }
+      : { ...etag, dirty: stillDirty() },
     kind: 'update',
   }
 }

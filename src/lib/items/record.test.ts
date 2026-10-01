@@ -7,14 +7,16 @@ const pushed = { etags: {}, id: 'evt1', rev: 'r1' } as unknown as Item
 describe('recordFor', () => {
   it('marks an unchanged entry synced and stores the etag for this user', () => {
     expect(recordFor({ latest: pushed, outcome: { event: { etag: '"v1"' }, kind: 'synced' }, pushed, remote: null, uid: 'owner' })).toEqual({
-      fields: { 'dirty': [], 'etags.owner': '"v1"', 'pendingOp': null, 'sync': 'synced', 'syncError': null },
+      fields: { 'dirty': [], 'etags.owner': '"v1"', 'googleUpdated': '', 'pendingOp': null, 'sync': 'synced', 'syncError': null },
       kind: 'update',
     })
   })
 
-  it('keeps an entry edited during the push pending, with only the new etag', () => {
-    const edited = { ...pushed, rev: 'r2' }
-    expect(recordFor({ latest: edited, outcome: { event: { etag: '"v1"' }, kind: 'synced' }, pushed, remote: null, uid: 'owner' })).toEqual({ fields: { 'etags.owner': '"v1"' }, kind: 'update' })
+  it('keeps an entry edited during the push pending, with the new etag and only its newer edits', () => {
+    const sent = { ...pushed, code: 'A', dirty: ['code', 'dueDate'], dueDate: '2026-12-24' } as Item
+    const edited = { ...sent, code: 'B', dirty: ['code', 'dueDate'], rev: 'r2' } as Item
+    expect(recordFor({ latest: edited, outcome: { event: { etag: '"v1"' }, kind: 'synced' }, pushed: sent, remote: null, uid: 'owner' }))
+      .toEqual({ fields: { 'dirty': ['code'], 'etags.owner': '"v1"' }, kind: 'update' })
   })
 
   it('takes every field from Google\'s reply, including changes made in Google meanwhile', () => {
