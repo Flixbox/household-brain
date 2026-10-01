@@ -415,6 +415,12 @@ scheduled jobs.
   - The Firebase web config (`apiKey`, `projectId`, …) is public by design and protected by the
     rules. It is supplied at build time as `VITE_FIREBASE_*` so forks can point it at their
     own project. Defaults live in `.env.production`, which is fine to commit.
+  - The browser API key is additionally **restricted in Google Cloud**:
+    - Websites: only `https://household-brain-sf.web.app/*`, `https://household-brain-sf.firebaseapp.com/*`,
+      `http://localhost:5173/*` and `http://localhost/*`.
+    - APIs: only Identity Toolkit, Secure Token, Firestore and App Check.
+
+    A copied key can't be used from other sites, or for any other Google API.
   - The OAuth client id is public by design.
   - `firestore.rules` contains no personal data, because the allowlist lives only in the database.
 - **CI: GitHub Actions** on GitHub-hosted runners, in the public repo
