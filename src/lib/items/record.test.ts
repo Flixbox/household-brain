@@ -6,7 +6,7 @@ const pushed = { etags: {}, id: 'evt1', rev: 'r1' } as unknown as Item
 
 describe('recordFor', () => {
   it('marks an unchanged entry synced and stores the etag for this user', () => {
-    expect(recordFor({ latest: pushed, outcome: { etag: '"v1"', kind: 'synced' }, pushed, uid: 'owner' })).toEqual({
+    expect(recordFor({ latest: pushed, outcome: { event: { etag: '"v1"' }, kind: 'synced' }, pushed, remote: null, uid: 'owner' })).toEqual({
       fields: { 'dirty': [], 'etags.owner': '"v1"', 'pendingOp': null, 'sync': 'synced', 'syncError': null },
       kind: 'update',
     })
@@ -14,16 +14,22 @@ describe('recordFor', () => {
 
   it('keeps an entry edited during the push pending, with only the new etag', () => {
     const edited = { ...pushed, rev: 'r2' }
-    expect(recordFor({ latest: edited, outcome: { etag: '"v1"', kind: 'synced' }, pushed, uid: 'owner' })).toEqual({ fields: { 'etags.owner': '"v1"' }, kind: 'update' })
+    expect(recordFor({ latest: edited, outcome: { event: { etag: '"v1"' }, kind: 'synced' }, pushed, remote: null, uid: 'owner' })).toEqual({ fields: { 'etags.owner': '"v1"' }, kind: 'update' })
+  })
+
+  it('takes every field from Google\'s reply, including changes made in Google meanwhile', () => {
+    const remote = { amount: '', category: 'coupon', code: 'MINE', dueDate: '2026-12-27', notes: '', status: 'open' as const, title: 'Cinema', url: '' }
+    const record = recordFor({ latest: pushed, outcome: { event: { etag: '"v2"' }, kind: 'synced' }, pushed, remote, uid: 'owner' })
+    expect(record).toMatchObject({ fields: { ...remote, 'etags.owner': '"v2"', 'sync': 'synced' }, kind: 'update' })
   })
 
   it('removes a deleted entry, unless it changed meanwhile', () => {
-    expect(recordFor({ latest: pushed, outcome: { kind: 'deleted' }, pushed, uid: 'owner' })).toEqual({ kind: 'delete' })
-    expect(recordFor({ latest: { ...pushed, rev: 'r2' }, outcome: { kind: 'deleted' }, pushed, uid: 'owner' })).toEqual({ kind: 'nothing' })
+    expect(recordFor({ latest: pushed, outcome: { kind: 'deleted' }, pushed, remote: null, uid: 'owner' })).toEqual({ kind: 'delete' })
+    expect(recordFor({ latest: { ...pushed, rev: 'r2' }, outcome: { kind: 'deleted' }, pushed, remote: null, uid: 'owner' })).toEqual({ kind: 'nothing' })
   })
 
   it('does nothing for an entry that no longer exists', () => {
-    expect(recordFor({ latest: null, outcome: { etag: '"v1"', kind: 'synced' }, pushed, uid: 'owner' })).toEqual({ kind: 'nothing' })
+    expect(recordFor({ latest: null, outcome: { event: { etag: '"v1"' }, kind: 'synced' }, pushed, remote: null, uid: 'owner' })).toEqual({ kind: 'nothing' })
   })
 })
 

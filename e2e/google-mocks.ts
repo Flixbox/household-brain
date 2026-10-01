@@ -77,7 +77,15 @@ export async function mockGoogle(page: Page, calendarId = 'household@group.calen
       await reply(route, 501, { error: { message: `Not mocked: ${request.method()} ${path}` } })
     }
   })
-  return { events, requests }
+  /** Changes made directly in Google Calendar, as another device or person would. */
+  const google = {
+    create: (event: Record<string, unknown> & { id: string }) => stored(event.id, event),
+    delete: (id: string) => stored(id, { ...events.get(id), status: 'cancelled' }),
+    edit: (id: string, changes: Record<string, unknown>) => stored(id, { ...events.get(id), ...changes }),
+    /** Events that exist (Google keeps deleted ones as "cancelled"). */
+    live: () => [...events.values()].filter(event => event.status !== 'cancelled'),
+  }
+  return { events, google, requests }
 }
 
 interface EventCall {
@@ -92,7 +100,16 @@ interface EventCall {
 /** Insert, get, patch (honouring If-Match) and delete for the fake calendar's events. */
 async function handleEvent({ request, path, body, events, stored, reply }: EventCall) {
   const eventId = path.split('/events/')[1] ?? ''
-  const existing = events.get(eventId)
+  if (request.method() === 'GET' && !eventId) {
+    // A list: everything every time, deleted events included, with a sync token. Real incremental
+    // listings return less, but the app treats both the same way.
+    await reply(200, { items: [...events.values()], nextSyncToken: `sync-${events.size}` })
+    return
+  }
+  const found = events.get(eventId)
+  // Like Google: a deleted event can't be read or deleted again, but can be revived with a patch.
+  const reachable = found && (found.status !== 'cancelled' || request.method() === 'PATCH')
+  const existing = reachable ? found : null
   const method = request.method()
   if (method === 'POST') {
     const { id } = body as { id: string }
@@ -107,7 +124,7 @@ async function handleEvent({ request, path, body, events, stored, reply }: Event
       ? reply(412, { error: { message: 'Precondition Failed' } })
       : reply(200, stored(eventId, { ...existing, ...body as object })))
   } else {
-    events.delete(eventId)
+    events.set(eventId, { ...existing, etag: `"deleted-${eventId}"`, status: 'cancelled' })
     await reply(204, null)
   }
 }

@@ -1,10 +1,10 @@
 import { collection, doc, onSnapshot, orderBy, query } from 'firebase/firestore'
-import type { Category } from '../categories'
-import type { HouseholdConfig } from '../calendar/setup'
 import { auth, db } from '../firebase'
 import { MEMBER_SCOPES, calendarToken, hasCalendarToken, loadGis } from '../google-token'
 import type { Item } from './model'
 import { type PushContext, pushItem } from './push'
+import { pullChanges } from './puller'
+import { draftFrom } from './from-event'
 import { itemsCollection, recordPush, recordPushError } from './store'
 import { outboxApi } from './outbox-api'
 import { isTransient } from './transient'
@@ -25,20 +25,22 @@ export interface OutboxState {
   needsAccess: boolean
   /** Entries wait because the household calendar hasn't been created yet. */
   missingCalendar: boolean
+  /** Why the last pull from Google Calendar failed, unless that clears by itself. */
+  pullProblem: string | null
 }
 
 const MIN_BACKOFF_MS = 5000
 const MAX_BACKOFF_MS = 5 * 60_000
 
 const fresh = () => ({
-  categories: null as Category[] | null,
-  config: null as HouseholdConfig | null,
+  categories: null as PushContext['categories'] | null,
+  config: null as PushContext['config'] | null,
   /** Whether the config snapshot has arrived; before that, a missing calendar is not yet known. */
   configLoaded: false,
   items: [] as Item[],
 })
 let data = fresh()
-let state: OutboxState = { failed: [], missingCalendar: false, needsAccess: false, waiting: 0 }
+let state: OutboxState = { failed: [], missingCalendar: false, needsAccess: false, pullProblem: null, waiting: 0 }
 let busy = false
 let backoffMs = 0
 let pausedUntil = 0
@@ -48,13 +50,21 @@ const recorded = new Map<string, string>()
 /** Entries whose latest local write the server hasn't confirmed yet. */
 let unconfirmed = new Set<string>()
 const listeners = new Set<() => void>()
+const PULL_REUSE_MS = 3000
+const PULL_EVERY_MS = 60_000
+let pulling: Promise<void> | null = null
+let pulledAt = Number.NEGATIVE_INFINITY
+let pullProblem: string | null = null
+const describe = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
 function publish() {
   const pending = data.items.filter(item => item.sync === 'pending')
   state = {
     failed: data.items.filter(item => item.sync === 'error'),
     missingCalendar: pending.length > 0 && data.configLoaded && data.config === null,
-    needsAccess: pending.length > 0 && !hasCalendarToken(MEMBER_SCOPES),
+    // Without a token this device neither pushes nor pulls, so it is offered whenever a calendar exists.
+    needsAccess: data.config !== null && !hasCalendarToken(MEMBER_SCOPES),
+    pullProblem,
     waiting: pending.length,
   }
   for (const listener of listeners) {
@@ -68,9 +78,11 @@ function retryLater() {
   timer = setTimeout(run, backoffMs)
 }
 
-async function pushOne(item: Item, context: Omit<PushContext, 'api'>): Promise<void> {
+async function pushOne(item: Item, context: PushContext): Promise<void> {
   try {
-    if (await recordPush(item, await pushItem({ ...context, api: outboxApi }, item), context.uid)) {
+    const outcome = await pushItem(context, item)
+    const remote = outcome.kind === 'synced' ? draftFrom(outcome.event, context.categories) : null
+    if (await recordPush(item, outcome, { remote, uid: context.uid })) {
       recorded.set(item.id, item.rev)
     }
     backoffMs = 0
@@ -78,7 +90,7 @@ async function pushOne(item: Item, context: Omit<PushContext, 'api'>): Promise<v
     if (isTransient(error)) {
       retryLater()
     } else {
-      await recordPushError(item, error instanceof Error ? error.message : String(error))
+      await recordPushError(item, describe(error))
     }
   }
 }
@@ -89,60 +101,122 @@ function nextToPush(): Item | undefined {
   return data.items.find(item => item.sync === 'pending' && !unconfirmed.has(item.id) && recorded.get(item.id) !== item.rev)
 }
 
-async function run(): Promise<void> {
-  publish()
+/** Everything a pull or push needs, or null while something is still missing. */
+function readyContext(): PushContext | null {
   const uid = auth.currentUser?.uid
-  const next = nextToPush()
   const { categories, config } = data
-  if (busy || !next || !uid || !config || !categories || performance.now() < pausedUntil || !hasCalendarToken(MEMBER_SCOPES)) {
+  if (!uid || !config || !categories || performance.now() < pausedUntil || !hasCalendarToken(MEMBER_SCOPES)) {
+    return null
+  }
+  return { api: outboxApi, categories, config, uid }
+}
+
+/** Pulls from Google Calendar, at most once per few seconds; parallel callers share one pull. */
+function pullNow(context: PushContext): Promise<void> {
+  if (performance.now() - pulledAt < PULL_REUSE_MS) {
+    return Promise.resolve()
+  }
+  pulling ??= pullChanges(context)
+    .then(() => {
+      pullProblem = null
+    }, (error: unknown) => {
+      pullProblem = isTransient(error) ? pullProblem : describe(error)
+    })
+    .finally(() => {
+      pulling = null
+      pulledAt = performance.now()
+    })
+  return pulling
+}
+
+/**
+ * One step: pull (always when `alwaysPull`, otherwise only before a push, so a write is based on
+ * Google's latest), then push the next pending entry, and repeat while entries wait.
+ */
+async function step(context: PushContext): Promise<void> {
+  busy = true
+  try {
+    await pullNow(context)
+    const next = nextToPush()
+    if (next) {
+      await pushOne(next, context)
+    }
+  } finally {
+    busy = false
+  }
+}
+
+async function run(alwaysPull = false): Promise<void> {
+  publish()
+  const context = readyContext()
+  if (busy || !context || (!alwaysPull && !nextToPush())) {
     return
   }
-  busy = true
-  await pushOne(next, { categories, config, uid }).finally(() => {
-    busy = false
-  })
-  await run()
+  await step(context)
+  publish()
+  if (nextToPush()) {
+    await run()
+  }
 }
 
 const ignore = () => null
 
-/** Starts watching for pending entries; returns the function that stops it. */
-export function startOutbox(): () => void {
-  // Load Google's script now, so the consent window opens instantly when Save or "Sync now" is clicked.
-  loadGis().catch(ignore)
-  const online = () => {
-    pausedUntil = 0
-    return run()
-  }
-  globalThis.addEventListener('online', online)
-  const stops = [
+function watchFirestore(): (() => void)[] {
+  return [
     onSnapshot(query(itemsCollection, orderBy('updatedAt')), { includeMetadataChanges: true }, snapshot => {
       data.items = snapshot.docs.map(entry => entry.data() as Item)
       unconfirmed = new Set(snapshot.docs.filter(entry => entry.metadata.hasPendingWrites).map(entry => entry.id))
       return run()
     }, ignore),
     onSnapshot(query(collection(db, 'categories'), orderBy('sortOrder')), snapshot => {
-      data.categories = snapshot.docs.map(entry => entry.data() as Category)
+      data.categories = snapshot.docs.map(entry => entry.data() as PushContext['categories'][number])
       return run()
     }, ignore),
     onSnapshot(doc(db, 'meta', 'config'), snapshot => {
-      data.config = snapshot.exists() ? snapshot.data() as HouseholdConfig : null
+      data.config = snapshot.exists() ? snapshot.data() as PushContext['config'] : null
       data.configLoaded = true
-      return run()
+      return run(true)
     }, ignore),
   ]
+}
+
+function watchDevice(): (() => void)[] {
+  const online = () => {
+    pausedUntil = 0
+    return run()
+  }
+  // Changes made directly in Google Calendar: picked up once a minute and whenever the app comes back
+  // to the foreground, while it is visible (README section 5.3).
+  const pullIfVisible = () => (document.visibilityState === 'visible' ? run(true) : Promise.resolve())
+  globalThis.addEventListener('online', online)
+  document.addEventListener('visibilitychange', pullIfVisible)
+  const every = setInterval(pullIfVisible, PULL_EVERY_MS)
+  return [
+    () => globalThis.removeEventListener('online', online),
+    () => document.removeEventListener('visibilitychange', pullIfVisible),
+    () => clearInterval(every),
+  ]
+}
+
+function reset() {
+  if (timer) {
+    clearTimeout(timer)
+  }
+  data = fresh()
+  recorded.clear()
+  unconfirmed = new Set()
+  publish()
+}
+
+/** Starts watching for pending entries; returns the function that stops it. */
+export function startOutbox(): () => void {
+  // Load Google's script now, so the consent window opens instantly when Save or "Sync now" is clicked.
+  loadGis().catch(ignore)
+  const stops = [...watchFirestore(), ...watchDevice(), reset]
   return () => {
     for (const stop of stops) {
       stop()
     }
-    globalThis.removeEventListener('online', online)
-    if (timer) {
-      clearTimeout(timer)
-    }
-    data = fresh()
-    recorded.clear()
-    unconfirmed = new Set()
-    publish()
   }
 }
 
@@ -153,7 +227,7 @@ export function startOutbox(): () => void {
 export function requestSyncAccess(): Promise<unknown> {
   return calendarToken(MEMBER_SCOPES, auth.currentUser?.email).then(() => {
     pausedUntil = 0
-    return run()
+    return run(true)
   }, ignore)
 }
 
@@ -161,7 +235,8 @@ export function requestSyncAccess(): Promise<unknown> {
 export async function syncNow(): Promise<void> {
   await calendarToken(MEMBER_SCOPES, auth.currentUser?.email)
   pausedUntil = 0
-  await run()
+  pulledAt = Number.NEGATIVE_INFINITY
+  await run(true)
 }
 
 /** For `useOutbox`: subscribe to changes of the outbox state. */

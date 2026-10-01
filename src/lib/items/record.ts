@@ -1,4 +1,4 @@
-import type { Item } from './model'
+import type { Item, ItemDraft } from './model'
 import type { PushOutcome } from './push'
 
 /** What to write after a push, given the entry as it is now (`latest`) and as it was pushed (`pushed`). */
@@ -18,9 +18,11 @@ export interface PushResult {
   pushed: Item
   outcome: PushOutcome
   uid: string
+  /** The entry fields of Google's event after the write, when there is one. */
+  remote: ItemDraft | null
 }
 
-export function recordFor({ latest, pushed, outcome, uid }: PushResult): PushRecord {
+export function recordFor({ latest, pushed, outcome, uid, remote }: PushResult): PushRecord {
   if (!latest) {
     return { kind: 'nothing' }
   }
@@ -28,9 +30,11 @@ export function recordFor({ latest, pushed, outcome, uid }: PushResult): PushRec
   if (outcome.kind === 'deleted') {
     return unchanged ? { kind: 'delete' } : { kind: 'nothing' }
   }
-  const etag = { [`etags.${uid}`]: outcome.etag }
+  const etag = { [`etags.${uid}`]: outcome.event.etag ?? '' }
+  // Google's reply holds the whole event: the fields just written, plus anything changed in Google
+  // meanwhile. Taking all of it keeps the entry identical to the event.
   return {
-    fields: unchanged ? { ...etag, dirty: [], pendingOp: null, sync: 'synced', syncError: null } : etag,
+    fields: unchanged ? { ...remote, ...etag, dirty: [], pendingOp: null, sync: 'synced', syncError: null } : etag,
     kind: 'update',
   }
 }

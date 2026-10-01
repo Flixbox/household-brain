@@ -311,6 +311,11 @@ There is no webhook, because that needs a server. The pull runs at exactly two m
 
 Both go through the single-flight routine, so they never run twice at the same time.
 
+Both need Google access on the device: a Calendar token, which only a click can provide. Until a
+device has one, the sync bar says "Not synced with Google Calendar on this device yet" and offers
+**Sync now**. Saving an entry also asks for access, during the click. A pull that just ran is reused
+for 3 seconds, so a burst of triggers causes one pull.
+
 **The routine**
 
 - **Incremental sync:** `events.list(calendarId, syncToken, showDeleted: true)` with this user's

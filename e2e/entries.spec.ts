@@ -13,7 +13,7 @@ test.beforeEach(async () => {
 })
 
 test('an entry is added, edited and deleted, and each change reaches Google Calendar', async ({ page }) => {
-  const { events, requests } = await mockGoogle(page)
+  const { google, requests } = await mockGoogle(page)
   await signInAllowlisted(page, 'owner@household-brain.test')
   const coupons = page.getByRole('region', { name: 'Coupon' })
   const synced = () => expect(page.getByText('not yet in Google Calendar')).toHaveCount(0)
@@ -26,7 +26,7 @@ test('an entry is added, edited and deleted, and each change reaches Google Cale
   await page.getByRole('button', { name: 'Save' }).click()
   await expect(coupons.getByRole('link', { name: /Amazon/u })).toContainText('2026-11-03')
   await synced()
-  expect([...events.values()]).toEqual([expect.objectContaining({
+  expect(google.live()).toEqual([expect.objectContaining({
     end: { dateTime: '2026-11-03T17:15:00', timeZone: 'Europe/Berlin' },
     extendedProperties: { private: expect.objectContaining({ 'hb.category': 'coupon', 'hb.code': 'SUMMER25' }) },
     reminders: { useDefault: true },
@@ -43,17 +43,17 @@ test('an entry is added, edited and deleted, and each change reaches Google Cale
   const patches = requests.filter(request => request.method === 'PATCH' && request.path.includes('/events/'))
   expect(patches).toHaveLength(1)
   expect(Object.keys(patches[0].body as object).toSorted()).toEqual(['end', 'start'])
-  expect([...events.values()][0]).toMatchObject({ start: { dateTime: '2026-11-05T17:00:00' }, summary: '[Coupon] Amazon' })
+  expect(google.live()[0]).toMatchObject({ start: { dateTime: '2026-11-05T17:00:00' }, summary: '[Coupon] Amazon' })
 
   // Delete.
   await coupons.getByRole('link', { name: /Amazon/u }).click()
   await page.getByRole('button', { name: 'Delete entry' }).click()
   await expect(coupons.getByRole('link', { name: /Amazon/u })).toHaveCount(0)
-  await expect.poll(() => events.size).toBe(0)
+  await expect.poll(() => google.live().length).toBe(0)
 })
 
 test('without Google access an entry waits, and "Sync now" sends it', async ({ page }) => {
-  const { events } = await mockGoogle(page)
+  const { google } = await mockGoogle(page)
   await page.addInitScript(() => {
     // The first token request fails, as when Google's window is closed; later ones succeed.
     const original = (window as unknown as { google: { accounts: { oauth2: { initTokenClient: (config: object) => unknown } } } }).google.accounts.oauth2
@@ -73,15 +73,15 @@ test('without Google access an entry waits, and "Sync now" sends it', async ({ p
   await page.getByLabel('Due date (17:00)').fill('2026-12-01')
   await page.getByRole('button', { name: 'Save' }).click()
   await expect(page.getByText('1 change not yet in Google Calendar.')).toBeVisible()
-  expect(events.size).toBe(0)
+  expect(google.live().length).toBe(0)
 
   await page.getByRole('button', { name: 'Sync now' }).click()
   await expect(page.getByText('not yet in Google Calendar')).toHaveCount(0)
-  expect([...events.values()]).toEqual([expect.objectContaining({ summary: '[Coupon] Gym' })])
+  expect(google.live()).toEqual([expect.objectContaining({ summary: '[Coupon] Gym' })])
 })
 
 test('a double-tapped Save creates one entry, and deleting it while it syncs removes the event too', async ({ page }) => {
-  const { events, requests } = await mockGoogle(page)
+  const { google, requests } = await mockGoogle(page)
   await signInAllowlisted(page, 'owner@household-brain.test')
 
   await page.getByRole('link', { name: 'Add Coupon' }).click()
@@ -95,7 +95,7 @@ test('a double-tapped Save creates one entry, and deleting it while it syncs rem
   await page.getByRole('button', { name: 'Delete entry' }).click()
   await expect(row).toHaveCount(0)
   await expect(page.getByText('not yet in Google Calendar')).toHaveCount(0)
-  expect(events.size, requests.map(request => `${request.method} ${request.path}`).join(' | ')).toBe(0)
+  expect(google.live().length, requests.map(request => `${request.method} ${request.path}`).join(' | ')).toBe(0)
   // At most one insert: the delete may even win before the entry was ever sent.
   expect(requests.filter(request => request.method === 'POST' && request.path.endsWith('/events')).length).toBeLessThanOrEqual(1)
 })

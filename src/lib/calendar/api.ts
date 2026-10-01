@@ -43,6 +43,19 @@ export interface CalendarApi {
   patchEvent: (target: EventTarget, patch: CalendarEvent, etag: string) => Promise<CalendarEvent>
   /** Succeeds when the event is already gone. */
   deleteEvent: (calendarId: string, eventId: string) => Promise<void>
+  /** One page of events, deleted ones included. Fails with 410 when `syncToken` has expired. */
+  listEvents: (calendarId: string, cursor: EventCursor) => Promise<EventPage>
+}
+
+export interface EventCursor {
+  syncToken?: string
+  pageToken?: string
+}
+
+export interface EventPage {
+  items?: CalendarEvent[]
+  nextPageToken?: string
+  nextSyncToken?: string
 }
 
 type Fetch = (input: string, init: RequestInit) => Promise<Response>
@@ -127,6 +140,16 @@ function eventMethods(call: Call) {
     },
     getEvent: (calendarId: string, eventId: string) => call<CalendarEvent>({ method: 'GET', path: event(calendarId, eventId) }),
     insertEvent: (calendarId: string, body: CalendarEvent) => call<CalendarEvent>({ body, method: 'POST', path: events(calendarId) }),
+    listEvents: (calendarId: string, { syncToken, pageToken }: EventCursor) => {
+      const query = new URLSearchParams({ maxResults: '250', showDeleted: 'true' })
+      if (syncToken) {
+        query.set('syncToken', syncToken)
+      }
+      if (pageToken) {
+        query.set('pageToken', pageToken)
+      }
+      return call<EventPage>({ method: 'GET', path: `${events(calendarId)}?${query}` })
+    },
     patchEvent: (target: EventTarget, body: CalendarEvent, etag: string) =>
       call<CalendarEvent>({ body, headers: { 'If-Match': etag }, method: 'PATCH', path: event(target.calendarId, target.eventId) }),
   }
