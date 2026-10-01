@@ -4,7 +4,12 @@ import { defineConfig, devices } from '@playwright/test'
 // Start it through `pnpm test:emulated`, which boots the emulators first.
 export default defineConfig({
   forbidOnly: Boolean(process.env.CI),
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  // Desktop plus the two phones the app is actually used on: Android Chrome and iPhone Safari (WebKit).
+  projects: [
+    { name: 'desktop-chrome', use: { ...devices['Desktop Chrome'] } },
+    { name: 'android-pixel-9', use: { ...devices['Pixel 9'] } },
+    { name: 'iphone-17', use: { ...devices['iPhone 17'] } },
+  ],
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : 'list',
   retries: process.env.CI ? 1 : 0,
   testDir: 'e2e',
