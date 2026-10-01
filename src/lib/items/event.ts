@@ -5,16 +5,24 @@ export const DUE_TIME = '17:00:00'
 export const END_TIME = '17:15:00'
 
 /** Google Calendar event fields the app writes (a subset of the events resource). */
+/** A start or end: timed (`dateTime`) or, for all-day events made in Google Calendar, a `date`. */
+export interface EventTime {
+  dateTime?: string
+  date?: string
+  timeZone?: string
+}
+
 export interface CalendarEvent {
   id?: string
   summary?: string
   description?: string
   colorId?: string
-  start?: { dateTime: string, timeZone: string }
-  end?: { dateTime: string, timeZone: string }
-  reminders?: { useDefault: boolean }
-  extendedProperties?: { private: Record<string, string> }
+  start?: EventTime
+  end?: EventTime
+  reminders?: { useDefault: boolean, overrides?: { method: string, minutes: number }[] }
+  extendedProperties?: { private?: Record<string, string> }
   etag?: string
+  /** "confirmed", "tentative", or "cancelled" for a deleted event. */
   status?: string
 }
 

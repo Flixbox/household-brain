@@ -7,7 +7,7 @@ import { type PushRecord, errorFor, recordFor } from './record'
 
 export const itemsCollection = collection(db, 'items')
 const itemDoc = (id: string) => doc(db, 'items', id)
-const stamp = () => ({ rev: newEventId(), updatedAt: serverTimestamp(), updatedBy: auth.currentUser?.uid ?? '' })
+export const stamp = () => ({ rev: newEventId(), updatedAt: serverTimestamp(), updatedBy: auth.currentUser?.uid ?? '' })
 
 // The write functions return Firestore's promise, which only settles once the server confirmed the
 // write. Callers must not wait for it before moving on: offline it never settles, yet the change is
@@ -60,7 +60,8 @@ function apply(item: Item, decide: (latest: Item | null) => PushRecord): Promise
   })
 }
 
-export const recordPush = (item: Item, outcome: PushOutcome, uid: string) => apply(item, latest => recordFor({ latest, outcome, pushed: item, uid }))
+export const recordPush = (item: Item, outcome: PushOutcome, { uid, remote }: { uid: string, remote: ItemDraft | null }) =>
+  apply(item, latest => recordFor({ latest, outcome, pushed: item, remote, uid }))
 
 export const recordPushError = (item: Item, message: string) => apply(item, latest => errorFor(latest, item, message))
 

@@ -46,27 +46,27 @@ function fakeApi(behaviour: Partial<Record<'insert' | 'patch' | 'delete', number
 describe('pushItem', () => {
   it('inserts a new entry with its client-generated id', async () => {
     const { calls, context } = fakeApi()
-    expect(await pushItem(context(), base)).toEqual({ etag: '"v1"', kind: 'synced' })
+    expect(await pushItem(context(), base)).toMatchObject({ event: { etag: '"v1"' }, kind: 'synced' })
     expect(calls).toEqual(['insert evt1 [Coupon] Amazon'])
   })
 
   it('treats 409 on insert as already created and reads the etag', async () => {
     const { calls, context } = fakeApi({ insert: [409] })
-    expect(await pushItem(context(), base)).toEqual({ etag: '"current"', kind: 'synced' })
+    expect(await pushItem(context(), base)).toMatchObject({ event: { etag: '"current"' }, kind: 'synced' })
     expect(calls).toEqual(['insert evt1 [Coupon] Amazon', 'get evt1'])
   })
 
   it('patches only the changed fields, guarded by the etag', async () => {
     const { calls, context } = fakeApi()
     const edited: Item = { ...base, dirty: ['dueDate'], etags: { owner: '"v1"' } }
-    expect(await pushItem(context(), edited)).toEqual({ etag: '"v2"', kind: 'synced' })
+    expect(await pushItem(context(), edited)).toMatchObject({ event: { etag: '"v2"' }, kind: 'synced' })
     expect(calls).toEqual(['patch evt1 end,start if "v1"'])
   })
 
   it('retries once against the current version after 412', async () => {
     const { calls, context } = fakeApi({ patch: [412] })
     const edited: Item = { ...base, dirty: ['title'], etags: { owner: '"old"' } }
-    expect(await pushItem(context(), edited)).toEqual({ etag: '"v2"', kind: 'synced' })
+    expect(await pushItem(context(), edited)).toMatchObject({ event: { etag: '"v2"' }, kind: 'synced' })
     expect(calls).toEqual(['patch evt1 colorId,summary if "old"', 'get evt1', 'patch evt1 colorId,summary if "current"'])
   })
 

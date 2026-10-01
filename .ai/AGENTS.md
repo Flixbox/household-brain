@@ -3,6 +3,34 @@
 The README is the spec and the source of truth for architecture, toolchain and code rules. This file
 holds what agents working in this repo have learned the hard way. Add to it when something bites.
 
+## Working as the bot
+
+The agent pushes, opens and updates pull requests, comments, and reads CI as **`flixbox-ai-agent[bot]`**
+(the private GitHub App "Flixbox [AI Agent]", installed only on this repository). It never does
+that work with the owner's account.
+
+- **Tokens:** `agent-gh-token` (in `~/.local/bin`) signs a JWT with the app's private key
+  (`~/.config/household-brain-agent/app.pem`, App ID in `app-id` next to it) and prints a 1-hour
+  installation token, cached for 50 minutes. `agent-gh` is `gh` with that token. The key is never
+  committed, pasted or sent anywhere except GitHub's token endpoint.
+- **Each worktree**, once after creating it:
+
+  ```sh
+  git config user.name 'flixbox-ai-agent[bot]'
+  git config user.email '336689584+flixbox-ai-agent[bot]@users.noreply.github.com'
+  git config credential.https://github.com.helper ''
+  git config --add credential.https://github.com.helper \
+    '!f() { test "$1" = get || exit 0; echo username=x-access-token; echo "password=$(agent-gh-token)"; }; f'
+  ```
+
+- **Pull requests and comments:** `agent-gh pr create …`, `agent-gh pr comment …`.
+- **Babysitter:** `GH=agent-gh /tmp/babysit-pr.sh <number>`.
+- **What the bot can't do**, on purpose: change repository settings or rulesets, merge past checks,
+  or approve. Settings changes the owner asks for are made with the owner's `gh` login. Merging is
+  the owner's auto-merge.
+- **Revoking or rotating:** suspend or uninstall the app in GitHub's settings; for a new key,
+  generate one on the app's page, replace `app.pem`, and delete the old key on GitHub.
+
 ## Babysitting a pull request
 
 You own a pull request from the moment you open it until it is merged and deployed. "Pushed" is not
@@ -51,7 +79,7 @@ docs. Only wait in the foreground for something whose result you need for the ve
 | `CI_SLOW` | More than 20 minutes: something hangs. Cancel the run (`gh run cancel <run>`), read the logs (`gh api repos/Flixbox/household-brain/actions/jobs/<job-id>/logs`), fix the hang **and** the missing time limit. A flaky download can just be re-run (`gh run rerun <run> --failed`). |
 | `CONFLICT` | Rebase on `main`, run the checks, push once, reply on the PR. |
 | `ACTIVITY` | Answer every comment (section 4), including those of a pending review. |
-| `DEPLOYED` | Check the live site responds, report, and only now start the next PR. |
+| `DEPLOYED` | Wait one minute, then check the live app in the browser (section 5). Report, and only now start the next PR. |
 | `DEPLOY_FAILED` | Fix it in a follow-up PR (never push to `main`). |
 | `MAIN_FAILED` / `MAIN_SLOW` | `main` is broken or hanging, whichever PR caused it. That comes first: fix it in a follow-up PR, or re-run a flaky job, before continuing. |
 
@@ -78,7 +106,15 @@ installing browsers), `deploy` about 2 minutes.
   `DEPLOYED` or `DEPLOY_FAILED`.
 - **If the deploy fails, open a follow-up pull request** with the fix. Never push to `main`
   directly; it only accepts PRs with green CI.
-- Finally, check the live site (`https://household-brain-sf.web.app`) responds, and report.
+- **One minute after every deploy, check the live app in the browser** (Claude in Chrome), not just
+  that the URL answers:
+  1. Open `https://household-brain-sf.web.app` and **reload** it, so the new service worker and build
+     are the ones running. If an "update available" prompt appears, take it.
+  2. Check that the page renders, sign-in or the signed-in screen works, and the browser console
+     shows no errors.
+  3. Exercise what the PR changed, where that is safe on real data. Never create, change or delete
+     real entries, or touch the real Google Calendar, just to test.
+  4. Report what you saw. If it is broken, open a follow-up PR right away.
 
 ## Lessons learned
 
