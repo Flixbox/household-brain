@@ -22,10 +22,16 @@ export type PushOutcome =
 const isStatus = (error: unknown, status: number) => error instanceof CalendarApiError && error.status === status
 const eventContext = ({ config, categories }: PushContext) => ({ categories, timeZone: config.timeZone })
 
-async function insert(context: PushContext, item: Item): Promise<CalendarEvent> {
+/** The event after an insert; `existed` when Google already had it (409). */
+interface Inserted {
+  event: CalendarEvent
+  existed: boolean
+}
+
+async function insert(context: PushContext, item: Item): Promise<Inserted> {
   const { api, config } = context
   try {
-    return await api.insertEvent(config.calendarId, eventFor(item, eventContext(context)))
+    return { event: await api.insertEvent(config.calendarId, eventFor(item, eventContext(context))), existed: false }
   } catch (error) {
     // 409: an earlier attempt already created it (the id is ours), so the insert did succeed. If it
     // was deleted in Google since, the entry still exists here: bring it back.
@@ -33,9 +39,10 @@ async function insert(context: PushContext, item: Item): Promise<CalendarEvent> 
       throw error
     }
     const existing = await api.getEvent(config.calendarId, item.id)
-    return existing.status === 'cancelled'
-      ? restore(context, item, { calendarId: config.calendarId, eventId: item.id })
+    const event = existing.status === 'cancelled'
+      ? await restore(context, item, { calendarId: config.calendarId, eventId: item.id })
       : existing
+    return { event, existed: true }
   }
 }
 
@@ -99,9 +106,9 @@ export async function pushItem(context: PushContext, item: Item): Promise<PushOu
   if (etag) {
     return { event: await patch(context, item, etag), kind: 'synced' }
   }
-  // Nothing seen yet as this user: a new entry, or one only the other person has pushed so far. An
-  // insert covers both: it creates the event, or gets 409 and reads the current one.
-  const inserted = await insert(context, item)
-  const editsOthersEvent = Object.keys(item.etags).length > 0 && item.dirty.length > 0
-  return { event: editsOthersEvent ? await patch(context, item, inserted.etag ?? '') : inserted, kind: 'synced' }
+  // No etag for this person yet: a new entry, one only the other person has pushed, or one created by
+  // a pull whose etag was never recorded. An insert covers all: it creates the event, or gets 409 and
+  // reads the existing one, which the local edits are then patched onto.
+  const { event, existed } = await insert(context, item)
+  return { event: existed && item.dirty.length > 0 ? await patch(context, item, event.etag ?? '') : event, kind: 'synced' }
 }

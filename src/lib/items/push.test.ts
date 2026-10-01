@@ -107,6 +107,12 @@ describe('pushItem', () => {
     ])
   })
 
+  it('patches local edits onto an existing event even when no etag was ever recorded here', async () => {
+    const { calls, context } = fakeApi({ insert: [409] })
+    await pushItem(context(), { ...base, dirty: ['code'], etags: {} })
+    expect(calls).toEqual(['insert evt1 [Coupon] Amazon', 'get evt1', 'patch evt1 extendedProperties if "current"'])
+  })
+
   it('deletes, and other failures surface', async () => {
     const { calls, context } = fakeApi({ insert: [500] })
     expect(await pushItem(context(), { ...base, pendingOp: 'delete' })).toEqual({ kind: 'deleted' })
