@@ -46,7 +46,7 @@ export function removeItem(id: string): Promise<void> {
 }
 
 /** Applies a push record in a transaction; resolves to false when nothing could be recorded. */
-async function apply(item: Item, decide: (latest: Item | null) => PushRecord): Promise<boolean> {
+function apply(item: Item, decide: (latest: Item | null) => PushRecord): Promise<boolean> {
   return runTransaction(db, async transaction => {
     const ref = itemDoc(item.id)
     const snapshot = await transaction.get(ref)
