@@ -53,6 +53,7 @@ docs. Only wait in the foreground for something whose result you need for the ve
 | `ACTIVITY` | Answer every comment (section 4), including those of a pending review. |
 | `DEPLOYED` | Check the live site responds, report, and only now start the next PR. |
 | `DEPLOY_FAILED` | Fix it in a follow-up PR (never push to `main`). |
+| `MAIN_FAILED` / `MAIN_SLOW` | `main` is broken or hanging, whichever PR caused it. That comes first: fix it in a follow-up PR, or re-run a flaky job, before continuing. |
 
 Normal durations, for comparison: `checks` about 1 minute, `e2e` about 3 minutes (most of it
 installing browsers), `deploy` about 2 minutes.

@@ -3,6 +3,7 @@
 #
 #   CI_PASSED / CI_FAILED     CI finished for the PR's current head commit
 #   CI_SLOW                   a CI run (PR or deploy) has been going for more than the limit
+#   MAIN_FAILED / MAIN_SLOW   the newest CI run on main failed or hangs, whichever PR caused it
 #   CONFLICT                  the PR conflicts with its base branch: rebase it
 #   ACTIVITY                  new comments, reviews (including a pending review's comments), review comments
 #   DEPLOYED / DEPLOY_FAILED  the PR was merged and the deploy run on main finished
@@ -68,9 +69,10 @@ check_activity() {
 
 check_run() { # check_run <sha> <label>: report a finished or slow CI run of that commit
   local sha=$1 label=$2 run status conclusion created age
+  # startedAt is the current attempt's start, so a re-run is timed from when it actually began.
   read -r run created status conclusion < <(gh run list --repo "$REPO" --workflow "$WORKFLOW" --commit "$sha" \
-    --json databaseId,createdAt,status,conclusion \
-    --jq '.[0] // empty | "\(.databaseId) \(.createdAt) \(.status) \(if (.conclusion // "") == "" then "-" else .conclusion end)"') || return
+    --json databaseId,startedAt,status,conclusion \
+    --jq '.[0] // empty | "\(.databaseId) \(.startedAt) \(.status) \(if (.conclusion // "") == "" then "-" else .conclusion end)"') || return
   [[ -z ${run:-} ]] && return
   local jobs
   jobs=$(gh run view "$run" --repo "$REPO" --json jobs --jq '.jobs[] | "  \(.name): \(.status) \(.conclusion // "")"')
@@ -87,6 +89,20 @@ check_run() { # check_run <sha> <label>: report a finished or slow CI run of tha
   (( age > limit )) && report "ci-slow $run" "CI_SLOW: run $run ($label, ${sha:0:7}) still $status after $(( age / 60 )) min. Cancel it and read the logs." "$jobs"
 }
 
+check_main() { # the newest CI run on main, whichever PR it came from
+  local run started status conclusion age
+  read -r run started status conclusion < <(gh run list --repo "$REPO" --workflow "$WORKFLOW" --branch main --event push --limit 1 \
+    --json databaseId,startedAt,status,conclusion \
+    --jq '.[0] // empty | "\(.databaseId) \(.startedAt) \(.status) \(if (.conclusion // "") == "" then "-" else .conclusion end)"') || return
+  [[ -z ${run:-} ]] && return
+  if [[ $status == completed ]]; then
+    [[ $conclusion == success || $conclusion == cancelled ]] && return
+    report "main-failed $run" "MAIN_FAILED: CI run $run on main ended $conclusion. Fix main first (follow-up PR). gh run view $run --repo $REPO --log-failed"
+  fi
+  age=$(( $(date +%s) - $(date -d "$started" +%s) ))
+  (( age > limit )) && report "main-slow $run" "MAIN_SLOW: CI run $run on main still $status after $(( age / 60 )) min. Cancel it and read the logs."
+}
+
 # Comments that existed before the first run are not news.
 if [[ ! -e $state_dir/started ]]; then
   until existing=$(activity); do sleep 30; done
@@ -97,6 +113,7 @@ fi
 while true; do
   read -r state mergeable head merge_sha < <(gh pr view "$pr" --repo "$REPO" --json state,mergeable,headRefOid,mergeCommit \
     --jq '"\(.state) \(.mergeable) \(.headRefOid) \(.mergeCommit.oid // "-")"') || { sleep 30; continue; }
+  check_main
   case $state in
     MERGED) check_run "$merge_sha" deploy ;;
     CLOSED) report "closed" "CLOSED: PR #$pr was closed without merging" ;;
