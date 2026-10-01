@@ -1,5 +1,5 @@
 // Google Calendar access tokens from Google Identity Services (GIS). Tokens live only in memory and
-// Last about an hour; there is no refresh token anywhere (README section 3.1).
+// last about an hour; there is no refresh token anywhere (README section 3.1).
 
 const GIS_SCRIPT = 'https://accounts.google.com/gsi/client'
 const CALENDAR = 'https://www.googleapis.com/auth/calendar'
@@ -128,8 +128,8 @@ export function acceptToken(response: TokenResponse, scopes: readonly string[]):
  * show its consent popup.
  */
 export async function calendarToken(scopes: readonly string[], hint?: string | null): Promise<string> {
-  // Performance.now() stops while some phones sleep, so a token can outlive this check; the API
-  // Wrapper then gets a 401, calls forgetCalendarToken() and asks again.
+  // The clock behind performance.now() stops while some phones sleep, so a token can outlive this check; the API
+  // wrapper then gets a 401, calls forgetCalendarToken() and asks again.
   if (current && covers(current, scopes) && performance.now() < current.usableUntil) {
     return current.value
   }

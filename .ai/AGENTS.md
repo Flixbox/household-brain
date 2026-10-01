@@ -8,6 +8,16 @@ holds what agents working in this repo have learned the hard way. Add to it when
 You own a pull request from the moment you open it until it is merged and deployed. "Pushed" is not
 "done". These steps keep it moving without anyone having to ask what is going on.
 
+**One pull request at a time.** Open the next one only after the previous one is merged and its
+deploy is green. Never stack pull requests or work on two in parallel: the owner merges with squash,
+which rewrites the history a stacked branch is built on, and every open PR is one more thing for
+the owner to track.
+
+**Run long things in the background and keep working.** Test suites, builds, installs, CI and PR
+watchers, reviewer agents: start them in the background (their exit is the notification) and do the
+next useful thing meanwhile, such as reading review findings, updating the PR description or the
+docs. Only wait in the foreground for something whose result you need for the very next step.
+
 ### 1. Before you push
 
 - **Run what CI runs, locally, once**: `pnpm lint && pnpm typecheck && pnpm test`, and for anything
@@ -20,26 +30,29 @@ You own a pull request from the moment you open it until it is merged and deploy
 ### 2. After every push
 
 1. **Update the PR description** so it describes what the branch does now.
-2. **Keep two watchers running in the background**, and let their exits wake you:
+2. **Keep the babysitter running in the background**, and let its exit wake you:
 
    ```sh
-   scripts/watch-ci.sh --commit "$(git rev-parse HEAD)"   # CI result, alerts after 20 minutes
-   scripts/watch-pr.sh <number>                           # comments, reviews, merge or close
+   cp scripts/babysit-pr.sh /tmp/babysit-pr.sh && /tmp/babysit-pr.sh <number>
    ```
 
-   - Don't poll by hand alongside them, and don't start a second watcher for the same thing.
-   - `watch-pr.sh` exits on the first new event. Handle it, then start it again. It stays armed
-     until the PR is merged or closed, so comments are answered even while CI is long green.
-3. **A newer push makes the old watcher's result meaningless.** It will report "cancelled". Start a
-   new one for the new head commit.
+   - It follows the PR's **current** head commit, so a push needs no new babysitter.
+   - It remembers what it already reported, so after handling an event you simply start it again and
+     it continues with the next one.
+   - It runs from a copy, because bash reads a script while running it.
+   - It stays armed through the merge and reports the deploy. Don't poll by hand alongside it.
 
-### 3. When the watcher exits
+### 3. When the babysitter reports
 
-| Exit | Meaning | What to do |
-| --- | --- | --- |
-| `0` | Green | Report it. If auto-merge is on, start watching the `main` run that the merge triggers (step 5). |
-| `1` | Failed or cancelled | If cancelled by your own newer push, ignore it. Otherwise read the failing job's log (`gh run view <run> --log-failed`), reproduce locally, fix, and push once. |
-| `2` | ALERT: more than 20 minutes | Something hangs; nothing here legitimately takes that long. Cancel the run (`gh run cancel <run>`), read the logs (`gh api repos/Flixbox/household-brain/actions/jobs/<job-id>/logs`), reproduce locally under `timeout`, then fix the hang **and** the missing time limit that let it run on. |
+| Event | What to do |
+| --- | --- |
+| `CI_PASSED` | Report it; the owner merges with auto-merge. Start the babysitter again. |
+| `CI_FAILED` | Read the failing job (`gh run view <run> --log-failed`), reproduce locally, fix, push once. |
+| `CI_SLOW` | More than 20 minutes: something hangs. Cancel the run (`gh run cancel <run>`), read the logs (`gh api repos/Flixbox/household-brain/actions/jobs/<job-id>/logs`), fix the hang **and** the missing time limit. A flaky download can just be re-run (`gh run rerun <run> --failed`). |
+| `CONFLICT` | Rebase on `main`, run the checks, push once, reply on the PR. |
+| `ACTIVITY` | Answer every comment (section 4), including those of a pending review. |
+| `DEPLOYED` | Check the live site responds, report, and only now start the next PR. |
+| `DEPLOY_FAILED` | Fix it in a follow-up PR (never push to `main`). |
 
 Normal durations, for comparison: `checks` about 1 minute, `e2e` about 3 minutes (most of it
 installing browsers), `deploy` about 2 minutes.
@@ -60,8 +73,8 @@ installing browsers), `deploy` about 2 minutes.
 
 - The owner merges by enabling **auto-merge**. It merges by itself once both required checks are
   green. Owner-authored PRs can't be approved by the owner, so there is no approval step.
-- After the merge, **watch the `main` run, including `deploy`**, with the same watcher:
-  `scripts/watch-ci.sh --commit <merge-commit-sha>` (`gh pr view <n> --json mergeCommit`).
+- After the merge, the same babysitter follows the `main` run through `deploy` and reports
+  `DEPLOYED` or `DEPLOY_FAILED`.
 - **If the deploy fails, open a follow-up pull request** with the fix. Never push to `main`
   directly; it only accepts PRs with green CI.
 - Finally, check the live site (`https://household-brain-sf.web.app`) responds, and report.
@@ -77,7 +90,7 @@ installing browsers), `deploy` about 2 minutes.
   silently for 1.5 hours in CI because nothing put a limit on it (GitHub's default is 6 hours).
 - **CI test reporters must stream progress** (`list`), not only write a report at the end. With
   `github` + `html` alone, a hang produced no output at all after "Running 12 tests".
-- **Watch a pipeline with a deadline**: `scripts/watch-ci.sh` (see the babysitting guide above).
+- **Watch a pipeline with a deadline**: `scripts/babysit-pr.sh` (see the babysitting guide above).
 - **Each push to a PR branch cancels the running CI** (`concurrency` with `cancel-in-progress`).
   Batch fixes into one push, or no run ever finishes.
 - **Pushing anything under `.github/workflows/` needs the `workflow` scope** on the GitHub token
@@ -89,8 +102,13 @@ installing browsers), `deploy` about 2 minutes.
 - **Right after a push, GitHub can still report the PR's previous head commit.** A watcher using
   `--pr` then watched the cancelled run of the old commit. Watch by the commit you just pushed.
 
-- **Run watchers from a copy of the script**, e.g. in a scratch directory. Bash reads a script while
-  running it, so editing or checking out `scripts/watch-*.sh` under a running watcher corrupts it.
+- **Run the babysitter from a copy of the script**, e.g. in a scratch directory. Bash reads a script
+  while running it, so editing or checking out `scripts/babysit-pr.sh` under a running one corrupts
+  it.
+
+- **Stacked PRs conflict after a squash merge.** PR 6 was built on PR 5's branch; squash-merging
+  PR 5 rewrote that history and left PR 6 conflicting, unnoticed until the owner pointed it out. One
+  PR at a time, and the babysitter reports conflicts.
 
 - **The e2e job runs in Microsoft's Playwright image**, which already has the browsers and their system
   packages. Installing them per run took over 3 minutes and once hung for 15. The image version must

@@ -15,6 +15,7 @@ export interface CalendarEvent {
   reminders?: { useDefault: boolean }
   extendedProperties?: { private: Record<string, string> }
   etag?: string
+  status?: string
 }
 
 /** What turning an entry into an event needs besides the entry. */

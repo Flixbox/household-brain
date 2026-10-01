@@ -16,6 +16,7 @@ const item: Item = {
   id: 'abc123def456',
   notes: 'Only online',
   pendingOp: null,
+  rev: 'r1',
   status: 'open',
   sync: 'pending',
   syncError: null,

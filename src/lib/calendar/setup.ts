@@ -35,7 +35,7 @@ export async function createHousehold(api: SetupApi, store: HouseholdStore, owne
   let config = await store.config()
   if (!config) {
     // Reuse a calendar left by an earlier attempt (a retry after a failure, or a second tab), so the
-    // Owner never ends up with two "Household Brain" calendars.
+    // owner never ends up with two "Household Brain" calendars.
     const [existing] = await api.findOwnedCalendars(CALENDAR_NAME)
     const calendar = existing ?? await api.insertCalendar({
       description: 'Due dates kept by the Household Brain app. Entries are due at 17:00.',

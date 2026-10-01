@@ -536,8 +536,7 @@ pnpm typecheck
 pnpm test               # unit tests (Vitest)
 pnpm test:emulated      # boots the Auth + Firestore emulators, then rules tests + Playwright e2e
 pnpm emulators          # emulators only, for running pnpm test:e2e or test:rules against them
-scripts/watch-ci.sh --commit HEAD   # watch this commit's CI run, alert after 20 minutes (.ai/AGENTS.md)
-scripts/watch-pr.sh <n>             # wait for the next comment, review, merge or close on a PR
+scripts/babysit-pr.sh <n>           # wait for the next CI result, slow run, conflict, comment or deploy (.ai/AGENTS.md)
 pnpm exec firebase deploy --only hosting,firestore:rules,firestore:indexes   # manual fallback for CI
 ```
 

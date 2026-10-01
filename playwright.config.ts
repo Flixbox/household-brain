@@ -21,8 +21,8 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   // `pnpm test:e2e` builds first. The server command must be `vite preview` itself, not a pnpm
-  // Script or an `&&` chain: those wrappers swallow the stop signal and Playwright then waits for the
-  // Server to exit forever.
+  // script or an `&&` chain: those wrappers swallow the stop signal and Playwright then waits for the
+  // server to exit forever.
   webServer: {
     command: 'vite preview --port 4173 --strictPort',
     gracefulShutdown: { signal: 'SIGTERM', timeout: 5000 },

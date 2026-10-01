@@ -1,5 +1,5 @@
 // Google Calendar event ids may only use base32hex characters (0-9, a-v), 5–1024 long. The client
-// Generates them so that a retried insert is idempotent: the second attempt gets 409, not a copy.
+// generates them so that a retried insert is idempotent: the second attempt gets 409, not a copy.
 const ALPHABET = '0123456789abcdefghijklmnopqrstuv'
 const LENGTH = 26
 

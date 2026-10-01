@@ -17,8 +17,13 @@ export interface Item {
   /** Fields changed locally since the last successful push. */
   dirty: EditableField[]
   syncError: string | null
-  /** Firestore server timestamp of the last local change; lets a finished push detect newer edits. */
-  updatedAt?: { isEqual: (other: unknown) => boolean } | null
+  /**
+   * A fresh random value on every local write. A finished push compares it with the stored one to
+   * tell whether the entry changed meanwhile (a server timestamp can't: it is still empty locally).
+   */
+  rev: string
+  updatedAt?: unknown
+  /** Uid of the person who made the last local change. */
   updatedBy?: string
 }
 

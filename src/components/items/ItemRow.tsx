@@ -8,7 +8,11 @@ export function ItemRow({ item }: { item: Item }) {
       <Link to="/items/$itemId" params={{ itemId: item.id }} className="flex items-baseline gap-3 rounded-lg px-3 py-2 hover:bg-stone-100 dark:hover:bg-stone-900">
         <span className="flex-1 font-medium">{item.title}</span>
         <span className="text-sm text-stone-500 tabular-nums">{item.dueDate}</span>
-        {item.sync !== 'synced' && <span title={item.sync === 'error' ? 'Sync failed' : 'Syncing'} aria-label={item.sync === 'error' ? 'Sync failed' : 'Syncing'} className={`size-2 rounded-full ${item.sync === 'error' ? 'bg-red-600' : 'bg-orange-500'}`} />}
+        {item.sync !== 'synced' && (
+          <span className={`size-2 rounded-full ${item.sync === 'error' ? 'bg-red-600' : 'bg-orange-500'}`}>
+            <span className="sr-only">{item.sync === 'error' ? 'Sync failed' : 'Syncing'}</span>
+          </span>
+        )}
       </Link>
     </li>
   )
