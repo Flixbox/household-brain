@@ -20,13 +20,16 @@ You own a pull request from the moment you open it until it is merged and deploy
 ### 2. After every push
 
 1. **Update the PR description** so it describes what the branch does now.
-2. **Start one watcher in the background, with a deadline**, and let its exit wake you:
+2. **Keep two watchers running in the background**, and let their exits wake you:
 
    ```sh
-   scripts/watch-ci.sh --commit "$(git rev-parse HEAD)"   # alerts after 20 minutes
+   scripts/watch-ci.sh --commit "$(git rev-parse HEAD)"   # CI result, alerts after 20 minutes
+   scripts/watch-pr.sh <number>                           # comments, reviews, merge or close
    ```
 
-   Don't poll by hand alongside it, and don't start a second watcher for the same run.
+   - Don't poll by hand alongside them, and don't start a second watcher for the same thing.
+   - `watch-pr.sh` exits on the first new event. Handle it, then start it again. It stays armed
+     until the PR is merged or closed, so comments are answered even while CI is long green.
 3. **A newer push makes the old watcher's result meaningless.** It will report "cancelled". Start a
    new one for the new head commit.
 
@@ -41,7 +44,12 @@ You own a pull request from the moment you open it until it is merged and deploy
 Normal durations, for comparison: `checks` about 1 minute, `e2e` about 3 minutes (most of it
 installing browsers), `deploy` about 2 minutes.
 
-### 4. Review
+### 4. Comments and review
+
+- **Every comment gets an answer.** Fix what is asked, in one push, then reply in the thread saying
+  what changed (`gh pr comment`, or a reply on the review comment). Resolve the thread once it is
+  settled.
+- If a comment needs the owner's decision, say so in the thread and leave it open.
 
 - Every pull request gets one reviewer agent: read-only, reporting findings with severity and
   evidence. Fix blockers and should-fix items before merge, and say in the PR description what was
@@ -106,6 +114,10 @@ installing browsers), `deploy` about 2 minutes.
   `no-cache` rule on `/index.html` does not cover `/` or SPA routes, so it needs `**`.
 - **Watch the allowlist entry with `onSnapshot`, don't read it once.** A one-shot server read raced
   sign-out (stale "allowed") and locked the app out offline.
+
+- **Never switch off "Enable create (sign-up)" in Firebase Authentication.** With sign-up off, nobody
+  can sign in for the first time, the owner included (`auth/admin-restricted-operation`). The
+  Firestore allowlist is the lock; anyone may create an account and still sees nothing.
 
 ### Repository and accounts
 

@@ -1,6 +1,7 @@
 import { GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth'
 import { type ReactNode, useState } from 'react'
 import { useAccess } from '../lib/access'
+import { signInErrorMessage } from '../lib/sign-in-errors'
 import { auth } from '../lib/firebase'
 
 const button = 'rounded-lg bg-orange-600 px-4 py-2 font-semibold text-white hover:bg-orange-700'
@@ -16,7 +17,7 @@ export function AccessGate({ children }: { children: ReactNode }) {
     try {
       await signInWithPopup(auth, new GoogleAuthProvider())
     } catch (error) {
-      setSignInError(error instanceof Error ? error.message : String(error))
+      setSignInError(signInErrorMessage(error) ?? '')
     }
   }
 
