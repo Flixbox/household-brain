@@ -4,7 +4,7 @@ import { firebaseOptionsFrom } from './env'
 const complete = {
   VITE_FIREBASE_API_KEY: 'key',
   VITE_FIREBASE_APP_ID: '1:1:web:1',
-  VITE_FIREBASE_AUTH_DOMAIN: 'example.web.app',
+  VITE_FIREBASE_AUTH_DOMAIN: 'household-brain.test',
   VITE_FIREBASE_MESSAGING_SENDER_ID: '1',
   VITE_FIREBASE_PROJECT_ID: 'example',
 }
@@ -14,7 +14,7 @@ describe('firebaseOptionsFrom', () => {
     expect(firebaseOptionsFrom(complete)).toEqual({
       apiKey: 'key',
       appId: '1:1:web:1',
-      authDomain: 'example.web.app',
+      authDomain: 'household-brain.test',
       messagingSenderId: '1',
       projectId: 'example',
     })

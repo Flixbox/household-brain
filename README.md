@@ -535,6 +535,8 @@ pnpm exec firebase deploy --only hosting,firestore:rules,firestore:indexes   # m
 
 **Code rules**
 
+- **Example and test domains use the reserved `.test` TLD** (RFC 2606), for example
+  `owner@household-brain.test`, never `example.com` or a real-looking hostname.
 - **`Date` is banned. Use `Temporal`.**
   - Due dates are calendar dates at 17:00 in `Europe/Berlin`, which is exactly what
     `Temporal.PlainDate` and `Temporal.ZonedDateTime` model. `Date` silently mixes UTC, local time

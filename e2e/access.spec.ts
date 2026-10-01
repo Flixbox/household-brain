@@ -28,7 +28,7 @@ test('the sign-in button opens the Google sign-in popup', async ({ page }) => {
 
 test('an account that is not on the allowlist is turned away and shown its user id', async ({ page }) => {
   await page.goto('/')
-  await signInAs(page, 'stranger@example.com')
+  await signInAs(page, 'stranger@household-brain.test')
   await expect(page.getByText('This account has no access.')).toBeVisible()
   await expect(page.getByTestId('uid')).not.toBeEmpty()
   await expect(page.getByText("You're on the allowlist")).toHaveCount(0)
@@ -36,7 +36,7 @@ test('an account that is not on the allowlist is turned away and shown its user 
 
 test('an allowlisted account gets in, and can sign out again', async ({ page }) => {
   await page.goto('/')
-  await signInAs(page, 'owner@example.com')
+  await signInAs(page, 'owner@household-brain.test')
   const uid = await page.getByTestId('uid').textContent()
   if (!uid) {
     throw new Error('The no-access screen showed no user id')
