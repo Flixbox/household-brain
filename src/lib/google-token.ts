@@ -144,6 +144,11 @@ export async function calendarToken(scopes: readonly string[], hint?: string | n
   return current.value
 }
 
+/** Whether a usable token covering `scopes` is cached, so work can run without asking Google. */
+export function hasCalendarToken(scopes: readonly string[]): boolean {
+  return current !== null && covers(current, scopes) && performance.now() < current.usableUntil
+}
+
 /** Forgets the cached token, e.g. on sign-out. */
 export function forgetCalendarToken() {
   current = null

@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { type Category, DEFAULT_CATEGORIES } from '../categories'
-import type { CalendarApi, CalendarListEntry, Reminder } from './api'
-import { CALENDAR_NAME, DEFAULT_REMINDERS, type HouseholdConfig, type HouseholdStore, TIME_ZONE, createHousehold, joinHousehold } from './setup'
+import type { CalendarListEntry, Reminder } from './api'
+import { CALENDAR_NAME, DEFAULT_REMINDERS, type HouseholdConfig, type HouseholdStore, type SetupApi, TIME_ZONE, createHousehold, joinHousehold } from './setup'
 
 function fakeApi(listEntries: Record<string, CalendarListEntry> = {}, owned: CalendarListEntry[] = []) {
   const calls: string[] = []
-  const api: CalendarApi = {
+  const api: SetupApi = {
     findOwnedCalendars: async summary => {
       calls.push(`find ${summary}`)
       return owned
