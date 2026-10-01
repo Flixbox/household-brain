@@ -1,0 +1,5 @@
+# Dependency install scripts are denied unless a package actually needs one.
+allowBuilds:
+  '@firebase/util': false
+  protobufjs: false
+  re2: false

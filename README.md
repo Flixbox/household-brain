@@ -433,10 +433,14 @@ scheduled jobs.
 - **CI: GitHub Actions** on GitHub-hosted runners, in the public repo
   [Flixbox/household-brain](https://github.com/Flixbox/household-brain). Public repos get unlimited
   free minutes on standard runners.
-  - `ci.yml`, triggered by `push` and `pull_request`: lint, typecheck, unit tests, `vite build`, and
-    `gitleaks`. Permissions: `contents: read`.
-  - `deploy.yml`, triggered by `push` to `main` only: a job with `environment: production` runs
-    `firebase deploy --only hosting,firestore:rules,firestore:indexes`.
+  One workflow, `ci.yml`, triggered by `push` to `main` and by `pull_request`. Workflow
+  permissions are `contents: read`. It has three jobs:
+
+  | Job | What it runs |
+  | --- | --- |
+  | `checks` | oxlint (with `@stylistic`), typecheck, unit tests (Vitest), `vite build`, and `gitleaks` over the whole history |
+  | `e2e` | The Firebase Auth and Firestore emulators, then Firestore security-rules tests (`@firebase/rules-unit-testing`), then Playwright end-to-end tests against an emulator build of the app |
+  | `deploy` | Only on `push` to `main`, after both other jobs pass. Uses `environment: production` and `id-token: write`, and runs `firebase deploy --only hosting,firestore:rules,firestore:indexes` |
   - **Never use the `pull_request_target` or `workflow_run` triggers.** Both run code with the base
     repository's privileges.
 - **The deploy uses no stored secret.** It authenticates through **GitHub OIDC → Google Workload
@@ -513,10 +517,22 @@ gcloud init                        # log in with the owner account, pick the Fir
 pnpm install
 pnpm dev                 # Vite dev server on http://localhost:5173
 pnpm build               # → dist/
-pnpm lint && pnpm typecheck && pnpm test
-pnpm firebase emulators:start --only auth,firestore,hosting
-pnpm firebase deploy --only hosting,firestore:rules,firestore:indexes   # manual fallback for CI
+pnpm lint               # oxlint, including @stylistic rules loaded as an oxlint JS plugin (no ESLint)
+pnpm lint:fix
+pnpm typecheck
+pnpm test               # unit tests (Vitest)
+pnpm test:emulated      # boots the Auth + Firestore emulators, then rules tests + Playwright e2e
+pnpm emulators          # emulators only, for running pnpm test:e2e or test:rules against them
+pnpm exec firebase deploy --only hosting,firestore:rules,firestore:indexes   # manual fallback for CI
 ```
+
+**Emulators and end-to-end tests:**
+- The Firestore emulator needs **Java 21**: install it with `brew install openjdk@21`. Playwright's
+  browser comes from `pnpm exec playwright install chromium`.
+- The emulators run as the `demo-household-brain` project. The `demo-` prefix makes them refuse
+  to reach any real Google service.
+- The emulator build of the app reads `.env.e2e` and adds a `window.e2eSignIn(email)` hook that
+  signs in with an unsigned emulator token. Production builds don't have that hook.
 
 **CI:** `actions/setup-node` with `node-version-file: package.json` reads the `volta.node` pin. Then
 `npm install -g pnpm` installs a bootstrap pnpm, which switches to the `packageManager` version.
@@ -555,7 +571,13 @@ household-brain/
 ├─ firestore.indexes.json
 ├─ firebase.json                  # hosting: dist/, rewrite ** → /index.html, no-cache for sw.js + index.html
 ├─ .env.production                # public Firebase web config
-├─ .github/workflows/ci.yml, deploy.yml
+├─ .github/workflows/ci.yml          # checks → e2e → deploy (main only)
+├─ e2e/                           # Playwright tests against the emulators
+├─ tests/rules/                   # Firestore security-rules tests
+├─ .env.e2e                       # emulator-only config for the e2e build
+├─ .gitleaks.toml                 # allowlists the public Firebase config
+├─ .oxlintrc.json                 # oxlint + @stylistic JS plugin
+├─ pwa-assets.config.ts           # PWA icons generated from public/icon.svg
 ├─ .github/dependabot.yml          # github-actions + npm ecosystem (covers pnpm) updates
 ├─ package.json                   # packageManager: pnpm@…, volta.node
 └─ pnpm-lock.yaml

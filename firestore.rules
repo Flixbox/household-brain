@@ -1,0 +1,19 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{db}/documents {
+    function allowed() {
+      return request.auth != null
+        && exists(/databases/$(db)/documents/allowlist/$(request.auth.uid));
+    }
+
+    // Read-only from the app: allowlist entries are managed only in the Firebase console.
+    match /allowlist/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Everything else, but never the allowlist (rules are OR'd, so the catch-all must exclude it).
+    match /{collection}/{document=**} {
+      allow read, write: if collection != 'allowlist' && allowed();
+    }
+  }
+}

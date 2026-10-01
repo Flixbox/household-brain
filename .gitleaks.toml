@@ -1,0 +1,6 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Public Firebase web config: identifies the project, grants nothing (README section 8)"
+paths = ['''^\.env\.(production|e2e)$''']

@@ -1,0 +1,18 @@
+version: 2
+updates:
+  # Keeps the commit-SHA pins of every action current (the repository requires SHA pinning).
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ['*']
+  # The npm ecosystem also covers pnpm-lock.yaml.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
