@@ -64,6 +64,9 @@ service cloud.firestore {
   allowlisted account, if hijacked, can't add another user. Only the console, which bypasses the
   rules, can.
 - If a signed-in user is not on the allowlist, the app shows "This account has no access".
+- **New sign-ups are off** in Firebase Authentication (since 2026-10-02, once both of us had signed
+  in): no new account can be created at all. To add a person, switch sign-up on in the console, let
+  them sign in once, allowlist their uid, and switch it off again.
 - Optional hardening: **App Check** with reCAPTCHA v3, so other origins can't burn Firestore quota.
 
 ## Google Cloud setup (once)

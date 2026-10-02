@@ -7,6 +7,7 @@ import { requestSyncAccess } from '../../lib/items/outbox'
 import { markDone } from '../../lib/items/swipe'
 import { extraDatesOf, nextDate } from '../../lib/items/dates'
 import { useSwipeToDone } from './use-swipe'
+import { amountLabel } from '../../lib/items/amount'
 
 const URGENCY_TEXT: Record<Urgency, string> = {
   later: 'text-stone-500',
@@ -15,7 +16,7 @@ const URGENCY_TEXT: Record<Urgency, string> = {
 }
 
 /**
- * One entry: title with its code underneath, when it is due (relative, coloured by urgency, and the
+ * One entry: title with its price and code underneath, when it is due (relative, coloured by urgency, and the
  * date), and a dot while it is not yet in Google Calendar. Done and cancelled entries say so instead.
  * `category` names its category, for lists that mix categories ("All by date"). Swiping an open
  * entry to the left marks it done.
@@ -27,6 +28,7 @@ export function ItemRow({ item, category }: { item: Item, category?: string }) {
   const more = item.status === 'open' && extraDatesOf(item).length > 0 ? ' + more' : ''
   const due = rowDue({ dueDate: next.date, status: item.status }, now)
   const since = startLabel(item.startDate, now)
+  const price = amountLabel(item.amount)
   const { handlers, offset } = useSwipeToDone(() => {
     // Asks Google for access while the gesture still counts as a click, like Save does.
     requestSyncAccess()
@@ -51,6 +53,7 @@ export function ItemRow({ item, category }: { item: Item, category?: string }) {
       >
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="font-medium">{item.title}</span>
+          {price && <span className="text-sm break-words text-stone-600 tabular-nums dark:text-stone-400">{price}</span>}
           {category && <span className="text-xs text-stone-500">{category}</span>}
           {item.code !== '' && <span className="font-mono text-sm break-all text-stone-600 select-all dark:text-stone-400">{item.code}</span>}
         </span>

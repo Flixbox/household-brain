@@ -47,6 +47,17 @@ the owner to track.
 **Keep each pull request tight: one topic.** Side findings, refactors and tooling tweaks go into
 their own follow-up PR, never along for the ride.
 
+**No pull requests that only change docs.** A doc or agent-note change (a new rule, a docs issue)
+rides along with the next real feature, refactor or fix PR, the one exception to "one topic", and
+that PR's description says so and closes the docs issue.
+
+**Abstract only when it pays.** Introduce or extend a shared helper, or file an issue proposing one,
+only when it makes the code simpler or two or more places depend on the same logic. Otherwise leave
+the special cases explicit and say why.
+
+**Rules live in this file, not in an agent's memory.** An agent's memory is ephemeral. When the owner
+states a rule for this repository, write it here (in the next real PR, see above).
+
 **Nothing personal goes on GitHub: the repository is public.** Issues, pull requests, comments,
 commits, code and tests never contain the household's real entries: amounts, balances, codes, card
 or phone numbers, providers tied to the owner, names of people. Use made-up examples ("a gift card
@@ -56,6 +67,9 @@ delete and recreate the issue (owner's `gh`), or tell the owner for a pull reque
 **Track queued work as GitHub issues.** Every idea or request that isn't being built right now gets
 an issue (assigned to the owner, an existing label such as `enhancement`), and the pull request that
 delivers it says `Closes #n`. Nothing waits only in a chat.
+
+**Read the issue and all its comments before starting work on it.** The owner decides things in
+issue comments (e.g. #43); the description alone can be out of date.
 
 **Keep going without being asked.** Once a pull request is deployed and its browser check is done,
 start the next planned piece of work, or fix what the owner reported, without waiting to be told.
@@ -251,9 +265,13 @@ installing browsers), `deploy` about 2 minutes.
 - **Watch the allowlist entry with `onSnapshot`, don't read it once.** A one-shot server read raced
   sign-out (stale "allowed") and locked the app out offline.
 
-- **Never switch off "Enable create (sign-up)" in Firebase Authentication.** With sign-up off, nobody
-  can sign in for the first time, the owner included (`auth/admin-restricted-operation`). The
-  Firestore allowlist is the lock; anyone may create an account and still sees nothing.
+- **New sign-ups are switched off** in Firebase Authentication, on purpose, since both household
+  members have accounts (2026-10-02). Existing accounts sign in as usual; a new account is refused
+  (`auth/admin-restricted-operation`, or `ADMIN_ONLY_OPERATION` from the REST API). The Firestore
+  allowlist is still the lock on the data. **To add a person:** switch sign-up on (Firebase console →
+  Authentication → Settings → User actions), let them sign in once, allowlist their uid (copy it from
+  Authentication → Users, not from a screenshot), and switch sign-up off again. While it is off,
+  nobody can sign in for the *first* time, the owner included after deleting their account.
 
 ### Repository and accounts
 
