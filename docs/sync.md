@@ -108,8 +108,16 @@ for 3 seconds, so a burst of triggers causes one pull.
     changed) or a delete (date removed). The outbox writes one per step, after the entry's own event is
     synced and no local change waits.
   - **Upsert:** insert; on 409, a full patch against the etag just read (which also revives an event
-    deleted in Google). The app is the only source of a date event: changes made to it in Google are
-    not adopted (#34, step C).
+    deleted in Google) and clears reminder overrides (Google rejects them next to the defaults).
+  - **Changed in Google** (`date-pull.ts`, `dateEventChange`, applied in a transaction):
+    - **moved:** the entry takes the new date;
+    - **deleted:** the entry drops the date (a deletion may come without properties, so a deleted
+      event is recognised by its id alone);
+    - **anything else** (title, notes, time, reminders, properties): put back. The ledger forgets the
+      event, so the outbox writes it again as the app has it. The entry stays the only source of the
+      shared fields, so there's never a question of which copy wins.
+    - Nothing is taken over while the app still has its own change to write to that event (`planDates`
+      lists it), or while the entry is being deleted: the app's change wins.
   - **Refused** (not transient): the shape is recorded with the error, so it is retried only once the
     entry changes. **Deleting an entry** deletes its date events first (recorded ones and its current
     dates; a missing one is fine).

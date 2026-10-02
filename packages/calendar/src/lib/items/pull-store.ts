@@ -2,6 +2,7 @@ import { type Timestamp, deleteField, doc, getDoc, getDocFromCache, getDocFromSe
 import { db } from '@household-brain/firebase/firebase'
 import type { CalendarEvent } from './event'
 import type { Item } from './model'
+import type { DateEventChange } from './date-pull'
 import type { PullDecision } from './pull-plan'
 import { newEventId } from './ids'
 import { itemsCollection } from './store'
@@ -92,6 +93,45 @@ export function dropStray(eventId: string): Promise<void> {
 export async function readEntryFromServer(id: string): Promise<Item | null> {
   const snapshot = await getDocFromServer(itemDoc(id))
   return snapshot.exists() ? snapshot.data() as Item : null
+}
+
+/**
+ * Applies what a date event changed in Google to its entry, in a transaction against the entry as it
+ * is now (`dateEventChange`): a moved date is taken over, a deleted one dropped (both are changes to
+ * the entry, so a new revision), and for anything else the ledger forgets the event, so the outbox
+ * writes it back.
+ */
+export function applyDateChange(entryId: string, dateId: string, decide: (entry: Item) => DateEventChange): Promise<void> {
+  return runTransaction(db, async transaction => {
+    const ref = itemDoc(entryId)
+    const snapshot = await transaction.get(ref)
+    if (!snapshot.exists()) {
+      return
+    }
+    const entry = snapshot.data() as Item
+    const fields = dateChangeFields(entry, dateId, decide(entry))
+    if (fields) {
+      transaction.update(ref, fields)
+    }
+  })
+}
+
+function dateChangeFields(entry: Item, dateId: string, change: DateEventChange): Record<string, unknown> | null {
+  const dates = entry.extraDates ?? []
+  switch (change.kind) {
+    case 'adopt': {
+      return { ...pullStamp(), extraDates: dates.map(entryDate => (entryDate.id === dateId ? { ...entryDate, date: change.date } : entryDate)) }
+    }
+    case 'remove': {
+      return { ...pullStamp(), [`dateEvents.${dateId}`]: deleteField(), extraDates: dates.filter(entryDate => entryDate.id !== dateId) }
+    }
+    case 'rewrite': {
+      return { [`dateEvents.${dateId}`]: deleteField() }
+    }
+    default: {
+      return null
+    }
+  }
 }
 
 /**

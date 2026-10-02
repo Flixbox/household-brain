@@ -51,7 +51,7 @@ export function draftFrom(event: CalendarEvent, categories: readonly Category[])
 }
 
 // A timed event's dateTime carries an offset ("…T17:00:00+01:00"); only the clock time matters here.
-const isAt = (time: CalendarEvent['start'], clock: string, timeZone: string) =>
+export const isAt = (time: CalendarEvent['start'], clock: string, timeZone: string) =>
   time?.timeZone === timeZone && time.dateTime?.slice(10, 19) === `T${clock}`
 
 function timeFix(event: CalendarEvent, draft: ItemDraft, timeZone: string): CalendarEvent {

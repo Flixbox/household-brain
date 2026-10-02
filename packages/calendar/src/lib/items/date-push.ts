@@ -33,7 +33,8 @@ async function overwrite({ api, config }: PushContext, event: CalendarEvent): Pr
   const eventId = event.id ?? ''
   const { etag = '' } = await api.getEvent(config.calendarId, eventId)
   const { id: _id, start, end, ...rest } = event
-  const full = { ...rest, end: { ...end, date: null }, start: { ...start, date: null }, status: 'confirmed' }
+  // Overrides must be cleared explicitly: Google rejects default reminders next to overrides.
+  const full = { ...rest, end: { ...end, date: null }, reminders: { overrides: [], useDefault: true }, start: { ...start, date: null }, status: 'confirmed' }
   await api.patchEvent({ calendarId: config.calendarId, eventId }, full, etag)
 }
 
