@@ -172,3 +172,28 @@ test('entries say when they are due, and overdue ones stand out', async ({ page 
   await expect(far).toContainText(/in \d+ days/u)
   await expect(far.getByText(/in \d+ days/u)).not.toHaveClass(/text-red|text-amber/u)
 })
+
+test('an entry marked done leaves the board until "Show completed", and Google gets the status', async ({ page }) => {
+  const { google } = await mockGoogle(page)
+  await signInAllowlisted(page, 'owner@household-brain.test')
+  await page.getByRole('link', { name: 'Add Coupon' }).click()
+  await page.getByLabel('Title').fill('Pizza')
+  await page.getByLabel('Due date (17:00)').fill('2026-12-01')
+  // Adding an entry has no status: a new entry is always open.
+  await expect(page.getByLabel('Status')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Save' }).click()
+
+  const coupons = page.getByRole('region', { name: 'Coupon' })
+  await coupons.getByRole('link', { name: /Pizza/u }).click()
+  await page.getByLabel('Status').selectOption('done')
+  await page.getByRole('button', { name: 'Save' }).click()
+  await expect(coupons.getByRole('link', { name: /Pizza/u })).toBeHidden()
+  await expect.poll(() => google.live()[0]?.extendedProperties).toMatchObject({ private: { 'hb.status': 'done' } })
+
+  const toggle = page.getByRole('button', { name: /Show completed/u })
+  await expect(toggle).toHaveText('Show completed (1)')
+  await toggle.click()
+  await expect(coupons.getByRole('link', { name: /Pizza/u })).toContainText('done')
+  await page.getByRole('button', { name: 'Hide completed' }).click()
+  await expect(coupons.getByRole('link', { name: /Pizza/u })).toBeHidden()
+})

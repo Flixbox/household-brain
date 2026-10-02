@@ -9,10 +9,12 @@ interface Props {
   initial: ItemDraft
   categories: Category[]
   onSave: (draft: ItemDraft) => Promise<unknown>
+  /** Offer the status (open, done, cancelled): when editing, not when adding. */
+  withStatus?: boolean
 }
 
 /** The add/edit form. The due date is a date only: every entry is due at 17:00. */
-export function ItemForm({ initial, categories, onSave }: Props) {
+export function ItemForm({ initial, categories, onSave, withStatus = false }: Props) {
   const [draft, setDraft] = useState(initial)
   const [saving, setSaving] = useState(false)
   const set = (field: keyof ItemDraft) => (event: { target: { value: string } }) => setDraft(current => ({ ...current, [field]: event.target.value }))
@@ -34,6 +36,15 @@ export function ItemForm({ initial, categories, onSave }: Props) {
         </select>
       </Field>
       <Field label="Due date (17:00)" required><input required type="date" className={textField} value={draft.dueDate} onChange={set('dueDate')} /></Field>
+      {withStatus && (
+        <Field label="Status">
+          <select className={textField} value={draft.status} onChange={set('status')}>
+            <option value="open">Open</option>
+            <option value="done">Done</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+        </Field>
+      )}
       <Field label="Code"><input className={textField} value={draft.code} onChange={set('code')} /></Field>
       <Field label="Amount"><input inputMode="decimal" pattern="[0-9]+([.,][0-9]{1,2})?" title="A number, e.g. 9.99" className={textField} value={draft.amount} onChange={set('amount')} /></Field>
       <Field label="Link">

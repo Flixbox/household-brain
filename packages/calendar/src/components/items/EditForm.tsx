@@ -31,7 +31,7 @@ export function EditForm({ item, categories }: { item: Item, categories: Categor
   return (
     <>
       {/* ItemForm keeps its first `initial`, so later values of the live entry don't reset it. */}
-      <ItemForm initial={draftOf(item)} categories={categories} onSave={save} />
+      <ItemForm initial={draftOf(item)} categories={categories} onSave={save} withStatus />
       <button type="button" className="font-semibold text-red-700 dark:text-red-400" onClick={remove}>Delete entry</button>
     </>
   )
