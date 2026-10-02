@@ -56,5 +56,6 @@
         "{workspaceRoot}/**/*"
       ]
     }
-  }
+  },
+  "nxCloudId": "6ac009522d777ddf25e0587c"
 }
