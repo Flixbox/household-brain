@@ -293,6 +293,11 @@ comments. Only wait in the foreground for something whose result you need for th
 
 ### App and build
 
+- **Browser functions must exist on the build target.** Vite's default target is
+  `baseline-widely-available` (iOS Safari 16.4 among others), and it converts syntax but adds no
+  polyfills. A newer function such as `URL.canParse` (iOS 17) throws on older iPhones and takes the
+  whole screen down. Check support before using a recent API; nothing in lint catches it.
+
 - **Compare `import.meta.env.X` inline** when the branch must vanish from production builds. Passing
   `import.meta.env` through a helper function stops Vite from folding it, so the dead code ships.
 - **Firebase Hosting matches header `source` against the request path, not the rewrite target.** A

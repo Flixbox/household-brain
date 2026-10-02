@@ -24,9 +24,15 @@ export const LINK_PATTERN = String.raw`\s*([a-zA-Z][a-zA-Z0-9+.\-]*:\/\/)?[^\s\/
  */
 export function openableLink(input: string): string | null {
   const link = normaliseLink(input)
-  if (!URL.canParse(link)) {
+  // Not `URL.canParse`: the build still targets iOS 16, which lacks it.
+  const url = parsed(link)
+  return url && (url.protocol === 'https:' || url.protocol === 'http:') && url.username === '' && url.hostname.includes('.') ? link : null
+}
+
+function parsed(link: string): URL | null {
+  try {
+    return new URL(link)
+  } catch {
     return null
   }
-  const { hostname, protocol, username } = new URL(link)
-  return (protocol === 'https:' || protocol === 'http:') && username === '' && hostname.includes('.') ? link : null
 }
