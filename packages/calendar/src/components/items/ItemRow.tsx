@@ -1,7 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import { useStore } from '@nanostores/react'
 import type { Item } from '../../lib/items/model'
-import { type Urgency, dueStatus } from '../../lib/items/due'
+import { type Urgency, rowDue } from '../../lib/items/due'
 import { $now } from '../../lib/items/now'
 
 const URGENCY_TEXT: Record<Urgency, string> = {
@@ -12,11 +12,10 @@ const URGENCY_TEXT: Record<Urgency, string> = {
 
 /**
  * One entry: title with its code underneath, when it is due (relative, coloured by urgency, and the
- * date), and a dot while it is not yet in Google Calendar. Only open entries are coloured.
+ * date), and a dot while it is not yet in Google Calendar. Done and cancelled entries say so instead.
  */
 export function ItemRow({ item }: { item: Item }) {
-  const due = dueStatus(item.dueDate, useStore($now))
-  const urgency = item.status === 'open' ? due.urgency : 'later'
+  const due = rowDue(item, useStore($now))
   return (
     <li>
       <Link to="/items/$itemId" params={{ itemId: item.id }} className="flex items-baseline gap-3 rounded-lg px-3 py-2 hover:bg-stone-100 dark:hover:bg-stone-900">
@@ -25,7 +24,7 @@ export function ItemRow({ item }: { item: Item }) {
           {item.code !== '' && <span className="font-mono text-sm break-all text-stone-600 select-all dark:text-stone-400">{item.code}</span>}
         </span>
         <span className="flex flex-col items-end text-sm">
-          <span className={URGENCY_TEXT[urgency]}>{due.label}</span>
+          <span className={URGENCY_TEXT[due.urgency]}>{due.label}</span>
           <span className="text-xs text-stone-500 tabular-nums">{item.dueDate}</span>
         </span>
         {item.sync !== 'synced' && (

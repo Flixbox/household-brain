@@ -34,3 +34,11 @@ export function dueStatus(dueDate: string, now: Temporal.ZonedDateTime): Due {
   }
   return { label: ahead(daysAhead), urgency: daysAhead <= SOON_DAYS ? 'soon' : 'later' }
 }
+
+/**
+ * What an entry's row says about when it is due: for an open entry its `dueStatus`, for a done or
+ * cancelled one just that, uncoloured (being past its date doesn't make it overdue).
+ */
+export function rowDue(item: { dueDate: string, status: 'open' | 'done' | 'cancelled' }, now: Temporal.ZonedDateTime): Due {
+  return item.status === 'open' ? dueStatus(item.dueDate, now) : { label: item.status, urgency: 'later' }
+}
