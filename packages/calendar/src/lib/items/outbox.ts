@@ -209,7 +209,7 @@ function watchDevice(): (() => void)[] {
     return run()
   }
   // Changes made directly in Google Calendar: picked up once a minute and whenever the app comes back
-  // to the foreground, while it is visible (README section 5.3).
+  // to the foreground, while it is visible (docs/sync.md).
   const pullIfVisible = () => (document.visibilityState === 'visible' ? run(true) : Promise.resolve())
   globalThis.addEventListener('online', online)
   document.addEventListener('visibilitychange', pullIfVisible)

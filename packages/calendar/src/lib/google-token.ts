@@ -1,6 +1,6 @@
 // Google Calendar access tokens from Google Identity Services (GIS). A token lasts about an hour and
 // is kept in localStorage through a persistent store, so a reload doesn't lose it; there is no
-// refresh token anywhere (README section 3.1).
+// refresh token anywhere (docs/access.md).
 import { persistentJSON } from '@nanostores/persistent'
 import { Temporal } from 'temporal-polyfill'
 

@@ -7,7 +7,7 @@ export type SetupApi = Pick<CalendarApi, 'findOwnedCalendars' | 'getListEntry' |
 export const CALENDAR_NAME = 'Household Brain'
 export const TIME_ZONE = 'Europe/Berlin'
 
-/** Every entry notifies each person 2 days and 1 day before its 17:00 due time (README section 4.1). */
+/** Every entry notifies each person 2 days and 1 day before its 17:00 due time (docs/storage.md). */
 export const DEFAULT_REMINDERS: readonly Reminder[] = [
   { method: 'popup', minutes: 2 * 24 * 60 },
   { method: 'popup', minutes: 24 * 60 },
