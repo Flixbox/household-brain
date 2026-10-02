@@ -80,6 +80,9 @@ pnpm exec firebase deploy --only hosting,firestore:rules,firestore:indexes   # m
 - Playwright runs every e2e test on three devices: desktop Chrome, an Android phone (Pixel 9, Chrome)
   and an iPhone 17 (Safari/WebKit). Install the browsers with
   `pnpm exec playwright install chromium webkit`.
+- Tests are **user journeys**: a few long tests, each one sign-in followed by `test.step(...)` per
+  behaviour, rather than one small test per behaviour, because the per-test setup (emulator reset,
+  sign-in, Google mocks) dominates the run time (#44).
 - The emulators run as the `demo-household-brain` project. The `demo-` prefix makes them refuse
   to reach any real Google service.
 - The emulator build of the app reads `.env.e2e` and adds a `window.e2eSignIn(email)` hook that

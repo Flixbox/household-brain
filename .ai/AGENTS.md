@@ -71,6 +71,11 @@ docs. Only wait in the foreground for something whose result you need for the ve
 - **Run the quick checks locally**: `pnpm lint && pnpm typecheck && pnpm test` (seconds). Leave the
   e2e suite (`pnpm test:emulated`) to CI, which runs it on every push anyway; run it locally only to
   debug a failure CI found.
+- **Write e2e tests as a few full user journeys, not many small tests.** Each test resets the
+  emulators, signs in and sets up the Google mocks, and that setup is most of the run time. So extend
+  the journey that covers the area (one sign-in, then a `test.step(...)` per behaviour) instead of
+  adding a new `test(...)`; open a new journey only for a new area or a setup that can't be shared.
+  Moving the existing tests over is #44.
 - **Batch your changes.** Every push cancels the running CI for that branch, so five quick pushes mean
   five cancelled runs and no result.
 - **Check exit codes without pipes**, or with `${PIPESTATUS[0]}`. See the shell lesson below.
