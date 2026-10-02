@@ -23,7 +23,8 @@ jobs:
     # can't read it, and fork pull requests get no secrets at all (#60). Elsewhere: no environment.
     environment: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'nx-cache' || '' }}
     env:
-      NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
+      # The same condition again, in case the token is ever stored as a repository secret by mistake.
+      NX_CLOUD_ACCESS_TOKEN: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.NX_CLOUD_ACCESS_TOKEN || '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -61,7 +62,7 @@ jobs:
       matrix:
         project: [desktop-chrome, android-pixel-9, iphone-17]
     # Microsoft's Playwright image already contains the browsers and every system package they need,
-    # so nothing is installed per run (installing them took 3+ minutes and once hung for 15).
+    # so nothing is installed per run (installing them was slow and once hung).
     # Its version must equal @playwright/test in package.json; the first step checks that.
     container:
       image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27

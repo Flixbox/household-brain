@@ -206,7 +206,7 @@ comments. Only wait in the foreground for something whose result you need for th
   PR at a time, and the babysitter reports conflicts.
 
 - **The e2e job runs in Microsoft's Playwright image**, which already has the browsers and their system
-  packages. Installing them per run took over 3 minutes and once hung for 15. The image version must
+  packages. Installing them per run was slow and once hung. The image version must
   equal `@playwright/test`: when Dependabot bumps the package, CI's first e2e step fails with a
   message, and `container.image` in `ci.yml` needs the matching tag and digest
   (`docker pull mcr.microsoft.com/playwright:vX.Y.Z-noble`, then `docker inspect` for the digest).
