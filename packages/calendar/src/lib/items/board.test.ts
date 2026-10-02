@@ -1,0 +1,57 @@
+import { describe, expect, it } from 'vitest'
+import { DEFAULT_CATEGORIES } from '../categories'
+import { boardFor } from './board'
+import type { Item } from './model'
+
+const entry = (overrides: Partial<Item>): Item => ({
+  amount: '',
+  category: 'coupon',
+  code: '',
+  dirty: [],
+  dueDate: '2026-11-03',
+  etags: {},
+  id: overrides.title ?? 'id',
+  notes: '',
+  pendingOp: null,
+  rev: 'r1',
+  status: 'open',
+  sync: 'synced',
+  syncError: null,
+  title: 'Entry',
+  url: '',
+  ...overrides,
+})
+
+const items = [
+  entry({ dueDate: '2026-12-01', title: 'Pizza' }),
+  entry({ dueDate: '2026-11-01', title: 'Cinema' }),
+  entry({ status: 'done', title: 'Old pizza' }),
+  entry({ category: 'membership', title: 'Gym' }),
+  entry({ pendingOp: 'delete', title: 'Pizza being deleted' }),
+  entry({ category: 'party', title: 'Pizza party' }),
+]
+const board = (query: string, showCompleted = false) => boardFor({ categories: DEFAULT_CATEGORIES, items, query, showCompleted })
+const titles = (section?: { items: Item[] }) => section?.items.map(item => item.title)
+
+describe('boardFor', () => {
+  it('lists open entries by due date in every category, and counts the completed ones', () => {
+    const result = board('')
+    expect(result.sections).toHaveLength(DEFAULT_CATEGORIES.length)
+    expect(titles(result.sections[0])).toEqual(['Cinema', 'Pizza'])
+    expect(result.completed).toBe(1)
+    expect(result.other.map(item => item.title)).toEqual(['Pizza party'])
+  })
+
+  it('adds completed entries only when asked to', () => {
+    expect(titles(board('', true).sections[0])).toEqual(['Cinema', 'Old pizza', 'Pizza'])
+  })
+
+  it('searches every entry, completed ones included, and keeps only categories with a match', () => {
+    const result = board('pizza')
+    expect(result.searching).toBe(true)
+    expect(result.sections.map(section => section.category.slug)).toEqual(['coupon'])
+    expect(titles(result.sections[0])).toEqual(['Old pizza', 'Pizza'])
+    expect(result.other.map(item => item.title)).toEqual(['Pizza party'])
+    expect(board('sushi').empty).toBe(true)
+  })
+})

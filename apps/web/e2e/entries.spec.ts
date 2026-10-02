@@ -198,3 +198,35 @@ test('an entry marked done leaves the board until "Show completed", and Google g
   await toggle.click()
   await expect(coupons.getByRole('link', { name: /Pizza/u })).toBeHidden()
 })
+
+test('searching shows only matching entries, in their categories, even folded ones', async ({ page }) => {
+  await mockGoogle(page)
+  await signInAllowlisted(page, 'owner@household-brain.test')
+  const add = async (category: string, title: string, code: string) => {
+    await page.getByRole('link', { name: `Add ${category}` }).click()
+    await page.getByLabel('Title').fill(title)
+    await page.getByLabel('Due date (17:00)').fill('2026-12-01')
+    await page.getByLabel('Code').fill(code)
+    await page.getByRole('button', { name: 'Save' }).click()
+  }
+  await add('Coupon', 'Café Müller', 'COFFEE5')
+  await add('Membership', 'Gym', 'FIT2026')
+
+  const coupons = page.getByRole('region', { name: 'Coupon' })
+  await coupons.getByRole('button', { name: /Coupon/u }).click()
+  const search = page.getByRole('searchbox', { name: 'Search entries' })
+  await search.fill('muller')
+  await expect(coupons.getByRole('link', { name: /Café Müller/u })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Membership' })).toHaveCount(0)
+
+  await search.fill('fit2026')
+  await expect(page.getByRole('region', { name: 'Membership' }).getByRole('link', { name: /Gym/u })).toBeVisible()
+  await expect(coupons).toHaveCount(0)
+
+  await search.fill('sushi')
+  await expect(page.getByText('No entries match “sushi”.')).toBeVisible()
+
+  await search.fill('')
+  await expect(page.getByRole('region', { name: 'Membership' })).toBeVisible()
+  await expect(coupons.getByRole('link', { name: /Café Müller/u })).toBeHidden()
+})
