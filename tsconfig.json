@@ -1,25 +1,7 @@
 {
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
-        "target": "es2023",
-    "lib": ["ES2023", "DOM"],
-    "types": ["node"],
-    "skipLibCheck": true,
-
-    /* Bundler mode */
-    "module": "esnext",
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "verbatimModuleSyntax": true,
-    "moduleDetection": "force",
-    "noEmit": true,
-
-    /* Linting */
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "erasableSyntaxOnly": true,
-    "noFallthroughCasesInSwitch": true,
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true
+    "types": ["node"]
   },
   "include": ["vitest.rules.config.ts", "npmpackagejsonlint.config.ts", "tests"]
 }

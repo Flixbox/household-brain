@@ -286,6 +286,10 @@ adapted to this repository:
   repository setting); pnpm is installed from `packageManager`, not through a third-party action.
 - **Never use the `pull_request_target` or `workflow_run` triggers** (both run code with the base
   repository's privileges), and never add self-hosted runners to this public repo.
+- **One TypeScript config to change: `tsconfig.base.json`** (#79). Every tsconfig extends it and adds
+  only its own `types`, `jsx`, `include` and build-info files; a compiler option all projects share
+  goes into the base. It is an Nx input of every project (`sharedGlobals` in `nx.json`), so changing
+  it reruns their typecheck and tests instead of serving them from the cache.
 - **Lint and typecheck are Nx targets:** `pnpm lint` is `nx run-many` over the root project's
   `lint:oxlint`, `lint:packages` and `lint:fallow` (only those root scripts are Nx targets, through
   `nx.includedScripts`), `pnpm typecheck` over every project's `typecheck` (the root's own is in
