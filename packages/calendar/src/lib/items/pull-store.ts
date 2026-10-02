@@ -66,3 +66,22 @@ export async function serverNow(uid: string): Promise<Timestamp> {
 export function saveSyncToken(uid: string, syncToken: string): Promise<void> {
   return setDoc(syncStateDoc(uid), { syncToken }, { merge: true })
 }
+
+/**
+ * An extra date's event (one with `hb.entry`) never becomes an entry. An older app version that
+ * didn't know them may have made one from it anyway, under the event's id: that stray is removed,
+ * in Firestore only (nothing is pushed).
+ */
+export function dropStray(eventId: string): Promise<void> {
+  return runTransaction(db, async transaction => {
+    const ref = itemDoc(eventId)
+    if ((await transaction.get(ref)).exists()) {
+      transaction.delete(ref)
+    }
+  })
+}
+
+/** Tells the other devices this person's app recognises date events (see DATE_EVENTS_SCHEMA). */
+export function markSchema(uid: string, schema: number): Promise<void> {
+  return setDoc(syncStateDoc(uid), { schema }, { merge: true })
+}

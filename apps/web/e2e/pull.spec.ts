@@ -1,5 +1,5 @@
 import { type Page, expect, test } from '@playwright/test'
-import { allowlist, resetEmulators, seedDocument } from './emulators'
+import { allowlist, readDocument, resetEmulators, seedDocument } from './emulators'
 import { mockGoogle } from './google-mocks'
 import { openMenu, signInAllowlisted, signInAs } from './session'
 
@@ -204,4 +204,25 @@ test('an entry opened for editing catches up with Google, keeping what was typed
   await page.getByRole('button', { name: 'Save' }).click()
   await expect.poll(() => google.live()[0]?.summary).toBe('[Coupon] Bakery Müller')
   expect(google.live()[0]?.extendedProperties).toMatchObject({ private: { 'hb.code': 'NEWER30' } })
+})
+
+test("an extra date's event in Google never becomes an entry, and a stray one is removed", async ({ page }) => {
+  const { google } = await mockGoogle(page)
+  const strayId = 'abcdefghijklmnopqrstuv0123d01234567'
+  // As an older app version might have left it: an entry made from a date event.
+  await seedDocument(`items/${strayId}`, { category: 'coupon', dueDate: '2099-11-30', status: 'open', sync: 'synced', title: 'Stray' })
+  google.create({
+    end: { dateTime: '2099-11-30T17:15:00', timeZone: 'Europe/Berlin' },
+    extendedProperties: { private: { 'hb.category': 'coupon', 'hb.date': '01234567', 'hb.entry': 'abcdefghijklmnopqrstuv0123', 'hb.v': '1' } },
+    id: strayId,
+    start: { dateTime: '2099-11-30T17:00:00', timeZone: 'Europe/Berlin' },
+    summary: '[Coupon] Something — Cancel by',
+  })
+  const uid = await signInAllowlisted(page, 'owner@household-brain.test')
+  await page.getByRole('button', { name: 'Sync now' }).click()
+
+  await expect.poll(() => readDocument(`items/${strayId}`)).toBeNull()
+  await expect(page.getByRole('link', { name: /Something|Stray/u })).toHaveCount(0)
+  // This app version says so, for the devices that will write date events.
+  await expect.poll(async () => (await readDocument(`syncState/${uid}`))?.schema).toEqual({ integerValue: '2' })
 })
