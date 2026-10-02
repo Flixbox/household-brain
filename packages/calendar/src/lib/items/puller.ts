@@ -117,7 +117,8 @@ const applyEntryEvent = async (context: PushContext, event: CalendarEvent): Prom
 const fixOwnReminders = async (context: PushContext, event: CalendarEvent, draft: ItemDraft): Promise<string | null> => {
   const fix = ownRemindersFix(event, draft, context.categories)
   if (fix) {
-    // Records this person's etag once the fix is written; a failed or interrupted one comes again.
+    // Records this person's etag once the fix is written. An interruption or a transient failure stops
+    // the pull before its sync token is saved, so the fix runs again; Google refusing it doesn't.
     return normalise(context, event, fix)
   }
   await recordEtag(event.id ?? '', context.uid, event)

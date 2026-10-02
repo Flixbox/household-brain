@@ -11,10 +11,10 @@ export type PullDecision =
   /** A new entry; `draft` also tells the caller what to normalise. */
   | { kind: 'create', draft: ItemDraft, fields: Record<string, unknown> }
   /**
-   * Overwrite the entry with Google's version (`normalise`: the entry has no local edits), or merge it
-   * into local edits, or, for the other person's push of the version it already holds, only this
-   * person's etag. `ownCopy`: this person's own copy of the event (reminders are per person) still has
-   * to follow `draft`, which the other person's push didn't change for them.
+   * Overwrite the entry with Google's version (`normalise`: the entry has no local edits), merge it
+   * into local edits, or, for the other person's push of the version it already holds, change nothing
+   * (`fields` empty). `ownCopy`: this person's own copy of the event (reminders are per person) still
+   * has to follow `draft`, and their etag is recorded only once it does (`fixOwnReminders` in the puller).
    */
   | { kind: 'update', draft: ItemDraft, fields: Record<string, unknown>, normalise: boolean, ownCopy?: boolean }
 
@@ -40,7 +40,7 @@ const rememberEtag = (event: CalendarEvent): PullDecision => ({ draft: draftFrom
 
 const merged = (entry: Item, draft: ItemDraft): PullDecision => {
   const theirs = EDITABLE_FIELDS.filter(field => !entry.dirty.includes(field))
-  // This person's etag and the version are recorded only after their own copy is checked (below).
+  // This person's etag and the version are recorded only after their own copy is checked (`ownCopy`).
   const fields = Object.fromEntries(theirs.map(field => [field, draft[field]]))
   // The entry as it is after the merge: this person's own copy of the event follows it (#74). Their
   // own push only rewrites the reminders when its own edits touched the status or the reminders.
