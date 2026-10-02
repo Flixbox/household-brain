@@ -41,5 +41,6 @@ describe('startLabel', () => {
     expect(startLabel('2026-11-01', at('2026-10-02T12:00'))).toBe('from 2026-11-01')
     expect(startLabel('', at('2026-10-02T12:00'))).toBeNull()
     expect(startLabel(null, at('2026-10-02T12:00'))).toBeNull()
+    expect(startLabel('next spring', at('2026-10-02T12:00'))).toBeNull()
   })
 })

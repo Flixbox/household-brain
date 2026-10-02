@@ -64,4 +64,9 @@ describe('normalisationFor', () => {
       summary: '[Membership] Gym',
     })
   })
+
+  it('ignores a start date that is not a date', () => {
+    const odd = { ...appEvent, extendedProperties: { private: { ...appEvent.extendedProperties?.private, 'hb.start': 'next spring' } } }
+    expect(draftFrom(odd, DEFAULT_CATEGORIES).startDate).toBe('')
+  })
 })

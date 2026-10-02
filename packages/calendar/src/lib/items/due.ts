@@ -51,6 +51,11 @@ export function startLabel(startDate: string | null | undefined, now: Temporal.Z
   if (!startDate) {
     return null
   }
-  const notYet = Temporal.PlainDate.compare(Temporal.PlainDate.from(startDate), now.toPlainDate()) > 0
-  return `${notYet ? 'from' : 'since'} ${startDate}`
+  try {
+    const notYet = Temporal.PlainDate.compare(Temporal.PlainDate.from(startDate), now.toPlainDate()) > 0
+    return `${notYet ? 'from' : 'since'} ${startDate}`
+  } catch {
+    // Not a date (written by something else): show nothing rather than break the board.
+    return null
+  }
 }
