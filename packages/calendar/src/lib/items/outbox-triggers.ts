@@ -6,6 +6,7 @@ import { $calendarToken } from '../google-token'
 import { watchDateGate } from './date-outbox'
 import type { Item } from './model'
 import { itemsCollection } from './store'
+import { categoryFrom, householdFrom, itemFrom } from '../documents'
 
 const PULL_EVERY_MS = 60_000
 
@@ -30,14 +31,14 @@ const ignore = () => null
 const watchFirestore = (triggers: Triggers): (() => void)[] =>
   [
     onSnapshot(query(itemsCollection, orderBy('updatedAt')), { includeMetadataChanges: true }, snapshot => triggers.items(
-      snapshot.docs.map(entry => entry.data() as Item),
+      snapshot.docs.map(entry => itemFrom(entry.id, entry.data())),
       new Set(snapshot.docs.filter(entry => entry.metadata.hasPendingWrites).map(entry => entry.id)),
     ), ignore),
     onSnapshot(query(collection(db, 'categories'), orderBy('sortOrder')), snapshot =>
-      triggers.categories(snapshot.docs.map(entry => entry.data() as Category)), ignore),
+      triggers.categories(snapshot.docs.map(entry => categoryFrom(entry.id, entry.data()))), ignore),
     watchDateGate(triggers.dateGate),
     onSnapshot(doc(db, 'meta', 'config'), snapshot =>
-      triggers.config(snapshot.exists() ? snapshot.data() as HouseholdConfig : null), ignore),
+      triggers.config(snapshot.exists() ? householdFrom(snapshot.data()) : null), ignore),
   ]
 
 /**

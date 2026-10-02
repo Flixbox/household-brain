@@ -4,7 +4,7 @@ import { Field } from './Field'
 
 /** The usual currencies, plus the entry's own should it be another (one set in another app). */
 const choicesFor = (current: string): readonly string[] =>
-  (current === '' || (CURRENCIES as readonly string[]).includes(current) ? CURRENCIES : [...CURRENCIES, current])
+  (current === '' || CURRENCIES.some(code => code === current) ? CURRENCIES : [...CURRENCIES, current])
 
 type Change = (event: { target: { value: string } }) => void
 

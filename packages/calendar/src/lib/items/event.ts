@@ -152,15 +152,15 @@ const PROPERTY_OF: Partial<Record<EditableField, string>> = {
 /** The full event for a new entry: due 17:00–17:15, reminding while open (`remindersOf`). */
 export const eventFor = (item: Item, context: EventContext): CalendarEvent => {
   // A new event has no all-day date to clear, so the patch-only `date: null` is left out.
-  const { start, end } = groups.date(item, context)
+  const { timeZone } = context
   return {
     id: item.id,
     ...groups.title(item, context),
     ...groups.notes(item),
-    end: { dateTime: end?.dateTime, timeZone: end?.timeZone },
+    end: { dateTime: `${item.dueDate}T${END_TIME}`, timeZone },
     extendedProperties: { private: privateProperties(item) },
     reminders: remindersOf(item),
-    start: { dateTime: start?.dateTime, timeZone: start?.timeZone },
+    start: { dateTime: `${item.dueDate}T${DUE_TIME}`, timeZone },
   }
 }
 
@@ -181,5 +181,9 @@ const changedProperties = (item: Item, dirty: readonly EditableField[]): Calenda
 /** Only the parts of the event that the changed fields affect, for `events.patch`. */
 export const patchFor = (item: Item, dirty: readonly EditableField[], context: EventContext): CalendarEvent => {
   const touched = new Set(dirty.flatMap(field => GROUP_OF[field]))
-  return Object.assign({}, ...[...touched].map(group => groups[group](item, context)), changedProperties(item, dirty)) as CalendarEvent
+  const patch: CalendarEvent = {}
+  for (const group of touched) {
+    Object.assign(patch, groups[group](item, context))
+  }
+  return Object.assign(patch, changedProperties(item, dirty))
 }

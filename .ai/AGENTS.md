@@ -254,6 +254,12 @@ adapted to this repository:
   a route file's `createFileRoute({ component })`, comes after the definitions it uses. A direct use
   before the definition is reported, a callback that runs at load isn't. Calls inside other functions
   may point further down.
+- **No type assertions (`as`) in the app's code** (#68); `as const` is fine. Narrow with a type guard
+  (`(value: unknown): value is Rate => …`), build the typed value explicitly, or read it with a parser:
+  Firestore documents go through `lib/documents.ts` (`itemFrom`, `categoryFrom`, `householdFrom`),
+  never `snapshot.data() as Item`. oxlint enforces it (`consistent-type-assertions: never`); tests
+  and e2e may cast their partial fixtures and fakes. tsconfig adds `noUncheckedIndexedAccess` and
+  `exactOptionalPropertyTypes` to TypeScript 7's default `strict`.
 - **No measured numbers in docs or comments** (durations, sizes, counts): they go stale. They belong
   in the PR or issue that measured them; a job's run history shows what is normal.
 - **`Date` is banned; use `Temporal`** (`temporal-polyfill`). Due dates are calendar dates at 17:00 in

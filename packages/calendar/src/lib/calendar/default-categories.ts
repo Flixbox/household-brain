@@ -1,8 +1,9 @@
 import { collection, onSnapshot } from 'firebase/firestore'
 import { db } from '@household-brain/firebase/firebase'
-import { type Category, missingDefaults } from '../categories'
+import { missingDefaults } from '../categories'
 import { firestoreHouseholdStore } from './store'
 import { pruneCollapsed } from '../items/collapsed'
+import { categoryFrom } from '../documents'
 
 const ignore = () => null
 
@@ -21,7 +22,7 @@ export const watchDefaultCategories = (): () => void =>
     if (snapshot.metadata.fromCache) {
       return
     }
-    const categories = snapshot.docs.map(entry => entry.data() as Category)
+    const categories = snapshot.docs.map(entry => categoryFrom(entry.id, entry.data()))
     if (categories.length > 0) {
       pruneCollapsed(categories.map(category => category.slug))
     }

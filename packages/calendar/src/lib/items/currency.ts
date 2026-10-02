@@ -13,12 +13,14 @@ export interface EuroRates {
   rates: Record<string, number>
 }
 
+const isRate = (entry: unknown): entry is { quote: string, rate: number } =>
+  typeof entry === 'object' && entry !== null && 'quote' in entry && 'rate' in entry
+  && typeof entry.quote === 'string' && typeof entry.rate === 'number' && entry.rate > 0
+
 /** The rates in the service's answer, `[{ quote: 'BRL', rate: 5.88 }, …]`; anything malformed is left out. */
 export const ratesOf = (answer: unknown): Record<string, number> => {
   if (!Array.isArray(answer)) {
     return {}
   }
-  const valid = (answer as { quote?: unknown, rate?: unknown }[])
-    .filter(entry => typeof entry.quote === 'string' && typeof entry.rate === 'number' && entry.rate > 0)
-  return Object.fromEntries(valid.map(entry => [entry.quote as string, entry.rate as number]))
+  return Object.fromEntries(answer.filter(isRate).map(entry => [entry.quote, entry.rate]))
 }

@@ -31,6 +31,7 @@
         "allowConstantExport": true
       }
     ],
+    "typescript/consistent-type-assertions": ["error", { "assertionStyle": "never" }], // narrow with type guards instead of casting (#68)
     "react/react-in-jsx-scope": "off", // the automatic JSX runtime needs no React import
     "react/function-component-definition": ["error", { "namedComponents": "arrow-function", "unnamedComponents": "arrow-function" }], // components are arrow functions too (#67)
     "@stylistic/indent": [
@@ -214,9 +215,12 @@
     },
     {
       // Test fakes implement async interfaces without needing to await anything, and a test is a
-      // linear script: splitting it to satisfy size limits would hide the steps it checks.
+      // linear script: splitting it to satisfy size limits would hide the steps it checks. Fixtures
+      // fill in only the fields a test is about, and fakes stand in for Google's and the browser's
+      // objects, so tests may cast (#68); the app's code may not.
       "files": ["**/*.test.ts", "tests/**", "apps/web/e2e/**"],
       "rules": {
+        "typescript/consistent-type-assertions": "off",
         "eslint/require-await": "off",
         "eslint/max-statements": "off",
         "eslint/max-lines-per-function": "off"

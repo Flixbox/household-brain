@@ -1,4 +1,4 @@
-import { type Timestamp, deleteField, doc, getDoc, getDocFromCache, getDocFromServer, getDocs, query, runTransaction, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore'
+import { Timestamp, deleteField, doc, getDoc, getDocFromCache, getDocFromServer, getDocs, query, runTransaction, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore'
 import { db } from '@household-brain/firebase/firebase'
 import type { CalendarEvent } from './event'
 import type { Item } from './model'
@@ -7,6 +7,7 @@ import type { PullDecision } from './pull-plan'
 import { newEventId } from './ids'
 import { isDate } from './dates'
 import { itemsCollection } from './store'
+import { itemFrom } from '../documents'
 
 const itemDoc = (id: string) => doc(db, 'items', id)
 /** A pulled change is a new revision, but not a change by this person: `updatedBy` stays as it was. */
@@ -18,7 +19,7 @@ export const applyPulled = (event: CalendarEvent, decide: (entry: Item | null) =
   runTransaction(db, async transaction => {
     const ref = itemDoc(event.id ?? '')
     const snapshot = await transaction.get(ref)
-    const decision = decide(snapshot.exists() ? snapshot.data() as Item : null)
+    const decision = decide(snapshot.exists() ? itemFrom(snapshot.id, snapshot.data()) : null)
     if (decision.kind === 'delete') {
       transaction.delete(ref)
     } else if (decision.kind === 'create') {
@@ -52,8 +53,8 @@ const staleLedger = (entry: Item) => Object.fromEntries(Object.keys(entry.dateEv
  */
 export const removeVanished = async (eventIds: ReadonlySet<string>, listedSince: Timestamp, beforeDelete: (entry: Item) => Promise<void>): Promise<void> => {
   const untouched = (entry: { exists: () => boolean, get: (field: string) => unknown }) => {
-    const updatedAt = entry.get('updatedAt') as Timestamp | null
-    return entry.exists() && entry.get('sync') === 'synced' && Boolean(updatedAt) && (updatedAt?.toMillis() ?? 0) < listedSince.toMillis()
+    const updatedAt: unknown = entry.get('updatedAt')
+    return entry.exists() && entry.get('sync') === 'synced' && updatedAt instanceof Timestamp && updatedAt.toMillis() < listedSince.toMillis()
   }
   const synced = await getDocs(query(itemsCollection, where('sync', '==', 'synced')))
   // The same check as the transaction's, so date events only go for entries about to go too.
@@ -61,14 +62,14 @@ export const removeVanished = async (eventIds: ReadonlySet<string>, listedSince:
   const vanished = synced.docs.filter(entry => !eventIds.has(entry.id) && isDate(entry.get('dueDate')) && untouched(entry))
   // Their date events go first. A transient failure stops here, so the entries stay for the next full
   // listing; a refusal is reported by `beforeDelete` and the entries still go.
-  await Promise.all(vanished.map(entry => beforeDelete(entry.data() as Item)))
+  await Promise.all(vanished.map(entry => beforeDelete(itemFrom(entry.id, entry.data()))))
   await Promise.all(vanished.map(entry => runTransaction(db, async transaction => {
     const latest = await transaction.get(entry.ref)
     if (untouched(latest)) {
       transaction.delete(entry.ref)
     } else if (latest.exists()) {
       // Kept after all (changed meanwhile): its date events, already deleted, are written again.
-      transaction.update(entry.ref, staleLedger(latest.data() as Item))
+      transaction.update(entry.ref, staleLedger(itemFrom(latest.id, latest.data())))
     }
   })))
 }
@@ -76,13 +77,18 @@ export const removeVanished = async (eventIds: ReadonlySet<string>, listedSince:
 /** Each person's Google sync token: Google issues them per user. */
 export const readSyncToken = async (uid: string): Promise<string | null> => {
   const snapshot = await getDoc(syncStateDoc(uid))
-  return snapshot.exists() ? (snapshot.data() as { syncToken: string }).syncToken : null
+  const token: unknown = snapshot.get('syncToken')
+  return typeof token === 'string' ? token : null
 }
 
 /** The server's clock, not this device's: written to syncState/{uid} and read back. */
 export const serverNow = async (uid: string): Promise<Timestamp> => {
   await setDoc(syncStateDoc(uid), { listingStartedAt: serverTimestamp() }, { merge: true })
-  return (await getDocFromServer(syncStateDoc(uid))).get('listingStartedAt') as Timestamp
+  const startedAt: unknown = (await getDocFromServer(syncStateDoc(uid))).get('listingStartedAt')
+  if (!(startedAt instanceof Timestamp)) {
+    throw new TypeError('The server did not return the listing time')
+  }
+  return startedAt
 }
 
 export const saveSyncToken = (uid: string, syncToken: string): Promise<void> =>
@@ -104,7 +110,7 @@ export const dropStray = (eventId: string): Promise<void> =>
 /** An entry as the server has it now (a date event's owner must not be judged gone from a stale cache). */
 export const readEntryFromServer = async (id: string): Promise<Item | null> => {
   const snapshot = await getDocFromServer(itemDoc(id))
-  return snapshot.exists() ? snapshot.data() as Item : null
+  return snapshot.exists() ? itemFrom(snapshot.id, snapshot.data()) : null
 }
 
 /**
@@ -120,7 +126,7 @@ export const applyDateChange = (entryId: string, dateId: string, decide: (entry:
     if (!snapshot.exists()) {
       return
     }
-    const entry = snapshot.data() as Item
+    const entry = itemFrom(snapshot.id, snapshot.data())
     const fields = dateChangeFields(entry, dateId, decide(entry))
     if (fields) {
       transaction.update(ref, fields)
@@ -152,7 +158,7 @@ const dateChangeFields = (entry: Item, dateId: string, change: DateEventChange):
 export const forgetDateEvents = (id: string): Promise<void> =>
   runTransaction(db, async transaction => {
     const snapshot = await transaction.get(itemDoc(id))
-    const fields = snapshot.exists() ? staleLedger(snapshot.data() as Item) : {}
+    const fields = snapshot.exists() ? staleLedger(itemFrom(snapshot.id, snapshot.data())) : {}
     if (Object.keys(fields).length > 0) {
       transaction.update(itemDoc(id), fields)
     }
@@ -161,7 +167,7 @@ export const forgetDateEvents = (id: string): Promise<void> =>
 /** An entry from the local cache, or null when the cache doesn't have it (then ask the server). */
 export const readEntryFromCache = async (id: string): Promise<Item | null> => {
   const snapshot = await getDocFromCache(itemDoc(id)).catch(() => null)
-  return snapshot?.exists() ? snapshot.data() as Item : null
+  return snapshot?.exists() ? itemFrom(snapshot.id, snapshot.data()) : null
 }
 
 /** Tells the other devices what this person's app handles (see APP_SCHEMA). */

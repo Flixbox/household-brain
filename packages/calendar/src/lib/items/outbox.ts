@@ -22,13 +22,15 @@ import { forgetDateWork, nextDateWork, runDateWork } from './date-outbox'
 const MIN_BACKOFF_MS = 5000
 const MAX_BACKOFF_MS = 5 * 60_000
 
-const fresh = () => ({
-  categories: null as PushContext['categories'] | null,
-  config: null as PushContext['config'] | null,
+interface OutboxData {
+  categories: PushContext['categories'] | null
+  config: PushContext['config'] | null
   /** Whether the config snapshot has arrived; before that, a missing calendar is not yet known. */
-  configLoaded: false,
-  items: [] as Item[],
-})
+  configLoaded: boolean
+  items: Item[]
+}
+
+const fresh = (): OutboxData => ({ categories: null, config: null, configLoaded: false, items: [] })
 let data = fresh()
 let busy = false
 let backoffMs = 0
