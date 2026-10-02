@@ -279,3 +279,17 @@ export async function syncNow(): Promise<void> {
   pulledAt = Number.NEGATIVE_INFINITY
   await run(true)
 }
+
+/**
+ * Pulls from Google Calendar now, so a screen about to show an entry shows Google's latest. Resolves
+ * once the pull is done, or at once when this device has no Google access or is offline (the board
+ * then shows what it has, as always). While a push is running, the pull it asks for runs right
+ * after it.
+ */
+export function refreshNow(): Promise<void> {
+  if (!navigator.onLine || !hasCalendarToken(MEMBER_SCOPES, auth.currentUser?.email)) {
+    return Promise.resolve()
+  }
+  pulledAt = Number.NEGATIVE_INFINITY
+  return run(true)
+}
