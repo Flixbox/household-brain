@@ -279,3 +279,16 @@ export async function syncNow(): Promise<void> {
   pulledAt = Number.NEGATIVE_INFINITY
   await run(true)
 }
+
+/**
+ * Pulls from Google Calendar now, ignoring the reuse window, so an entry opened for editing catches
+ * up with Google; what the pull brings arrives through the entries listener like any other change.
+ * Nothing happens offline or without Google access; while a push runs, the pull runs right after it.
+ */
+export function refreshNow(): Promise<void> {
+  if (!navigator.onLine || !hasCalendarToken(MEMBER_SCOPES, auth.currentUser?.email)) {
+    return Promise.resolve()
+  }
+  pulledAt = Number.NEGATIVE_INFINITY
+  return run(true)
+}
