@@ -44,6 +44,8 @@ let pulling: Promise<void> | null = null
 let pulledAt = Number.NEGATIVE_INFINITY
 let pullProblem: string | null = null
 let pullRequested = false
+/** Bumped by `reset`, so a pull still running for the previous account can't report into the next one. */
+let generation = 0
 const describe = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
 function publish() {
@@ -102,11 +104,16 @@ function pullNow(context: PushContext): Promise<void> {
   if (performance.now() - pulledAt < PULL_REUSE_MS) {
     return Promise.resolve()
   }
+  const started = generation
   pulling ??= pullChanges(context)
     .then(problems => {
-      pullProblem = problems.length > 0 ? problems.join(' · ') : null
+      if (started === generation) {
+        pullProblem = problems.length > 0 ? problems.join(' · ') : null
+      }
     }, (error: unknown) => {
-      pullProblem = isTransient(error) ? pullProblem : describe(error)
+      if (started === generation) {
+        pullProblem = isTransient(error) ? pullProblem : describe(error)
+      }
     })
     .finally(() => {
       pulling = null
@@ -203,10 +210,23 @@ function watchDevice(): (() => void)[] {
   ]
 }
 
-function reset() {
+/** Forgets retries and pulls: the waiting, the last pull and its problem. */
+function forgetTiming() {
   if (timer) {
     clearTimeout(timer)
   }
+  timer = null
+  backoffMs = 0
+  pausedUntil = 0
+  pulledAt = Number.NEGATIVE_INFINITY
+  pullProblem = null
+  pullRequested = false
+}
+
+/** Back to a clean start (sign-out): nothing of the previous account's sync state carries over. */
+function reset() {
+  forgetTiming()
+  generation += 1
   data = fresh()
   recorded.clear()
   unconfirmed = new Set()

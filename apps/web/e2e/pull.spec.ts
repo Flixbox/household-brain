@@ -1,7 +1,7 @@
 import { type Page, expect, test } from '@playwright/test'
-import { resetEmulators, seedDocument } from './emulators'
+import { allowlist, resetEmulators, seedDocument } from './emulators'
 import { mockGoogle } from './google-mocks'
-import { signInAllowlisted } from './session'
+import { signInAllowlisted, signInAs } from './session'
 
 const CALENDAR = 'household@group.calendar.google.test'
 
@@ -123,4 +123,21 @@ test('an entry edited here while it was deleted in Google comes back with the ed
   await expect.poll(() => google.live()[0]).toMatchObject({ extendedProperties: { private: { 'hb.code': 'CROISSANT' } }, id, status: 'confirmed' })
   google.refuseListings(false)
   await expect(page.getByRole('link', { name: /Bakery/u })).toHaveCount(1)
+})
+
+test('after signing out, the next person sees none of the previous sync problems', async ({ page }) => {
+  const { google } = await mockGoogle(page)
+  google.refuseListings(true, 403)
+  await signInAllowlisted(page, 'owner@household-brain.test')
+  await page.getByRole('button', { name: 'Sync now' }).click()
+  await expect(page.getByText(/Couldn.t read changes from Google Calendar/u)).toBeVisible()
+
+  // Same page, no reload: only the sign-out may clear what the outbox remembers.
+  await page.getByRole('button', { name: 'Sign out' }).click()
+  await signInAs(page, 'spouse@household-brain.test')
+  const uid = await page.getByTestId('uid').textContent()
+  await allowlist(uid ?? '')
+  await expect(page.getByText("You're on the allowlist.")).toBeVisible()
+  await expect(page.getByText(/Couldn.t read changes from Google Calendar/u)).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Sync now' })).toBeVisible()
 })
