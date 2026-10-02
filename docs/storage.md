@@ -88,4 +88,4 @@ items/{eventId}                      {
   | `warranty` | Warranty | Warranty and return deadlines |
   | `contract` | Contract | Phone, internet, energy, rental contracts |
   | `insurance` | Insurance | |
-  | `document` | Document expiry | ID card, passport, licences |
+  | `paperwork` | Paperwork | ID card, passport, licences, letters with a deadline (replaced `document`, "Document expiry", which is hidden while no entry uses it) |

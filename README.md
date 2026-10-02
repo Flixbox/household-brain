@@ -11,20 +11,14 @@ Items are grouped by **category**, and within each category they are **sorted by
 
 ## Quick start
 
-Machine setup (Volta, pnpm, Java 21 for the emulators) is in [docs/toolchain.md](docs/toolchain.md).
+Machine setup (Volta, pnpm, Java 21 for the emulators) and every command are in
+[docs/toolchain.md](docs/toolchain.md).
 
 ```sh
 pnpm install
-pnpm dev                 # Vite dev server on http://localhost:5173
-pnpm build               # nx: @household-brain/web → apps/web/dist/
-pnpm lint               # oxlint (with @stylistic as an oxlint JS plugin, no ESLint) + npm-package-json-lint
-pnpm lint:fix
-pnpm typecheck          # nx run-many: every project
-pnpm test               # unit tests (Vitest)
-pnpm test:emulated      # boots the Auth + Firestore emulators, then rules tests + Playwright e2e
-pnpm emulators          # emulators only, for running pnpm test:rules or pnpm --filter @household-brain/web test:e2e against them
-scripts/babysit-pr.sh <n>           # wait for the next CI result, slow run, conflict, comment or deploy (.ai/AGENTS.md)
-pnpm exec firebase deploy --only hosting,firestore:rules,firestore:indexes   # manual fallback for CI
+pnpm dev              # Vite dev server on http://localhost:5173
+pnpm lint && pnpm typecheck && pnpm test
+pnpm test:emulated    # Firebase emulators, rules tests and Playwright end-to-end tests (needs Java 21)
 ```
 
 ## Project layout
