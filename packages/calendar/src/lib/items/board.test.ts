@@ -7,6 +7,7 @@ const entry = (overrides: Partial<Item>): Item => ({
   amount: '',
   category: 'coupon',
   code: '',
+  currency: '',
   dirty: [],
   dueDate: '2026-11-03',
   etags: {},

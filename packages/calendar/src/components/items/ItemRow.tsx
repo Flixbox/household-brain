@@ -7,7 +7,7 @@ import { requestSyncAccess } from '../../lib/items/outbox'
 import { markDone } from '../../lib/items/swipe'
 import { extraDatesOf, nextDate } from '../../lib/items/dates'
 import { useSwipeToDone } from './use-swipe'
-import { amountLabel } from '../../lib/items/amount'
+import { usePrice } from '../../lib/items/use-price'
 import { DueColumn } from './DueColumn'
 
 /**
@@ -22,7 +22,7 @@ export function ItemRow({ item, category }: { item: Item, category?: string }) {
   const next = nextDate(item, now.toPlainDate().toString())
   const more = item.status === 'open' && extraDatesOf(item).length > 0 ? ' + more' : ''
   const since = startLabel(item.startDate, now)
-  const price = amountLabel(item.amount)
+  const price = usePrice(item, now.toPlainDate().toString())
   const { handlers, offset } = useSwipeToDone(() => {
     // Asks Google for access while the gesture still counts as a click, like Save does.
     requestSyncAccess()

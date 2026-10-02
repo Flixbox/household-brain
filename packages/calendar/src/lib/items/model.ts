@@ -18,6 +18,8 @@ export interface Item {
   status: 'open' | 'done' | 'cancelled'
   code: string
   amount: string
+  /** The amount's currency: an ISO 4217 code such as `BRL`, or '' for euros. Absent on older entries. */
+  currency: string
   url: string
   notes: string
   /** Last Google etag seen, per user: reminders are per person, so etags can differ between users. */
@@ -49,7 +51,7 @@ export interface Item {
   updatedBy?: string
 }
 
-export const EDITABLE_FIELDS = ['title', 'category', 'dueDate', 'startDate', 'status', 'code', 'amount', 'url', 'notes'] as const
+export const EDITABLE_FIELDS = ['title', 'category', 'dueDate', 'startDate', 'status', 'code', 'amount', 'currency', 'url', 'notes'] as const
 export type EditableField = typeof EDITABLE_FIELDS[number]
 export type ItemDraft = Pick<Item, EditableField>
 
@@ -57,6 +59,7 @@ export const emptyDraft = (category = ''): ItemDraft => ({
   amount: '',
   category,
   code: '',
+  currency: '',
   dueDate: '',
   notes: '',
   startDate: '',
