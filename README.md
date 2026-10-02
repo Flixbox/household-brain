@@ -381,6 +381,10 @@ for 3 seconds, so a burst of triggers causes one pull.
 
 ## 6. UI
 
+**Top bar and menu:** every signed-in page has a top bar with the app's name and a menu button. It
+opens a drawer from the right (a modal dialog) with **Entries**, **Settings** and **Sign out**. The
+shell owns the bar, the drawer and "Sign out"; the app passes in its links.
+
 **Category board (home)**
 
 - One collapsible section per category, ordered by `sortOrder`. The header shows the icon, the
@@ -416,7 +420,7 @@ for 3 seconds, so a burst of triggers causes one pull.
 **Settings:** categories (add, rename, reorder, icon, colour), **"Share with your household"**
 (owner only: the steps for sharing the calendar in Google Calendar), a "Notifications: 2 days + 1 day before ✓"
 status for the current user (re-applied if it drifts), a reconnect-Google button, a sync status
-panel (last sync, pending and error counts, "Full resync"), and sign out.
+panel (last sync, pending and error counts, "Full resync"). (Sign out is in the menu.)
 
 **PWA:** `manifest.webmanifest` with `display: standalone`, regular and maskable icons, light and
 dark themes, and a `share_target`, so a coupon email or screenshot text can be shared into the add
