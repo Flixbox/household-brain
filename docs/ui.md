@@ -23,8 +23,8 @@ shell owns the bar, the drawer and "Sign out"; the app passes in its links.
 - Items are sorted by their next date: a passed due date first (the entry is overdue), otherwise the
   first of the due date and the extra dates from today on, or the last once all have passed; with ties broken by title. The row shows that date, and "+
   more" when the entry has other dates.
-- Each card shows the title; under it the price in slightly smaller text (as euros, e.g. "9,99 €",
-  only when an amount is set), the category in mixed lists, and the code; on the right the relative
+- Each card shows the title; under it the price in slightly smaller text (only when an amount is set; a
+  plain number as euros, e.g. "9,99 €", anything else as typed), the category in mixed lists, and the code; on the right the relative
   due date ("tomorrow, 17:00", "in 5 days", "overdue by 2 days") plus the absolute date.
 - Urgency colours: **overdue from 17:00 on the due date** is red, within 7 days is amber, anything
   else is neutral.

@@ -48,7 +48,7 @@ test('an entry is added, edited and deleted, and each change reaches Google Cale
   await synced()
   expect(google.live()).toEqual([expect.objectContaining({
     end: { dateTime: '2026-11-03T17:15:00', timeZone: 'Europe/Berlin' },
-    extendedProperties: { private: expect.objectContaining({ 'hb.category': 'coupon', 'hb.code': 'SUMMER25', 'hb.url': 'https://shop.household-brain.test' }) },
+    extendedProperties: { private: expect.objectContaining({ 'hb.amount': '10', 'hb.category': 'coupon', 'hb.code': 'SUMMER25', 'hb.url': 'https://shop.household-brain.test' }) },
     reminders: { useDefault: true },
     start: { dateTime: '2026-11-03T17:00:00', timeZone: 'Europe/Berlin' },
     summary: '[Coupon] Amazon',

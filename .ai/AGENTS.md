@@ -64,12 +64,12 @@ or phone numbers, providers tied to the owner, names of people. Use made-up exam
 credit", "Coupon 10 €"). Editing a slip away isn't enough, because GitHub keeps the edit history:
 delete and recreate the issue (owner's `gh`), or tell the owner for a pull request.
 
-**Read the issue and all its comments before starting work on it.** The owner decides things in
-issue comments (e.g. #43); the description alone can be out of date.
-
 **Track queued work as GitHub issues.** Every idea or request that isn't being built right now gets
 an issue (assigned to the owner, an existing label such as `enhancement`), and the pull request that
 delivers it says `Closes #n`. Nothing waits only in a chat.
+
+**Read the issue and all its comments before starting work on it.** The owner decides things in
+issue comments (e.g. #43); the description alone can be out of date.
 
 **Keep going without being asked.** Once a pull request is deployed and its browser check is done,
 start the next planned piece of work, or fix what the owner reported, without waiting to be told.
