@@ -2,7 +2,8 @@ import { CalendarApiError, type EventCursor, type EventPage } from '../calendar/
 import type { CalendarEvent } from './event'
 import { normalisationFor } from './from-event'
 import { decidePull } from './pull-plan'
-import { applyPulled, readSyncToken, recordEtag, removeVanished, saveSyncToken, serverNow } from './pull-store'
+import { applyPulled, dropStray, markSchema, readSyncToken, recordEtag, removeVanished, saveSyncToken, serverNow } from './pull-store'
+import { DATE_EVENTS_SCHEMA, entryOfEvent } from './date-events'
 import type { PushContext } from './push'
 import { isTransient } from './transient'
 
@@ -39,7 +40,14 @@ async function normalise(context: PushContext, event: CalendarEvent, patch: Cale
   }
 }
 
-async function applyEvent(context: PushContext, event: CalendarEvent): Promise<string | null> {
+/** An extra date's event belongs to its entry and is never an entry of its own (#34). */
+async function applyDateEvent(event: CalendarEvent): Promise<null> {
+  await dropStray(event.id ?? '')
+  return null
+}
+
+/** An entry's own event: merged into the entry, and brought back into shape when needed. */
+async function applyEntryEvent(context: PushContext, event: CalendarEvent): Promise<string | null> {
   const { categories, config, uid } = context
   const decision = await applyPulled(event, entry => decidePull({ categories, entry, event, uid }))
   const fresh = decision.kind === 'create' || (decision.kind === 'update' && decision.normalise)
@@ -54,6 +62,9 @@ async function applyEvent(context: PushContext, event: CalendarEvent): Promise<s
   await recordEtag(event.id ?? '', uid, event)
   return null
 }
+
+const applyEvent = (context: PushContext, event: CalendarEvent): Promise<string | null> =>
+  (entryOfEvent(event) ? applyDateEvent(event) : applyEntryEvent(context, event))
 
 interface Listing {
   events: CalendarEvent[]
@@ -87,7 +98,14 @@ async function pullPages(context: PushContext, syncToken: string | null): Promis
   return problems
 }
 
+/** People whose schema marker this app already wrote since it started. */
+const marked = new Set<string>()
+
 export async function pullChanges(context: PushContext): Promise<string[]> {
+  if (!marked.has(context.uid)) {
+    await markSchema(context.uid, DATE_EVENTS_SCHEMA)
+    marked.add(context.uid)
+  }
   const syncToken = await readSyncToken(context.uid)
   try {
     return await pullPages(context, syncToken)

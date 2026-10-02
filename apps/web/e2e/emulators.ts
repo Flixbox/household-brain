@@ -41,3 +41,15 @@ export async function seedDocument(path: string, fields: Record<string, string |
     throw new Error(`Seeding ${path} failed: ${response.status} ${await response.text()}`)
   }
 }
+
+/** Reads a document as the console would (bypassing the rules); null when it doesn't exist. */
+export async function readDocument(path: string): Promise<Record<string, unknown> | null> {
+  const response = await fetch(
+    `${FIRESTORE}/v1/projects/${PROJECT}/databases/(default)/documents/${path.split('/').map(encodeURIComponent).join('/')}`,
+    { headers: { Authorization: 'Bearer owner' } },
+  )
+  if (response.status === 404) {
+    return null
+  }
+  return ((await response.json()) as { fields: Record<string, unknown> }).fields
+}

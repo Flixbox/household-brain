@@ -91,6 +91,10 @@ for 3 seconds, so a burst of triggers causes one pull.
 
 - **Not touched at all:** repeating events (`recurrence` or `recurringEventId`), until repeating
   entries exist; and events older than what the entry already has (`updated` ≤ `googleUpdated`).
+- **An extra date's event** (one with `hb.entry`, #34) never becomes an entry: the pull skips it, and
+  removes a stray entry an older app version may have made from it (in Firestore only). Each app
+  writes `syncState/{uid}.schema = 2` to say it knows these events; date events are only written
+  once every person's marker says so.
 - **Events put in by hand** (no `hb.category` and no `[Label]` prefix naming a category, e.g. a
   birthday) are shown under **Uncategorised** but never rewritten in Google.
 - **One event that can't be adjusted** (say Google rejects the patch) is reported in the sync bar and
