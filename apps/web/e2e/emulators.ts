@@ -23,15 +23,18 @@ export async function allowlist(uid: string) {
   }
 }
 
-/** Writes a document as the console would (bypassing the rules). Strings and integers are supported. */
+/**
+ * Writes a document as the console would (bypassing the rules). Strings and integers are supported.
+ * A PATCH, so it replaces a document that is still there (e.g. written late by a previous test's
+ * page) instead of failing with "already exists".
+ */
 export async function seedDocument(path: string, fields: Record<string, string | number>) {
-  const [collection, id] = path.split('/')
   const response = await fetch(
-    `${FIRESTORE}/v1/projects/${PROJECT}/databases/(default)/documents/${collection}?documentId=${encodeURIComponent(id)}`,
+    `${FIRESTORE}/v1/projects/${PROJECT}/databases/(default)/documents/${path.split('/').map(encodeURIComponent).join('/')}`,
     {
       body: JSON.stringify({ fields: Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, typeof value === 'number' ? { integerValue: String(value) } : { stringValue: value }])) }),
       headers: { 'Authorization': 'Bearer owner', 'Content-Type': 'application/json' },
-      method: 'POST',
+      method: 'PATCH',
     },
   )
   if (!response.ok) {

@@ -15,9 +15,10 @@ export function ExtraDatesField({ dates, onChange }: { dates: EntryDate[], onCha
       <legend className="mb-1 text-sm font-medium">More dates (optional, in the app only)</legend>
       <datalist id="date-labels">{DATE_LABELS.map(label => <option key={label} value={label} />)}</datalist>
       {dates.map((entry, index) => (
-        <div key={entry.id} className="flex gap-2">
-          <input aria-label={`Label of date ${index + 1}`} list="date-labels" required className={`${textField} min-w-0 flex-1`} value={entry.label} onChange={event => update(entry.id, { label: event.target.value })} />
-          <input aria-label={`Date ${index + 1}`} type="date" required className={textField} value={entry.date} onChange={event => update(entry.id, { date: event.target.value })} />
+        // Wraps on a phone (label on its own line), or the row would be wider than the screen.
+        <div key={entry.id} className="flex flex-wrap items-center gap-2">
+          <input aria-label={`Label of date ${index + 1}`} list="date-labels" required className={`${textField} min-w-0 basis-full sm:basis-0 sm:flex-1`} value={entry.label} onChange={event => update(entry.id, { label: event.target.value })} />
+          <input aria-label={`Date ${index + 1}`} type="date" required className={`${textField} min-w-0 flex-1`} value={entry.date} onChange={event => update(entry.id, { date: event.target.value })} />
           <button type="button" aria-label={`Remove date ${index + 1}`} className={small} onClick={() => onChange(dates.filter(other => other.id !== entry.id))}>✕</button>
         </div>
       ))}
