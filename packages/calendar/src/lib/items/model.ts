@@ -48,3 +48,24 @@ export const emptyDraft = (category = ''): ItemDraft => ({
 export function changedFields(before: ItemDraft, after: ItemDraft): EditableField[] {
   return EDITABLE_FIELDS.filter(field => before[field] !== after[field])
 }
+
+export interface FormState {
+  /** What the form shows and saves. */
+  draft: ItemDraft
+  /** What each field was before the person edited it: saving sends only the fields that differ. */
+  base: ItemDraft
+}
+
+/**
+ * A newer version of the entry arrived (e.g. from Google) while the form is open: every field the
+ * person hasn't edited takes the new value; edited fields keep theirs, and win when saved.
+ * Returns `state` itself when nothing changes.
+ */
+export function followUntouched(state: FormState, next: ItemDraft): FormState {
+  const adopt = EDITABLE_FIELDS.filter(field => state.draft[field] === state.base[field] && state.base[field] !== next[field])
+  if (adopt.length === 0) {
+    return state
+  }
+  const newer = Object.fromEntries(adopt.map(field => [field, next[field]]))
+  return { base: { ...state.base, ...newer }, draft: { ...state.draft, ...newer } }
+}

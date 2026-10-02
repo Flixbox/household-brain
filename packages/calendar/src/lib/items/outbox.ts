@@ -281,10 +281,9 @@ export async function syncNow(): Promise<void> {
 }
 
 /**
- * Pulls from Google Calendar now, so a screen about to show an entry shows Google's latest. Resolves
- * once the pull is done, or at once when this device has no Google access or is offline (the board
- * then shows what it has, as always). While a push is running, the pull it asks for runs right
- * after it.
+ * Pulls from Google Calendar now, ignoring the reuse window, so an entry opened for editing catches
+ * up with Google; what the pull brings arrives through the entries listener like any other change.
+ * Nothing happens offline or without Google access; while a push runs, the pull runs right after it.
  */
 export function refreshNow(): Promise<void> {
   if (!navigator.onLine || !hasCalendarToken(MEMBER_SCOPES, auth.currentUser?.email)) {

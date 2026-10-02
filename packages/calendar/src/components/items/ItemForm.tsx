@@ -1,6 +1,6 @@
 import { type FormEvent, useState } from 'react'
 import type { Category } from '../../lib/categories'
-import type { ItemDraft } from '../../lib/items/model'
+import { type FormState, type ItemDraft, changedFields, followUntouched } from '../../lib/items/model'
 import { primaryButton, textField } from '../settings/styles'
 import { Field } from './Field'
 import { LINK_PATTERN, normaliseLink } from '../../lib/items/link'
@@ -8,23 +8,35 @@ import { LINK_PATTERN, normaliseLink } from '../../lib/items/link'
 interface Props {
   initial: ItemDraft
   categories: Category[]
-  onSave: (draft: ItemDraft) => Promise<unknown>
+  /** `base` is what the edited fields were before the person changed them. */
+  onSave: (draft: ItemDraft, base: ItemDraft) => Promise<unknown>
   /** Offer the status (open, done, cancelled): when editing, not when adding. */
   withStatus?: boolean
 }
 
-/** The add/edit form. The due date is a date only: every entry is due at 17:00. */
+/**
+ * The add/edit form. The due date is a date only: every entry is due at 17:00. When `initial`
+ * changes while the form is open (a newer version arrived), fields not edited here follow it.
+ */
 export function ItemForm({ initial, categories, onSave, withStatus = false }: Props) {
-  const [draft, setDraft] = useState(initial)
+  const [form, setForm] = useState<FormState>({ base: initial, draft: initial })
+  const [seen, setSeen] = useState(initial)
   const [saving, setSaving] = useState(false)
-  const set = (field: keyof ItemDraft) => (event: { target: { value: string } }) => setDraft(current => ({ ...current, [field]: event.target.value }))
+  // A newer `initial` (compared by value): adjust the state during render, as React recommends
+  // instead of an effect.
+  if (changedFields(seen, initial).length > 0) {
+    setSeen(initial)
+    setForm(followUntouched(form, initial))
+  }
+  const { draft, base } = form
+  const set = (field: keyof ItemDraft) => (event: { target: { value: string } }) => setForm(current => ({ ...current, draft: { ...current.draft, [field]: event.target.value } }))
   const submit = (event: FormEvent) => {
     event.preventDefault()
     if (saving) {
       return null
     }
     setSaving(true)
-    return onSave({ ...draft, title: draft.title.trim(), url: normaliseLink(draft.url) })
+    return onSave({ ...draft, title: draft.title.trim(), url: normaliseLink(draft.url) }, base)
   }
   return (
     <form className="grid gap-4" onSubmit={submit}>

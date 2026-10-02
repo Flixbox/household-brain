@@ -172,7 +172,7 @@ test('an edit made here keeps a field someone else changed in Google meanwhile',
     .toMatchObject({ 'hb.code': 'NEW20', 'hb.url': 'https://elsewhere.household-brain.test' })
 })
 
-test('opening an entry to edit it fetches the latest from Google first', async ({ page }) => {
+test('an entry opened for editing catches up with Google, keeping what was typed here', async ({ page }) => {
   const { google } = await mockGoogle(page)
   await signInAllowlisted(page, 'owner@household-brain.test')
   await page.getByRole('button', { name: 'Sync now' }).click()
@@ -192,4 +192,16 @@ test('opening an entry to edit it fetches the latest from Google first', async (
   google.edit(String(event.id), { extendedProperties: { private: { ...properties, 'hb.code': 'NEW20' } } })
   await page.getByRole('region', { name: 'Coupon' }).getByRole('link', { name: /Bakery/u }).click()
   await expect(page.getByLabel('Code')).toHaveValue('NEW20')
+
+  // While the form is open: a field typed in here stays, a field not touched follows Google.
+  await page.getByLabel('Title').fill('Bakery Müller')
+  google.edit(String(event.id), { extendedProperties: { private: { ...properties, 'hb.code': 'NEWER30' } }, summary: '[Coupon] Bäckerei' })
+  await expect.poll(async () => {
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')))
+    return page.getByLabel('Code').inputValue()
+  }, { intervals: [1000], timeout: 15_000 }).toBe('NEWER30')
+  await expect(page.getByLabel('Title')).toHaveValue('Bakery Müller')
+  await page.getByRole('button', { name: 'Save' }).click()
+  await expect.poll(() => google.live()[0]?.summary).toBe('[Coupon] Bakery Müller')
+  expect(google.live()[0]?.extendedProperties).toMatchObject({ private: { 'hb.code': 'NEWER30' } })
 })
