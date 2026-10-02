@@ -27,7 +27,7 @@
 | Hosting | Firebase Hosting |
 
 **Stack:** **Vite + React + TypeScript** (pnpm, Node through Volta, [toolchain](toolchain.md)) as a plain single-page app, with **`vite-plugin-pwa`**
-(Workbox: manifest, precaching, an "update available" prompt), **TanStack Router** (board, item
+(Workbox: manifest, precaching, updates applied when the app leaves the screen), **TanStack Router** (board, item
 sheet, settings), Firebase JS SDK v11+ (`firebase/auth`, `firebase/firestore`), Google Identity
 Services (the GIS token client), `rrule` (computing the next occurrence of repeating items),
 Tailwind, shadcn/ui (Vite setup), and `nanostores` + `@nanostores/react` + `@nanostores/persistent`

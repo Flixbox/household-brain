@@ -32,7 +32,10 @@ test('an entry is added, edited and deleted, and each change reaches Google Cale
 
   // Add, from the category's own "+" so the category is preselected.
   await page.getByRole('link', { name: 'Add Coupon' }).click()
+  // An untouched form lets a new app version load when the app leaves the screen; an edited one doesn't.
+  await expect(page.locator('[data-hold-updates]')).toHaveCount(0)
   await page.getByLabel('Title').fill('Amazon')
+  await expect(page.locator('form[data-hold-updates]')).toHaveCount(1)
   await page.getByLabel('Due date (17:00)').fill('2026-11-03')
   await page.getByLabel('Code').fill('SUMMER25')
   // A bare domain is fine; it is stored as a full address.

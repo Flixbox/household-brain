@@ -116,7 +116,7 @@ for 3 seconds, so a burst of triggers causes one pull.
 ## Offline behaviour
 
 - The app shell is precached by the Workbox service worker that `vite-plugin-pwa` generates.
-  A new deploy shows an "Update available, reload" toast (`registerType: 'prompt'`). Firestore's persistent cache serves the last state
+  A new deploy is installed in the background (checked on start, hourly and whenever the app comes back on screen) and applied when the app leaves the screen, so old builds become rare. Not while a form has unsaved edits or a Google window is open (`data-hold-updates`): then the next time; while the app is on screen a toast offers to reload now (`ReloadPrompt` in `packages/shell`). Firestore's persistent cache serves the last state
   immediately.
 - Offline edits sit in the Firestore write queue, and then appear as `pending`. The outbox worker
   pushes them to Google once the device is online and has a token.

@@ -9,6 +9,7 @@ import { ExtraDatesField } from './ExtraDatesField'
 import { useEntryDates } from './use-entry-dates'
 import type { EntryDate } from '../../lib/items/dates'
 import { LINK_PATTERN, normaliseLink } from '../../lib/items/link'
+import { holdUpdatesValue } from '../../lib/update-hold'
 
 interface Props {
   initial: ItemDraft
@@ -28,10 +29,12 @@ const NO_DATES: EntryDate[] = []
 
 /**
  * The add/edit form. The due date is a date only: every entry is due at 17:00. When `initial`
- * changes while the form is open (a newer version arrived), fields not edited here follow it.
+ * changes while the form is open (a newer version arrived), fields not edited here follow it. Once
+ * something is edited, the form holds back a new version of the app, so leaving the app to copy a
+ * code doesn't reload the page and lose the entry.
  */
 export function ItemForm({ initial, initialDates = NO_DATES, categories, onSave, withStatus = false }: Props) {
-  const { draft, latest, set } = useEntryForm(initial)
+  const { draft, edited, latest, set } = useEntryForm(initial)
   const [saving, setSaving] = useState(false)
   const { change: setDates, dates, touched } = useEntryDates(initialDates)
   const submit = (event: FormEvent) => {
@@ -43,7 +46,7 @@ export function ItemForm({ initial, initialDates = NO_DATES, categories, onSave,
     return onSave({ ...draft, title: draft.title.trim(), url: normaliseLink(draft.url) }, { dates: dates.map(entry => ({ ...entry, label: entry.label.trim() })), datesChanged: touched, latest })
   }
   return (
-    <form className="grid gap-4" onSubmit={submit}>
+    <form className="grid gap-4" onSubmit={submit} data-hold-updates={holdUpdatesValue(edited || touched)}>
       <Field label="Title" required><input required pattern=".*\S.*" title="Enter a title" className={textField} value={draft.title} onChange={set('title')} /></Field>
       <Field label="Category" required>
         <select required className={textField} value={draft.category} onChange={set('category')}>
