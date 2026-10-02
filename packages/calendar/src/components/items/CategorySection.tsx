@@ -11,17 +11,20 @@ export function CategorySection({ category, items, collapsed }: { category: Cate
   return (
     <section aria-label={category.label} className="space-y-1">
       <div className="flex items-baseline justify-between gap-3">
-        <button
-          type="button"
-          aria-expanded={!collapsed}
-          aria-controls={listId}
-          onClick={() => toggleCollapsed(category.slug)}
-          className="flex flex-1 items-baseline gap-2 text-left"
-        >
-          <span aria-hidden="true" className={`inline-block text-sm text-stone-500 transition-transform ${collapsed ? '-rotate-90' : ''}`}>▾</span>
-          <h2 className="text-lg font-semibold">{category.label}</h2>
-          {open > 0 && <span className="text-sm text-stone-500 tabular-nums">{open} open</span>}
-        </button>
+        {/* The button sits inside the heading, so the category stays a heading for screen readers. */}
+        <h2 className="flex-1 text-lg font-semibold">
+          <button
+            type="button"
+            aria-expanded={!collapsed}
+            aria-controls={listId}
+            onClick={() => toggleCollapsed(category.slug)}
+            className="flex w-full items-baseline gap-2 text-left"
+          >
+            <span aria-hidden="true" className={`inline-block text-sm text-stone-500 transition-transform ${collapsed ? '-rotate-90' : ''}`}>▾</span>
+            <span>{category.label}</span>
+            {open > 0 && <span className="text-sm font-normal text-stone-500 tabular-nums">{open} open</span>}
+          </button>
+        </h2>
         <Link to="/items/new" search={{ category: category.slug }} aria-label={`Add ${category.label}`} className="text-xl font-semibold text-orange-700 dark:text-orange-400">+</Link>
       </div>
       <ul id={listId} hidden={collapsed}>

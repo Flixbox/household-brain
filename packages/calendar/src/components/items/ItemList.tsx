@@ -1,8 +1,7 @@
 import { useStore } from '@nanostores/react'
-import { useEffect } from 'react'
 import type { Category } from '../../lib/categories'
 import type { Item } from '../../lib/items/model'
-import { $collapsed, collapsedSlugs, pruneCollapsed } from '../../lib/items/collapsed'
+import { $collapsed, collapsedSlugs } from '../../lib/items/collapsed'
 import { CategorySection } from './CategorySection'
 import { ItemRow } from './ItemRow'
 
@@ -14,12 +13,6 @@ const byDueDate = (left: Item, right: Item) => left.dueDate.localeCompare(right.
  */
 export function ItemList({ items, categories }: { items: Item[], categories: Category[] }) {
   const collapsed = collapsedSlugs(useStore($collapsed))
-  useEffect(() => {
-    // An empty list means the categories haven't loaded yet, not that every category is gone.
-    if (categories.length > 0) {
-      pruneCollapsed(categories.map(category => category.slug))
-    }
-  }, [categories])
   const visible = items.filter(item => item.pendingOp !== 'delete')
   const known = new Set(categories.map(category => category.slug))
   // Events put into the calendar by hand, or whose category was removed.

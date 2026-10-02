@@ -137,6 +137,7 @@ test('a category collapses, shows its open count, and stays collapsed after a re
 
   const coupons = page.getByRole('region', { name: 'Coupon' })
   const header = coupons.getByRole('button', { name: /Coupon/u })
+  await expect(coupons.getByRole('heading', { name: /Coupon/u })).toBeVisible()
   await expect(header).toHaveAttribute('aria-expanded', 'true')
   await expect(header).toContainText('1 open')
   await header.click()
