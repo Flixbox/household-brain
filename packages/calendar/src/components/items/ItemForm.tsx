@@ -38,7 +38,8 @@ const NO_DATES: EntryDate[] = []
  */
 export function ItemForm({ initial, initialDates = NO_DATES, categories, onSave, withStatus = false }: Props) {
   const { draft, edited, latest, set } = useEntryForm(initial)
-  const undatedAllowed = useUndatedAllowed()
+  // Without a due date only once every app handles that; an entry that already has none may stay so.
+  const dateRequired = !useUndatedAllowed() && !(withStatus && initial.dueDate === '')
   const [saving, setSaving] = useState(false)
   const { change: setDates, dates, touched } = useEntryDates(initialDates)
   const submit = (event: FormEvent) => {
@@ -58,8 +59,8 @@ export function ItemForm({ initial, initialDates = NO_DATES, categories, onSave,
           {categories.map(category => <option key={category.slug} value={category.slug}>{category.label}</option>)}
         </select>
       </Field>
-      <Field label="Due date (17:00)" required={!undatedAllowed}>
-        <input type="date" required={!undatedAllowed} title={undatedAllowed ? 'Leave it empty for something that never expires, e.g. a gift card credit' : 'Required until every phone runs the latest version'} className={textField} value={draft.dueDate} onChange={set('dueDate')} />
+      <Field label="Due date (17:00)" required={dateRequired}>
+        <input type="date" required={dateRequired} title={dateRequired ? 'Required until every phone runs the latest version' : 'Leave it empty for something that never expires, e.g. a gift card credit'} className={textField} value={draft.dueDate} onChange={set('dueDate')} />
       </Field>
       <Field label="Start date (optional)">
         <input type="date" max={draft.dueDate || '9999-12-31'} title="When it started or becomes valid; not after the due date" className={textField} value={draft.startDate} onChange={set('startDate')} />

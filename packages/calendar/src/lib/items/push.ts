@@ -115,8 +115,14 @@ async function unschedule(context: PushContext, item: Item): Promise<PushOutcome
     return { kind: 'unscheduled', updated: item.googleUpdated ?? '' }
   }
   await context.api.deleteEvent(context.config.calendarId, item.id)
-  // A deleted event can still be read: its `updated` is when it was deleted.
-  const gone = await context.api.getEvent(context.config.calendarId, item.id).catch(() => null)
+  // A deleted event can still be read: its `updated` is when it was deleted. Only "not there" is
+  // fine; anything else (offline, rate limit) retries, so the version guard is never lost.
+  const gone = await context.api.getEvent(context.config.calendarId, item.id).catch((error: unknown) => {
+    if (isStatus(error, 404) || isStatus(error, 410)) {
+      return null
+    }
+    throw error
+  })
   return { kind: 'unscheduled', updated: gone?.updated ?? '' }
 }
 

@@ -37,7 +37,7 @@ export function recordFor({ latest, pushed, outcome, uid, remote }: PushResult):
     return {
       fields: unchanged
         ? { dirty: [], etags: {}, googleUpdated: outcome.updated, pendingOp: null, sync: 'synced', syncError: null }
-        : { dirty: stillDirty(), etags: {} },
+        : { dirty: stillDirty(), etags: {}, ...outcome.updated ? { googleUpdated: outcome.updated } : {} },
       kind: 'update',
     }
   }
