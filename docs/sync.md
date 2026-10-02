@@ -66,7 +66,8 @@ All go through the single-flight routine, so they never run twice at the same ti
 All need Google access on the device: a Calendar token, which only a click can provide. Until a
 device has one, the sync bar says "Not synced with Google Calendar on this device yet" and offers
 **Sync now**. Saving an entry also asks for access, during the click. A pull that just ran is reused
-for 3 seconds, so a burst of triggers causes one pull.
+for 3 seconds, so a burst of triggers causes one pull (200 ms in the emulator build the e2e tests run
+against, so they don't wait on it).
 
 **The routine**
 
