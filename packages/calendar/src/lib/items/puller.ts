@@ -102,9 +102,11 @@ async function pullPages(context: PushContext, syncToken: string | null): Promis
 const marked = new Set<string>()
 
 export async function pullChanges(context: PushContext): Promise<string[]> {
+  // Best effort and not awaited: offline it would wait for the server, and a failure mustn't stop
+  // the pull. Tried again next session (or next pull) if it fails.
   if (!marked.has(context.uid)) {
-    await markSchema(context.uid, DATE_EVENTS_SCHEMA)
     marked.add(context.uid)
+    markSchema(context.uid, DATE_EVENTS_SCHEMA).catch(() => marked.delete(context.uid))
   }
   const syncToken = await readSyncToken(context.uid)
   try {
