@@ -221,6 +221,10 @@ installing browsers), `deploy` about 2 minutes.
   `@nanostores/persistent` for state that survives a reload (the Calendar token, UI preferences),
   read in components with `useStore` from `@nanostores/react`. No hand-rolled listener sets and no
   direct `localStorage` calls.
+  - **Firestore data a screen shows** comes from a live store (`queryStore` / `docStore` in
+    `@household-brain/firebase/live`): it listens only while read, shares one listener between all
+    readers, and resets when it stops. Not a `useEffect` with `onSnapshot` per component. Listeners
+    with special needs (pending-write metadata in the outbox, server-only answers) stay explicit.
 - **No barrel files.** No `index.ts` that re-exports a package's modules: barrels pull every module
   into whatever imports one of them, which defeats tree shaking and code splitting. Packages
   expose their modules by path through `exports` patterns in `package.json` (e.g.
