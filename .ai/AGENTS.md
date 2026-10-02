@@ -77,6 +77,10 @@ issue comments (e.g. #43); the description alone can be out of date.
 start the next planned piece of work, or fix what the owner reported, without waiting to be told.
 Ask only for decisions that belong to the owner (security trade-offs, product decisions, scope).
 
+**Stuck? File an issue and move on.** When something can't be finished without the owner (a
+setting the bot can't change, a decision, a broken tool), file an issue describing what is blocked
+and why, assigned to the owner, and continue with the next work instead of waiting.
+
 **Run long things in the background and keep working.** Test suites, builds, installs, CI and PR
 watchers, reviewer agents: start them in the background (their exit is the notification) and do the
 next useful thing meanwhile, such as reading review findings, updating the PR description or the
