@@ -14,6 +14,8 @@ export interface Board {
   sections: { category: Category, items: Item[] }[]
   /** Entries in no known category: events put in by hand, or whose category was removed. */
   other: Item[]
+  /** Every listed entry in one list, sorted by due date ("All by date"). */
+  flat: Item[]
 }
 
 /**
@@ -32,6 +34,7 @@ export function boardFor({ items, categories, query, showCompleted }: { items: r
   return {
     completed: current.filter(item => item.status !== 'open').length,
     empty: listed.length === 0,
+    flat: listed.toSorted(byDueDate),
     other: listed.filter(item => !known.has(item.category)).toSorted(byDueDate),
     searching,
     sections,

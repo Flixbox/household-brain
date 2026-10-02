@@ -31,7 +31,9 @@ shell owns the bar, the drawer and "Sign out"; the app passes in its links.
   word must match; case and accents are ignored). While searching it lists every match, completed
   ones included, only in categories that have a match, and those open even if folded. It isn't
   remembered across reloads.
-- There is an "All by date" flat-list toggle.
+- An "All by date" toggle shows every listed entry in one list by due date, each labelled with its
+  category, instead of the categories. A per-device preference (`hb:by-date`), off by default;
+  search and "Show completed" apply to it too.
 
 **Add / edit sheet**
 

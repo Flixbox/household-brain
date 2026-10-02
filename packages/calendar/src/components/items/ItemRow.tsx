@@ -13,14 +13,16 @@ const URGENCY_TEXT: Record<Urgency, string> = {
 /**
  * One entry: title with its code underneath, when it is due (relative, coloured by urgency, and the
  * date), and a dot while it is not yet in Google Calendar. Done and cancelled entries say so instead.
+ * `category` names its category, for lists that mix categories ("All by date").
  */
-export function ItemRow({ item }: { item: Item }) {
+export function ItemRow({ item, category }: { item: Item, category?: string }) {
   const due = rowDue(item, useStore($now))
   return (
     <li>
       <Link to="/items/$itemId" params={{ itemId: item.id }} className="flex items-baseline gap-3 rounded-lg px-3 py-2 hover:bg-stone-100 dark:hover:bg-stone-900">
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="font-medium">{item.title}</span>
+          {category && <span className="text-xs text-stone-500">{category}</span>}
           {item.code !== '' && <span className="font-mono text-sm break-all text-stone-600 select-all dark:text-stone-400">{item.code}</span>}
         </span>
         <span className="flex flex-col items-end text-sm">

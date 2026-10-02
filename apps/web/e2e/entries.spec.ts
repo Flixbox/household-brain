@@ -239,3 +239,29 @@ test('searching shows only matching entries, in their categories, even folded on
   await signInAs(page, 'owner@household-brain.test')
   await expect(page.getByRole('searchbox', { name: 'Search entries' })).toHaveValue('')
 })
+
+test('"All by date" lists every entry in one list by due date, labelled with its category', async ({ page }) => {
+  await mockGoogle(page)
+  await signInAllowlisted(page, 'owner@household-brain.test')
+  const add = async (category: string, title: string, dueDate: string) => {
+    await page.getByRole('link', { name: `Add ${category}` }).click()
+    await page.getByLabel('Title').fill(title)
+    await page.getByLabel('Due date (17:00)').fill(dueDate)
+    await page.getByRole('button', { name: 'Save' }).click()
+  }
+  await add('Coupon', 'Late coupon', '2026-12-20')
+  await add('Membership', 'Early gym', '2026-11-05')
+
+  const toggle = page.getByRole('button', { name: 'All by date' })
+  await toggle.click()
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true')
+  const list = page.getByRole('region', { name: 'All entries by date' })
+  await expect(list.getByRole('link')).toHaveText([/Early gym.*Membership/u, /Late coupon.*Coupon/u])
+  await expect(page.getByRole('region', { name: 'Coupon' })).toHaveCount(0)
+
+  // Remembered on this device.
+  await page.reload()
+  await expect(page.getByRole('region', { name: 'All entries by date' })).toBeVisible()
+  await page.getByRole('button', { name: 'All by date' }).click()
+  await expect(page.getByRole('region', { name: 'Coupon' })).toBeVisible()
+})
