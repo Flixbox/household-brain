@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CalendarApiError } from '../calendar/api'
+import { CalendarApiError } from '@household-brain/calendar/lib/calendar/api'
 import { NeedsAccessError, isTransient } from './transient'
 
 describe('isTransient', () => {

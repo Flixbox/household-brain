@@ -1,12 +1,12 @@
 import { collection, doc, onSnapshot, orderBy, query } from 'firebase/firestore'
 import { db } from '@household-brain/firebase/firebase'
-import type { Category } from '../categories'
-import type { HouseholdConfig } from '../calendar/setup'
-import { $calendarToken } from '../google-token'
+import type { Category } from '@household-brain/calendar/lib/categories'
+import type { HouseholdConfig } from '@household-brain/calendar/lib/calendar/setup'
+import { $calendarToken } from '@household-brain/calendar/lib/google-token'
 import { watchDateGate } from './date-outbox'
 import type { Item } from './model'
 import { itemsCollection } from './store'
-import { categoryFrom, householdFrom, itemFrom } from '../documents'
+import { categoryFrom, householdFrom, itemFrom } from '@household-brain/calendar/lib/documents'
 
 const PULL_EVERY_MS = 60_000
 

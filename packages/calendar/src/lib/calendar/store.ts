@@ -1,7 +1,7 @@
 import { collection, doc, getDoc, getDocs, limit, query, setDoc, writeBatch } from 'firebase/firestore'
 import { db } from '@household-brain/firebase/firebase'
 import type { HouseholdStore } from './setup'
-import { householdFrom } from '../documents'
+import { householdFrom } from '@household-brain/calendar/lib/documents'
 
 const configDoc = doc(db, 'meta', 'config')
 

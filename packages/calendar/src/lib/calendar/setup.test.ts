@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { type Category, DEFAULT_CATEGORIES } from '../categories'
+import { type Category, DEFAULT_CATEGORIES } from '@household-brain/calendar/lib/categories'
 import type { CalendarListEntry, Reminder } from './api'
 import { CALENDAR_NAME, DEFAULT_REMINDERS, type HouseholdConfig, type HouseholdStore, type SetupApi, TIME_ZONE, createHousehold, joinHousehold } from './setup'
 

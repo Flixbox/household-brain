@@ -1,5 +1,5 @@
 import { useStore } from '@nanostores/react'
-import { $showCompleted, toggleShowCompleted } from '../../lib/items/show-completed'
+import { $showCompleted, toggleShowCompleted } from '@household-brain/calendar/lib/items/show-completed'
 import { ToggleChip } from './ToggleChip'
 
 /** "Show completed (n)". It stays while it is on, so it can be switched off even once nothing is completed. */

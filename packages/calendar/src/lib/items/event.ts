@@ -1,6 +1,6 @@
 import { isForeign } from './currency'
 import { reminderMinutes } from './reminders'
-import type { Category } from '../categories'
+import type { Category } from '@household-brain/calendar/lib/categories'
 import type { EditableField, Item } from './model'
 
 export const DUE_TIME = '17:00:00'

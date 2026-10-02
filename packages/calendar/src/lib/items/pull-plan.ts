@@ -1,4 +1,4 @@
-import type { Category } from '../categories'
+import type { Category } from '@household-brain/calendar/lib/categories'
 import type { CalendarEvent } from './event'
 import { draftFrom, isRecurring } from './from-event'
 import { EDITABLE_FIELDS, type Item, type ItemDraft, draftOf } from './model'

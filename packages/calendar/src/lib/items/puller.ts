@@ -1,4 +1,4 @@
-import { CalendarApiError, type EventCursor, type EventPage } from '../calendar/api'
+import { CalendarApiError, type EventCursor, type EventPage } from '@household-brain/calendar/lib/calendar/api'
 import type { CalendarEvent } from './event'
 import { normalisationFor, ownRemindersFix } from './from-event'
 import { type PullDecision, decidePull } from './pull-plan'

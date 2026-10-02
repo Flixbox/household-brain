@@ -1,4 +1,4 @@
-import { type Category, DEFAULT_CATEGORIES } from '../categories'
+import { type Category, DEFAULT_CATEGORIES } from '@household-brain/calendar/lib/categories'
 import type { CalendarApi, Reminder } from './api'
 
 /** The calendar calls household setup needs. */

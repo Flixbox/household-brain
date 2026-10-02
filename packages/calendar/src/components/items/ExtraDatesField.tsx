@@ -1,6 +1,6 @@
-import { DATE_LABELS, type EntryDate } from '../../lib/items/dates'
-import { newEventId } from '../../lib/items/ids'
-import { textField } from '../settings/styles'
+import { DATE_LABELS, type EntryDate } from '@household-brain/calendar/lib/items/dates'
+import { newEventId } from '@household-brain/calendar/lib/items/ids'
+import { textField } from '@household-brain/calendar/lib/styles'
 
 const small = 'text-sm font-medium text-orange-700 dark:text-orange-400'
 

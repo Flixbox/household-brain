@@ -1,5 +1,5 @@
 import { type MouseEvent, type PointerEvent, useRef, useState } from 'react'
-import { swipedToDone } from '../../lib/items/swipe-threshold'
+import { swipedToDone } from '@household-brain/calendar/lib/items/swipe-threshold'
 
 /** Movement (px) below which a press still counts as a tap. */
 const TAP_SLOP_PX = 10

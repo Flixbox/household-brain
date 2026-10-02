@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { type EntryDate, sameDates } from '../../lib/items/dates'
+import { type EntryDate, sameDates } from '@household-brain/calendar/lib/items/dates'
 
 /**
  * The form's extra dates. Like the other fields: while nobody has changed them here, they follow a

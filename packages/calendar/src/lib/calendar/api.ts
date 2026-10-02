@@ -1,4 +1,4 @@
-import type { CalendarEvent } from '../items/event'
+import type { CalendarEvent } from '@household-brain/calendar/lib/items/event'
 
 const BASE = 'https://www.googleapis.com/calendar/v3'
 

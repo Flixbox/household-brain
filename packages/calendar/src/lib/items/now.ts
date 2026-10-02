@@ -1,6 +1,6 @@
 import { atom, onMount } from 'nanostores'
 import { Temporal } from 'temporal-polyfill'
-import { TIME_ZONE } from '../calendar/setup'
+import { TIME_ZONE } from '@household-brain/calendar/lib/calendar/setup'
 
 const current = () => Temporal.Now.zonedDateTimeISO(TIME_ZONE)
 

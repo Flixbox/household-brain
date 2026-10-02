@@ -1,6 +1,6 @@
 import type { ChangeEvent } from 'react'
-import type { Item } from '../../lib/items/model'
-import { textField } from '../settings/styles'
+import type { Item } from '@household-brain/calendar/lib/items/model'
+import { textField } from '@household-brain/calendar/lib/styles'
 import { Field } from './Field'
 
 /** An entry's status, offered when editing (a new entry is always open). */

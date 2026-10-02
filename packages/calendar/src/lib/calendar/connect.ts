@@ -1,5 +1,5 @@
 import { auth } from '@household-brain/firebase/firebase'
-import { MEMBER_SCOPES, OWNER_SCOPES, calendarToken, forgetCalendarToken } from '../google-token'
+import { MEMBER_SCOPES, OWNER_SCOPES, calendarToken, forgetCalendarToken } from '@household-brain/calendar/lib/google-token'
 import { createCalendarApi } from './api'
 import { type HouseholdConfig, createHousehold, joinHousehold } from './setup'
 import { firestoreHouseholdStore } from './store'

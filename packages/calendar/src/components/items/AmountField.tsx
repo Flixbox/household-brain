@@ -1,5 +1,5 @@
-import { CURRENCIES } from '../../lib/items/currency'
-import { textField } from '../settings/styles'
+import { CURRENCIES } from '@household-brain/calendar/lib/items/currency'
+import { textField } from '@household-brain/calendar/lib/styles'
 import { Field } from './Field'
 
 /** The usual currencies, plus the entry's own should it be another (one set in another app). */

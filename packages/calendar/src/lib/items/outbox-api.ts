@@ -1,6 +1,6 @@
-import { createCalendarApi } from '../calendar/api'
+import { createCalendarApi } from '@household-brain/calendar/lib/calendar/api'
 import { auth } from '@household-brain/firebase/firebase'
-import { MEMBER_SCOPES, calendarToken, forgetCalendarToken, hasCalendarToken } from '../google-token'
+import { MEMBER_SCOPES, calendarToken, forgetCalendarToken, hasCalendarToken } from '@household-brain/calendar/lib/google-token'
 import { NeedsAccessError } from './transient'
 
 /**

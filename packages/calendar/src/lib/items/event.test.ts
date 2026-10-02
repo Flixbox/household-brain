@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_CATEGORIES } from '../categories'
+import { DEFAULT_CATEGORIES } from '@household-brain/calendar/lib/categories'
 import { isEventId, newEventId } from './ids'
 import { eventFor, patchFor, summaryOf } from './event'
 import type { Item } from './model'

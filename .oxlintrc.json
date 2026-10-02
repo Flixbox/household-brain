@@ -32,6 +32,7 @@
       }
     ],
     "typescript/consistent-type-assertions": ["error", { "assertionStyle": "never" }], // narrow with type guards instead of casting (#68)
+    "import/no-relative-parent-imports": "error", // a package imports its own modules by its name, `@household-brain/calendar/lib/…` (#77)
     "react/react-in-jsx-scope": "off", // the automatic JSX runtime needs no React import
     "react/function-component-definition": ["error", { "namedComponents": "arrow-function", "unnamedComponents": "arrow-function" }], // components are arrow functions too (#67)
     "@stylistic/indent": [

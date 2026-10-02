@@ -1,6 +1,6 @@
 import { useStore } from '@nanostores/react'
-import { $search } from '../../lib/items/search'
-import { textField } from '../settings/styles'
+import { $search } from '@household-brain/calendar/lib/items/search'
+import { textField } from '@household-brain/calendar/lib/styles'
 
 /** The board's search field. */
 export const SearchBox = () => {

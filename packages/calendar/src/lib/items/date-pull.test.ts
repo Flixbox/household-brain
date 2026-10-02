@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_CATEGORIES } from '../categories'
+import { DEFAULT_CATEGORIES } from '@household-brain/calendar/lib/categories'
 import { dateEventFor, shapeOf } from './date-events'
 import { dateEventChange } from './date-pull'
 import type { Item } from './model'

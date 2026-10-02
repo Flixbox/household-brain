@@ -1,4 +1,4 @@
-import { CalendarApiError } from '../calendar/api'
+import { CalendarApiError } from '@household-brain/calendar/lib/calendar/api'
 import { type DateOp, dateEventId, dateEventIdsOf } from './date-events'
 import type { CalendarEvent } from './event'
 import type { Item } from './model'

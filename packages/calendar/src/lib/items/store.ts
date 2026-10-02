@@ -1,6 +1,6 @@
 import { arrayUnion, collection, deleteField, doc, runTransaction, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore'
 import { auth, db } from '@household-brain/firebase/firebase'
-import type { Category } from '../categories'
+import type { Category } from '@household-brain/calendar/lib/categories'
 import type { DateOp } from './date-events'
 import { draftFrom } from './from-event'
 import type { EntryDate } from './dates'
@@ -8,7 +8,7 @@ import { EDITABLE_FIELDS, type Item, type ItemDraft, changedFields, draftOf } fr
 import { newEventId } from './ids'
 import type { PushOutcome } from './push'
 import { type PushRecord, errorFor, recordFor } from './record'
-import { itemFrom } from '../documents'
+import { itemFrom } from '@household-brain/calendar/lib/documents'
 
 export const itemsCollection = collection(db, 'items')
 const itemDoc = (id: string) => doc(db, 'items', id)

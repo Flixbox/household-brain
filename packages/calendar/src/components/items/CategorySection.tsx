@@ -1,8 +1,8 @@
 import { Link } from '@tanstack/react-router'
-import type { Category } from '../../lib/categories'
-import type { Item } from '../../lib/items/model'
-import { toggleCollapsed } from '../../lib/items/collapsed'
-import { categoryColor } from '../../lib/category-colors'
+import type { Category } from '@household-brain/calendar/lib/categories'
+import type { Item } from '@household-brain/calendar/lib/items/model'
+import { toggleCollapsed } from '@household-brain/calendar/lib/items/collapsed'
+import { categoryColor } from '@household-brain/calendar/lib/category-colors'
 import { ItemRow } from './ItemRow'
 
 /**

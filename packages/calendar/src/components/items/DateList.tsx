@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router'
-import type { Category } from '../../lib/categories'
-import type { Board } from '../../lib/items/board'
+import type { Category } from '@household-brain/calendar/lib/categories'
+import type { Board } from '@household-brain/calendar/lib/items/board'
 import { ItemRow } from './ItemRow'
 
 /** What an empty list says: nothing while searching (the board says no entry matches). */
