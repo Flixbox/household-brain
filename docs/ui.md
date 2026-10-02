@@ -9,6 +9,8 @@ shell owns the bar, the drawer and "Sign out"; the app passes in its links.
 - One collapsible section per category, ordered by `sortOrder`. The header shows the icon, the
   label, the open count, a badge such as "2 due this week", and a **"+" that preselects the
   category**.
+- Each category has a coloured line down its left, from its heading to its last entry, in the
+  category's Google Calendar event colour (`colorId`), so the app matches the calendar.
 - **All categories are expanded by default.** Collapsing is a per-device preference:
   - It lives in a nanostores `persistentAtom` from `@nanostores/persistent`, stored in
     `localStorage` under `hb:collapsed`.

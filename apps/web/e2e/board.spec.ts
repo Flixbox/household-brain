@@ -212,3 +212,11 @@ test('swiping an entry left marks it done, with Undo', async ({ page }) => {
   await expect(row).toBeVisible()
   await expect(page.getByRole('status').filter({ hasText: 'Marked' })).toHaveCount(0)
 })
+
+test('each category has a line down its left in its Google Calendar colour', async ({ page }) => {
+  await mockGoogle(page)
+  await signInAllowlisted(page, 'owner@household-brain.test')
+  // Coupon is tangerine (colour 6), Membership grape (colour 3), as their events in Google Calendar.
+  await expect(page.getByRole('region', { name: 'Coupon' })).toHaveCSS('border-left-color', 'rgb(244, 81, 30)')
+  await expect(page.getByRole('region', { name: 'Membership' })).toHaveCSS('border-left-color', 'rgb(142, 36, 170)')
+})

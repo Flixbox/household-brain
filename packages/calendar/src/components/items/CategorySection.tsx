@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router'
 import type { Category } from '../../lib/categories'
 import type { Item } from '../../lib/items/model'
 import { toggleCollapsed } from '../../lib/items/collapsed'
+import { categoryColor } from '../../lib/category-colors'
 import { ItemRow } from './ItemRow'
 
 /**
@@ -13,7 +14,8 @@ export function CategorySection({ category, items, collapsed, foldable = true }:
   const listId = `category-${category.slug}`
   const open = items.filter(item => item.status === 'open').length
   return (
-    <section aria-label={category.label} className="space-y-1">
+    // A line down the left in the category's Google Calendar colour, from its heading to its last entry.
+    <section aria-label={category.label} className="space-y-1 border-l-4 pl-3" style={{ borderColor: categoryColor(category.colorId) }}>
       <div className="flex items-baseline justify-between gap-3">
         {/* The button sits inside the heading, so the category stays a heading for screen readers. */}
         <h2 className="flex-1 text-lg font-semibold">
