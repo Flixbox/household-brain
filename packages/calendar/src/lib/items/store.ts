@@ -8,6 +8,7 @@ import { EDITABLE_FIELDS, type Item, type ItemDraft, changedFields, draftOf } fr
 import { newEventId } from './ids'
 import type { PushOutcome } from './push'
 import { type PushRecord, errorFor, recordFor } from './record'
+import { itemFrom } from '../documents'
 
 export const itemsCollection = collection(db, 'items')
 const itemDoc = (id: string) => doc(db, 'items', id)
@@ -66,7 +67,7 @@ const apply = (item: Item, decide: (latest: Item | null) => PushRecord): Promise
   runTransaction(db, async transaction => {
     const ref = itemDoc(item.id)
     const snapshot = await transaction.get(ref)
-    const record = decide(snapshot.exists() ? snapshot.data() as Item : null)
+    const record = decide(snapshot.exists() ? itemFrom(snapshot.id, snapshot.data()) : null)
     if (record.kind === 'delete') {
       transaction.delete(ref)
     } else if (record.kind === 'update') {

@@ -71,7 +71,7 @@ test('entries: categories and the form, added, edited, deleted, and a double-tap
     await synced()
     const patches = requests.filter(request => request.method === 'PATCH' && request.path.includes('/events/'))
     expect(patches).toHaveLength(1)
-    expect(Object.keys(patches[0].body as object).toSorted()).toEqual(['end', 'start'])
+    expect(Object.keys(patches[0]?.body as object).toSorted()).toEqual(['end', 'start'])
     expect(google.live().find(event => event.summary === '[Coupon] Amazon')).toMatchObject({ start: { dateTime: '2026-11-05T17:00:00' }, summary: '[Coupon] Amazon' })
 
     // Its own reminders: a week ahead and the day before, instead of the default two days and one day.

@@ -1,4 +1,4 @@
-import { type DocumentReference, type Query, onSnapshot } from 'firebase/firestore'
+import { type DocumentData, type DocumentReference, type Query, onSnapshot } from 'firebase/firestore'
 import { type ReadableAtom, atom, onMount } from 'nanostores'
 
 /** Firestore data kept live in a store: loading until the first answer (often from the offline cache). */
@@ -57,13 +57,13 @@ export const liveStore = <Value>(subscribe: Subscribe<Value>): ReadableAtom<Live
   return $store
 }
 
-/** The documents of a query, live. */
-export const queryStore = <Value>(query: Query) =>
-  liveStore<Value[]>((next, fail) => onSnapshot(query, snapshot => next(snapshot.docs.map(entry => entry.data() as Value)), fail))
+/** The documents of a query, live, each read by `read` from its id and data. */
+export const queryStore = <Value>(query: Query, read: (id: string, data: DocumentData) => Value) =>
+  liveStore<Value[]>((next, fail) => onSnapshot(query, snapshot => next(snapshot.docs.map(entry => read(entry.id, entry.data()))), fail))
 
-/** One document, live; null while it doesn't exist. */
-export const docStore = <Value>(ref: DocumentReference) =>
-  liveStore<Value | null>((next, fail) => onSnapshot(ref, snapshot => next(snapshot.exists() ? snapshot.data() as Value : null), fail))
+/** One document, live, read by `read`; null while it doesn't exist (or `read` finds nothing usable). */
+export const docStore = <Value>(ref: DocumentReference, read: (data: DocumentData) => Value | null) =>
+  liveStore<Value | null>((next, fail) => onSnapshot(ref, snapshot => next(snapshot.exists() ? read(snapshot.data()) : null), fail))
 
 /** The data once it is there, else null (loading, or the listener failed). */
 export const dataOf = <Value>(live: Live<Value>): Value | null => (live.state === 'ready' ? live.data : null)

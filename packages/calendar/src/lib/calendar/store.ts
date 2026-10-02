@@ -1,6 +1,7 @@
 import { collection, doc, getDoc, getDocs, limit, query, setDoc, writeBatch } from 'firebase/firestore'
 import { db } from '@household-brain/firebase/firebase'
-import type { HouseholdConfig, HouseholdStore } from './setup'
+import type { HouseholdStore } from './setup'
+import { householdFrom } from '../documents'
 
 const configDoc = doc(db, 'meta', 'config')
 
@@ -8,7 +9,7 @@ const configDoc = doc(db, 'meta', 'config')
 export const firestoreHouseholdStore: HouseholdStore = {
   config: async () => {
     const snapshot = await getDoc(configDoc)
-    return snapshot.exists() ? snapshot.data() as HouseholdConfig : null
+    return snapshot.exists() ? householdFrom(snapshot.data()) : null
   },
   hasCategories: async () => !(await getDocs(query(collection(db, 'categories'), limit(1)))).empty,
   saveCategories: async categories => {

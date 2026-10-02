@@ -6,12 +6,13 @@ import { db } from '@household-brain/firebase/firebase'
 import { dataOf, queryStore } from '@household-brain/firebase/live'
 import type { Item } from './model'
 import { itemsCollection } from './store'
+import { categoryFrom, itemFrom } from '../documents'
 
 /** All entries, kept live (from the offline cache first, then the server); one listener for every reader. */
-const $items = queryStore<Item>(itemsCollection)
+const $items = queryStore(itemsCollection, itemFrom)
 
 /** The household's categories in their display order, live. */
-const $categories = queryStore<Category>(query(collection(db, 'categories'), orderBy('sortOrder')))
+const $categories = queryStore(query(collection(db, 'categories'), orderBy('sortOrder')), categoryFrom)
 
 /** All entries, or null until the first answer. */
 export const useItems = (): Item[] | null => dataOf(useStore($items))

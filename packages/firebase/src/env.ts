@@ -14,7 +14,13 @@ export const firebaseOptionsFrom = (env: Partial<Record<string, string | undefin
   if (missing.length > 0) {
     throw new Error(`Missing Firebase config: ${missing.join(', ')}`)
   }
-  return Object.fromEntries(
-    Object.entries(REQUIRED).map(([option, key]) => [option, env[key]]),
-  ) as FirebaseOptions
+  // Every value is there now; `?? ''` only tells TypeScript so.
+  const value = (key: string) => env[key] ?? ''
+  return {
+    apiKey: value(REQUIRED.apiKey),
+    appId: value(REQUIRED.appId),
+    authDomain: value(REQUIRED.authDomain),
+    messagingSenderId: value(REQUIRED.messagingSenderId),
+    projectId: value(REQUIRED.projectId),
+  }
 }
