@@ -17,9 +17,11 @@ history live in the GitHub issues.
 ```sh
 pnpm install
 pnpm dev               # Vite dev server on http://localhost:5173
-pnpm lint              # oxlint, npm-package-json-lint, fallow
+pnpm lint              # oxlint, npm-package-json-lint, fallow (Nx, cached); pnpm lint:fix fixes what it can
 pnpm typecheck && pnpm test
+pnpm build             # apps/web/dist
 pnpm test:emulated     # Firebase emulators: rules tests and Playwright e2e (needs Java 21)
+pnpm emulators         # emulators only, to iterate on pnpm test:rules or the e2e tests against them
 ```
 
 **Machine setup (once):**
@@ -69,6 +71,9 @@ The Firebase project is a Google Cloud project; everything below happens in it.
   their first sign-in; copy it from there). The app itself can never write the allowlist.
 - **New sign-ups are switched off** once everyone has signed in (Authentication → Settings → User
   actions). To add a person: switch sign-up on, let them sign in once, allowlist them, switch it off.
+- **When a person leaves:** delete their `allowlist/<uid>` **and** their `syncState/<uid>`. Every
+  app records its version there, and an old record would keep features that need every app to be
+  up to date (extra-date events, entries without a due date) switched off for everyone.
 
 **The household calendar**
 - The owner creates it from the app's Settings ("Create the household calendar").
@@ -83,9 +88,13 @@ The Firebase project is a Google Cloud project; everything below happens in it.
   Hosting Admin, Firebase Rules Admin, Cloud Datastore Index Admin and Service Usage Consumer.
 - The provider's condition accepts only this repository's numeric id, `refs/heads/main` and the
   `production` environment, so forks and other branches can't deploy.
+- Repository variables (not secrets) for `ci.yml`: `WIF_PROVIDER` (the provider's full resource name)
+  and `DEPLOY_SA` (the service account's email).
 - Repository settings: fork PR workflows need approval; `GITHUB_TOKEN` is read-only; only
   GitHub-owned and `google-github-actions/*` actions, pinned to full SHAs; the `production`
   environment deploys from `main` only; `main` can't be deleted or force-pushed.
+- Ground rules: review a fork PR's diff, `.github/` included, before clicking "Approve and run";
+  never use the `pull_request_target` or `workflow_run` triggers; never add self-hosted runners.
 - Manual fallback: `pnpm exec firebase deploy --only hosting,firestore:rules,firestore:indexes`.
 
 Licence: Unlicense.

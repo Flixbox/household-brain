@@ -5,11 +5,11 @@
   "$schema": "./node_modules/fallow/schema.json",
   // vite-plugin-pwa loads it by name (`pwaAssets: { config: true }` in apps/web/vite.config.ts).
   "entry": ["apps/web/pwa-assets.config.ts"],
-  // Loaded by vite-plugin-pwa's generated register module, not imported by our code.
+  // vite-plugin-pwa's peer: loaded by the plugin's generated register module, not imported by our code.
   "ignoreDependencies": ["workbox-window"],
   "boundaries": {
     "zones": [
-      { "name": "app", "patterns": ["apps/web/src/**"] },
+      { "name": "app", "patterns": ["apps/web/**"] },
       { "name": "shell", "patterns": ["packages/shell/src/**"] },
       { "name": "calendar", "patterns": ["packages/calendar/src/**"] },
       { "name": "firebase", "patterns": ["packages/firebase/src/**"] }

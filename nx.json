@@ -37,6 +37,24 @@
         "^production"
       ],
       "cache": true
+    },
+    "lint:oxlint": {
+      "cache": true,
+      "inputs": [
+        "{workspaceRoot}/**/*"
+      ]
+    },
+    "lint:packages": {
+      "cache": true,
+      "inputs": [
+        "{workspaceRoot}/**/*"
+      ]
+    },
+    "lint:fallow": {
+      "cache": true,
+      "inputs": [
+        "{workspaceRoot}/**/*"
+      ]
     }
   }
 }

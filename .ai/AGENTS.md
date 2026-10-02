@@ -75,7 +75,7 @@ issue comments (e.g. #43); the description alone can be out of date.
 
 **Keep going without being asked.** Once a pull request is deployed and its browser check is done,
 start the next planned piece of work, or fix what the owner reported, without waiting to be told.
-Ask only for decisions that belong to the owner (security trade-offs, spec changes, scope).
+Ask only for decisions that belong to the owner (security trade-offs, product decisions, scope).
 
 **Run long things in the background and keep working.** Test suites, builds, installs, CI and PR
 watchers, reviewer agents: start them in the background (their exit is the notification) and do the
@@ -236,13 +236,21 @@ installing browsers), `deploy` about 2 minutes.
   Dependabot bumps them. Node is pinned in `package.json` (`volta.node`), pnpm in `packageManager`.
 - **fallow** (`.fallowrc.jsonc`, part of `pnpm lint`) fails on unused files, exports and
   dependencies, on duplication, and on imports across the package boundaries: `apps/web` may use
-  every package; `shell` and `calendar` only `firebase`; nothing imports `apps/web`.
+  every package; `shell` and `calendar` only `firebase`; nothing imports `apps/web` (its e2e tests
+  and config included).
 - **The e2e build must never reach production:** the emulator wiring and the `window.e2eSignIn` hook
   are behind an inline `import.meta.env.VITE_USE_EMULATORS` comparison, `vite.config.ts` refuses a
   production build with it set, and CI fails if `apps/web/dist/` mentions either. The emulators run
   as `demo-household-brain`, which can't reach real Google services.
 - **CI uses only GitHub-owned and `google-github-actions/*` actions**, pinned to full SHAs (a
   repository setting); pnpm is installed from `packageManager`, not through a third-party action.
+- **Never use the `pull_request_target` or `workflow_run` triggers** (both run code with the base
+  repository's privileges), and never add self-hosted runners to this public repo.
+- **Lint and typecheck are Nx targets:** `pnpm lint` is `nx run-many` over the root project's
+  `lint:oxlint`, `lint:packages` and `lint:fallow` (only those root scripts are Nx targets, through
+  `nx.includedScripts`), `pnpm typecheck` over every project's `typecheck` (the root's own is in
+  `nx.targets`). Whole-repo tools take `{workspaceRoot}/**/*` as input: the root project's default
+  inputs exclude files that belong to other projects, which once served a stale green from cache.
 
 ### Toolchain
 
