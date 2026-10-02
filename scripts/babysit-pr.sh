@@ -54,9 +54,10 @@ report() { # report <key> <message...>: print and exit unless this key was repor
   exit 0
 }
 
-activity() { # one line per item: "<kind> <id> <author> <text>"
+# One line per item: "<kind> <id> <author> <text>". Nx Cloud's status comment on every push needs no answer.
+activity() {
   "$ACTIVITY_GH" api --paginate "repos/$REPO/issues/$pr/comments" \
-    --jq '.[] | "comment \(.id) \(.user.login): \((.body // "") | gsub("\\s+"; " ") | .[0:200])"' &&
+    --jq '.[] | select(.user.login != "nx-cloud[bot]") | "comment \(.id) \(.user.login): \((.body // "") | gsub("\\s+"; " ") | .[0:200])"' &&
   "$ACTIVITY_GH" api --paginate "repos/$REPO/pulls/$pr/reviews" \
     --jq '.[] | select(.state != "APPROVED" or (.body // "") != "") | select(.user.login != "'"$SELF"'" or (.body // "") != "") | "review \(.id) \(.user.login) \(.state): \((.body // "") | gsub("\\s+"; " ") | .[0:200])"' &&
   "$ACTIVITY_GH" api --paginate "repos/$REPO/pulls/$pr/comments" \

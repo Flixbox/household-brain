@@ -114,7 +114,10 @@ adapted to this repository:
 - Turn it into a GIF with `scripts/pr-gif.sh` (`fetch`, then `sheet` to find the seconds, then `gif`),
   from the run of the commit the description talks about. At most 10 MB.
 - Attach it with `gh pr edit <n> --body-file <body.md> --attach '<file.gif>#<what it shows>'`
-  (gh 2.99 or newer). Never commit a GIF to the branch.
+  (gh 2.99 or newer), with `![what it shows](./file.gif)` in `body.md` where it belongs: gh uploads
+  the file and rewrites that reference to the uploaded copy. Then put that uploaded URL into
+  `body.md` itself, so a later description update (after every push) keeps the GIF. Never commit a
+  GIF to the branch.
 - When the change has no visible part (CI, sync logic), say so in the description instead.
 
 ### 2. After every push
