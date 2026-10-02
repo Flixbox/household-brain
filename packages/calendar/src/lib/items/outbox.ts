@@ -1,14 +1,14 @@
-import { collection, doc, onSnapshot, orderBy, query } from 'firebase/firestore'
-import { auth, db } from '@household-brain/firebase/firebase'
-import { $calendarToken, MEMBER_SCOPES, calendarToken, hasCalendarToken, loadGis } from '../google-token'
+import { auth } from '@household-brain/firebase/firebase'
+import { MEMBER_SCOPES, calendarToken, hasCalendarToken, loadGis } from '../google-token'
 import type { Item } from './model'
 import { type PushContext, pushItem } from './push'
 import { pullChanges } from './puller'
-import { draftFrom } from './from-event'
-import { itemsCollection, recordPush, recordPushError } from './store'
+import { recordPush, recordPushError } from './store'
 import { outboxApi } from './outbox-api'
 import { isTransient } from './transient'
 import { $outbox } from './outbox-state'
+import { watchOutboxTriggers } from './outbox-triggers'
+import { forgetDateWork, nextDateWork, runDateWork } from './date-outbox'
 
 /**
  * The outbox: pushes pending entries to Google Calendar one at a time while a Calendar token is
@@ -39,7 +39,6 @@ const recorded = new Map<string, string>()
 /** Entries whose latest local write the server hasn't confirmed yet. */
 let unconfirmed = new Set<string>()
 const PULL_REUSE_MS = 3000
-const PULL_EVERY_MS = 60_000
 let pulling: Promise<void> | null = null
 let pulledAt = Number.NEGATIVE_INFINITY
 let pullProblem: string | null = null
@@ -75,8 +74,7 @@ function retryLater(started: number) {
 async function pushOne(item: Item, context: PushContext, started: number): Promise<void> {
   try {
     const outcome = await pushItem(context, item)
-    const remote = outcome.kind === 'synced' ? draftFrom(outcome.event, context.categories) : null
-    if (await recordPush(item, outcome, { remote, uid: context.uid })) {
+    if (await recordPush(item, outcome, { categories: context.categories, uid: context.uid })) {
       recorded.set(item.id, item.rev)
     }
     backoffMs = 0
@@ -88,6 +86,10 @@ async function pushOne(item: Item, context: PushContext, started: number): Promi
     }
   }
 }
+
+/** The next extra date's event to write (`date-outbox.ts`), for entries whose own event is in Google. */
+const nextDate = (context: PushContext | null) =>
+  context && nextDateWork(data.items, context, item => item.sync === 'synced' && !unconfirmed.has(item.id))
 
 function nextToPush(): Item | undefined {
   // Only entries the server already has: recording a push needs the server's copy, and offline
@@ -130,6 +132,17 @@ function pullNow(context: PushContext): Promise<void> {
   return pulling
 }
 
+/** Pushes the next pending entry, or else writes the next date event. */
+async function pushNext(context: PushContext, started: number): Promise<void> {
+  const next = nextToPush()
+  const date = next ? null : nextDate(context)
+  if (next) {
+    await pushOne(next, context, started)
+  } else if (date) {
+    await runDateWork(context, date).then(() => { backoffMs = 0 }, () => retryLater(started))
+  }
+}
+
 /**
  * One step: pull (always when `alwaysPull`, otherwise only before a push, so a write is based on
  * Google's latest), then push the next pending entry, and repeat while entries wait.
@@ -139,9 +152,8 @@ async function step(context: PushContext): Promise<boolean> {
   busy = true
   try {
     await pullNow(context)
-    const next = nextToPush()
-    if (next && started === generation) {
-      await pushOne(next, context, started)
+    if (started === generation) {
+      await pushNext(context, started)
     }
   } finally {
     if (started === generation) {
@@ -160,7 +172,7 @@ async function run(alwaysPull = false): Promise<void> {
     return
   }
   const context = readyContext()
-  if (!context || (!alwaysPull && !nextToPush())) {
+  if (!context || (!alwaysPull && !nextToPush() && !nextDate(context))) {
     return
   }
   if (await step(context)) {
@@ -177,51 +189,37 @@ async function continueAfterStep(): Promise<void> {
     // The pull that just ran started before the request: don't let its reuse window swallow it.
     pulledAt = Number.NEGATIVE_INFINITY
   }
-  if (again || nextToPush()) {
+  if (again || nextToPush() || nextDate(readyContext())) {
     await run(again)
   }
 }
 
 const ignore = () => null
 
-function watchFirestore(): (() => void)[] {
-  return [
-    onSnapshot(query(itemsCollection, orderBy('updatedAt')), { includeMetadataChanges: true }, snapshot => {
-      data.items = snapshot.docs.map(entry => entry.data() as Item)
-      unconfirmed = new Set(snapshot.docs.filter(entry => entry.metadata.hasPendingWrites).map(entry => entry.id))
+function watch(): (() => void)[] {
+  return watchOutboxTriggers({
+    categories: categories => {
+      data.categories = categories
       return run()
-    }, ignore),
-    onSnapshot(query(collection(db, 'categories'), orderBy('sortOrder')), snapshot => {
-      data.categories = snapshot.docs.map(entry => entry.data() as PushContext['categories'][number])
-      return run()
-    }, ignore),
-    onSnapshot(doc(db, 'meta', 'config'), snapshot => {
-      data.config = snapshot.exists() ? snapshot.data() as PushContext['config'] : null
+    },
+    config: config => {
+      data.config = config
       data.configLoaded = true
       return run(true)
-    }, ignore),
-  ]
-}
-
-function watchDevice(): (() => void)[] {
-  const online = () => {
-    pausedUntil = 0
-    return run()
-  }
-  // Changes made directly in Google Calendar: picked up once a minute and whenever the app comes back
-  // to the foreground, while it is visible (docs/sync.md).
-  const pullIfVisible = () => (document.visibilityState === 'visible' ? run(true) : Promise.resolve())
-  globalThis.addEventListener('online', online)
-  document.addEventListener('visibilitychange', pullIfVisible)
-  const every = setInterval(pullIfVisible, PULL_EVERY_MS)
-  return [
-    // A token from another tab (shared through storage), or one forgotten after a 401: update the bar
-    // and use it straight away.
-    $calendarToken.listen(() => run()),
-    () => globalThis.removeEventListener('online', online),
-    () => document.removeEventListener('visibilitychange', pullIfVisible),
-    () => clearInterval(every),
-  ]
+    },
+    dateGate: () => run(),
+    items: (items, pendingWrites) => {
+      data.items = items
+      unconfirmed = pendingWrites
+      return run()
+    },
+    online: () => {
+      pausedUntil = 0
+      return run()
+    },
+    pull: () => run(true),
+    tokenChanged: () => run(),
+  })
 }
 
 /** Forgets retries and pulls: the waiting, the last pull and its problem. */
@@ -245,6 +243,7 @@ function reset() {
   generation += 1
   data = fresh()
   recorded.clear()
+  forgetDateWork()
   unconfirmed = new Set()
   publish()
 }
@@ -253,7 +252,7 @@ function reset() {
 export function startOutbox(): () => void {
   // Load Google's script now, so the consent window opens instantly when Save or "Sync now" is clicked.
   loadGis().catch(ignore)
-  const stops = [...watchFirestore(), ...watchDevice(), reset]
+  const stops = [...watch(), reset]
   return () => {
     for (const stop of stops) {
       stop()

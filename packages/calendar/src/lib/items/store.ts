@@ -1,5 +1,8 @@
-import { arrayUnion, collection, doc, runTransaction, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore'
+import { arrayUnion, collection, deleteField, doc, runTransaction, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore'
 import { auth, db } from '@household-brain/firebase/firebase'
+import type { Category } from '../categories'
+import type { DateOp } from './date-events'
+import { draftFrom } from './from-event'
 import type { EntryDate } from './dates'
 import { EDITABLE_FIELDS, type Item, type ItemDraft, changedFields, draftOf } from './model'
 import { newEventId } from './ids'
@@ -45,7 +48,8 @@ export function setItemStatus(item: Item, status: Item['status']): Promise<void>
 }
 
 /**
- * Saves an entry's extra dates. They live in the app only for now, so nothing is pushed to Google.
+ * Saves an entry's extra dates. The outbox then brings their Google events in line (`planDates`),
+ * without marking the entry pending: its own event doesn't change.
  */
 export function setExtraDates(id: string, extraDates: EntryDate[]): Promise<void> {
   return updateDoc(itemDoc(id), { ...stamp(), extraDates })
@@ -75,11 +79,30 @@ function apply(item: Item, decide: (latest: Item | null) => PushRecord): Promise
   })
 }
 
-export const recordPush = (item: Item, outcome: PushOutcome, { uid, remote }: { uid: string, remote: ItemDraft | null }) =>
-  apply(item, latest => recordFor({ latest, outcome, pushed: item, remote, uid }))
+/** Records a push; Google's event after it is read back as a draft with the household's categories. */
+export function recordPush(item: Item, outcome: PushOutcome, { uid, categories }: { uid: string, categories: readonly Category[] }) {
+  const remote = outcome.kind === 'synced' ? draftFrom(outcome.event, categories) : null
+  return apply(item, latest => recordFor({ latest, outcome, pushed: item, remote, uid }))
+}
 
 export const recordPushError = (item: Item, message: string) => apply(item, latest => errorFor(latest, item, message))
 
 export function retryItem(item: Item): Promise<void> {
   return updateDoc(itemDoc(item.id), { sync: 'pending', syncError: null })
+}
+
+/**
+ * Records in the ledger what a date write left in Google: the shape written (also when Google refused
+ * it, with the error, so it isn't retried until the entry changes), or nothing after a delete. Skipped
+ * when the entry is gone meanwhile.
+ */
+export function recordDateOp(item: Item, op: DateOp, error: string | null = null): Promise<void> {
+  return runTransaction(db, async transaction => {
+    const ref = itemDoc(item.id)
+    if (!(await transaction.get(ref)).exists()) {
+      return
+    }
+    const record = op.kind === 'delete' ? deleteField() : { shape: op.shape, ...error ? { error } : {} }
+    transaction.update(ref, { [`dateEvents.${op.dateId}`]: record })
+  })
 }

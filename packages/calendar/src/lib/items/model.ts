@@ -1,5 +1,11 @@
 import type { EntryDate } from './dates'
 
+/** The ledger of one extra date's Google event. */
+export interface DateEventRecord {
+  shape: string
+  error?: string
+}
+
 /** An entry as the app keeps it in Firestore (`items/{id}`); the id is also the Google event id. */
 export interface Item {
   id: string
@@ -27,10 +33,15 @@ export interface Item {
    */
   rev: string
   /**
-   * More dates besides the due date (#34), e.g. "Cancel by". For now they live in the app only (shared
-   * through Firestore); only the due date is a Google Calendar event. Absent on older entries.
+   * More dates besides the due date (#34), e.g. "Cancel by". Each gets its own Google Calendar event
+   * (`date-events.ts`) once every person's app recognises those. Absent on older entries.
    */
   extraDates?: EntryDate[]
+  /**
+   * What Google holds for each extra date's event, by date id: the shape last written there, and the
+   * error when Google refused it. Comparing it with the entry tells which events to write or delete.
+   */
+  dateEvents?: Record<string, DateEventRecord>
   /** Google's `updated` time of the event this entry last matched; older listings are ignored. */
   googleUpdated?: string
   updatedAt?: unknown

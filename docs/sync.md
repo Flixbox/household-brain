@@ -93,8 +93,26 @@ for 3 seconds, so a burst of triggers causes one pull.
   entries exist; and events older than what the entry already has (`updated` ≤ `googleUpdated`).
 - **An extra date's event** (one with `hb.entry`, #34) never becomes an entry: the pull skips it, and
   removes a stray entry an older app version may have made from it (in Firestore only). Each app
-  writes `syncState/{uid}.schema = 2` to say it knows these events; date events are only written
-  once every person's marker says so.
+  writes `syncState/{uid}.schema = 2` to say it knows these events.
+- **Writing date events** (`date-events.ts`, `date-outbox.ts`): every extra date gets its own event,
+  `<entryId>d<dateId>`, titled `[Category] Title · Label`, at 17:00 on its date, with the entry's
+  notes and private properties plus `hb.entry`, `hb.date`, `hb.label`.
+  - **Gate:** only while **every** `syncState/{uid}` has `schema >= 2`, as the server reports it (not
+    the local cache). Every app version writes that document on its first pull, so a person on an
+    older version closes the gate, live. **When someone leaves the household**, delete their
+    `syncState/{uid}` along with their allowlist entry, or an old marker of theirs can keep it closed.
+  - Only extra dates whose event id has the date-event shape: an entry that came from Google keeps
+    that event's id, which may be longer, so its extra dates stay in the app.
+  - **Ledger:** `items/{id}.dateEvents.<dateId>.shape` is the event as last written. `planDates`
+    compares it with the entry and plans an upsert (new date, moved, relabelled, or a shared field
+    changed) or a delete (date removed). The outbox writes one per step, after the entry's own event is
+    synced and no local change waits.
+  - **Upsert:** insert; on 409, a full patch against the etag just read (which also revives an event
+    deleted in Google). The app is the only source of a date event: changes made to it in Google are
+    not adopted (#34, step C).
+  - **Refused** (not transient): the shape is recorded with the error, so it is retried only once the
+    entry changes. **Deleting an entry** deletes its date events first (recorded ones and its current
+    dates; a missing one is fine).
 - **Events put in by hand** (no `hb.category` and no `[Label]` prefix naming a category, e.g. a
   birthday) are shown under **Uncategorised** but never rewritten in Google.
 - **One event that can't be adjusted** (say Google rejects the patch) is reported in the sync bar and

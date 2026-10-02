@@ -52,6 +52,7 @@
   | `hb.start` | `2026-08-15` | Optional start date (when it started or becomes valid); empty if none |
   | `hb.noticeDays` | `30` | Notice period, which gives a "cancel by" date |
   | `hb.v` | `1` | Schema version |
+  | `hb.entry` / `hb.date` / `hb.label` | `<entryId>` / `<dateId>` / `Cancel by` | Only on an extra date's event (`<entryId>d<dateId>`, [sync](sync.md)) |
 
 - **Notes** go in the event `description`.
 - **Repeating items** (memberships, which include subscriptions, and season tickets) use an `RRULE` on the event. The reminders sit on
@@ -62,12 +63,13 @@
 ```
 allowlist/{uid}                      {}                          ← created by hand
 meta/config                          { calendarId, timeZone: "Europe/Berlin", ownerUid }
-syncState/{uid}                      { syncToken, lastSyncAt }   ← one per person (sync tokens are per user)
+syncState/{uid}                      { syncToken, listingStartedAt, schema }   ← one per person (sync tokens are per user; schema 2 = knows date events)
 categories/{slug}                    { slug, label, colorId, sortOrder }   ← an icon comes with the board UI
 items/{eventId}                      {
   title, category, dueDate: "YYYY-MM-DD", rrule?: string,
   status, amount?, currency?, code?, url?, notes?, noticeDays?, startDate?: "YYYY-MM-DD",
-  extraDates?: { id, label, date: "YYYY-MM-DD" }[],   // more dates (#34); app only for now, no event
+  extraDates?: { id, label, date: "YYYY-MM-DD" }[],   // more dates (#34), each its own event
+  dateEvents?: { [dateId]: { shape, error? } },       // what Google holds for them (the ledger)
   etags?: { [uid]: string },         // last known Google etag, per user (an event's etag can differ
                                      //   between users because reminders are per user)
   sync: "synced" | "pending" | "error",
