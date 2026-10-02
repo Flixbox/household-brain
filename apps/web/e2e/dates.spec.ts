@@ -85,7 +85,9 @@ test("while someone's app doesn't know date events yet, extra dates stay out of 
   await expect.poll(() => requests.slice(opened).some(request => request.method === 'GET' && request.path.endsWith('/events'))).toBe(true)
   await expect.poll(async () => {
     const before = requests.length
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    await new Promise(resolve => {
+      setTimeout(resolve, 1000)
+    })
     return requests.length === before
   }, { timeout: 15_000 }).toBe(true)
   expect(requests.some(isDateInsert)).toBe(false)
