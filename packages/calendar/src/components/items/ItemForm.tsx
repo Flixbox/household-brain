@@ -28,7 +28,8 @@ interface Props {
 const NO_DATES: EntryDate[] = []
 
 /**
- * The add/edit form. The due date is a date only: every entry is due at 17:00. When `initial`
+ * The add/edit form. The due date is a date only: every entry is due at 17:00. It is optional: an
+ * entry without one (a balance that never expires) has no Google Calendar event. When `initial`
  * changes while the form is open (a newer version arrived), fields not edited here follow it. Once
  * something is edited, the form holds back a new version of the app, so leaving the app to copy a
  * code doesn't reload the page and lose the entry.
@@ -54,7 +55,9 @@ export function ItemForm({ initial, initialDates = NO_DATES, categories, onSave,
           {categories.map(category => <option key={category.slug} value={category.slug}>{category.label}</option>)}
         </select>
       </Field>
-      <Field label="Due date (17:00)" required><input required type="date" className={textField} value={draft.dueDate} onChange={set('dueDate')} /></Field>
+      <Field label="Due date (17:00)">
+        <input type="date" title="Leave it empty for something that never expires, e.g. a gift card credit" className={textField} value={draft.dueDate} onChange={set('dueDate')} />
+      </Field>
       <Field label="Start date (optional)">
         <input type="date" max={draft.dueDate || '9999-12-31'} title="When it started or becomes valid; not after the due date" className={textField} value={draft.startDate} onChange={set('startDate')} />
       </Field>

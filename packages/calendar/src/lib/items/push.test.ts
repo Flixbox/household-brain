@@ -120,3 +120,17 @@ describe('pushItem', () => {
     expect(calls[0]).toBe('delete evt1')
   })
 })
+
+describe('pushItem for an entry without a due date', () => {
+  it('writes no event for a new one', async () => {
+    const { calls, context } = fakeApi()
+    expect(await pushItem(context(), { ...base, dueDate: '' })).toEqual({ kind: 'unscheduled' })
+    expect(calls).toEqual([])
+  })
+
+  it('deletes the event of one whose date was just removed', async () => {
+    const { calls, context } = fakeApi()
+    expect(await pushItem(context(), { ...base, dirty: ['dueDate'], dueDate: '', etags: { owner: '"v1"' } })).toEqual({ kind: 'unscheduled' })
+    expect(calls).toEqual(['delete evt1'])
+  })
+})

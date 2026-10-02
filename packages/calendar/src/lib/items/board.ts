@@ -3,9 +3,12 @@ import type { Item } from './model'
 import { matchesSearch } from './search'
 import { nextDate } from './dates'
 
-/** By each entry's next date (its due date, or an extra date coming first), then by title. */
+/** An entry's sort key: its next date, or one after every date for an entry with none (a balance). */
+const sortDate = (item: Item, today: string) => nextDate(item, today)?.date ?? '9999-99-99'
+
+/** By each entry's next date (its due date, or an extra date coming first), then by title; undated last. */
 const byNextDate = (today: string) => (left: Item, right: Item) =>
-  nextDate(left, today).date.localeCompare(nextDate(right, today).date) || left.title.localeCompare(right.title)
+  sortDate(left, today).localeCompare(sortDate(right, today)) || left.title.localeCompare(right.title)
 
 export interface Board {
   searching: boolean

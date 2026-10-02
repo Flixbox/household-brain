@@ -2,6 +2,7 @@ import type { Category } from '../categories'
 import type { CalendarEvent } from './event'
 import { draftFrom, isRecurring } from './from-event'
 import { EDITABLE_FIELDS, type Item, type ItemDraft } from './model'
+import { isDate } from './dates'
 
 /** What to do with one event from Google Calendar. */
 export type PullDecision =
@@ -76,6 +77,12 @@ function versionOf(entry: Item | null, event: CalendarEvent): 'older' | 'same' |
   return theirs === mine ? 'same' : 'newer'
 }
 
+/**
+ * An entry without a due date and nothing to send: it has no event, so whatever Google lists under
+ * its id is a version from before its date was removed.
+ */
+const isUnscheduled = (entry: Item | null) => entry !== null && !isDate(entry.dueDate) && !hasLocalEdits(entry)
+
 /** Our own write coming back, or an entry whose deletion is about to be pushed. */
 const isSettled = (entry: Item | null, event: CalendarEvent, uid: string) =>
   entry !== null && (entry.etags[uid] === event.etag || entry.pendingOp === 'delete')
@@ -88,6 +95,7 @@ const isSettled = (entry: Item | null, event: CalendarEvent, uid: string) =>
  * - unknown: a new, synced entry;
  * - an entry with unsent local edits: Google's values for every field not edited locally;
  * - an entry waiting to be deleted: skip (the delete is pushed);
+ * - an entry without a due date and nothing to send: skip (it has no event; its old one is gone);
  * - a deleted event: removes the entry, unless the entry has unsent edits;
  * - otherwise: Google's version replaces the entry.
  */
@@ -95,7 +103,8 @@ export function decidePull(input: PullInput): PullDecision {
   const { entry, event, uid } = input
   const version = versionOf(entry, event)
   const cancelled = event.status === 'cancelled'
-  if (version === 'older' || (isRecurring(event) && !cancelled)) {
+  // Unscheduled is checked before a deletion: removing an entry's due date deletes its event on purpose.
+  if (version === 'older' || (isRecurring(event) && !cancelled) || isUnscheduled(entry)) {
     return { kind: 'skip' }
   }
   if (cancelled) {

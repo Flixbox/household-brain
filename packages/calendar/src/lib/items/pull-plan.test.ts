@@ -74,3 +74,17 @@ describe('decidePull', () => {
     expect(decide({ entry: { ...entry, pendingOp: 'delete', sync: 'pending' } })).toEqual({ kind: 'skip' })
   })
 })
+
+describe('decidePull for an entry without a due date', () => {
+  const balance = { ...entry, dueDate: '', etags: {} }
+
+  it('ignores its old event, also when Google lists it deleted (the app deleted it on purpose)', () => {
+    expect(decide({ entry: balance, event: { ...event, status: 'cancelled' } })).toEqual({ kind: 'skip' })
+    expect(decide({ entry: balance })).toEqual({ kind: 'skip' })
+  })
+
+  it('still merges while its own change (e.g. removing the date) waits to be sent', () => {
+    const pending = { ...balance, dirty: ['dueDate' as const], pendingOp: 'upsert' as const, sync: 'pending' as const }
+    expect(decide({ entry: pending })).toMatchObject({ kind: 'update', normalise: false })
+  })
+})

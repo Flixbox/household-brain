@@ -68,3 +68,12 @@ describe('boardFor', () => {
     expect(titles(result.sections[0])).toEqual(['Has a deadline', 'Cinema', 'Pizza'])
   })
 })
+
+describe('boardFor with an entry without dates (a balance)', () => {
+  it('lists it after every dated entry', () => {
+    const withBalance = [...items, entry({ category: 'coupon', dueDate: '', title: 'Gift card credit' })]
+    const result = boardFor({ categories: DEFAULT_CATEGORIES, items: withBalance, query: '', showCompleted: false, today: '2026-10-02' })
+    expect(titles(result.sections[0])).toEqual(['Cinema', 'Pizza', 'Gift card credit'])
+    expect(result.flat.at(-1)?.title).toBe('Gift card credit')
+  })
+})

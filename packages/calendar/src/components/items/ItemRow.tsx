@@ -1,19 +1,14 @@
 import { Link } from '@tanstack/react-router'
 import { useStore } from '@nanostores/react'
 import type { Item } from '../../lib/items/model'
-import { type Urgency, rowDue, startLabel } from '../../lib/items/due'
+import { startLabel } from '../../lib/items/due'
 import { $now } from '../../lib/items/now'
 import { requestSyncAccess } from '../../lib/items/outbox'
 import { markDone } from '../../lib/items/swipe'
 import { extraDatesOf, nextDate } from '../../lib/items/dates'
 import { useSwipeToDone } from './use-swipe'
 import { amountLabel } from '../../lib/items/amount'
-
-const URGENCY_TEXT: Record<Urgency, string> = {
-  later: 'text-stone-500',
-  overdue: 'font-semibold text-red-700 dark:text-red-400',
-  soon: 'font-semibold text-amber-700 dark:text-amber-400',
-}
+import { DueColumn } from './DueColumn'
 
 /**
  * One entry: title with its price and code underneath, when it is due (relative, coloured by urgency, and the
@@ -26,7 +21,6 @@ export function ItemRow({ item, category }: { item: Item, category?: string }) {
   // The date that matters now; "+ more" says the entry has others (see them when it's opened).
   const next = nextDate(item, now.toPlainDate().toString())
   const more = item.status === 'open' && extraDatesOf(item).length > 0 ? ' + more' : ''
-  const due = rowDue({ dueDate: next.date, status: item.status }, now)
   const since = startLabel(item.startDate, now)
   const price = amountLabel(item.amount)
   const { handlers, offset } = useSwipeToDone(() => {
@@ -53,15 +47,11 @@ export function ItemRow({ item, category }: { item: Item, category?: string }) {
       >
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="font-medium">{item.title}</span>
-          {price && <span className="text-sm break-words text-stone-600 tabular-nums dark:text-stone-400">{price}</span>}
+          {price && next && <span className="text-sm break-words text-stone-600 tabular-nums dark:text-stone-400">{price}</span>}
           {category && <span className="text-xs text-stone-500">{category}</span>}
           {item.code !== '' && <span className="font-mono text-sm break-all text-stone-600 select-all dark:text-stone-400">{item.code}</span>}
         </span>
-        <span className="flex flex-col items-end text-sm">
-          <span className={URGENCY_TEXT[due.urgency]}>{due.label}{more}</span>
-          <span className="text-xs text-stone-500 tabular-nums">{next.date}{more}</span>
-          {since && <span className="text-xs text-stone-500 tabular-nums">{since}</span>}
-        </span>
+        <DueColumn item={item} next={next} more={more} price={price} since={since} now={now} />
         {item.sync !== 'synced' && (
           <span className={`size-2 rounded-full ${item.sync === 'error' ? 'bg-red-600' : 'bg-orange-500'}`}>
             <span className="sr-only">{item.sync === 'error' ? 'Sync failed' : 'Syncing'}</span>

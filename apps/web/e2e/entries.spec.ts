@@ -24,7 +24,7 @@ test('entries: categories and the form, added, edited, deleted, and a double-tap
 
     await page.getByRole('link', { name: 'Add Paperwork' }).click()
     const stars = page.locator('form label > span').filter({ hasText: '*' })
-    await expect(stars).toHaveText(['Title*', 'Category*', 'Due date (17:00)*'])
+    await expect(stars).toHaveText(['Title*', 'Category*'])
     await page.getByRole('link', { name: 'Cancel' }).click()
   })
 
@@ -72,6 +72,35 @@ test('entries: categories and the form, added, edited, deleted, and a double-tap
     await page.getByRole('button', { name: 'Delete entry' }).click()
     await expect(coupons.getByRole('link', { name: /Amazon/u })).toHaveCount(0)
     await expect.poll(() => google.live().length).toBe(0)
+  })
+
+  await test.step('a balance without a date stays in the app, and gets an event only while it has a date', async () => {
+    // Balance is a newer default: this older household gets it through the top-up.
+    await page.getByRole('link', { name: 'Add Balance' }).click()
+    await page.getByLabel('Title').fill('Gift card credit')
+    await page.getByLabel('Amount').fill('25')
+    await page.getByRole('button', { name: 'Save' }).click()
+    const credit = page.getByRole('region', { name: 'Balance' }).getByRole('link', { name: /Gift card credit/u })
+    await expect(credit).toContainText(/25,00\s€/u)
+    await expect(credit).toContainText('no expiry')
+    await expect(page.getByText('not yet in Google Calendar')).toHaveCount(0)
+    const creditEvent = () => google.live().find(event => String(event.summary).includes('Gift card credit'))
+    expect(creditEvent()).toBeUndefined()
+
+    // Given a date, it is an ordinary entry with an event; without it again, the event goes.
+    await credit.click()
+    await page.getByLabel('Due date (17:00)').fill('2026-12-31')
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(credit).toContainText('2026-12-31')
+    await expect.poll(() => creditEvent()?.summary).toBe('[Balance] Gift card credit')
+    await credit.click()
+    await page.getByLabel('Due date (17:00)').fill('')
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(credit).toContainText('no expiry')
+    await expect.poll(() => creditEvent()).toBeUndefined()
+    // The pull that sees the event deleted keeps the entry.
+    await page.reload()
+    await expect(credit).toContainText('no expiry')
   })
 
   await test.step('a double-tapped Save creates one entry, and deleting it while it syncs removes the event too', async () => {

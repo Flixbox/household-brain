@@ -42,3 +42,19 @@ describe('errorFor', () => {
     expect(errorFor(null, pushed, 'boom')).toEqual({ kind: 'nothing' })
   })
 })
+
+describe('recordFor an entry without a due date', () => {
+  it('has no event any more: no etags, synced', () => {
+    expect(recordFor({ latest: pushed, outcome: { kind: 'unscheduled' }, pushed, remote: null, uid: 'owner' })).toEqual({
+      fields: { dirty: [], etags: {}, googleUpdated: '', pendingOp: null, sync: 'synced', syncError: null },
+      kind: 'update',
+    })
+  })
+
+  it('keeps a date added meanwhile pending, so its event is inserted next', () => {
+    const sent = { ...pushed, dirty: ['dueDate'], dueDate: '' } as Item
+    const dated = { ...sent, dueDate: '2026-12-24', rev: 'r2' } as Item
+    expect(recordFor({ latest: dated, outcome: { kind: 'unscheduled' }, pushed: sent, remote: null, uid: 'owner' }))
+      .toEqual({ fields: { dirty: ['dueDate'], etags: {} }, kind: 'update' })
+  })
+})

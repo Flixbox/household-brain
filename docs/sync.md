@@ -94,6 +94,10 @@ against, so they don't wait on it).
 
 - **Not touched at all:** repeating events (`recurrence` or `recurringEventId`), until repeating
   entries exist; and events older than what the entry already has (`updated` ≤ `googleUpdated`).
+- **An entry without a due date** (a balance, #33) has no event. The push deletes the event of an entry
+  whose date was removed (outcome `unscheduled`, which clears its etags). The pull skips anything
+  Google lists under its id, a deletion included, unless the entry has a change of its own waiting.
+  A full listing never removes it as vanished.
 - **An extra date's event** (one with `hb.entry`, #34) never becomes an entry: the pull skips it, and
   removes a stray entry an older app version may have made from it (in Firestore only). Each app
   writes `syncState/{uid}.schema = 2` to say it knows these events.
