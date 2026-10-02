@@ -127,9 +127,14 @@ check_main() { # the newest CI run on main, whichever PR it came from
 }
 
 check_moved() { # main has commits the PR's branch doesn't
-  local ahead main_sha
+  local ahead main_sha now
   read -r ahead main_sha < <("$GH" api "repos/$REPO/compare/$head...main" --jq '"\(.ahead_by) \(.commits[-1].sha // "-")"') || return
-  (( ${ahead:-0} > 0 )) && report "main-moved $main_sha" "MAIN_MOVED: main is $ahead commit(s) ahead of PR #$pr's branch: rebase on main and run the checks again"
+  (( ${ahead:-0} > 0 )) || return 0
+  # The PR may have been merged since its state was read: then the new commit on main is its own
+  # squash merge, not someone else's, and the next round reports the deploy instead.
+  now=$("$GH" pr view "$pr" --repo "$REPO" --json state --jq .state) || return
+  [[ $now == OPEN ]] || return 0
+  report "main-moved $main_sha" "MAIN_MOVED: main is $ahead commit(s) ahead of PR #$pr's branch: rebase on main and run the checks again"
 }
 
 if [[ $pr == main ]]; then
