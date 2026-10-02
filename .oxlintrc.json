@@ -216,6 +216,13 @@
         "eslint/max-statements": "off",
         "eslint/max-lines-per-function": "off"
       }
+    },
+    {
+      // e2e specs are a few long user journeys (one per area), so they may be long files.
+      "files": ["apps/web/e2e/**"],
+      "rules": {
+        "eslint/max-lines": "off"
+      }
     }
   ]
 }
