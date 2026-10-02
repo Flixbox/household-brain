@@ -1,8 +1,10 @@
 # Agent notes for household-brain
 
-The spec lives in `docs/` (indexed from the README) and is the source of truth for architecture,
-toolchain and code rules; change it in the same pull request as the code it describes. This file
-holds what agents working in this repo have learned the hard way. Add to it when something bites.
+There is no separate spec. **The code explains itself**, with short comments next to it for the
+reasons a reader can't see (keep them true in the same pull request that changes the code).
+**Decisions and their history live in the GitHub issues.** The README holds only what a human has to
+do by hand (setup) and how to run things. This file holds the rules for working here and what agents
+have learned the hard way; add to it when something bites.
 
 ## Working as the bot
 
@@ -47,7 +49,7 @@ the owner to track.
 **Keep each pull request tight: one topic.** Side findings, refactors and tooling tweaks go into
 their own follow-up PR, never along for the ride.
 
-**No pull requests that only change docs.** A doc or agent-note change (a new rule, a docs issue)
+**No pull requests that only change docs.** A README or agent-note change (a new rule, a docs issue)
 rides along with the next real feature, refactor or fix PR, the one exception to "one topic", and
 that PR's description says so and closes the docs issue.
 
@@ -73,12 +75,12 @@ issue comments (e.g. #43); the description alone can be out of date.
 
 **Keep going without being asked.** Once a pull request is deployed and its browser check is done,
 start the next planned piece of work, or fix what the owner reported, without waiting to be told.
-Ask only for decisions that belong to the owner (security trade-offs, spec changes, scope).
+Ask only for decisions that belong to the owner (security trade-offs, product decisions, scope).
 
 **Run long things in the background and keep working.** Test suites, builds, installs, CI and PR
 watchers, reviewer agents: start them in the background (their exit is the notification) and do the
 next useful thing meanwhile, such as reading review findings, updating the PR description or the
-docs. Only wait in the foreground for something whose result you need for the very next step.
+comments. Only wait in the foreground for something whose result you need for the very next step.
 
 ### 1. Before you push
 
@@ -219,6 +221,36 @@ installing browsers), `deploy` about 2 minutes.
 - **A pipe hides the exit code.** `pnpm lint | tail` succeeds even when lint fails, and a commit
   chained after it with `&&` went through with a lint error. Check `${PIPESTATUS[0]}`, use
   `set -o pipefail`, or don't pipe a command whose exit code matters.
+
+### Code rules
+
+- **`Date` is banned; use `Temporal`** (`temporal-polyfill`). Due dates are calendar dates at 17:00 in
+  `Europe/Berlin`, which `Temporal.PlainDate` and `ZonedDateTime` model; `Date` silently mixes UTC,
+  local time and daylight saving. oxlint enforces it. Convert only at the edges (Google's RFC 3339
+  strings).
+- **Example and test domains use the reserved `.test` TLD** (`owner@household-brain.test`), never
+  `example.com` or a real-looking host.
+- **oxlint runs every category as an error.** A rule is switched off only in `.oxlintrc.json`, with
+  its reason as a comment, never with an inline disable comment.
+- **Every dependency is pinned exactly** (`savePrefix: ''`, enforced by npm-package-json-lint);
+  Dependabot bumps them. Node is pinned in `package.json` (`volta.node`), pnpm in `packageManager`.
+- **fallow** (`.fallowrc.jsonc`, part of `pnpm lint`) fails on unused files, exports and
+  dependencies, on duplication, and on imports across the package boundaries: `apps/web` may use
+  every package; `shell` and `calendar` only `firebase`; nothing imports `apps/web` (its e2e tests
+  and config included).
+- **The e2e build must never reach production:** the emulator wiring and the `window.e2eSignIn` hook
+  are behind an inline `import.meta.env.VITE_USE_EMULATORS` comparison, `vite.config.ts` refuses a
+  production build with it set, and CI fails if `apps/web/dist/` mentions either. The emulators run
+  as `demo-household-brain`, which can't reach real Google services.
+- **CI uses only GitHub-owned and `google-github-actions/*` actions**, pinned to full SHAs (a
+  repository setting); pnpm is installed from `packageManager`, not through a third-party action.
+- **Never use the `pull_request_target` or `workflow_run` triggers** (both run code with the base
+  repository's privileges), and never add self-hosted runners to this public repo.
+- **Lint and typecheck are Nx targets:** `pnpm lint` is `nx run-many` over the root project's
+  `lint:oxlint`, `lint:packages` and `lint:fallow` (only those root scripts are Nx targets, through
+  `nx.includedScripts`), `pnpm typecheck` over every project's `typecheck` (the root's own is in
+  `nx.targets`). Whole-repo tools take `{workspaceRoot}/**/*` as input: the root project's default
+  inputs exclude files that belong to other projects, which once served a stale green from cache.
 
 ### Toolchain
 

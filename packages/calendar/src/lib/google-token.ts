@@ -1,6 +1,12 @@
-// Google Calendar access tokens from Google Identity Services (GIS). A token lasts about an hour and
-// is kept in localStorage through a persistent store, so a reload doesn't lose it; there is no
-// refresh token anywhere (docs/access.md).
+// Google Calendar access tokens from Google Identity Services (GIS), separate from the Firebase
+// sign-in. A token lasts about an hour and is kept in localStorage through a persistent store, so a
+// reload doesn't lose it; there is no refresh token anywhere. The trade-off: injected script could
+// read a calendar-only token that expires within the hour. A token belongs to the account it was
+// asked for (the signed-in person's email as the hint) and is never used for another person.
+// Scopes: `calendar.events` (not the narrower `calendar.app.created`, which may not cover a calendar
+// another account owns) and `calendar.calendarlist` for everyone; the owner also grants
+// `calendar.app.created` once, to create the household calendar. Sharing it would need
+// `calendar.acls`, so it is done by hand instead (README).
 import { persistentJSON } from '@nanostores/persistent'
 import { Temporal } from 'temporal-polyfill'
 import { holdUpdatesWhile } from './update-hold'

@@ -11,9 +11,12 @@
   "scripts": {
     "dev": "pnpm --filter @household-brain/web dev",
     "build": "nx run @household-brain/web:build",
-    "lint": "oxlint --max-warnings=0 && npmPkgJsonLint -c npmpackagejsonlint.config.ts . 'apps/*' 'packages/*'",
+    "lint": "nx run-many -t lint:oxlint lint:packages lint:fallow",
+    "lint:oxlint": "oxlint --max-warnings=0",
+    "lint:packages": "npmPkgJsonLint -c npmpackagejsonlint.config.ts . 'apps/*' 'packages/*'",
+    "lint:fallow": "fallow dead-code && fallow dupes",
     "lint:fix": "oxlint --fix && npmPkgJsonLint -c npmpackagejsonlint.config.ts --fix . 'apps/*' 'packages/*'",
-    "typecheck": "tsc -p tsconfig.json && nx run-many -t typecheck",
+    "typecheck": "nx run-many -t typecheck",
     "test": "nx run-many -t test",
     "test:rules": "vitest run --config vitest.rules.config.ts",
     "test:emulated": "firebase emulators:exec --only auth,firestore --project demo-household-brain \"pnpm test:rules && pnpm --filter @household-brain/web test:e2e\"",
@@ -26,22 +29,28 @@
     "@firebase/rules-unit-testing": "5.0.2",
     "@playwright/test": "1.63.0",
     "@stylistic/eslint-plugin": "5.10.0",
-    "@tailwindcss/vite": "4.3.3",
-    "@tanstack/router-plugin": "1.168.41",
     "@types/node": "26.6.3",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
-    "@vite-pwa/assets-generator": "1.0.4",
-    "@vitejs/plugin-react": "6.1.1",
+    "fallow": "3.31.0",
     "firebase-tools": "15.32.0",
     "npm-package-json-lint": "11.0.0",
     "nx": "23.2.1",
     "oxlint": "1.86.0",
-    "tailwindcss": "4.3.3",
     "typescript": "7.0.2",
     "vite": "8.3.1",
-    "vite-plugin-pwa": "1.3.0",
-    "vitest": "5.0.3",
-    "workbox-window": "7.4.1"
+    "vitest": "5.0.3"
+  },
+  "nx": {
+    "includedScripts": [
+      "lint:oxlint",
+      "lint:packages",
+      "lint:fallow"
+    ],
+    "targets": {
+      "typecheck": {
+        "command": "tsc -p tsconfig.json"
+      }
+    }
   }
 }

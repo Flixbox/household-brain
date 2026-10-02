@@ -8,7 +8,7 @@ import type { Item } from './model'
  */
 
 /** The `syncState/{uid}.schema` from which an app version recognises date events. */
-export const DATE_EVENTS_SCHEMA = 2
+const DATE_EVENTS_SCHEMA = 2
 
 /** The `syncState/{uid}.schema` from which an app version handles entries without a due date (#33). */
 export const UNDATED_SCHEMA = 3

@@ -2,5 +2,5 @@
 useDefault = true
 
 [[allowlists]]
-description = "Public Firebase web config: identifies the project, grants nothing (docs/repository.md)"
+description = "Public Firebase web config: identifies the project, grants nothing (README: one-time setup)"
 paths = ['''^(apps/web/)?\.env\.(production|e2e)$''']

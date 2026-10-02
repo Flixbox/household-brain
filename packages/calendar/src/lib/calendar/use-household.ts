@@ -10,7 +10,7 @@ export type HouseholdState =
   | { state: 'ready', config: HouseholdConfig }
 
 /** The household calendar settings (`meta/config`), live. */
-export const $household = docStore<HouseholdConfig>(doc(db, 'meta', 'config'))
+const $household = docStore<HouseholdConfig>(doc(db, 'meta', 'config'))
 
 /** The household calendar settings; loading until known (a failed listener keeps it loading, as before). */
 export function useHousehold(): HouseholdState {

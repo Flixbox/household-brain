@@ -44,7 +44,7 @@ function watchFirestore(triggers: Triggers): (() => void)[] {
 /**
  * What wakes the outbox: changes in Firestore, coming back online, a Calendar token arriving or
  * going, and pulls once a minute and whenever the app comes back to the foreground, while it is
- * visible (docs/sync.md). Returns the functions that stop each.
+ * visible. Returns the functions that stop each.
  */
 export function watchOutboxTriggers(triggers: Triggers): (() => void)[] {
   const pullIfVisible = () => (document.visibilityState === 'visible' ? triggers.pull() : null)

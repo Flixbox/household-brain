@@ -11,7 +11,7 @@ import type { PushContext } from './push'
 import { isTransient } from './transient'
 
 /**
- * Pulls what changed in Google Calendar since the last pull (docs/sync.md): each changed event
+ * Pulls what changed in Google Calendar since the last pull: each changed event
  * is merged into Firestore, and events made or changed in Google Calendar through the app's
  * categories are brought back into shape (17:00, default reminders, category). Without a sync token,
  * or when Google says it has expired (410), it lists everything and drops synced entries whose event
