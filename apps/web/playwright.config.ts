@@ -15,7 +15,11 @@ export default defineConfig({
   reporter: process.env.CI ? [['list'], ['github'], ['html', { open: 'never' }]] : 'list',
   retries: process.env.CI ? 1 : 0,
   testDir: 'e2e',
+  // Tests are user journeys of several steps (#44), so they get more than the default 30 s each.
+  timeout: 120_000,
   use: {
+    // A missing element fails its step quickly instead of using up a journey's whole timeout.
+    actionTimeout: 15_000,
     baseURL: 'http://localhost:4173',
     serviceWorkers: 'block',
     trace: 'retain-on-failure',
