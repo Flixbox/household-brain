@@ -259,6 +259,11 @@ test('"All by date" lists every entry in one list by due date, labelled with its
   await expect(list.getByRole('link')).toHaveText([/Early gym.*Membership/u, /Late coupon.*Coupon/u])
   await expect(page.getByRole('region', { name: 'Coupon' })).toHaveCount(0)
 
+  // Adding works in this view too: its "+" opens the form without a category.
+  await list.getByRole('link', { name: 'Add entry' }).click()
+  await expect(page.getByLabel('Category')).toHaveValue('')
+  await page.getByRole('link', { name: 'Cancel' }).click()
+
   // Remembered on this device.
   await page.reload()
   await expect(page.getByRole('region', { name: 'All entries by date' })).toBeVisible()
