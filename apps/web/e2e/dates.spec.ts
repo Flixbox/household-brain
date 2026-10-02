@@ -76,13 +76,18 @@ test("while someone's app doesn't know date events yet, extra dates stay out of 
   const summaries = () => google.live().map(event => event.summary).toSorted()
   await expect.poll(summaries).toEqual(['[Membership] Streaming'])
   await expect.poll(async () => (await readDocument(`syncState/${uid}`))?.schema).toEqual({ integerValue: '2' })
-  // Opening the entry pulls again. Outbox steps run one at a time, so once a pull after the entry's
-  // insert has gone out, the step that would have written the date event (had the gate been open)
-  // is over.
+  // Opening the entry pulls again; then wait until the app has made no Google request for a full
+  // second. The outbox acts on its triggers at once, so had the gate been open, the date event would
+  // have been written by then (whatever the pull reuse window).
   const isDateInsert = (request: { method: string, body: unknown }) => request.method === 'POST' && JSON.stringify(request.body).includes('Cancel by')
-  const entryInsert = requests.findIndex(request => request.method === 'POST' && JSON.stringify(request.body).includes('Streaming'))
+  const opened = requests.length
   await page.getByRole('region', { name: 'Membership' }).getByRole('link', { name: /Streaming/u }).click()
-  await expect.poll(() => requests.slice(entryInsert + 1).some(request => request.method === 'GET' && request.path.endsWith('/events'))).toBe(true)
+  await expect.poll(() => requests.slice(opened).some(request => request.method === 'GET' && request.path.endsWith('/events'))).toBe(true)
+  await expect.poll(async () => {
+    const before = requests.length
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    return requests.length === before
+  }, { timeout: 15_000 }).toBe(true)
   expect(requests.some(isDateInsert)).toBe(false)
 
   // Once that person's app is updated too, the date event follows.
