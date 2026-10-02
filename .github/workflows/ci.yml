@@ -18,6 +18,10 @@ jobs:
     name: Lint, typecheck, unit tests, build, secret scan
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      # Nx Cloud lets runs without a token only read the shared cache. Only pushes to main get the
+      # read-write token, so a pull request (a fork's included) can never write to it (#60).
+      NX_CLOUD_ACCESS_TOKEN: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.NX_CLOUD_ACCESS_TOKEN || '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -44,9 +48,16 @@ jobs:
             ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f git --config .gitleaks.toml --redact --no-banner --verbose .
 
   e2e:
-    name: Security rules and end-to-end tests (Firebase emulators)
+    name: End-to-end tests on ${{ matrix.project }} (Firebase emulators)
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # One runner per device, each with its own emulators: the journeys run one at a time, so
+    # splitting by device is what shortens the critical path. The security-rules tests ride along
+    # on the desktop runner.
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [desktop-chrome, android-pixel-9, iphone-17]
     # Microsoft's Playwright image already contains the browsers and every system package they need,
     # so nothing is installed per run (installing them took 3+ minutes and once hung for 15).
     # Its version must equal @playwright/test in package.json; the first step checks that.
@@ -80,16 +91,35 @@ jobs:
         with:
           path: ~/.cache/firebase/emulators
           key: firebase-emulators-${{ hashFiles('pnpm-lock.yaml') }}
-      - run: pnpm test:emulated
+      - name: Run the tests against the emulators
         timeout-minutes: 8
+        env:
+          PROJECT: ${{ matrix.project }}
+        run: |
+          tests="pnpm --filter @household-brain/web test:e2e --project=$PROJECT"
+          if [ "$PROJECT" = desktop-chrome ]; then tests="pnpm test:rules && $tests"; fi
+          pnpm exec firebase emulators:exec --only auth,firestore --project demo-household-brain "$tests"
       - if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.project }}
           path: |
             apps/web/playwright-report/
             apps/web/test-results/
           retention-days: 7
+
+  # The "Protect main" ruleset requires a check with this name: it passes only when every device did.
+  e2e-result:
+    name: Security rules and end-to-end tests (Firebase emulators)
+    needs: [e2e]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Every device passed
+        env:
+          RESULT: ${{ needs.e2e.result }}
+        run: test "$RESULT" = success
 
   deploy:
     name: Deploy to Firebase
@@ -115,7 +145,9 @@ jobs:
       - name: Install pnpm (version from packageManager)
         run: npm install -g "$(node -p "require('./package.json').packageManager")"
       - run: pnpm install --frozen-lockfile
-      - run: pnpm build
+      # Built here from the checked-out commit, never from a cache entry: the remote cache is
+      # shared, and production must not depend on what some other run stored in it.
+      - run: pnpm build --skip-nx-cache
       - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
