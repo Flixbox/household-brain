@@ -49,9 +49,9 @@ docs. Only wait in the foreground for something whose result you need for the ve
 
 ### 1. Before you push
 
-- **Run what CI runs, locally, once**: `pnpm lint && pnpm typecheck && pnpm test`, and for anything
-  touching the app, rules or e2e setup, `pnpm test:emulated` (needs Java 21). A local run takes about
-  30 seconds; a CI round trip takes minutes.
+- **Run the quick checks locally**: `pnpm lint && pnpm typecheck && pnpm test` (seconds). Leave the
+  e2e suite (`pnpm test:emulated`) to CI, which runs it on every push anyway; run it locally only to
+  debug a failure CI found.
 - **Batch your changes.** Every push cancels the running CI for that branch, so five quick pushes mean
   five cancelled runs and no result.
 - **Check exit codes without pipes**, or with `${PIPESTATUS[0]}`. See the shell lesson below.
@@ -72,7 +72,8 @@ docs. Only wait in the foreground for something whose result you need for the ve
    - It stays armed through the merge and reports the deploy. Don't poll by hand alongside it.
    - It watches `main` too: failing or hanging runs (`MAIN_FAILED`, `MAIN_SLOW`) and new commits the
      PR lacks (`MAIN_MOVED`). Between PRs, `babysit-pr.sh --main` watches `main`'s CI on its own.
-   - Approvals are reported as `APPROVED` only, not again as `ACTIVITY`.
+   - A plain approval is reported as `APPROVED` only. One with text also comes as `ACTIVITY`, so a
+     request written into the approval gets answered before auto-merge.
 
 ### 3. When the babysitter reports
 

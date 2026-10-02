@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { LINK_PATTERN, normaliseLink } from './link'
 
-const matches = (value: string) => new RegExp(`^(?:${LINK_PATTERN})$`, 'u').test(value)
+// Compiled the way the browser compiles an input's pattern.
+const matches = (value: string) => new RegExp(`^(?:${LINK_PATTERN})$`, 'v').test(value)
 
 describe('normaliseLink', () => {
   it('adds https:// to a bare domain', () => {

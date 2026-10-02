@@ -55,7 +55,7 @@ activity() { # one line per item: "<kind> <id> <author> <text>"
   "$ACTIVITY_GH" api --paginate "repos/$REPO/issues/$pr/comments" \
     --jq '.[] | "comment \(.id) \(.user.login): \((.body // "") | gsub("\\s+"; " ") | .[0:200])"' &&
   "$ACTIVITY_GH" api --paginate "repos/$REPO/pulls/$pr/reviews" \
-    --jq '.[] | select(.state != "APPROVED") | "review \(.id) \(.user.login) \(.state): \((.body // "") | gsub("\\s+"; " ") | .[0:200])"' &&
+    --jq '.[] | select(.state != "APPROVED" or (.body // "") != "") | "review \(.id) \(.user.login) \(.state): \((.body // "") | gsub("\\s+"; " ") | .[0:200])"' &&
   "$ACTIVITY_GH" api --paginate "repos/$REPO/pulls/$pr/comments" \
     --jq '.[] | "review-comment \(.id) \(.user.login) \(.path): \((.body // "") | gsub("\\s+"; " ") | .[0:200])"'
 }

@@ -10,5 +10,9 @@ export function normaliseLink(input: string): string {
   return /^[a-z][a-z\d+.-]*:\/\//iu.test(link) ? link : `https://${link}`
 }
 
-/** For the field's `pattern`: something with a dot and no spaces, with or without a scheme. */
-export const LINK_PATTERN = String.raw`\s*([a-zA-Z][a-zA-Z0-9+.\-]*://)?[^\s/]+\.[^\s]+\s*`
+/**
+ * For the field's `pattern`: something with a dot and no spaces, with or without a scheme. Browsers
+ * compile a pattern with the `v` flag and silently ignore it when that fails, so `/` is escaped even
+ * inside the character class.
+ */
+export const LINK_PATTERN = String.raw`\s*([a-zA-Z][a-zA-Z0-9+.\-]*:\/\/)?[^\s\/]+\.[^\s]+\s*`

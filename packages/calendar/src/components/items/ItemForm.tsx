@@ -26,14 +26,14 @@ export function ItemForm({ initial, categories, onSave }: Props) {
   }
   return (
     <form className="grid gap-4" onSubmit={submit}>
-      <Field label="Title"><input required pattern=".*\S.*" title="Enter a title" className={textField} value={draft.title} onChange={set('title')} /></Field>
-      <Field label="Category">
+      <Field label="Title" required><input required pattern=".*\S.*" title="Enter a title" className={textField} value={draft.title} onChange={set('title')} /></Field>
+      <Field label="Category" required>
         <select required className={textField} value={draft.category} onChange={set('category')}>
           <option value="" disabled>Choose…</option>
           {categories.map(category => <option key={category.slug} value={category.slug}>{category.label}</option>)}
         </select>
       </Field>
-      <Field label="Due date (17:00)"><input required type="date" className={textField} value={draft.dueDate} onChange={set('dueDate')} /></Field>
+      <Field label="Due date (17:00)" required><input required type="date" className={textField} value={draft.dueDate} onChange={set('dueDate')} /></Field>
       <Field label="Code"><input className={textField} value={draft.code} onChange={set('code')} /></Field>
       <Field label="Amount"><input inputMode="decimal" pattern="[0-9]+([.,][0-9]{1,2})?" title="A number, e.g. 9.99" className={textField} value={draft.amount} onChange={set('amount')} /></Field>
       <Field label="Link">

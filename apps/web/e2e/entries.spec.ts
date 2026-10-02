@@ -12,6 +12,18 @@ test.beforeEach(async () => {
   await seedDocument('categories/membership', { colorId: '3', label: 'Membership', slug: 'membership', sortOrder: 2 })
 })
 
+test('an older household gets new default categories and loses unused retired ones; the form stars only required fields', async ({ page }) => {
+  await seedDocument('categories/document', { colorId: '8', label: 'Document expiry', slug: 'document', sortOrder: 7 })
+  await mockGoogle(page)
+  await signInAllowlisted(page, 'owner@household-brain.test')
+  await expect(page.getByRole('region', { name: 'Paperwork' })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Document expiry' })).toHaveCount(0)
+
+  await page.getByRole('link', { name: 'Add Paperwork' }).click()
+  const stars = page.locator('form label > span').filter({ hasText: '*' })
+  await expect(stars).toHaveText(['Title*', 'Category*', 'Due date (17:00)*'])
+})
+
 test('an entry is added, edited and deleted, and each change reaches Google Calendar', async ({ page }) => {
   const { google, requests } = await mockGoogle(page)
   await signInAllowlisted(page, 'owner@household-brain.test')
