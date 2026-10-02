@@ -8,26 +8,16 @@ import { draftFrom } from './from-event'
 import { itemsCollection, recordPush, recordPushError } from './store'
 import { outboxApi } from './outbox-api'
 import { isTransient } from './transient'
+import { $outbox } from './outbox-state'
 
 /**
  * The outbox: pushes pending entries to Google Calendar one at a time while a Calendar token is
  * available. Asking Google for a token needs a click, so the outbox never asks itself: without a
  * token, entries wait and the UI offers "Sync now" (`syncNow`). Network trouble, rate limits and
  * server errors leave entries pending and are retried with backoff and when the device comes back
- * online; only definite rejections are shown as errors. Lives outside React; components read
- * `useOutbox()`.
+ * online; only definite rejections are shown as errors. Lives outside React; it publishes its state
+ * to `$outbox`, which components read with `useOutbox()`.
  */
-
-export interface OutboxState {
-  waiting: number
-  failed: Item[]
-  /** Entries wait for Google access, which needs a click ("Sync now"). */
-  needsAccess: boolean
-  /** Entries wait because the household calendar hasn't been created yet. */
-  missingCalendar: boolean
-  /** Why the last pull from Google Calendar failed, unless that clears by itself. */
-  pullProblem: string | null
-}
 
 const MIN_BACKOFF_MS = 5000
 const MAX_BACKOFF_MS = 5 * 60_000
@@ -40,7 +30,6 @@ const fresh = () => ({
   items: [] as Item[],
 })
 let data = fresh()
-let state: OutboxState = { failed: [], missingCalendar: false, needsAccess: false, pullProblem: null, waiting: 0 }
 let busy = false
 let backoffMs = 0
 let pausedUntil = 0
@@ -49,7 +38,6 @@ let timer: ReturnType<typeof setTimeout> | null = null
 const recorded = new Map<string, string>()
 /** Entries whose latest local write the server hasn't confirmed yet. */
 let unconfirmed = new Set<string>()
-const listeners = new Set<() => void>()
 const PULL_REUSE_MS = 3000
 const PULL_EVERY_MS = 60_000
 let pulling: Promise<void> | null = null
@@ -60,17 +48,14 @@ const describe = (error: unknown) => (error instanceof Error ? error.message : S
 
 function publish() {
   const pending = data.items.filter(item => item.sync === 'pending')
-  state = {
+  $outbox.set({
     failed: data.items.filter(item => item.sync === 'error'),
     missingCalendar: pending.length > 0 && data.configLoaded && data.config === null,
     // Without a token this device neither pushes nor pulls, so it is offered whenever a calendar exists.
     needsAccess: data.config !== null && !hasCalendarToken(MEMBER_SCOPES, auth.currentUser?.email),
     pullProblem,
     waiting: pending.length,
-  }
-  for (const listener of listeners) {
-    listener()
-  }
+  })
 }
 
 function retryLater() {
@@ -258,11 +243,3 @@ export async function syncNow(): Promise<void> {
   pulledAt = Number.NEGATIVE_INFINITY
   await run(true)
 }
-
-/** For `useOutbox`: subscribe to changes of the outbox state. */
-export function subscribeOutbox(listener: () => void): () => void {
-  listeners.add(listener)
-  return () => listeners.delete(listener)
-}
-
-export const outboxState = (): OutboxState => state

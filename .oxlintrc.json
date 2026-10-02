@@ -108,6 +108,13 @@
     ],
     "@stylistic/jsx-closing-bracket-location": "error",
     "@stylistic/jsx-self-closing-comp": "error",
+    // Type-only imports add no runtime coupling, so they don't count towards the limit.
+    "import/max-dependencies": [
+      "error",
+      {
+        "ignoreTypeImports": true
+      }
+    ],
     "import/no-unassigned-import": [
       "warn",
       {
