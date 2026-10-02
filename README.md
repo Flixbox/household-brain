@@ -103,8 +103,10 @@ I sign in with my account, and my wife signs in with hers. Each device does two 
      so the app never asks for that extra sensitive permission.
    - The token is valid for about **1 hour**. It is kept in `localStorage` (`hb:calendar-token`,
      through `@nanostores/persistent`), so a reload or reopening the app within that hour needs no
-     click; sign-out clears it. It is tied to the Google account it was issued for and never used for
-     another one, even if a Firebase session ends without our sign-out. Its deadline is wall-clock
+     click; sign-out clears it. It is tied to the account the app requested it for (the signed-in
+     person's email, passed to Google as a hint) and never used for another signed-in person, even if
+     a Firebase session ends without our sign-out. Google may still let someone pick a different
+     account in its chooser; the app doesn't verify which one issued the token. Its deadline is wall-clock
      time (`Temporal.Now`, via `temporal-polyfill`), not `performance.now()`, which stops while some
      phones sleep. No refresh token exists anywhere. The trade-off: script injected into
      the page could read a calendar-only token that expires within the hour.

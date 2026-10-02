@@ -43,6 +43,9 @@ deploy is green. Never stack pull requests or work on two in parallel: the owner
 which rewrites the history a stacked branch is built on, and every open PR is one more thing for
 the owner to track.
 
+**Keep each pull request tight: one topic.** Side findings, refactors and tooling tweaks go into
+their own follow-up PR, never along for the ride.
+
 **Keep going without being asked.** Once a pull request is deployed and its browser check is done,
 start the next planned piece of work, or fix what the owner reported, without waiting to be told.
 Ask only for decisions that belong to the owner (security trade-offs, spec changes, scope).

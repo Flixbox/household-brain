@@ -98,8 +98,11 @@ test('without Google access an entry waits, "Sync now" sends it, and a reload ke
   // The token is kept across a reload: the reloaded app reads Google Calendar straight away, which it
   // only does with a token, and offers no "Sync now". (This test's first token request is refused,
   // so a reload that asked Google again would show the button.)
+  // Leave the app first, so a late request from the old page can't count as the new page's.
+  const appUrl = page.url()
+  await page.goto('about:blank')
   const before = requests.length
-  await page.reload()
+  await page.goto(appUrl)
   await expect.poll(() => requests.length).toBeGreaterThan(before)
   await expect(page.getByRole('button', { name: 'Sync now' })).toHaveCount(0)
 })
