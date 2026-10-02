@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { resetEmulators, seedDocument } from './emulators'
 import { mockGoogle } from './google-mocks'
-import { signInAllowlisted } from './session'
+import { openMenu, signInAllowlisted } from './session'
 
 const TWO_REMINDERS = [{ method: 'popup', minutes: 2880 }, { method: 'popup', minutes: 1440 }]
 const call = (request: { method: string, path: string }) => `${request.method} ${request.path}`
@@ -43,7 +43,9 @@ test('a second person connects the shared calendar and gets their own reminders'
   const { requests } = await mockGoogle(page)
   await signInAllowlisted(page, 'partner@household-brain.test')
 
+  await openMenu(page)
   await page.getByRole('link', { name: 'Settings' }).click()
+  await expect(page.getByRole('dialog', { name: 'Menu' })).toBeHidden()
   await expect(page.getByRole('heading', { name: 'Share with your household' })).toHaveCount(0)
   await page.getByRole('button', { name: 'Connect my Google Calendar' }).click()
   await expect(page.getByRole('status').filter({ hasText: 'Connected' })).toBeVisible()

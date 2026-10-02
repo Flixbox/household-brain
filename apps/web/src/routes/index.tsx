@@ -3,7 +3,6 @@ import { ItemList } from '@household-brain/calendar/components/items/ItemList'
 import { useHousehold } from '@household-brain/calendar/lib/calendar/use-household'
 import { useCategories, useItems } from '@household-brain/calendar/lib/items/use-items'
 import { auth } from '@household-brain/firebase/firebase'
-import { signOutOfApp } from '@household-brain/shell/lib/session'
 
 export const Route = createFileRoute('/')({
   component: Home,
@@ -16,10 +15,8 @@ function Home() {
   const categories = useCategories()
   return (
     <section className="space-y-6">
-      <div className="flex items-baseline justify-between">
-        <h1 className="text-3xl font-bold">Household Brain</h1>
-        <Link to="/settings" className="text-orange-700 underline dark:text-orange-400">Settings</Link>
-      </div>
+      {/* The top bar shows the app's name; the page still needs its own heading. */}
+      <h1 className="sr-only">Entries</h1>
       <p className="text-lg">
         Hello,
         {' '}
@@ -34,15 +31,7 @@ function Home() {
           .
         </p>
       )}
-      <Link to="/items/new" className="inline-block rounded-lg bg-orange-600 px-4 py-2 font-semibold text-white hover:bg-orange-700">Add entry</Link>
       {items && <ItemList items={items} categories={categories} />}
-      <button
-        type="button"
-        className="rounded-lg border border-stone-300 px-4 py-2 font-medium dark:border-stone-700"
-        onClick={() => signOutOfApp()}
-      >
-        Sign out
-      </button>
     </section>
   )
 }

@@ -411,7 +411,7 @@ for 3 seconds, so a burst of triggers causes one pull.
   yearly / custom), amount, code, link, notes, notice period.
 - There is **no reminder or time field.** Every entry gets 17:00 and the 2-day and 1-day
   reminders.
-- A floating "+" opens it with no category preselected.
+- It opens from a category's "+", with that category preselected. There is no separate "add" button.
 
 **Settings:** categories (add, rename, reorder, icon, colour), **"Share with your household"**
 (owner only: the steps for sharing the calendar in Google Calendar), a "Notifications: 2 days + 1 day before ✓"

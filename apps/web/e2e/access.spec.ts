@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { allowlist, resetEmulators } from './emulators'
-import { signInAs } from './session'
+import { openMenu, signInAs } from './session'
 
 test.beforeEach(async () => {
   await resetEmulators()
@@ -39,6 +39,15 @@ test('an allowlisted account gets in, and can sign out again', async ({ page }) 
   await page.reload()
   await expect(page.getByText("Hello, owner. You're on the allowlist.")).toBeVisible()
 
-  await page.getByRole('button', { name: 'Sign out' }).click()
+  // The menu opens from the top bar and closes with Escape; "Sign out" lives in it.
+  const menu = page.getByRole('dialog', { name: 'Menu' })
+  await expect(page.getByRole('button', { name: 'Sign out' })).toBeHidden()
+  await openMenu(page)
+  await expect(menu).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(menu).toBeHidden()
+  await expect(page.getByRole('button', { name: 'Menu' })).toHaveAttribute('aria-expanded', 'false')
+  await openMenu(page)
+  await menu.getByRole('button', { name: 'Sign out' }).click()
   await expect(page.getByRole('button', { name: 'Sign in with Google' })).toBeVisible()
 })

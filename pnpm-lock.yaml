@@ -293,9 +293,15 @@ importers:
       '@household-brain/firebase':
         specifier: workspace:*
         version: link:../firebase
+      '@nanostores/react':
+        specifier: 2.0.1
+        version: 2.0.1(nanostores@1.5.4)(react@19.3.0)
       firebase:
         specifier: 12.19.0
         version: 12.19.0
+      nanostores:
+        specifier: 1.5.4
+        version: 1.5.4
       react:
         specifier: 19.3.0
         version: 19.3.0
