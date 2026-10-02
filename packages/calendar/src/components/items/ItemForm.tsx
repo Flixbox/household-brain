@@ -8,7 +8,7 @@ import { StatusField } from './StatusField'
 import { ExtraDatesField } from './ExtraDatesField'
 import { useEntryDates } from './use-entry-dates'
 import type { EntryDate } from '../../lib/items/dates'
-import { LINK_PATTERN, normaliseLink } from '../../lib/items/link'
+import { LinkField } from './LinkField'
 import { holdUpdatesValue } from '../../lib/update-hold'
 import { AmountField } from './AmountField'
 
@@ -37,7 +37,7 @@ const NO_DATES: EntryDate[] = []
  * code doesn't reload the page and lose the entry.
  */
 export function ItemForm({ initial, initialDates = NO_DATES, categories, onSave, withStatus = false }: Props) {
-  const { dateRequired, draft, edited, latest, set } = useEntryForm(initial, { editing: withStatus })
+  const { dateRequired, draft, edited, finished, latest, set } = useEntryForm(initial, { editing: withStatus })
   const [saving, setSaving] = useState(false)
   const { change: setDates, dates, touched } = useEntryDates(initialDates)
   const submit = (event: FormEvent) => {
@@ -46,7 +46,7 @@ export function ItemForm({ initial, initialDates = NO_DATES, categories, onSave,
       return null
     }
     setSaving(true)
-    return onSave({ ...draft, title: draft.title.trim(), url: normaliseLink(draft.url) }, { dates: dates.map(entry => ({ ...entry, label: entry.label.trim() })), datesChanged: touched, latest })
+    return onSave(finished, { dates: dates.map(entry => ({ ...entry, label: entry.label.trim() })), datesChanged: touched, latest })
   }
   return (
     <form className="grid gap-4" onSubmit={submit} data-hold-updates={holdUpdatesValue(edited || touched)}>
@@ -67,9 +67,7 @@ export function ItemForm({ initial, initialDates = NO_DATES, categories, onSave,
       {withStatus && <StatusField value={draft.status} onChange={set('status')} />}
       <Field label="Code"><input className={textField} value={draft.code} onChange={set('code')} /></Field>
       <AmountField amount={draft.amount} currency={draft.currency} onAmount={set('amount')} onCurrency={set('currency')} />
-      <Field label="Link">
-        <input inputMode="url" autoCapitalize="none" pattern={LINK_PATTERN} title="A web address, e.g. example.de or https://example.de/deal" placeholder="example.de" className={textField} value={draft.url} onChange={set('url')} />
-      </Field>
+      <LinkField value={draft.url} onChange={set('url')} />
       <Field label="Notes"><textarea rows={3} className={textField} value={draft.notes} onChange={set('notes')} /></Field>
       <button type="submit" className={primaryButton} disabled={saving}>Save</button>
     </form>

@@ -16,3 +16,12 @@ export function normaliseLink(input: string): string {
  * inside the character class.
  */
 export const LINK_PATTERN = String.raw`\s*([a-zA-Z][a-zA-Z0-9+.\-]*:\/\/)?[^\s\/]+\.[^\s]+\s*`
+
+/**
+ * The address to open from the field, or null while it isn't a web address yet. Only `http(s)`:
+ * any other scheme (a `javascript:` link someone stored) is never opened.
+ */
+export function openableLink(input: string): string | null {
+  const link = normaliseLink(input)
+  return /^https?:\/\/[^\s/]+\.\S+$/iu.test(link) ? link : null
+}

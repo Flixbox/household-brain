@@ -43,6 +43,7 @@ test('entries: categories and the form, added, edited, deleted, and a double-tap
     await page.getByLabel('Amount').fill('10')
     // A bare domain is fine; it is stored as a full address.
     await page.getByLabel('Link').fill('shop.household-brain.test')
+    await expect(page.getByRole('link', { name: 'Open the link in a new tab' })).toHaveAttribute('href', 'https://shop.household-brain.test')
     await page.getByRole('button', { name: 'Save' }).click()
     // The price and the code show in the list, in that order under the title.
     await expect(coupons.getByRole('link', { name: /Amazon/u })).toContainText(/Amazon\s*10,00\s€\s*SUMMER25/u)
