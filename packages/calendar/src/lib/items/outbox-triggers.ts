@@ -1,0 +1,61 @@
+import { collection, doc, onSnapshot, orderBy, query } from 'firebase/firestore'
+import { db } from '@household-brain/firebase/firebase'
+import type { Category } from '../categories'
+import type { HouseholdConfig } from '../calendar/setup'
+import { $calendarToken } from '../google-token'
+import { watchDateGate } from './date-outbox'
+import type { Item } from './model'
+import { itemsCollection } from './store'
+
+const PULL_EVERY_MS = 60_000
+
+interface Triggers {
+  /** The entries, and the ids of those whose latest local write the server hasn't confirmed yet. */
+  items: (items: Item[], pendingWrites: Set<string>) => unknown
+  categories: (categories: Category[]) => unknown
+  /** The household's calendar settings; null while there is no calendar yet. */
+  config: (config: HouseholdConfig | null) => unknown
+  /** The app versions in use changed (whether date events may be written). */
+  dateGate: () => unknown
+  /** The device came back online. */
+  online: () => unknown
+  /** Time to look for changes made directly in Google Calendar. */
+  pull: () => unknown
+  /** A token from another tab (shared through storage), or one forgotten after a 401. */
+  tokenChanged: () => unknown
+}
+
+const ignore = () => null
+
+function watchFirestore(triggers: Triggers): (() => void)[] {
+  return [
+    onSnapshot(query(itemsCollection, orderBy('updatedAt')), { includeMetadataChanges: true }, snapshot => triggers.items(
+      snapshot.docs.map(entry => entry.data() as Item),
+      new Set(snapshot.docs.filter(entry => entry.metadata.hasPendingWrites).map(entry => entry.id)),
+    ), ignore),
+    onSnapshot(query(collection(db, 'categories'), orderBy('sortOrder')), snapshot =>
+      triggers.categories(snapshot.docs.map(entry => entry.data() as Category)), ignore),
+    watchDateGate(triggers.dateGate),
+    onSnapshot(doc(db, 'meta', 'config'), snapshot =>
+      triggers.config(snapshot.exists() ? snapshot.data() as HouseholdConfig : null), ignore),
+  ]
+}
+
+/**
+ * What wakes the outbox: changes in Firestore, coming back online, a Calendar token arriving or
+ * going, and pulls once a minute and whenever the app comes back to the foreground, while it is
+ * visible (docs/sync.md). Returns the functions that stop each.
+ */
+export function watchOutboxTriggers(triggers: Triggers): (() => void)[] {
+  const pullIfVisible = () => (document.visibilityState === 'visible' ? triggers.pull() : null)
+  globalThis.addEventListener('online', triggers.online)
+  document.addEventListener('visibilitychange', pullIfVisible)
+  const every = setInterval(pullIfVisible, PULL_EVERY_MS)
+  return [
+    ...watchFirestore(triggers),
+    $calendarToken.listen(() => triggers.tokenChanged()),
+    () => globalThis.removeEventListener('online', triggers.online),
+    () => document.removeEventListener('visibilitychange', pullIfVisible),
+    () => clearInterval(every),
+  ]
+}

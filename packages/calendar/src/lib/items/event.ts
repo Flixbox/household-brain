@@ -39,7 +39,7 @@ export interface EventContext {
   categories: readonly Category[]
 }
 
-const labelOf = (item: Pick<Item, 'category'>, categories: readonly Category[]) =>
+export const labelOf = (item: Pick<Item, 'category'>, categories: readonly Category[]) =>
   categories.find(category => category.slug === item.category)
 
 /** `[Coupon] Amazon 10€`: the prefix keeps entries readable in Google Calendar itself. */
@@ -48,7 +48,8 @@ export function summaryOf(item: Pick<Item, 'title' | 'category'>, categories: re
   return category ? `[${category.label}] ${item.title}` : item.title
 }
 
-function privateProperties(item: Item): Record<string, string> {
+/** The entry's fields kept in the event's private properties; date events carry them too. */
+export function privateProperties(item: Item): Record<string, string> {
   return {
     'hb.amount': item.amount,
     // An uncategorised entry (an event added by hand) stays without one, so it stays untouched.

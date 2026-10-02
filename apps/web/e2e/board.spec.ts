@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { resetEmulators, seedDocument } from './emulators'
+import { readDocument, resetEmulators, seedDocument } from './emulators'
 import { mockGoogle } from './google-mocks'
 import { openMenu, signInAllowlisted, signInAs } from './session'
 
@@ -254,8 +254,10 @@ test('an entry can have more dates; the list shows the next one with "+ more"', 
   const row = page.getByRole('region', { name: 'Membership' }).getByRole('link', { name: /Streaming/u })
   await expect(row).toContainText('2099-11-30 + more')
   await expect(row).toContainText(/in \d+ days \+ more/u)
-  // Only the due date is a Google Calendar event for now.
-  await expect.poll(() => google.live().map(event => event.summary)).toEqual(['[Membership] Streaming'])
+  // The extra date gets its own Google Calendar event, once this app has marked itself as one that
+  // recognises them (on its first pull).
+  const summaries = () => google.live().map(event => event.summary).toSorted()
+  await expect.poll(summaries).toEqual(['[Membership] Streaming', '[Membership] Streaming · Cancel by'])
 
   // Kept across a reload, and editable: removing it leaves just the due date.
   await page.reload()
@@ -265,4 +267,28 @@ test('an entry can have more dates; the list shows the next one with "+ more"', 
   await page.getByRole('button', { name: 'Save' }).click()
   await expect(row).toContainText('2099-12-14')
   await expect(row).not.toContainText('+ more')
+  await expect.poll(summaries).toEqual(['[Membership] Streaming'])
+})
+
+test("while someone's app doesn't know date events yet, extra dates stay out of Google", async ({ page }) => {
+  // Another person whose app synced but predates date events: no schema marker.
+  await seedDocument('syncState/older-app', { syncToken: 'sync-1' })
+  const { google } = await mockGoogle(page)
+  const uid = await signInAllowlisted(page, 'owner@household-brain.test')
+  // This app has synced and marked itself, so only the other person holds the date events back.
+  await expect.poll(async () => (await readDocument(`syncState/${uid}`))?.schema).toEqual({ integerValue: '2' })
+  await page.getByRole('link', { name: 'Add Membership' }).click()
+  await page.getByLabel('Title').fill('Streaming')
+  await page.getByLabel('Due date (17:00)').fill('2099-12-14')
+  await page.getByRole('button', { name: '+ Add date' }).click()
+  await page.getByLabel('Label of date 1').fill('Cancel by')
+  await page.getByLabel('Date 1', { exact: true }).fill('2099-11-30')
+  await page.getByRole('button', { name: 'Save' }).click()
+  const summaries = () => google.live().map(event => event.summary).toSorted()
+  await expect.poll(summaries).toEqual(['[Membership] Streaming'])
+  await expect(page.getByRole('region', { name: 'Membership' })).toContainText('2099-11-30 + more')
+
+  // Once that person's app is updated too, the date event follows.
+  await seedDocument('syncState/older-app', { schema: 2, syncToken: 'sync-1' })
+  await expect.poll(summaries).toEqual(['[Membership] Streaming', '[Membership] Streaming · Cancel by'])
 })

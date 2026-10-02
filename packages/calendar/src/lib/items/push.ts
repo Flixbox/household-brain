@@ -1,6 +1,7 @@
 import type { Category } from '../categories'
 import { type CalendarApi, CalendarApiError, type EventTarget } from '../calendar/api'
 import type { HouseholdConfig } from '../calendar/setup'
+import { deleteDateEvents } from './date-push'
 import { type CalendarEvent, eventFor, patchFor } from './event'
 import type { Item } from './model'
 
@@ -99,6 +100,7 @@ async function patch(context: PushContext, item: Item, etag: string): Promise<Ca
 /** Pushes one pending entry to Google Calendar. */
 export async function pushItem(context: PushContext, item: Item): Promise<PushOutcome> {
   if (item.pendingOp === 'delete') {
+    await deleteDateEvents(context, item)
     await context.api.deleteEvent(context.config.calendarId, item.id)
     return { kind: 'deleted' }
   }
