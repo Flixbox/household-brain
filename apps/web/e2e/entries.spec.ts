@@ -74,6 +74,18 @@ test('entries: categories and the form, added, edited, deleted, and a double-tap
     expect(Object.keys(patches[0].body as object).toSorted()).toEqual(['end', 'start'])
     expect(google.live().find(event => event.summary === '[Coupon] Amazon')).toMatchObject({ start: { dateTime: '2026-11-05T17:00:00' }, summary: '[Coupon] Amazon' })
 
+    // Its own reminders: a week ahead and the day before, instead of the default two days and one day.
+    await coupons.getByRole('link', { name: /Amazon/u }).click()
+    await expect(page.getByRole('button', { name: '2 days' })).toHaveAttribute('aria-pressed', 'true')
+    await page.getByRole('button', { name: '1 week' }).click()
+    await page.getByRole('button', { name: '2 days' }).click()
+    await page.getByRole('button', { name: 'Save' }).click()
+    await synced()
+    await expect.poll(() => google.live().find(event => event.summary === '[Coupon] Amazon')).toMatchObject({
+      extendedProperties: { private: expect.objectContaining({ 'hb.reminders': '10080,1440' }) },
+      reminders: { overrides: [{ method: 'popup', minutes: 10080 }, { method: 'popup', minutes: 1440 }], useDefault: false },
+    })
+
     // Delete.
     await coupons.getByRole('link', { name: /Amazon/u }).click()
     await page.getByRole('button', { name: 'Delete entry' }).click()

@@ -17,6 +17,7 @@ const item: Item = {
   id: 'abc123def456',
   notes: 'Only online',
   pendingOp: null,
+  reminders: '',
   rev: 'r1',
   startDate: '2026-10-01',
   status: 'open',
@@ -61,6 +62,22 @@ describe('patchFor', () => {
     expect(patchFor(item, ['code'], context)).toEqual({ extendedProperties: { private: { 'hb.code': 'SUMMER25', 'hb.v': '1' } } })
     expect(patchFor(item, ['code', 'url'], context)).toEqual({ extendedProperties: { private: { 'hb.code': 'SUMMER25', 'hb.url': item.url, 'hb.v': '1' } } })
     expect(patchFor({ ...item, category: 'uncategorised' }, ['category'], context).extendedProperties).toBeUndefined()
+  })
+
+  it("sends an entry's own reminders, and clears them when it is back to the default", () => {
+    const weekAhead = { ...item, reminders: '10080,0' }
+    expect(eventFor(weekAhead, context)).toMatchObject({
+      extendedProperties: { private: { 'hb.reminders': '10080,0' } },
+      reminders: { overrides: [{ method: 'popup', minutes: 10080 }, { method: 'popup', minutes: 0 }], useDefault: false },
+    })
+    expect(eventFor(item, context).extendedProperties?.private).not.toHaveProperty('hb.reminders')
+    expect(patchFor(item, ['reminders'], context)).toEqual({
+      extendedProperties: { private: { 'hb.reminders': '', 'hb.v': '1' } },
+      reminders: { overrides: [], useDefault: true },
+    })
+    expect(eventFor({ ...item, reminders: 'none' }, context).reminders).toEqual({ overrides: [], useDefault: false })
+    // Done entries never remind, whatever their own reminders say.
+    expect(eventFor({ ...weekAhead, status: 'done' }, context).reminders).toEqual({ overrides: [], useDefault: false })
   })
 
   it('stores another currency, and clears it again when the entry is back in euros', () => {

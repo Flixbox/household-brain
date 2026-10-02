@@ -1,6 +1,6 @@
 import { extraDatesOf } from './dates'
 import { dateEventFor, planDates } from './date-events'
-import { type CalendarEvent, DUE_TIME, END_TIME, type EventContext } from './event'
+import { type CalendarEvent, DUE_TIME, END_TIME, type EventContext, sameReminders } from './event'
 import { dueDateOf, isAt } from './from-event'
 import type { Item } from './model'
 
@@ -20,7 +20,7 @@ const NONE: DateEventChange = { kind: 'none' }
 function fits(event: CalendarEvent, expected: CalendarEvent, timeZone: string): boolean {
   const theirs = event.extendedProperties?.private ?? {}
   return isAt(event.start, DUE_TIME, timeZone) && isAt(event.end, END_TIME, timeZone)
-    && event.reminders?.useDefault === expected.reminders?.useDefault && !event.reminders?.overrides?.length
+    && sameReminders(event.reminders, expected.reminders ?? { useDefault: true })
     && event.summary === expected.summary && (event.description ?? '') === (expected.description ?? '')
     && event.colorId === expected.colorId
     && Object.entries(expected.extendedProperties?.private ?? {}).every(([key, value]) => (theirs[key] ?? '') === value)

@@ -22,6 +22,8 @@ export interface Item {
   currency: string
   url: string
   notes: string
+  /** The entry's own reminders as text (`reminders.ts`): '' for the household default. Absent on older entries. */
+  reminders: string
   /** Last Google etag seen, per user: reminders are per person, so etags can differ between users. */
   etags: Record<string, string>
   sync: 'pending' | 'synced' | 'error'
@@ -51,7 +53,7 @@ export interface Item {
   updatedBy?: string
 }
 
-export const EDITABLE_FIELDS = ['title', 'category', 'dueDate', 'startDate', 'status', 'code', 'amount', 'currency', 'url', 'notes'] as const
+export const EDITABLE_FIELDS = ['title', 'category', 'dueDate', 'startDate', 'status', 'code', 'amount', 'currency', 'url', 'notes', 'reminders'] as const
 export type EditableField = typeof EDITABLE_FIELDS[number]
 export type ItemDraft = Pick<Item, EditableField>
 
@@ -62,6 +64,7 @@ export const emptyDraft = (category = ''): ItemDraft => ({
   currency: '',
   dueDate: '',
   notes: '',
+  reminders: '',
   startDate: '',
   status: 'open',
   title: '',

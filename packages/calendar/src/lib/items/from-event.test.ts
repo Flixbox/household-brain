@@ -16,7 +16,7 @@ const appEvent: CalendarEvent = {
 describe('draftFrom', () => {
   it('reads an event the app wrote', () => {
     expect(draftFrom(appEvent, DEFAULT_CATEGORIES)).toEqual({
-      amount: '10', category: 'coupon', code: 'X1', currency: '', dueDate: '2026-11-03', notes: 'Only online', startDate: '2026-10-01', status: 'open', title: 'Amazon', url: '',
+      amount: '10', category: 'coupon', code: 'X1', currency: '', dueDate: '2026-11-03', notes: 'Only online', reminders: '', startDate: '2026-10-01', status: 'open', title: 'Amazon', url: '',
     })
   })
 
@@ -69,6 +69,15 @@ describe('normalisationFor', () => {
     const done: CalendarEvent = { ...appEvent, extendedProperties: { private: { ...appEvent.extendedProperties?.private, 'hb.status': 'done' } }, summary: '[Done] Amazon' }
     expect(normalisationFor({ ...done, reminders: { overrides: [], useDefault: false } }, draftFrom(done, DEFAULT_CATEGORIES), context)).toBeNull()
     expect(normalisationFor(done, draftFrom(done, DEFAULT_CATEGORIES), context)).toEqual({ reminders: { overrides: [], useDefault: false } })
+  })
+
+  it("fixes this person's own reminders after the other person's push of new reminders", () => {
+    const withOwn = { ...appEvent, extendedProperties: { private: { ...appEvent.extendedProperties?.private, 'hb.reminders': '10080' } } }
+    const draft = draftFrom(withOwn, DEFAULT_CATEGORIES)
+    expect(draft.reminders).toBe('10080')
+    expect(ownRemindersFix(withOwn, draft, DEFAULT_CATEGORIES)).toEqual({ reminders: { overrides: [{ method: 'popup', minutes: 10080 }], useDefault: false } })
+    const applied = { ...withOwn, reminders: { overrides: [{ method: 'popup', minutes: 10080 }], useDefault: false } }
+    expect(ownRemindersFix(applied, draft, DEFAULT_CATEGORIES)).toBeNull()
   })
 
   it("fixes this person's own reminders after the other person's push, by status", () => {

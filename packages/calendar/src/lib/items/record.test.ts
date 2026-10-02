@@ -20,7 +20,7 @@ describe('recordFor', () => {
   })
 
   it('takes every field from Google\'s reply, including changes made in Google meanwhile', () => {
-    const remote = { amount: '', category: 'coupon', code: 'MINE', currency: '', dueDate: '2026-12-27', notes: '', startDate: '', status: 'open' as const, title: 'Cinema', url: '' }
+    const remote = { amount: '', category: 'coupon', code: 'MINE', currency: '', dueDate: '2026-12-27', notes: '', reminders: '', startDate: '', status: 'open' as const, title: 'Cinema', url: '' }
     const record = recordFor({ latest: pushed, outcome: { event: { etag: '"v2"' }, kind: 'synced' }, pushed, remote, uid: 'owner' })
     expect(record).toMatchObject({ fields: { ...remote, 'etags.owner': '"v2"', 'sync': 'synced' }, kind: 'update' })
   })

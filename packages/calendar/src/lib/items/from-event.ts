@@ -1,5 +1,6 @@
 import type { Category } from '../categories'
-import { type CalendarEvent, DUE_TIME, END_TIME, type EventContext, STATUS_TAGS, remindersOf, summaryOf } from './event'
+import { type CalendarEvent, DUE_TIME, END_TIME, type EventContext, STATUS_TAGS, remindersOf, remindersPatch, sameReminders, summaryOf } from './event'
+import { remindersFromText } from './reminders'
 import type { ItemDraft } from './model'
 
 const PREFIX = /^\[(?<label>[^\]]+)\]\s*(?<rest>.*)$/u
@@ -53,6 +54,7 @@ export function draftFrom(event: CalendarEvent, categories: readonly Category[])
     currency: currencyOf(properties['hb.currency']),
     dueDate: dueDateOf(event),
     notes: event.description ?? '',
+    reminders: remindersFromText(properties['hb.reminders']),
     // Only a `YYYY-MM-DD` date; anything else another client wrote reads as no start date.
     startDate: /^\d{4}-\d{2}-\d{2}$/u.test(properties['hb.start'] ?? '') ? properties['hb.start'] ?? '' : '',
     status: status === 'done' || status === 'cancelled' ? status : 'open',
@@ -85,20 +87,19 @@ function categoryFix(event: CalendarEvent, draft: ItemDraft, categories: readonl
   }
 }
 
-/** Default reminders while open; none at all once done or cancelled (#43). */
-const remindersFit = (event: CalendarEvent, draft: ItemDraft) =>
-  event.reminders?.useDefault === remindersOf(draft).useDefault && !event.reminders?.overrides?.length
+/** The entry's reminders (or the defaults) while open; none at all once done or cancelled (#43). */
+const remindersFit = (event: CalendarEvent, draft: ItemDraft) => sameReminders(event.reminders, remindersOf(draft))
 
 /**
- * Google keeps reminders per person, so the other person's push of a done entry silenced only theirs:
- * this person's reminders on the event, as a patch, or null when they already fit the entry's status.
+ * Google keeps reminders per person, so the other person's push of a done entry, or of new reminders,
+ * changed only theirs: this person's reminders on the event, as a patch, or null when they already fit.
  * Events added by hand and repeating ones are left alone.
  */
 export function ownRemindersFix(event: CalendarEvent, draft: ItemDraft, categories: readonly Category[]): CalendarEvent | null {
   if (isForeign(event, categories) || isRecurring(event) || remindersFit(event, draft)) {
     return null
   }
-  return { reminders: { overrides: [], useDefault: remindersOf(draft).useDefault } }
+  return { reminders: remindersPatch(draft) }
 }
 
 /**
@@ -113,8 +114,7 @@ export function normalisationFor(event: CalendarEvent, draft: ItemDraft, context
   }
   const patch: CalendarEvent = {
     ...timeFix(event, draft, context.timeZone),
-    // Overrides must be cleared explicitly: Google rejects default reminders next to overrides.
-    ...remindersFit(event, draft) ? {} : { reminders: { overrides: [], useDefault: remindersOf(draft).useDefault } },
+    ...remindersFit(event, draft) ? {} : { reminders: remindersPatch(draft) },
     ...categoryFix(event, draft, context.categories),
   }
   return Object.keys(patch).length > 0 ? patch : null
