@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_CATEGORIES } from '../categories'
 import type { CalendarEvent } from './event'
-import { draftFrom, normalisationFor } from './from-event'
+import { draftFrom, normalisationFor, ownRemindersFix } from './from-event'
 
 const context = { categories: DEFAULT_CATEGORIES, timeZone: 'Europe/Berlin' }
 const appEvent: CalendarEvent = {
@@ -24,7 +24,8 @@ describe('draftFrom', () => {
     const done = { ...appEvent, extendedProperties: { private: { ...appEvent.extendedProperties?.private, 'hb.status': 'done' } }, summary: '[Done] Amazon' }
     expect(draftFrom(done, DEFAULT_CATEGORIES)).toMatchObject({ category: 'coupon', status: 'done', title: 'Amazon' })
     expect(draftFrom({ ...done, summary: '[Cancelled] Amazon' }, DEFAULT_CATEGORIES).title).toBe('Amazon')
-    // Without the app's category, "[Done]" is just part of someone's title.
+    // On an open entry, or without the app's category, "[Done]" is just part of the title.
+    expect(draftFrom({ ...appEvent, summary: '[Done] Amazon' }, DEFAULT_CATEGORIES).title).toBe('[Done] Amazon')
     expect(draftFrom({ start: { date: '2026-12-01' }, summary: '[Done] Bake' }, DEFAULT_CATEGORIES).title).toBe('[Done] Bake')
   })
 
@@ -61,6 +62,16 @@ describe('normalisationFor', () => {
     const done: CalendarEvent = { ...appEvent, extendedProperties: { private: { ...appEvent.extendedProperties?.private, 'hb.status': 'done' } }, summary: '[Done] Amazon' }
     expect(normalisationFor({ ...done, reminders: { overrides: [], useDefault: false } }, draftFrom(done, DEFAULT_CATEGORIES), context)).toBeNull()
     expect(normalisationFor(done, draftFrom(done, DEFAULT_CATEGORIES), context)).toEqual({ reminders: { overrides: [], useDefault: false } })
+  })
+
+  it("fixes this person's own reminders after the other person's push, by status", () => {
+    const done: CalendarEvent = { ...appEvent, extendedProperties: { private: { ...appEvent.extendedProperties?.private, 'hb.status': 'done' } }, summary: '[Done] Amazon' }
+    expect(ownRemindersFix(done, draftFrom(done, DEFAULT_CATEGORIES), DEFAULT_CATEGORIES)).toEqual({ reminders: { overrides: [], useDefault: false } })
+    const reopened = { ...appEvent, reminders: { useDefault: false } }
+    expect(ownRemindersFix(reopened, draftFrom(reopened, DEFAULT_CATEGORIES), DEFAULT_CATEGORIES)).toEqual({ reminders: { overrides: [], useDefault: true } })
+    expect(ownRemindersFix(appEvent, draftFrom(appEvent, DEFAULT_CATEGORIES), DEFAULT_CATEGORIES)).toBeNull()
+    const birthday: CalendarEvent = { reminders: { useDefault: false }, start: { date: '2026-12-01' }, summary: 'Grandma' }
+    expect(ownRemindersFix(birthday, draftFrom(birthday, DEFAULT_CATEGORIES), DEFAULT_CATEGORIES)).toBeNull()
   })
 
   it('never rewrites events put in by hand, or repeating events', () => {

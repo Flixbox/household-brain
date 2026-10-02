@@ -82,7 +82,11 @@ const groups = {
     start: { date: null, dateTime: `${item.dueDate}T${DUE_TIME}`, timeZone },
   }),
   notes: (item: Item): CalendarEvent => ({ description: item.notes }),
-  reminders: (item: Item): CalendarEvent => ({ reminders: remindersOf(item) }),
+  // In a patch, overrides are cleared explicitly: Google merges nested fields, and rejects default
+  // reminders next to overrides someone added in Google.
+  reminders: (item: Item): CalendarEvent => ({ reminders: { overrides: [], useDefault: remindersOf(item).useDefault } }),
+  // The status tag replaces the category's; an uncategorised event (added by hand) is left alone.
+  tag: (item: Item, context: EventContext): CalendarEvent => (item.category === 'uncategorised' ? {} : groups.title(item, context)),
   title: (item: Item, { categories }: EventContext): CalendarEvent => ({
     colorId: labelOf(item, categories)?.colorId ?? '8',
     summary: summaryOf(item, categories),
@@ -96,7 +100,7 @@ const GROUP_OF: Record<EditableField, (keyof typeof groups)[]> = {
   dueDate: ['date'],
   notes: ['notes'],
   startDate: [],
-  status: ['title', 'reminders'],
+  status: ['tag', 'reminders'],
   title: ['title'],
   url: [],
 }

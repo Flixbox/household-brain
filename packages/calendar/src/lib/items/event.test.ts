@@ -87,10 +87,14 @@ describe('a done or cancelled entry', () => {
       reminders: { overrides: [], useDefault: false },
       summary: '[Done] Amazon',
     })
-    expect(patchFor(item, ['status'], context)).toMatchObject({ reminders: { useDefault: true }, summary: '[Coupon] Amazon' })
+    // Reopened: overrides someone added in Google are cleared, or Google refuses the defaults.
+    expect(patchFor(item, ['status'], context)).toMatchObject({ reminders: { overrides: [], useDefault: true }, summary: '[Coupon] Amazon' })
   })
 
-  it('keeps the own title of an uncategorised event (one added by hand)', () => {
-    expect(eventFor({ ...item, category: 'uncategorised', status: 'done' }, context).summary).toBe('Amazon')
+  it('keeps the own title and colour of an uncategorised event (one added by hand)', () => {
+    const handMade = { ...item, category: 'uncategorised', status: 'done' as const }
+    expect(eventFor(handMade, context).summary).toBe('Amazon')
+    expect(patchFor(handMade, ['status'], context)).not.toHaveProperty('colorId')
+    expect(patchFor(handMade, ['status'], context)).not.toHaveProperty('summary')
   })
 })

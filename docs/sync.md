@@ -23,7 +23,8 @@ keeps "pull before every write" cheap even when several edits happen in a row.
       Google's value, and `etags.<myUid>` is updated.
    2. **Push:**
       - New item: `events.insert` with the client-generated id, 17:00–17:15 Europe/Berlin,
-        `reminders.useDefault: true`, the category title prefix and colour, the `hb.*` properties,
+        `reminders.useDefault: true` (none at all for a done or cancelled entry), the category title
+        prefix (`[Done]` / `[Cancelled]` instead once done or cancelled) and colour, the `hb.*` properties,
         and an `RRULE` if it repeats. A `409 Conflict` means it already exists, so it is treated as
         success.
       - Edited item: `events.patch` with **only the `dirty` fields** (plus the title prefix and
@@ -108,7 +109,8 @@ for 3 seconds, so a burst of triggers causes one pull.
     changed) or a delete (date removed). The outbox writes one per step, after the entry's own event is
     synced and no local change waits.
   - **Upsert:** insert; on 409, a full patch against the etag just read (which also revives an event
-    deleted in Google) and clears reminder overrides (Google rejects them next to the defaults).
+    deleted in Google) and clears reminder overrides (Google rejects them next to the defaults); a
+    done or cancelled entry's date events get no reminders.
   - **Changed in Google** (`date-pull.ts`, `dateEventChange`, applied in a transaction):
     - **moved:** the entry takes the new date;
     - **deleted:** the entry drops the date (a deletion may come without properties, so a deleted
@@ -141,8 +143,11 @@ for 3 seconds, so a burst of triggers causes one pull.
   shape with one etag-guarded `events.patch` per event:
   - The start is not 17:00 Europe/Berlin, or it is an all-day event: keep the date, set
     17:00–17:15.
-  - The event has its own reminder overrides instead of `useDefault: true`: reset it. This only
-    affects the reminders of the user whose device runs the pull, because reminders are per user.
+  - The event's reminders don't match the entry's status (default reminders while open, none once done
+    or cancelled, #43): reset them. This only affects the reminders of the user whose device runs the
+    pull, because reminders are per user. That is also why the other person's push of a status change
+    is followed by this person's own reminder fix (`ownRemindersFix`), though the entry itself needs
+    nothing else.
     The other person's are fixed when their device pulls.
   - There is no `hb.category` but the title starts with a `[Label]` naming a category: record that
     category and add its colour. Without such a prefix the event is one added by hand: it is shown

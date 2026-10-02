@@ -1,12 +1,12 @@
 import { CalendarApiError, type EventCursor, type EventPage } from '../calendar/api'
 import type { CalendarEvent } from './event'
-import { normalisationFor } from './from-event'
+import { normalisationFor, ownRemindersFix } from './from-event'
 import { type PullDecision, decidePull } from './pull-plan'
 import { applyDateChange, applyPulled, dropStray, forgetDateEvents, markSchema, readEntryFromCache, readEntryFromServer, readSyncToken, recordEtag, removeVanished, saveSyncToken, serverNow } from './pull-store'
 import { DATE_EVENTS_SCHEMA, entryOfEvent, isOrphanDate } from './date-events'
 import { deleteDateEvents } from './date-push'
 import { dateEventChange } from './date-pull'
-import type { Item } from './model'
+import type { Item, ItemDraft } from './model'
 import type { PushContext } from './push'
 import { isTransient } from './transient'
 
@@ -107,7 +107,16 @@ async function applyEntryEvent(context: PushContext, event: CalendarEvent): Prom
   if (removed !== null && decision.kind !== 'delete') {
     await forgetDateEvents(event.id ?? '')
   }
-  return await settleEntryEvent(context, event, decision) ?? (removed || null)
+  const settled = decision.kind === 'update' && decision.ownCopy
+    ? await fixOwnReminders(context, event, decision.draft)
+    : await settleEntryEvent(context, event, decision)
+  return settled ?? (removed || null)
+}
+
+/** The other person's push: this person's reminders still have to follow the status (#43). */
+function fixOwnReminders(context: PushContext, event: CalendarEvent, draft: ItemDraft): Promise<string | null> {
+  const fix = ownRemindersFix(event, draft, context.categories)
+  return fix ? normalise(context, event, fix) : Promise.resolve(null)
 }
 
 /** After merging: created and replaced entries are brought into shape and get this person's etag. */

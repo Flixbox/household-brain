@@ -9,8 +9,11 @@ export type PullDecision =
   | { kind: 'delete' }
   /** A new entry; `draft` also tells the caller what to normalise. */
   | { kind: 'create', draft: ItemDraft, fields: Record<string, unknown> }
-  /** Overwrite the entry with Google's version (`normalise`: the entry has no local edits). */
-  | { kind: 'update', draft: ItemDraft, fields: Record<string, unknown>, normalise: boolean }
+  /**
+   * Overwrite the entry with Google's version (`normalise`: the entry has no local edits), or, for the
+   * other person's push of the version it already holds, only this person's etag (`ownCopy`).
+   */
+  | { kind: 'update', draft: ItemDraft, fields: Record<string, unknown>, normalise: boolean, ownCopy?: boolean }
 
 export interface PullInput {
   /** The entry with this event's id, or null. */
@@ -29,7 +32,7 @@ function deleted({ entry }: PullInput): PullDecision {
 
 /** The other person's push of the version this entry already holds: just this person's etag. */
 function rememberEtag(event: CalendarEvent, uid: string): PullDecision {
-  return { draft: draftFrom(event, []), fields: { [`etags.${uid}`]: event.etag ?? '' }, kind: 'update', normalise: false }
+  return { draft: draftFrom(event, []), fields: { [`etags.${uid}`]: event.etag ?? '' }, kind: 'update', normalise: false, ownCopy: true }
 }
 
 function merged(entry: Item, draft: ItemDraft, version: Record<string, string>): PullDecision {
