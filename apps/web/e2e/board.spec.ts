@@ -193,4 +193,11 @@ test('swiping an entry left marks it done, with Undo', async ({ page }) => {
   await page.getByRole('button', { name: 'Undo' }).click()
   await expect(row).toBeVisible()
   await expect.poll(() => google.live()[0]?.extendedProperties).toMatchObject({ private: { 'hb.status': 'open' } })
+
+  // A gesture the browser cancels (e.g. it starts scrolling) never marks done, whatever the
+  // coordinates on the cancel event.
+  await row.dispatchEvent('pointerdown', { clientX: 300, isPrimary: true, pointerId: 7, pointerType: 'touch' })
+  await row.dispatchEvent('pointercancel', { clientX: 0, isPrimary: true, pointerId: 7, pointerType: 'touch' })
+  await expect(row).toBeVisible()
+  await expect(page.getByRole('status').filter({ hasText: 'Marked' })).toHaveCount(0)
 })

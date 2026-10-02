@@ -33,6 +33,8 @@ export function ItemRow({ item, category }: { item: Item, category?: string }) {
       <Link
         to="/items/$itemId"
         params={{ itemId: item.id }}
+        // A native link drag would take over the pointer and stop the swipe.
+        draggable={false}
         onClickCapture={handlers.handleClickCapture}
         onPointerCancel={handlers.handlePointerCancel}
         onPointerDown={handlers.handlePointerDown}
