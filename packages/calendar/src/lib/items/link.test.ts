@@ -36,5 +36,10 @@ describe('openableLink', () => {
     // A script link that would pass as an address; built from parts, as the literal is banned by lint.
     expect(openableLink(['javascript', '//shop.household-brain.test/%0aalert(1)'].join(':'))).toBeNull()
     expect(openableLink('ftp://files.household-brain.test')).toBeNull()
+    expect(openableLink(['JavaScript', 'alert(1)'].join(':'))).toBeNull()
+    expect(openableLink(['javascript', 'a@shop.household-brain.test'].join(':'))).toBeNull()
+    expect(openableLink('mailto:a@shop.household-brain.test')).toBeNull()
+    expect(openableLink('http://')).toBeNull()
+    expect(openableLink('  HTTPS://shop.household-brain.test/deal  ')).toBe('HTTPS://shop.household-brain.test/deal')
   })
 })

@@ -18,10 +18,15 @@ export function normaliseLink(input: string): string {
 export const LINK_PATTERN = String.raw`\s*([a-zA-Z][a-zA-Z0-9+.\-]*:\/\/)?[^\s\/]+\.[^\s]+\s*`
 
 /**
- * The address to open from the field, or null while it isn't a web address yet. Only `http(s)`:
- * any other scheme (a `javascript:` link someone stored) is never opened.
+ * The address to open from the field, or null while it isn't a web address yet. Only `http(s)` with a
+ * real host: another scheme (`javascript:`, `mailto:`) is never opened, also not when `https://` put
+ * in front of it would turn it into the user part of an address (`https://mailto:a@shop.test`).
  */
 export function openableLink(input: string): string | null {
   const link = normaliseLink(input)
-  return /^https?:\/\/[^\s/]+\.\S+$/iu.test(link) ? link : null
+  if (!URL.canParse(link)) {
+    return null
+  }
+  const { hostname, protocol, username } = new URL(link)
+  return (protocol === 'https:' || protocol === 'http:') && username === '' && hostname.includes('.') ? link : null
 }
