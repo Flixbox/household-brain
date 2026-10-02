@@ -1,9 +1,11 @@
 import { CalendarApiError, type EventCursor, type EventPage } from '../calendar/api'
 import type { CalendarEvent } from './event'
 import { normalisationFor } from './from-event'
-import { decidePull } from './pull-plan'
-import { applyPulled, dropStray, markSchema, readSyncToken, recordEtag, removeVanished, saveSyncToken, serverNow } from './pull-store'
-import { DATE_EVENTS_SCHEMA, entryOfEvent } from './date-events'
+import { type PullDecision, decidePull } from './pull-plan'
+import { applyPulled, dropStray, forgetDateEvents, markSchema, readEntryFromCache, readEntryFromServer, readSyncToken, recordEtag, removeVanished, saveSyncToken, serverNow } from './pull-store'
+import { DATE_EVENTS_SCHEMA, entryOfEvent, isOrphanDate } from './date-events'
+import { deleteDateEvents } from './date-push'
+import type { Item } from './model'
 import type { PushContext } from './push'
 import { isTransient } from './transient'
 
@@ -40,16 +42,71 @@ async function normalise(context: PushContext, event: CalendarEvent, patch: Cale
   }
 }
 
-/** An extra date's event belongs to its entry and is never an entry of its own (#34). */
-async function applyDateEvent(event: CalendarEvent): Promise<null> {
-  await dropStray(event.id ?? '')
-  return null
+/** Transient failures fail the pull (it is retried); others are reported and the pull goes on. */
+const reportUnlessTransient = (what: string) => (error: unknown) => {
+  if (isTransient(error)) {
+    throw error
+  }
+  return `Couldn't remove ${what} from Google Calendar: ${describe(error)}`
 }
 
-/** An entry's own event: merged into the entry, and brought back into shape when needed. */
+/** Before an entry goes here, its extra dates' events go from Google, so their reminders stop. */
+const removeDateEvents = (context: PushContext, entry: Item): Promise<string | null> =>
+  deleteDateEvents(context, entry).then(() => null, reportUnlessTransient(`the other dates of "${entry.title}"`))
+
+/** The entry a date event belongs to: the cached copy when it still has the date, else the server's. */
+async function ownerOf(entryId: string, dateId: string): Promise<Item | null> {
+  const cached = await readEntryFromCache(entryId)
+  return cached && !isOrphanDate(cached, dateId) ? cached : readEntryFromServer(entryId)
+}
+
+/**
+ * An extra date's event belongs to its entry and is never an entry of its own (#34). One whose entry
+ * or date is gone is deleted in Google, e.g. an insert that landed unrecorded, or (in a full listing)
+ * one whose entry an app version from before date events deleted.
+ */
+async function applyDateEvent(context: PushContext, event: CalendarEvent, entryId: string): Promise<string | null> {
+  const eventId = event.id ?? ''
+  const dateId = eventId.slice(entryId.length + 1)
+  await dropStray(eventId)
+  if (event.status === 'cancelled' || !isOrphanDate(await ownerOf(entryId, dateId), dateId)) {
+    return null
+  }
+  return context.api.deleteEvent(context.config.calendarId, eventId).then(() => null, reportUnlessTransient(`the leftover "${event.summary ?? eventId}"`))
+}
+
+/**
+ * An entry's own event deleted in Google: when that deletes the entry here, its date events go first.
+ * Null when nothing was removed, else the problem (or '' for none).
+ */
+async function removeDatesOfDeleted(context: PushContext, event: CalendarEvent): Promise<string | null> {
+  const { categories, uid } = context
+  const entry = event.status === 'cancelled' ? await readEntryFromServer(event.id ?? '') : null
+  if (!entry || decidePull({ categories, entry, event, uid }).kind !== 'delete') {
+    return null
+  }
+  return await removeDateEvents(context, entry) ?? ''
+}
+
+/**
+ * An entry's own event: merged into the entry, and brought back into shape when needed. When it was
+ * deleted in Google, the entry's date events go too; a failure there is reported, but the entry is
+ * still removed (an incremental listing won't bring the deletion again).
+ */
 async function applyEntryEvent(context: PushContext, event: CalendarEvent): Promise<string | null> {
-  const { categories, config, uid } = context
+  const { categories, uid } = context
+  const removed = await removeDatesOfDeleted(context, event)
   const decision = await applyPulled(event, entry => decidePull({ categories, entry, event, uid }))
+  // Edited here between the read and the transaction, so the entry stays: its date events are rewritten.
+  if (removed !== null && decision.kind !== 'delete') {
+    await forgetDateEvents(event.id ?? '')
+  }
+  return await settleEntryEvent(context, event, decision) ?? (removed || null)
+}
+
+/** After merging: created and replaced entries are brought into shape and get this person's etag. */
+async function settleEntryEvent(context: PushContext, event: CalendarEvent, decision: PullDecision): Promise<string | null> {
+  const { categories, config, uid } = context
   const fresh = decision.kind === 'create' || (decision.kind === 'update' && decision.normalise)
   // Created and replaced entries get this person's etag only here, after the adjustment.
   if (!fresh) {
@@ -63,8 +120,13 @@ async function applyEntryEvent(context: PushContext, event: CalendarEvent): Prom
   return null
 }
 
-const applyEvent = (context: PushContext, event: CalendarEvent): Promise<string | null> =>
-  (entryOfEvent(event) ? applyDateEvent(event) : applyEntryEvent(context, event))
+/** Applies events one after another, in Google's order, collecting the problems. */
+const applyInOrder = (events: CalendarEvent[], apply: (event: CalendarEvent) => Promise<string | null>) =>
+  events.reduce<Promise<string[]>>(async (previous, event) => {
+    const found = await previous
+    const problem = await apply(event)
+    return problem ? [...found, problem] : found
+  }, Promise.resolve([]))
 
 interface Listing {
   events: CalendarEvent[]
@@ -83,19 +145,22 @@ async function listAll(context: PushContext, cursor: EventCursor, events: Calend
 async function pullPages(context: PushContext, syncToken: string | null): Promise<string[]> {
   const listedSince = syncToken ? null : await serverNow(context.uid)
   const { events, nextSyncToken } = await listAll(context, syncToken ? { syncToken } : {})
-  // One event after another, in Google's order: later changes to the same entry must land last.
-  const problems = await events.reduce<Promise<string[]>>(async (previous, event) => {
-    const found = await previous
-    const problem = await applyEvent(context, event)
-    return problem ? [...found, problem] : found
-  }, Promise.resolve([]))
+  // Entries first, in Google's order (later changes to the same entry must land last), then the
+  // extra dates' events, so each is judged against its entry as this listing left it.
+  const problems = await applyInOrder(events.filter(event => !entryOfEvent(event)), event => applyEntryEvent(context, event))
   if (listedSince) {
-    await removeVanished(new Set(events.map(event => event.id ?? '')), listedSince)
+    await removeVanished(new Set(events.map(event => event.id ?? '')), listedSince, async entry => {
+      const problem = await removeDateEvents(context, entry)
+      if (problem) {
+        problems.push(problem)
+      }
+    })
   }
+  const dateProblems = await applyInOrder(events.filter(event => entryOfEvent(event)), event => applyDateEvent(context, event, entryOfEvent(event) ?? ''))
   if (nextSyncToken && nextSyncToken !== syncToken) {
     await saveSyncToken(context.uid, nextSyncToken)
   }
-  return problems
+  return [...problems, ...dateProblems]
 }
 
 /** People whose schema marker this app already wrote since it started. */

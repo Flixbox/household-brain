@@ -113,6 +113,18 @@ for 3 seconds, so a burst of triggers causes one pull.
   - **Refused** (not transient): the shape is recorded with the error, so it is retried only once the
     entry changes. **Deleting an entry** deletes its date events first (recorded ones and its current
     dates; a missing one is fine).
+  - **Leftovers** (no reminder should outlive its entry):
+    - When the pull deletes an entry (its event was deleted in Google, or it vanished from a full
+      listing), it deletes the entry's date events in Google first. A failure there is reported;
+      the entry is still removed.
+    - A date event the pull lists is deleted when its entry is gone or neither has that date nor
+      knows the event (`isOrphanDate`), e.g. an insert that landed unrecorded. Date events are
+      handled after the entry events and the full listing's removals, and judged against the
+      server's copy of the entry (the cache only to confirm one still has the date). An entry about
+      to be deleted, or a date whose delete is still planned, is left to the push.
+    - An entry deleted by an app version from before date events is only noticed on a full listing
+      (no sync token, or Google answers 410): incremental listings don't include the unchanged
+      date event.
 - **Events put in by hand** (no `hb.category` and no `[Label]` prefix naming a category, e.g. a
   birthday) are shown under **Uncategorised** but never rewritten in Google.
 - **One event that can't be adjusted** (say Google rejects the patch) is reported in the sync bar and

@@ -90,3 +90,17 @@ export const dateEventIdsOf = (item: Item) =>
  */
 export const dateEventsAllowed = (syncStates: readonly { schema?: unknown }[]) =>
   syncStates.length > 0 && syncStates.every(state => typeof state.schema === 'number' && state.schema >= DATE_EVENTS_SCHEMA)
+
+/**
+ * Whether a date event in Google has nothing left in the app to belong to, so it should go: its entry
+ * is gone (deleted in Google, or by an app version from before date events), or the entry no longer
+ * has that date and doesn't know the event either (an insert that landed unrecorded). Not while the
+ * entry's own deletion or the date's planned delete is still to be pushed: those remove it anyway.
+ */
+export function isOrphanDate(entry: Item | null, dateId: string): boolean {
+  if (!entry) {
+    return true
+  }
+  const known = entry.pendingOp === 'delete' || dateId in (entry.dateEvents ?? {}) || extraDatesOf(entry).some(entryDate => entryDate.id === dateId)
+  return !known
+}

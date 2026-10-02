@@ -1,4 +1,4 @@
-import { type Timestamp, doc, getDoc, getDocFromServer, getDocs, query, runTransaction, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore'
+import { type Timestamp, deleteField, doc, getDoc, getDocFromCache, getDocFromServer, getDocs, query, runTransaction, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore'
 import { db } from '@household-brain/firebase/firebase'
 import type { CalendarEvent } from './event'
 import type { Item } from './model'
@@ -40,12 +40,19 @@ export function recordEtag(id: string, uid: string, event: CalendarEvent): Promi
  * entries untouched since the listing began, re-checked in a transaction each, so an entry another
  * device created or someone edited meanwhile survives.
  */
-export async function removeVanished(eventIds: ReadonlySet<string>, listedSince: Timestamp): Promise<void> {
+export async function removeVanished(eventIds: ReadonlySet<string>, listedSince: Timestamp, beforeDelete: (entry: Item) => Promise<void>): Promise<void> {
+  const untouched = (entry: { exists: () => boolean, get: (field: string) => unknown }) => {
+    const updatedAt = entry.get('updatedAt') as Timestamp | null
+    return entry.exists() && entry.get('sync') === 'synced' && Boolean(updatedAt) && (updatedAt?.toMillis() ?? 0) < listedSince.toMillis()
+  }
   const synced = await getDocs(query(itemsCollection, where('sync', '==', 'synced')))
-  await Promise.all(synced.docs.filter(entry => !eventIds.has(entry.id)).map(entry => runTransaction(db, async transaction => {
-    const latest = await transaction.get(entry.ref)
-    const updatedAt = latest.get('updatedAt') as Timestamp | null
-    if (latest.exists() && latest.get('sync') === 'synced' && updatedAt && updatedAt.toMillis() < listedSince.toMillis()) {
+  // The same check as the transaction's, so date events only go for entries about to go too.
+  const vanished = synced.docs.filter(entry => !eventIds.has(entry.id) && untouched(entry))
+  // Their date events go first. A transient failure stops here, so the entries stay for the next full
+  // listing; a refusal is reported by `beforeDelete` and the entries still go.
+  await Promise.all(vanished.map(entry => beforeDelete(entry.data() as Item)))
+  await Promise.all(vanished.map(entry => runTransaction(db, async transaction => {
+    if (untouched(await transaction.get(entry.ref))) {
       transaction.delete(entry.ref)
     }
   })))
@@ -79,6 +86,26 @@ export function dropStray(eventId: string): Promise<void> {
       transaction.delete(ref)
     }
   })
+}
+
+/** An entry as the server has it now (a date event's owner must not be judged gone from a stale cache). */
+export async function readEntryFromServer(id: string): Promise<Item | null> {
+  const snapshot = await getDocFromServer(itemDoc(id))
+  return snapshot.exists() ? snapshot.data() as Item : null
+}
+
+/**
+ * After an entry's date events were deleted in Google but the entry stayed (edited here meanwhile):
+ * forgets what Google held, so the outbox writes them again.
+ */
+export function forgetDateEvents(id: string): Promise<void> {
+  return updateDoc(itemDoc(id), { dateEvents: deleteField() })
+}
+
+/** An entry from the local cache, or null when the cache doesn't have it (then ask the server). */
+export async function readEntryFromCache(id: string): Promise<Item | null> {
+  const snapshot = await getDocFromCache(itemDoc(id)).catch(() => null)
+  return snapshot?.exists() ? snapshot.data() as Item : null
 }
 
 /** Tells the other devices this person's app recognises date events (see DATE_EVENTS_SCHEMA). */
