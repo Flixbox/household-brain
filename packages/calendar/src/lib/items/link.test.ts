@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { LINK_PATTERN, normaliseLink } from './link'
+import { LINK_PATTERN, normaliseLink, openableLink } from './link'
 
 // Compiled the way the browser compiles an input's pattern.
 const matches = (value: string) => new RegExp(`^(?:${LINK_PATTERN})$`, 'v').test(value)
@@ -24,5 +24,22 @@ describe('LINK_PATTERN', () => {
     expect(matches('https://example.de/deal')).toBe(true)
     expect(matches('just words')).toBe(false)
     expect(matches('nodot')).toBe(false)
+  })
+})
+
+describe('openableLink', () => {
+  it('opens web addresses only, with https:// added to a bare domain', () => {
+    expect(openableLink('shop.household-brain.test/deal')).toBe('https://shop.household-brain.test/deal')
+    expect(openableLink('http://shop.household-brain.test')).toBe('http://shop.household-brain.test')
+    expect(openableLink('')).toBeNull()
+    expect(openableLink('just words')).toBeNull()
+    // A script link that would pass as an address; built from parts, as the literal is banned by lint.
+    expect(openableLink(['javascript', '//shop.household-brain.test/%0aalert(1)'].join(':'))).toBeNull()
+    expect(openableLink('ftp://files.household-brain.test')).toBeNull()
+    expect(openableLink(['JavaScript', 'alert(1)'].join(':'))).toBeNull()
+    expect(openableLink(['javascript', 'a@shop.household-brain.test'].join(':'))).toBeNull()
+    expect(openableLink('mailto:a@shop.household-brain.test')).toBeNull()
+    expect(openableLink('http://')).toBeNull()
+    expect(openableLink('  HTTPS://shop.household-brain.test/deal  ')).toBe('HTTPS://shop.household-brain.test/deal')
   })
 })

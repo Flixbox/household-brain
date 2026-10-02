@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { normaliseLink } from '../../lib/items/link'
 import { useUndatedAllowed } from '../../lib/items/use-undated'
 import { type EditableField, type FormState, type ItemDraft, changedFields, editField, followUntouched, openForm } from '../../lib/items/model'
 
@@ -8,6 +9,7 @@ import { type EditableField, type FormState, type ItemDraft, changedFields, edit
  * is adjusted during render, as React recommends instead of an effect. `edited`: a field was changed here.
  * `dateRequired`: the due date may be left empty only once every app handles that, and an entry being
  * edited that already has none may stay so.
+ * `finished`: the draft as it is saved, with the title trimmed and a bare domain as a full address.
  */
 export function useEntryForm(initial: ItemDraft, { editing }: { editing: boolean }) {
   const [form, setForm] = useState<FormState>(() => openForm(initial))
@@ -18,5 +20,6 @@ export function useEntryForm(initial: ItemDraft, { editing }: { editing: boolean
   }
   const set = (field: EditableField) => (event: { target: { value: string } }) => setForm(current => editField(current, field, event.target.value))
   const dateRequired = !useUndatedAllowed() && !(editing && initial.dueDate === '')
-  return { dateRequired, draft: form.draft, edited: form.touched.length > 0, latest: form.latest, set }
+  const finished = { ...form.draft, title: form.draft.title.trim(), url: normaliseLink(form.draft.url) }
+  return { dateRequired, draft: form.draft, edited: form.touched.length > 0, finished, latest: form.latest, set }
 }
