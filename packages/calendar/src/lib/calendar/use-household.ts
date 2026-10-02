@@ -1,6 +1,7 @@
-import { doc, onSnapshot } from 'firebase/firestore'
-import { useEffect, useState } from 'react'
+import { doc } from 'firebase/firestore'
+import { useStore } from '@nanostores/react'
 import { db } from '@household-brain/firebase/firebase'
+import { docStore } from '@household-brain/firebase/live'
 import type { HouseholdConfig } from './setup'
 
 export type HouseholdState =
@@ -8,13 +9,14 @@ export type HouseholdState =
   | { state: 'missing' }
   | { state: 'ready', config: HouseholdConfig }
 
-/** The household calendar settings (`meta/config`), kept live. */
+/** The household calendar settings (`meta/config`), live. */
+export const $household = docStore<HouseholdConfig>(doc(db, 'meta', 'config'))
+
+/** The household calendar settings; loading until known (a failed listener keeps it loading, as before). */
 export function useHousehold(): HouseholdState {
-  const [household, setHousehold] = useState<HouseholdState>({ state: 'loading' })
-  useEffect(() => onSnapshot(doc(db, 'meta', 'config'), snapshot => {
-    setHousehold(snapshot.exists()
-      ? { config: snapshot.data() as HouseholdConfig, state: 'ready' }
-      : { state: 'missing' })
-  }), [])
-  return household
+  const live = useStore($household)
+  if (live.state !== 'ready') {
+    return { state: 'loading' }
+  }
+  return live.data ? { config: live.data, state: 'ready' } : { state: 'missing' }
 }

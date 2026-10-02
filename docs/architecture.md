@@ -31,7 +31,8 @@
 sheet, settings), Firebase JS SDK v11+ (`firebase/auth`, `firebase/firestore`), Google Identity
 Services (the GIS token client), `rrule` (computing the next occurrence of repeating items),
 Tailwind, shadcn/ui (Vite setup), and `nanostores` + `@nanostores/react` + `@nanostores/persistent`
-for small UI preferences kept in `localStorage`.
+for small UI preferences kept in `localStorage`, and for the Firestore data screens show: live
+stores (`@household-brain/firebase/live`) that listen only while read and share one listener.
 
 **Why not Next.js:** on the free Spark plan the app can only be static files, because server-side
 Next.js on Firebase needs the paid Blaze plan. A static export switches off everything Next.js adds
