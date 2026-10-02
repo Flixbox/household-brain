@@ -150,3 +150,25 @@ test('a category collapses, shows its open count, and stays collapsed after a re
   await header.click()
   await expect(coupons.getByRole('link', { name: /Cinema/u })).toBeVisible()
 })
+
+test('entries say when they are due, and overdue ones stand out', async ({ page }) => {
+  await mockGoogle(page)
+  await signInAllowlisted(page, 'owner@household-brain.test')
+  const add = async (title: string, dueDate: string) => {
+    await page.getByRole('link', { name: 'Add Coupon' }).click()
+    await page.getByLabel('Title').fill(title)
+    await page.getByLabel('Due date (17:00)').fill(dueDate)
+    await page.getByRole('button', { name: 'Save' }).click()
+  }
+  await add('Old voucher', '2020-01-01')
+  await add('Far voucher', '2099-01-01')
+
+  const coupons = page.getByRole('region', { name: 'Coupon' })
+  const old = coupons.getByRole('link', { name: /Old voucher/u })
+  await expect(old).toContainText(/overdue by \d+ days/u)
+  await expect(old).toContainText('2020-01-01')
+  await expect(old.getByText(/overdue by/u)).toHaveClass(/text-red/u)
+  const far = coupons.getByRole('link', { name: /Far voucher/u })
+  await expect(far).toContainText(/in \d+ days/u)
+  await expect(far.getByText(/in \d+ days/u)).not.toHaveClass(/text-red|text-amber/u)
+})
