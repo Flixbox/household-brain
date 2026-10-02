@@ -104,6 +104,19 @@ comments. Only wait in the foreground for something whose result you need for th
   five cancelled runs and no result.
 - **Check exit codes without pipes**, or with `${PIPESTATUS[0]}`. See the shell lesson below.
 
+**Every pull request that changes the UI shows it in a GIF**, in its description: the part of the
+screen that changed, in use. This follows the [record-browser-gif
+skill](https://github.com/deepseek-ai/deepseek-harness/blob/master/.agents/skills/record-browser-gif/SKILL.md),
+adapted to this repository:
+- **Record only the e2e build with demo data**, never the live app: it shows the household's real
+  entries, and pull requests are public. CI films every e2e test and uploads the videos per device
+  (`e2e-videos-<device>`), so the journey step that covers the change is the recording.
+- Turn it into a GIF with `scripts/pr-gif.sh` (`fetch`, then `sheet` to find the seconds, then `gif`),
+  from the run of the commit the description talks about. At most 10 MB.
+- Attach it with `gh pr edit <n> --body-file <body.md> --attach '<file.gif>#<what it shows>'`
+  (gh 2.99 or newer). Never commit a GIF to the branch.
+- When the change has no visible part (CI, sync logic), say so in the description instead.
+
 ### 2. After every push
 
 1. **Update the PR description** so it describes what the branch does now.

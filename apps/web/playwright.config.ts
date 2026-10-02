@@ -23,6 +23,9 @@ export default defineConfig({
     baseURL: 'http://localhost:4173',
     serviceWorkers: 'block',
     trace: 'retain-on-failure',
+    // Every test is filmed in CI, so a pull request can show the screens it changed as a GIF
+    // (`scripts/pr-gif.sh`). Demo data only: the tests never see real entries.
+    video: process.env.CI ? 'on' : 'off',
   },
   // `pnpm test:e2e` builds first. The server command must be `vite preview` itself, not a pnpm
   // script or an `&&` chain: those wrappers swallow the stop signal and Playwright then waits for the
