@@ -82,7 +82,8 @@ pnpm exec firebase deploy --only hosting,firestore:rules,firestore:indexes   # m
   `pnpm exec playwright install chromium webkit`.
 - Tests are **user journeys**: a few long tests, each one sign-in followed by `test.step(...)` per
   behaviour, rather than one small test per behaviour, because the per-test setup (emulator reset,
-  sign-in, Google mocks) dominates the run time (#44).
+  sign-in, Google mocks, on each device) is a large share of the run time. Moving the existing tests
+  over is #44.
 - The emulators run as the `demo-household-brain` project. The `demo-` prefix makes them refuse
   to reach any real Google service.
 - The emulator build of the app reads `.env.e2e` and adds a `window.e2eSignIn(email)` hook that
