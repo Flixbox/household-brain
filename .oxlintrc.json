@@ -157,7 +157,8 @@
       }
     ],
     // Functions are arrow constants (#67): one may call another defined further down, as the call only
-    // runs later. A use at the top level, before the definition, is still an error.
+    // runs later. A direct top-level use before the definition is still reported, but not one through a
+    // callback that runs at load (`[1].map(() => later())`): keep code that runs at load below what it uses.
     "eslint/no-use-before-define": [
       "error",
       {

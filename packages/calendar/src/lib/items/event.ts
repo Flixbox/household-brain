@@ -87,24 +87,22 @@ export const sameReminders = (actual: Reminders | undefined, expected: Reminders
   actual?.useDefault === expected.useDefault && minutesOf(actual) === minutesOf(expected)
 
 /** The entry's fields kept in the event's private properties; date events carry them too. */
-export const privateProperties = (item: Item): Record<string, string> => (
-  {
-    'hb.amount': item.amount,
-    // An uncategorised entry (an event added by hand) stays without one, so it stays untouched.
-    ...item.category === 'uncategorised' ? {} : { 'hb.category': item.category },
-    'hb.code': item.code,
-    // Like the currency: only when the entry has reminders of its own, so other events stay as they were.
-    ...item.reminders ? { 'hb.reminders': item.reminders } : {},
-    // Only when it isn't euros, so the events of every other entry stay as they were. Back in euros,
-    // a patch of the entry's own event clears it; its extra dates' events keep the old value, which
-    // nothing reads back (the entry's own event is the one a pull reads the currency from).
-    ...isForeign(item.currency) ? { 'hb.currency': item.currency } : {},
-    'hb.start': item.startDate ?? '',
-    'hb.status': item.status,
-    'hb.url': item.url,
-    'hb.v': '1',
-  }
-)
+export const privateProperties = (item: Item): Record<string, string> => ({
+  'hb.amount': item.amount,
+  // An uncategorised entry (an event added by hand) stays without one, so it stays untouched.
+  ...item.category === 'uncategorised' ? {} : { 'hb.category': item.category },
+  'hb.code': item.code,
+  // Like the currency: only when the entry has reminders of its own, so other events stay as they were.
+  ...item.reminders ? { 'hb.reminders': item.reminders } : {},
+  // Only when it isn't euros, so the events of every other entry stay as they were. Back in euros,
+  // a patch of the entry's own event clears it; its extra dates' events keep the old value, which
+  // nothing reads back (the entry's own event is the one a pull reads the currency from).
+  ...isForeign(item.currency) ? { 'hb.currency': item.currency } : {},
+  'hb.start': item.startDate ?? '',
+  'hb.status': item.status,
+  'hb.url': item.url,
+  'hb.v': '1',
+})
 
 const groups = {
   date: (item: Item, { timeZone }: EventContext): CalendarEvent => ({

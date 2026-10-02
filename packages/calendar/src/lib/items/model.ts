@@ -91,13 +91,11 @@ export interface FormState {
 export const openForm = (entry: ItemDraft): FormState => ({ draft: entry, latest: entry, touched: [] })
 
 /** The person typed in a field. */
-export const editField = (state: FormState, field: EditableField, value: string): FormState => (
-  {
-    ...state,
-    draft: { ...state.draft, [field]: value },
-    touched: state.touched.includes(field) ? state.touched : [...state.touched, field],
-  }
-)
+export const editField = (state: FormState, field: EditableField, value: string): FormState => ({
+  ...state,
+  draft: { ...state.draft, [field]: value },
+  touched: state.touched.includes(field) ? state.touched : [...state.touched, field],
+})
 
 /**
  * A newer version of the entry arrived (e.g. from Google) while the form is open: every field the

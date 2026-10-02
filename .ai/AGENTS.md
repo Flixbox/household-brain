@@ -247,11 +247,13 @@ adapted to this repository:
 
 ### Code rules
 
-- **Arrow functions only; the `function` keyword is banned** (#67): `const name = (…) => …`, components
-  included. oxlint enforces it (`func-style: expression`, `react/function-component-definition`). An
-  arrow constant isn't hoisted: whatever runs at module load, such as a route file's
-  `createFileRoute({ component })`, comes after the definitions it uses (TypeScript and
-  `no-use-before-define` report it); calls inside other functions may point further down.
+- **Arrow functions only, never the `function` keyword** (#67): `const name = (…) => …`, components
+  included. oxlint reports declarations and non-arrow components (`func-style: expression`,
+  `react/function-component-definition`); a `function` expression (`const f = function …`) slips
+  through, so don't write one. An arrow constant isn't hoisted: whatever runs at module load, such as
+  a route file's `createFileRoute({ component })`, comes after the definitions it uses. A direct use
+  before the definition is reported, a callback that runs at load isn't. Calls inside other functions
+  may point further down.
 - **No measured numbers in docs or comments** (durations, sizes, counts): they go stale. They belong
   in the PR or issue that measured them; a job's run history shows what is normal.
 - **`Date` is banned; use `Temporal`** (`temporal-polyfill`). Due dates are calendar dates at 17:00 in

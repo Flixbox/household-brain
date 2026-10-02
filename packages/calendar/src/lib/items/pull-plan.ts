@@ -31,9 +31,7 @@ const deleted = ({ entry }: PullInput): PullDecision =>
   !entry || hasLocalEdits(entry) ? { kind: 'skip' } : { kind: 'delete' }
 
 /** The other person's push of the version this entry already holds: just this person's etag. */
-const rememberEtag = (event: CalendarEvent, uid: string): PullDecision => (
-  { draft: draftFrom(event, []), fields: { [`etags.${uid}`]: event.etag ?? '' }, kind: 'update', normalise: false, ownCopy: true }
-)
+const rememberEtag = (event: CalendarEvent, uid: string): PullDecision => ({ draft: draftFrom(event, []), fields: { [`etags.${uid}`]: event.etag ?? '' }, kind: 'update', normalise: false, ownCopy: true })
 
 const merged = (entry: Item, draft: ItemDraft, version: Record<string, string>): PullDecision => {
   const theirs = EDITABLE_FIELDS.filter(field => !entry.dirty.includes(field))

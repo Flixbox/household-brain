@@ -38,9 +38,7 @@ export const useEntryForm = (initial: ItemDraft, { editing, initialDates }: { ed
 }
 
 /** The fields that depend on what every person's app handles. */
-const useFieldGates = (initial: ItemDraft, editing: boolean) => (
-  {
-    dateRequired: !useUndatedAllowed() && !(editing && initial.dueDate === ''),
-    remindersShown: useRemindersAllowed() || initial.reminders !== '',
-  }
-)
+const useFieldGates = (initial: ItemDraft, editing: boolean) => ({
+  dateRequired: !useUndatedAllowed() && !(editing && initial.dueDate === ''),
+  remindersShown: useRemindersAllowed() || initial.reminders !== '',
+})
