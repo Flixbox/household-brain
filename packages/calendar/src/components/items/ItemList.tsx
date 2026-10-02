@@ -24,9 +24,16 @@ export function ItemList({ items, categories }: { items: Item[], categories: Cat
   const other = visible.filter(item => !known.has(item.category)).toSorted(byDueDate)
   return (
     <div className="space-y-6">
-      {completed > 0 && (
-        <button type="button" aria-pressed={showCompleted} onClick={toggleShowCompleted} className="text-sm font-medium text-orange-700 underline dark:text-orange-400">
-          {showCompleted ? 'Hide completed' : `Show completed (${completed})`}
+      {/* Stays while it is on, so it can be switched off even once nothing is completed. */}
+      {(completed > 0 || showCompleted) && (
+        // A toggle keeps one name; whether it is on is aria-pressed (and the filled look).
+        <button
+          type="button"
+          aria-pressed={showCompleted}
+          onClick={toggleShowCompleted}
+          className="rounded-full border border-stone-300 px-3 py-1 text-sm font-medium aria-pressed:border-orange-600 aria-pressed:bg-orange-600 aria-pressed:text-white dark:border-stone-700"
+        >
+          {`Show completed (${completed})`}
         </button>
       )}
       {categories.map(category => (

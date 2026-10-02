@@ -405,13 +405,15 @@ shell owns the bar, the drawer and "Sign out"; the app passes in its links.
 - Urgency colours: **overdue from 17:00 on the due date** is red, within 7 days is amber, anything
   else is neutral.
 - Memberships and contracts with `noticeDays` also show **"cancel by <dueDate − noticeDays>"**.
-- `done` and `cancelled` items are hidden behind a "Show completed" toggle. Swiping marks an item
+- `done` and `cancelled` items are hidden behind a "Show completed (n)" toggle, a per-device preference
+  (`hb:show-completed`, `@nanostores/persistent`), off by default. Swiping marks an item
   done; long-pressing edits it.
 - There is a global search and an "All by date" flat-list toggle.
 
 **Add / edit sheet**
 
-- Fields: title, category (chips), **due date (date only, always 17:00)**, repeat (none / monthly /
+- Fields: title, category (chips), **due date (date only, always 17:00)**, status (open / done /
+  cancelled; when editing only, a new entry is open), repeat (none / monthly /
   yearly / custom), amount, code, link, notes, notice period.
 - There is **no reminder or time field.** Every entry gets 17:00 and the 2-day and 1-day
   reminders.
