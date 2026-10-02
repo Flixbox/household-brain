@@ -1,3 +1,9 @@
 @import 'tailwindcss';
 /* The feature packages render the app's markup too. */
 @source '../../../packages';
+
+/* Native controls (select lists, date pickers, scrollbars) follow the light or dark theme too;
+   without this, a select's options render dark-on-white text in dark mode. */
+:root {
+  color-scheme: light dark;
+}

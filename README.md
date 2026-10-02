@@ -603,8 +603,7 @@ exported by path (no barrel files); only the app is built.
 ```
 household-brain/
 ├─ apps/web/                      # the PWA: Vite + React, routes, PWA config, e2e tests
-│  ├─ src/main.tsx, src/routes/   # thin route files rendering what the packages export
-│  ├─ src/components/             # app chrome for now: sign-in gate, update prompt
+│  ├─ src/main.tsx, src/routes/   # wires the features into the shell; thin route files
 │  ├─ e2e/                        # Playwright against the Firebase emulators
 │  ├─ .env.production, .env.e2e   # public Firebase config; emulator-only config
 │  └─ vite.config.ts, playwright.config.ts, pwa-assets.config.ts, public/
@@ -614,6 +613,8 @@ household-brain/
 │     ├─ lib/items/               # entries: model, event mapping, outbox push, pull, Firestore
 │     ├─ lib/google-token.ts      # GIS token client
 │     └─ components/              # entry list/form, settings sections, sync bar
+├─ packages/shell/                # app chrome (@household-brain/shell): page frame, sign-in gate with the
+│                                 #   allowlist, update prompt, sign-out (features register what to forget)
 ├─ packages/firebase/             # Firebase app, Auth, Firestore, env checks (@household-brain/firebase)
 ├─ tests/rules/                   # Firestore security-rules tests
 ├─ firestore.rules, firestore.indexes.json, firebase.json   # hosting serves apps/web/dist

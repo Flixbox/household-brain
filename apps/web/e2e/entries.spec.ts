@@ -12,6 +12,18 @@ test.beforeEach(async () => {
   await seedDocument('categories/membership', { colorId: '3', label: 'Membership', slug: 'membership', sortOrder: 2 })
 })
 
+test('an older household gets new default categories and no longer sees unused retired ones; the form stars only required fields', async ({ page }) => {
+  await seedDocument('categories/document', { colorId: '8', label: 'Document expiry', slug: 'document', sortOrder: 7 })
+  await mockGoogle(page)
+  await signInAllowlisted(page, 'owner@household-brain.test')
+  await expect(page.getByRole('region', { name: 'Paperwork' })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Document expiry' })).toHaveCount(0)
+
+  await page.getByRole('link', { name: 'Add Paperwork' }).click()
+  const stars = page.locator('form label > span').filter({ hasText: '*' })
+  await expect(stars).toHaveText(['Title*', 'Category*', 'Due date (17:00)*'])
+})
+
 test('an entry is added, edited and deleted, and each change reaches Google Calendar', async ({ page }) => {
   const { google, requests } = await mockGoogle(page)
   await signInAllowlisted(page, 'owner@household-brain.test')
@@ -23,12 +35,16 @@ test('an entry is added, edited and deleted, and each change reaches Google Cale
   await page.getByLabel('Title').fill('Amazon')
   await page.getByLabel('Due date (17:00)').fill('2026-11-03')
   await page.getByLabel('Code').fill('SUMMER25')
+  // A bare domain is fine; it is stored as a full address.
+  await page.getByLabel('Link').fill('shop.household-brain.test')
   await page.getByRole('button', { name: 'Save' }).click()
+  // The code shows in the list, under the title.
+  await expect(coupons.getByRole('link', { name: /Amazon/u })).toContainText('SUMMER25')
   await expect(coupons.getByRole('link', { name: /Amazon/u })).toContainText('2026-11-03')
   await synced()
   expect(google.live()).toEqual([expect.objectContaining({
     end: { dateTime: '2026-11-03T17:15:00', timeZone: 'Europe/Berlin' },
-    extendedProperties: { private: expect.objectContaining({ 'hb.category': 'coupon', 'hb.code': 'SUMMER25' }) },
+    extendedProperties: { private: expect.objectContaining({ 'hb.category': 'coupon', 'hb.code': 'SUMMER25', 'hb.url': 'https://shop.household-brain.test' }) },
     reminders: { useDefault: true },
     start: { dateTime: '2026-11-03T17:00:00', timeZone: 'Europe/Berlin' },
     summary: '[Coupon] Amazon',
