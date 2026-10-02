@@ -76,6 +76,7 @@ issue comments (e.g. #43); the description alone can be out of date.
 **Keep going without being asked.** Once a pull request is deployed and its browser check is done,
 start the next planned piece of work, or fix what the owner reported, without waiting to be told.
 Ask only for decisions that belong to the owner (security trade-offs, product decisions, scope).
+The work isn't done while open issues remain: when one pull request is deployed, take the next issue.
 
 **Stuck? File an issue and move on.** When something can't be finished without the owner (a
 setting the bot can't change, a decision, a broken tool), file an issue describing what is blocked
