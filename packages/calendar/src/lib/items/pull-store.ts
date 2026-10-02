@@ -1,4 +1,4 @@
-import { type Timestamp, doc, getDoc, getDocFromServer, getDocs, query, runTransaction, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore'
+import { type Timestamp, doc, getDoc, getDocFromCache, getDocFromServer, getDocs, query, runTransaction, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore'
 import { db } from '@household-brain/firebase/firebase'
 import type { CalendarEvent } from './event'
 import type { Item } from './model'
@@ -40,9 +40,12 @@ export function recordEtag(id: string, uid: string, event: CalendarEvent): Promi
  * entries untouched since the listing began, re-checked in a transaction each, so an entry another
  * device created or someone edited meanwhile survives.
  */
-export async function removeVanished(eventIds: ReadonlySet<string>, listedSince: Timestamp): Promise<void> {
+export async function removeVanished(eventIds: ReadonlySet<string>, listedSince: Timestamp, beforeDelete: (entry: Item) => Promise<void>): Promise<void> {
   const synced = await getDocs(query(itemsCollection, where('sync', '==', 'synced')))
-  await Promise.all(synced.docs.filter(entry => !eventIds.has(entry.id)).map(entry => runTransaction(db, async transaction => {
+  const vanished = synced.docs.filter(entry => !eventIds.has(entry.id))
+  // Their date events go first: if that fails, the entry stays and the next full listing tries again.
+  await Promise.all(vanished.map(entry => beforeDelete(entry.data() as Item)))
+  await Promise.all(vanished.map(entry => runTransaction(db, async transaction => {
     const latest = await transaction.get(entry.ref)
     const updatedAt = latest.get('updatedAt') as Timestamp | null
     if (latest.exists() && latest.get('sync') === 'synced' && updatedAt && updatedAt.toMillis() < listedSince.toMillis()) {
@@ -81,10 +84,16 @@ export function dropStray(eventId: string): Promise<void> {
   })
 }
 
-/** An entry as the server has it now (a date event's owner must not be judged from a stale cache). */
+/** An entry as the server has it now (a date event's owner must not be judged gone from a stale cache). */
 export async function readEntryFromServer(id: string): Promise<Item | null> {
   const snapshot = await getDocFromServer(itemDoc(id))
   return snapshot.exists() ? snapshot.data() as Item : null
+}
+
+/** An entry from the local cache, or null when the cache doesn't have it (then ask the server). */
+export async function readEntryFromCache(id: string): Promise<Item | null> {
+  const snapshot = await getDocFromCache(itemDoc(id)).catch(() => null)
+  return snapshot?.exists() ? snapshot.data() as Item : null
 }
 
 /** Tells the other devices this person's app recognises date events (see DATE_EVENTS_SCHEMA). */

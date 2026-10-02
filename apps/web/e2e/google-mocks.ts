@@ -73,7 +73,7 @@ export async function mockGoogle(page: Page, calendarId = 'household@group.calen
       calendarList.set(id, { ...calendarList.get(id), ...body as object })
       await reply(route, 200, calendarList.get(id))
     } else if (path.includes('/events')) {
-      await handleEvent({ body, events, listing, path, reply: (status, json) => reply(route, status, json), request, stored })
+      await handleEvent({ body, events, latest: () => version, listing, path, reply: (status, json) => reply(route, status, json), request, stored })
     } else {
       await reply(route, 501, { error: { message: `Not mocked: ${request.method()} ${path}` } })
     }
@@ -98,26 +98,33 @@ export async function mockGoogle(page: Page, calendarId = 'household@group.calen
 }
 
 interface EventCall {
-  request: { method: () => string, headers: () => Record<string, string> }
+  request: { method: () => string, headers: () => Record<string, string>, url: () => string }
   path: string
   body: unknown
   events: Map<string, Record<string, unknown>>
+  /** The newest change's version; sync tokens are `sync-<version>`. */
+  latest: () => number
   listing: { refused: boolean, status: number }
   stored: (id: string, event: object) => Record<string, unknown> | undefined
   reply: (status: number, body: unknown) => Promise<void>
 }
 
 /** Insert, get, patch (honouring If-Match) and delete for the fake calendar's events. */
-async function handleEvent({ request, path, body, events, listing, stored, reply }: EventCall) {
+/** The events a listing returns: all of them, or with a sync token only those changed since, like Google. */
+function listed(events: Map<string, Record<string, unknown>>, url: string) {
+  const since = Number(new URL(url).searchParams.get('syncToken')?.replace('sync-', '') ?? '0')
+  return [...events.values()].filter(event => Number(String(event.etag).replaceAll(/[^0-9]/gu, '')) > since)
+}
+
+async function handleEvent({ request, path, body, events, latest, listing, stored, reply }: EventCall) {
   const eventId = path.split('/events/')[1] ?? ''
   if (request.method() === 'GET' && !eventId && listing.refused) {
     await reply(listing.status, { error: { message: listing.status === 503 ? 'Backend Error' : 'Bad Request' } })
     return
   }
   if (request.method() === 'GET' && !eventId) {
-    // A list: everything every time, deleted events included, with a sync token. Real incremental
-    // listings return less, but the app treats both the same way.
-    await reply(200, { items: [...events.values()], nextSyncToken: `sync-${events.size}` })
+    // A list, deleted events included: everything, or with a sync token only what changed since.
+    await reply(200, { items: listed(events, request.url()), nextSyncToken: `sync-${latest()}` })
     return
   }
   const found = events.get(eventId)
