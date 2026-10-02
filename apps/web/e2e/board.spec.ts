@@ -141,7 +141,7 @@ test('"All by date" lists every entry in one list by due date, labelled with its
   await toggle.click()
   await expect(toggle).toHaveAttribute('aria-pressed', 'true')
   const list = page.getByRole('region', { name: 'All entries by date' })
-  await expect(list.getByRole('link')).toHaveText([/Early gym.*Membership/u, /Late coupon.*Coupon/u])
+  await expect(list.getByRole('listitem')).toHaveText([/Early gym.*Membership/u, /Late coupon.*Coupon/u])
   await expect(page.getByRole('region', { name: 'Coupon' })).toHaveCount(0)
 
   // A search with no match says so once, not also "no entries".
