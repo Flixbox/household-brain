@@ -31,6 +31,15 @@ test('an entry can have more dates; the list shows the next one with "+ more"', 
   await expect.poll(summaries).toEqual(['[Membership] Streaming', '[Membership] Streaming · Cancel by'])
   const dateEventId = String(google.live().find(event => String(event.summary).endsWith('· Cancel by'))?.id)
 
+  await test.step('other edits to a date event in Google Calendar are put back', async () => {
+    // In the same session that inserted it, without a reload: putting it back is a new write, not a
+    // repeat of the insert the outbox remembers having done.
+    google.edit(dateEventId, { summary: 'Renamed in Google' })
+    await row.click()
+    await expect.poll(summaries).toEqual(['[Membership] Streaming', '[Membership] Streaming · Cancel by'])
+    await page.getByRole('link', { name: 'Cancel' }).click()
+  })
+
   await test.step('a date event moved in Google Calendar moves the date in the app', async () => {
     google.edit(dateEventId, {
       end: { dateTime: '2099-11-28T17:15:00+01:00', timeZone: 'Europe/Berlin' },
@@ -38,13 +47,7 @@ test('an entry can have more dates; the list shows the next one with "+ more"', 
     })
     await page.reload()
     await expect(row).toContainText('2099-11-28 + more')
-  })
-
-  await test.step('other edits to a date event in Google Calendar are put back', async () => {
-    google.edit(dateEventId, { summary: 'Renamed in Google' })
-    await page.reload()
-    await expect.poll(summaries).toEqual(['[Membership] Streaming', '[Membership] Streaming · Cancel by'])
-    await expect(row).toContainText('2099-11-28 + more')
+    await expect.poll(() => google.live().find(event => event.id === dateEventId)?.start).toMatchObject({ dateTime: '2099-11-28T17:00:00' })
   })
 
   // Kept across a reload, and editable: removing it leaves just the due date.

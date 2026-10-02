@@ -37,6 +37,16 @@ export function recordEtag(id: string, uid: string, event: CalendarEvent): Promi
 }
 
 /**
+ * A ledger value no event was ever written with, fresh each time: the outbox then writes the event
+ * again. Clearing the entry instead would repeat a step (none → shape) the outbox may already have
+ * taken this session, and it skips steps it has taken.
+ */
+const staleShape = () => ({ shape: `stale ${newEventId()}` })
+
+/** Marks every date event of an entry stale, so the outbox writes them all again. */
+const staleLedger = (entry: Item) => Object.fromEntries(Object.keys(entry.dateEvents ?? {}).map(dateId => [`dateEvents.${dateId}`, staleShape()]))
+
+/**
  * After a full listing: removes synced entries whose event no longer exists in Google Calendar. Only
  * entries untouched since the listing began, re-checked in a transaction each, so an entry another
  * device created or someone edited meanwhile survives.
@@ -53,8 +63,12 @@ export async function removeVanished(eventIds: ReadonlySet<string>, listedSince:
   // listing; a refusal is reported by `beforeDelete` and the entries still go.
   await Promise.all(vanished.map(entry => beforeDelete(entry.data() as Item)))
   await Promise.all(vanished.map(entry => runTransaction(db, async transaction => {
-    if (untouched(await transaction.get(entry.ref))) {
+    const latest = await transaction.get(entry.ref)
+    if (untouched(latest)) {
       transaction.delete(entry.ref)
+    } else if (latest.exists()) {
+      // Kept after all (changed meanwhile): its date events, already deleted, are written again.
+      transaction.update(entry.ref, staleLedger(latest.data() as Item))
     }
   })))
 }
@@ -126,7 +140,7 @@ function dateChangeFields(entry: Item, dateId: string, change: DateEventChange):
       return { ...pullStamp(), [`dateEvents.${dateId}`]: deleteField(), extraDates: dates.filter(entryDate => entryDate.id !== dateId) }
     }
     case 'rewrite': {
-      return { [`dateEvents.${dateId}`]: deleteField() }
+      return { [`dateEvents.${dateId}`]: staleShape() }
     }
     default: {
       return null
@@ -136,10 +150,16 @@ function dateChangeFields(entry: Item, dateId: string, change: DateEventChange):
 
 /**
  * After an entry's date events were deleted in Google but the entry stayed (edited here meanwhile):
- * forgets what Google held, so the outbox writes them again.
+ * they are written again.
  */
 export function forgetDateEvents(id: string): Promise<void> {
-  return updateDoc(itemDoc(id), { dateEvents: deleteField() })
+  return runTransaction(db, async transaction => {
+    const snapshot = await transaction.get(itemDoc(id))
+    const fields = snapshot.exists() ? staleLedger(snapshot.data() as Item) : {}
+    if (Object.keys(fields).length > 0) {
+      transaction.update(itemDoc(id), fields)
+    }
+  })
 }
 
 /** An entry from the local cache, or null when the cache doesn't have it (then ask the server). */
