@@ -1,6 +1,6 @@
 import { arrayUnion, collection, doc, runTransaction, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore'
 import { auth, db } from '@household-brain/firebase/firebase'
-import { EDITABLE_FIELDS, type Item, type ItemDraft, changedFields } from './model'
+import { EDITABLE_FIELDS, type Item, type ItemDraft, changedFields, draftOf } from './model'
 import { newEventId } from './ids'
 import type { PushOutcome } from './push'
 import { type PushRecord, errorFor, recordFor } from './record'
@@ -35,6 +35,12 @@ export function editItem(id: string, opened: ItemDraft, draft: ItemDraft): Promi
   return updateDoc(itemDoc(id), {
     ...values, ...stamp(), dirty: arrayUnion(...changed), pendingOp: 'upsert', sync: 'pending', syncError: null,
   })
+}
+
+/** Sets an entry's status (e.g. done after a swipe): only the status is written and pushed. */
+export function setItemStatus(item: Item, status: Item['status']): Promise<void> {
+  const before = draftOf(item)
+  return editItem(item.id, before, { ...before, status })
 }
 
 /**

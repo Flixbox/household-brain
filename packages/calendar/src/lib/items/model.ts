@@ -45,6 +45,9 @@ export const emptyDraft = (category = ''): ItemDraft => ({
 })
 
 /** The fields whose value differs between two drafts. */
+/** The editable fields of an entry. */
+export const draftOf = (item: Item): ItemDraft => Object.fromEntries(EDITABLE_FIELDS.map(field => [field, item[field]])) as ItemDraft
+
 export function changedFields(before: ItemDraft, after: ItemDraft): EditableField[] {
   return EDITABLE_FIELDS.filter(field => before[field] !== after[field])
 }

@@ -1,13 +1,11 @@
 import { useNavigate } from '@tanstack/react-router'
 import { useEffect, useMemo } from 'react'
 import type { Category } from '../../lib/categories'
-import { EDITABLE_FIELDS, type Item, type ItemDraft } from '../../lib/items/model'
+import { type Item, type ItemDraft, draftOf } from '../../lib/items/model'
 import { refreshNow, requestSyncAccess } from '../../lib/items/outbox'
 import { editItem, removeItem } from '../../lib/items/store'
 import { reportWriteFailure } from '../../lib/items/write-failures'
 import { ItemForm } from './ItemForm'
-
-const draftOf = (item: Item) => Object.fromEntries(EDITABLE_FIELDS.map(field => [field, item[field]])) as ItemDraft
 
 /** Edit and delete one entry. */
 export function EditForm({ item, categories }: { item: Item, categories: Category[] }) {
