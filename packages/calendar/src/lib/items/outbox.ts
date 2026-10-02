@@ -38,7 +38,9 @@ let timer: ReturnType<typeof setTimeout> | null = null
 const recorded = new Map<string, string>()
 /** Entries whose latest local write the server hasn't confirmed yet. */
 let unconfirmed = new Set<string>()
-const PULL_REUSE_MS = 3000
+// How long a finished pull is reused instead of pulling again. Shorter in the emulator (e2e) build, so
+// the tests don't wait on it; compared inline so production builds drop the branch.
+const PULL_REUSE_MS = import.meta.env.VITE_USE_EMULATORS === 'true' ? 200 : 3000
 let pulling: Promise<void> | null = null
 let pulledAt = Number.NEGATIVE_INFINITY
 let pullProblem: string | null = null

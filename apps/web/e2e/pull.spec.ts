@@ -17,7 +17,7 @@ const pullUntil = (page: Page, check: () => Promise<number>, expected: number) =
   expect.poll(async () => {
     await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')))
     return check()
-  }, { intervals: [1000], timeout: 15_000 }).toBe(expected)
+  }, { intervals: [250], timeout: 15_000 }).toBe(expected)
 
 test('events made in Google Calendar: taken in and shaped, left alone when put in by hand, strays removed', async ({ page }) => {
   const { google } = await mockGoogle(page)
@@ -171,7 +171,7 @@ test('edits racing Google Calendar: a waiting edit, a conflict, an open form cat
     await expect.poll(async () => {
       await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')))
       return page.getByLabel('Code').inputValue()
-    }, { intervals: [1000], timeout: 15_000 }).toBe('NEWER30')
+    }, { intervals: [250], timeout: 15_000 }).toBe('NEWER30')
     await expect(page.getByLabel('Title')).toHaveValue('Bakery Müller')
     await page.getByRole('button', { name: 'Save' }).click()
     await expect.poll(() => byId(String(event.id))?.summary).toBe('[Coupon] Bakery Müller')
