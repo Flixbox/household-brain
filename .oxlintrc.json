@@ -140,7 +140,6 @@
     "import/prefer-default-export": "off", // conflicts with no-default-export
     "import/group-exports": "off", // exports stay next to what they export
     "import/exports-last": "off", // exports stay next to what they export
-    "import/no-relative-parent-imports": "off", // the src tree is small, parent imports are fine
     "react/jsx-no-literals": "off", // no i18n layer, plain text in JSX is fine
     "react/jsx-max-depth": "off", // layout depth is a design choice, not a defect
     "eslint/no-undef": "off", // TypeScript already checks undefined names

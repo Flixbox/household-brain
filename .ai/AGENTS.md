@@ -269,7 +269,9 @@ adapted to this repository:
 - **Example and test domains use the reserved `.test` TLD** (`owner@household-brain.test`), never
   `example.com` or a real-looking host.
 - **oxlint runs every category as an error.** A rule is switched off only in `.oxlintrc.json`, with
-  its reason as a comment, never with an inline disable comment.
+  its reason as a comment, never with an inline disable comment. Before switching a rule on, search
+  the file for it: a rule already listed as `"off"` further down wins (the last duplicate key in
+  JSON counts), and the new entry silently does nothing. Prove a new rule with a file that breaks it.
 - **Every dependency is pinned exactly** (`savePrefix: ''`, enforced by npm-package-json-lint);
   Dependabot bumps them. Node is pinned in `package.json` (`volta.node`), pnpm in `packageManager`.
 - **fallow** (`.fallowrc.jsonc`, part of `pnpm lint`) fails on unused files, exports and
