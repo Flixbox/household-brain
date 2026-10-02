@@ -38,11 +38,12 @@ test('an entry is added, edited and deleted, and each change reaches Google Cale
   await expect(page.locator('form[data-hold-updates]')).toHaveCount(1)
   await page.getByLabel('Due date (17:00)').fill('2026-11-03')
   await page.getByLabel('Code').fill('SUMMER25')
+  await page.getByLabel('Amount').fill('10')
   // A bare domain is fine; it is stored as a full address.
   await page.getByLabel('Link').fill('shop.household-brain.test')
   await page.getByRole('button', { name: 'Save' }).click()
-  // The code shows in the list, under the title.
-  await expect(coupons.getByRole('link', { name: /Amazon/u })).toContainText('SUMMER25')
+  // The price and the code show in the list, in that order under the title.
+  await expect(coupons.getByRole('link', { name: /Amazon/u })).toContainText(/Amazon\s*10,00\s€\s*SUMMER25/u)
   await expect(coupons.getByRole('link', { name: /Amazon/u })).toContainText('2026-11-03')
   await synced()
   expect(google.live()).toEqual([expect.objectContaining({
