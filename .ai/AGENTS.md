@@ -77,6 +77,8 @@ issue comments (e.g. #43); the description alone can be out of date.
 start the next planned piece of work, or fix what the owner reported, without waiting to be told.
 Ask only for decisions that belong to the owner (security trade-offs, product decisions, scope).
 The work isn't done while open issues remain: when one pull request is deployed, take the next issue.
+**Tech debt and refactors come first:** take open refactor, cleanup, tooling and bug issues before
+new feature issues.
 
 **Stuck? File an issue and move on.** When something can't be finished without the owner (a
 setting the bot can't change, a decision, a broken tool), file an issue describing what is blocked
