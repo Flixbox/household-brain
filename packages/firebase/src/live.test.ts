@@ -63,4 +63,24 @@ describe('liveStore', () => {
     expect(seen.at(-1)).toEqual({ data: 'back', state: 'ready' })
     stop()
   })
+
+  it('cancels a pending retry when it stops', () => {
+    const listener = fakeListener()
+    const stop = liveStore(listener.subscribe).listen(() => null)
+    listener.fail('unavailable')
+    stop()
+    vi.runAllTimers()
+    expect(listener.calls.started).toBe(1)
+  })
+
+  it('stays quiet about a listener refused once nobody reads it (e.g. right after sign-out)', () => {
+    const listener = fakeListener()
+    const stop = liveStore(listener.subscribe).listen(() => null)
+    stop()
+    // Within nanostores' unmount delay the listener still runs; the rules now refuse it.
+    listener.fail('permission-denied')
+    vi.runAllTimers()
+    expect(globalThis.reportError).not.toHaveBeenCalled()
+    expect(listener.calls.started).toBe(1)
+  })
 })

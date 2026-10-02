@@ -34,6 +34,11 @@ export function liveStore<Value>(subscribe: Subscribe<Value>): ReadableAtom<Live
     let retry: ReturnType<typeof setTimeout> | null = null
     const start = () => {
       stop = subscribe(data => $store.set({ data, state: 'ready' }), error => {
+        // Nobody reads it any more, e.g. right after sign-out, when the rules refuse the listener
+        // that is still running for the short unmount delay: nothing to report.
+        if ($store.lc === 0) {
+          return
+        }
         // Reported like an uncaught error (the browser logs it), which is what it was before.
         globalThis.reportError(error)
         $store.set({ message: error.message, state: 'error' })
