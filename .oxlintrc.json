@@ -127,7 +127,7 @@
       "error",
       {
         "name": "Date",
-        "message": "Date is banned: use Temporal (README section 9)."
+        "message": "Date is banned: use Temporal (docs/toolchain.md)."
       }
     ],
     "oxc/no-async-await": "off", // async/await is the normal way to write async code

@@ -1,6 +1,7 @@
 # Agent notes for household-brain
 
-The README is the spec and the source of truth for architecture, toolchain and code rules. This file
+The spec lives in `docs/` (indexed from the README) and is the source of truth for architecture,
+toolchain and code rules; change it in the same pull request as the code it describes. This file
 holds what agents working in this repo have learned the hard way. Add to it when something bites.
 
 ## Working as the bot

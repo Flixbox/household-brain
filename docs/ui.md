@@ -1,0 +1,48 @@
+# UI
+
+**Top bar and menu:** every signed-in page has a top bar with the app's name and a menu button. It
+opens a drawer from the right (a modal dialog) with **Entries**, **Settings** and **Sign out**. The
+shell owns the bar, the drawer and "Sign out"; the app passes in its links.
+
+**Category board (home)**
+
+- One collapsible section per category, ordered by `sortOrder`. The header shows the icon, the
+  label, the open count, a badge such as "2 due this week", and a **"+" that preselects the
+  category**.
+- **All categories are expanded by default.** Collapsing is a per-device preference:
+  - It lives in a nanostores `persistentAtom` from `@nanostores/persistent`, stored in
+    `localStorage` under `hb:collapsed`.
+  - It stores the **collapsed** category slugs, as a JSON array. Anything not listed is expanded, so
+    new categories, a fresh device, or cleared storage all start fully expanded.
+  - It is not synced through Firestore: each person and device keeps their own view.
+  - If `localStorage` is unavailable (private mode, blocked storage), it falls back to in-memory
+    state, which means everything is expanded.
+  - Slugs of deleted categories are pruned on load.
+- Items are sorted by `dueDate` ascending, with ties broken by title.
+- Each card shows the title, the relative due date ("tomorrow, 17:00", "in 5 days", "overdue by 2
+  days") plus the absolute date, the amount, and the code with a copy button.
+- Urgency colours: **overdue from 17:00 on the due date** is red, within 7 days is amber, anything
+  else is neutral.
+- Memberships and contracts with `noticeDays` also show **"cancel by <dueDate − noticeDays>"**.
+- `done` and `cancelled` items are hidden behind a "Show completed (n)" toggle, a per-device preference
+  (`hb:show-completed`, `@nanostores/persistent`), off by default. Swiping marks an item
+  done; long-pressing edits it.
+- There is a global search and an "All by date" flat-list toggle.
+
+**Add / edit sheet**
+
+- Fields: title, category (chips), **due date (date only, always 17:00)**, status (open / done /
+  cancelled; when editing only, a new entry is open), repeat (none / monthly /
+  yearly / custom), amount, code, link, notes, notice period.
+- There is **no reminder or time field.** Every entry gets 17:00 and the 2-day and 1-day
+  reminders.
+- It opens from a category's "+", with that category preselected. There is no separate "add" button.
+
+**Settings:** categories (add, rename, reorder, icon, colour), **"Share with your household"**
+(owner only: the steps for sharing the calendar in Google Calendar), a "Notifications: 2 days + 1 day before ✓"
+status for the current user (re-applied if it drifts), a reconnect-Google button, a sync status
+panel (last sync, pending and error counts, "Full resync"). (Sign out is in the menu.)
+
+**PWA:** `manifest.webmanifest` with `display: standalone`, regular and maskable icons, light and
+dark themes, and a `share_target`, so a coupon email or screenshot text can be shared into the add
+sheet. iOS needs an "Add to Home Screen" hint.
