@@ -1,7 +1,7 @@
 import { type Page, expect, test } from '@playwright/test'
 import { allowlist, resetEmulators, seedDocument } from './emulators'
 import { mockGoogle } from './google-mocks'
-import { signInAllowlisted, signInAs } from './session'
+import { openMenu, signInAllowlisted, signInAs } from './session'
 
 const CALENDAR = 'household@group.calendar.google.test'
 
@@ -133,7 +133,8 @@ test('after signing out, the next person sees none of the previous sync problems
   await expect(page.getByText(/Couldn.t read changes from Google Calendar/u)).toBeVisible()
 
   // Same page, no reload: only the sign-out may clear what the outbox remembers.
-  await page.getByRole('button', { name: 'Sign out' }).click()
+  await openMenu(page)
+  await page.getByRole('dialog', { name: 'Menu' }).getByRole('button', { name: 'Sign out' }).click()
   await signInAs(page, 'spouse@household-brain.test')
   const uid = await page.getByTestId('uid').textContent()
   await allowlist(uid ?? '')

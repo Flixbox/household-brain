@@ -7,6 +7,9 @@ declare global {
   }
 }
 
+/** Opens the app menu (the drawer behind the top bar's button). */
+export const openMenu = (page: Page) => page.getByRole('button', { exact: true, name: 'Menu' }).click()
+
 /** Signs in through the emulator-only hook, without the Google popup. */
 export const signInAs = (page: Page, email: string) => page.evaluate(address => window.e2eSignIn(address), email)
 
