@@ -104,13 +104,19 @@ export const privateProperties = (item: Item): Record<string, string> => ({
   'hb.v': '1',
 })
 
+/** An entry's event times: 17:00–17:15 on its due date. */
+const dueTimes = (item: Pick<Item, 'dueDate'>, timeZone: string) => ({
+  end: { dateTime: `${item.dueDate}T${END_TIME}`, timeZone },
+  start: { dateTime: `${item.dueDate}T${DUE_TIME}`, timeZone },
+})
+
 const groups = {
-  date: (item: Item, { timeZone }: EventContext): CalendarEvent => ({
+  date: (item: Item, { timeZone }: EventContext): CalendarEvent => {
+    const { start, end } = dueTimes(item, timeZone)
     // `date: null` turns an all-day event (e.g. one added by hand) into a timed one; Google rejects
     // an event with both.
-    end: { date: null, dateTime: `${item.dueDate}T${END_TIME}`, timeZone },
-    start: { date: null, dateTime: `${item.dueDate}T${DUE_TIME}`, timeZone },
-  }),
+    return { end: { date: null, ...end }, start: { date: null, ...start } }
+  },
   notes: (item: Item): CalendarEvent => ({ description: item.notes }),
   // In a patch, overrides are cleared explicitly: Google merges nested fields, and rejects default
   // reminders next to overrides someone added in Google.
@@ -152,15 +158,15 @@ const PROPERTY_OF: Partial<Record<EditableField, string>> = {
 /** The full event for a new entry: due 17:00–17:15, reminding while open (`remindersOf`). */
 export const eventFor = (item: Item, context: EventContext): CalendarEvent => {
   // A new event has no all-day date to clear, so the patch-only `date: null` is left out.
-  const { timeZone } = context
+  const { start, end } = dueTimes(item, context.timeZone)
   return {
     id: item.id,
     ...groups.title(item, context),
     ...groups.notes(item),
-    end: { dateTime: `${item.dueDate}T${END_TIME}`, timeZone },
+    end,
     extendedProperties: { private: privateProperties(item) },
     reminders: remindersOf(item),
-    start: { dateTime: `${item.dueDate}T${DUE_TIME}`, timeZone },
+    start,
   }
 }
 

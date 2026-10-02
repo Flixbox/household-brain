@@ -47,7 +47,7 @@ const optionalFields = (data: DocumentData): Partial<Item> => ({
   ...typeof data.updatedBy === 'string' ? { updatedBy: data.updatedBy } : {},
 })
 
-/** An `items/{id}` document; `id` is the document's own when the data lacks it. */
+/** An `items/{id}` document. Its id is the document's own: every write goes to `items/{id}`. */
 export const itemFrom = (id: string, data: DocumentData): Item => ({
   amount: text(data.amount),
   category: text(data.category),
@@ -56,7 +56,7 @@ export const itemFrom = (id: string, data: DocumentData): Item => ({
   dirty: Array.isArray(data.dirty) ? data.dirty.filter(isEditableField) : [],
   dueDate: text(data.dueDate),
   etags: textMap(data.etags),
-  id: text(data.id, id),
+  id,
   notes: text(data.notes),
   pendingOp: oneOf(OPS, data.pendingOp) ?? null,
   reminders: text(data.reminders),

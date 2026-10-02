@@ -71,19 +71,19 @@ export const emptyDraft = (category = ''): ItemDraft => ({
   url: '',
 })
 
-/** The editable fields of an entry; a field older entries don't have yet (e.g. `startDate`) is ''. */
+/** The editable fields of an entry. (A field older entries lack is filled in when read: `itemFrom`.) */
 export const draftOf = (item: Item): ItemDraft => ({
-  amount: item.amount ?? '',
-  category: item.category ?? '',
-  code: item.code ?? '',
-  currency: item.currency ?? '',
-  dueDate: item.dueDate ?? '',
-  notes: item.notes ?? '',
-  reminders: item.reminders ?? '',
-  startDate: item.startDate ?? '',
-  status: item.status ?? 'open',
-  title: item.title ?? '',
-  url: item.url ?? '',
+  amount: item.amount,
+  category: item.category,
+  code: item.code,
+  currency: item.currency,
+  dueDate: item.dueDate,
+  notes: item.notes,
+  reminders: item.reminders,
+  startDate: item.startDate,
+  status: item.status,
+  title: item.title,
+  url: item.url,
 })
 
 /** The fields whose value differs between two drafts. */
