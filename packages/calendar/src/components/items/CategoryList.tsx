@@ -2,6 +2,7 @@ import { useStore } from '@nanostores/react'
 import type { Board } from '../../lib/items/board'
 import { $collapsed, collapsedSlugs } from '../../lib/items/collapsed'
 import { CategorySection } from './CategorySection'
+import { NO_CATEGORY_COLOR } from '../../lib/category-colors'
 import { ItemRow } from './ItemRow'
 
 /**
@@ -22,7 +23,7 @@ export function CategoryList({ board }: { board: Board }) {
         />
       ))}
       {board.other.length > 0 && (
-        <section aria-label="Uncategorised" className="space-y-1">
+        <section aria-label="Uncategorised" className="space-y-1 border-l-4 pl-3" style={{ borderColor: NO_CATEGORY_COLOR }}>
           <h2 className="text-lg font-semibold">Uncategorised</h2>
           <ul>{board.other.map(item => <ItemRow key={item.id} item={item} />)}</ul>
         </section>
