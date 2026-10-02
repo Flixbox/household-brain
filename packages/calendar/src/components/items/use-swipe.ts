@@ -26,6 +26,15 @@ function follow(gesture: Gesture | null, event: PointerEvent): number | null {
   return gesture.dx
 }
 
+/** Keeps the pointer's events coming to the row; a pointer the browser no longer knows is fine. */
+function capture(event: PointerEvent) {
+  try {
+    event.currentTarget.setPointerCapture(event.pointerId)
+  } catch {
+    // Not an active pointer (e.g. already lifted): the gesture works without capture.
+  }
+}
+
 /**
  * A left swipe on a row: follows one pointer, and calls `onDone` when that pointer is let go far
  * enough. A cancelled gesture (e.g. the browser taking over to scroll) only resets. A swipe never
@@ -53,7 +62,7 @@ export function useSwipeToDone(onDone: () => void, enabled: boolean) {
       if (enabled && !gesture.current && event.isPrimary) {
         gesture.current = { dx: 0, pointerId: event.pointerId, startX: event.clientX }
         moved.current = false
-        event.currentTarget.setPointerCapture(event.pointerId)
+        capture(event)
       }
     },
     handlePointerMove: (event: PointerEvent) => {
