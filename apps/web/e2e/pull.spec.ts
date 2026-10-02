@@ -127,7 +127,7 @@ test('an entry edited here while it was deleted in Google comes back with the ed
 
 test('after signing out, the next person sees none of the previous sync problems', async ({ page }) => {
   const { google } = await mockGoogle(page)
-  google.refuseListings(true, 403)
+  google.refuseListings(true, 400)
   await signInAllowlisted(page, 'owner@household-brain.test')
   await page.getByRole('button', { name: 'Sync now' }).click()
   await expect(page.getByText(/Couldn.t read changes from Google Calendar/u)).toBeVisible()

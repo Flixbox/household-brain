@@ -111,7 +111,7 @@ interface EventCall {
 async function handleEvent({ request, path, body, events, listing, stored, reply }: EventCall) {
   const eventId = path.split('/events/')[1] ?? ''
   if (request.method() === 'GET' && !eventId && listing.refused) {
-    await reply(listing.status, { error: { message: listing.status === 503 ? 'Backend Error' : 'Forbidden' } })
+    await reply(listing.status, { error: { message: listing.status === 503 ? 'Backend Error' : 'Bad Request' } })
     return
   }
   if (request.method() === 'GET' && !eventId) {
