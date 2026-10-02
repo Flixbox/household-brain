@@ -68,7 +68,6 @@ const groups = {
     start: { date: null, dateTime: `${item.dueDate}T${DUE_TIME}`, timeZone },
   }),
   notes: (item: Item): CalendarEvent => ({ description: item.notes }),
-  properties: (item: Item): CalendarEvent => ({ extendedProperties: { private: privateProperties(item) } }),
   title: (item: Item, { categories }: EventContext): CalendarEvent => ({
     colorId: labelOf(item, categories)?.colorId ?? '8',
     summary: summaryOf(item, categories),
@@ -76,14 +75,23 @@ const groups = {
 }
 
 const GROUP_OF: Record<EditableField, (keyof typeof groups)[]> = {
-  amount: ['properties'],
-  category: ['title', 'properties'],
-  code: ['properties'],
+  amount: [],
+  category: ['title'],
+  code: [],
   dueDate: ['date'],
   notes: ['notes'],
-  status: ['properties'],
+  status: [],
   title: ['title'],
-  url: ['properties'],
+  url: [],
+}
+
+/** The private property each field is stored in. */
+const PROPERTY_OF: Partial<Record<EditableField, string>> = {
+  amount: 'hb.amount',
+  category: 'hb.category',
+  code: 'hb.code',
+  status: 'hb.status',
+  url: 'hb.url',
 }
 
 /** The full event for a new entry: due 17:00–17:15, and each person's default reminders apply. */
@@ -95,14 +103,27 @@ export function eventFor(item: Item, context: EventContext): CalendarEvent {
     ...groups.title(item, context),
     ...groups.notes(item),
     end: { dateTime: end?.dateTime, timeZone: end?.timeZone },
-    start: { dateTime: start?.dateTime, timeZone: start?.timeZone },
-    ...groups.properties(item),
+    extendedProperties: { private: privateProperties(item) },
     reminders: { useDefault: true },
+    start: { dateTime: start?.dateTime, timeZone: start?.timeZone },
   }
+}
+
+/**
+ * Only the private properties of the changed fields. Google merges them key by key, so a property
+ * someone else changed in the meantime is left alone, also when a conflict makes the patch go again.
+ */
+function changedProperties(item: Item, dirty: readonly EditableField[]): CalendarEvent {
+  const all = privateProperties(item)
+  const keys = dirty.flatMap(field => PROPERTY_OF[field] ?? []).filter(key => key in all)
+  if (keys.length === 0) {
+    return {}
+  }
+  return { extendedProperties: { private: { 'hb.v': all['hb.v'] ?? '1', ...Object.fromEntries(keys.map(key => [key, all[key] ?? ''])) } } }
 }
 
 /** Only the parts of the event that the changed fields affect, for `events.patch`. */
 export function patchFor(item: Item, dirty: readonly EditableField[], context: EventContext): CalendarEvent {
   const touched = new Set(dirty.flatMap(field => GROUP_OF[field]))
-  return Object.assign({}, ...[...touched].map(group => groups[group](item, context))) as CalendarEvent
+  return Object.assign({}, ...[...touched].map(group => groups[group](item, context)), changedProperties(item, dirty)) as CalendarEvent
 }

@@ -54,6 +54,12 @@ describe('patchFor', () => {
     expect(Object.keys(patchFor(item, ['category'], context)).toSorted()).toEqual(['colorId', 'extendedProperties', 'summary'])
     expect(patchFor(item, [], context)).toEqual({})
   })
+
+  it('sends only the changed fields\' private properties, so others\' concurrent ones survive', () => {
+    expect(patchFor(item, ['status'], context)).toEqual({ extendedProperties: { private: { 'hb.status': item.status, 'hb.v': '1' } } })
+    expect(patchFor(item, ['code', 'url'], context)).toEqual({ extendedProperties: { private: { 'hb.code': 'SUMMER25', 'hb.url': item.url, 'hb.v': '1' } } })
+    expect(patchFor({ ...item, category: 'uncategorised' }, ['category'], context).extendedProperties).toBeUndefined()
+  })
 })
 
 describe('newEventId', () => {

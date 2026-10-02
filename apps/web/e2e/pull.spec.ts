@@ -142,3 +142,32 @@ test('after signing out, the next person sees none of the previous sync problems
   await expect(page.getByText(/Couldn.t read changes from Google Calendar/u)).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Sync now' })).toBeVisible()
 })
+
+test('an edit made here keeps a field someone else changed in Google meanwhile', async ({ page }) => {
+  const { google } = await mockGoogle(page)
+  await signInAllowlisted(page, 'owner@household-brain.test')
+  await page.getByRole('button', { name: 'Sync now' }).click()
+  await page.getByRole('link', { name: 'Add Coupon' }).click()
+  await page.getByLabel('Title').fill('Shoes')
+  await page.getByLabel('Due date (17:00)').fill('2026-12-01')
+  await page.getByLabel('Code').fill('OLD10')
+  await page.getByLabel('Link').fill('shop.household-brain.test')
+  await page.getByRole('button', { name: 'Save' }).click()
+  await expect.poll(() => google.live().length).toBe(1)
+  const [event] = google.live()
+  if (!event) {
+    throw new Error('The entry never reached Google')
+  }
+  const { private: properties } = event.extendedProperties as { private: Record<string, string> }
+
+  // Someone changes the link in Google; this device doesn't hear of it (its reads fail), so it edits
+  // the code on an outdated copy, and Google answers the first try with a conflict.
+  google.refuseListings(true)
+  google.edit(String(event.id), { extendedProperties: { private: { ...properties, 'hb.url': 'https://elsewhere.household-brain.test' } } })
+  await page.getByRole('region', { name: 'Coupon' }).getByRole('link', { name: /Shoes/u }).click()
+  await page.getByLabel('Code').fill('NEW20')
+  await page.getByRole('button', { name: 'Save' }).click()
+
+  await expect.poll(() => (google.live()[0]?.extendedProperties as { private: Record<string, string> } | undefined)?.private)
+    .toMatchObject({ 'hb.code': 'NEW20', 'hb.url': 'https://elsewhere.household-brain.test' })
+})
