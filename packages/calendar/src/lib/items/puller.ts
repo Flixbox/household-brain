@@ -113,7 +113,7 @@ const applyEntryEvent = async (context: PushContext, event: CalendarEvent): Prom
   return settled ?? (removed || null)
 }
 
-/** The other person's push: this person's reminders still have to follow the status (#43). */
+/** The other person's push, alone or merged into local edits: this person's reminders still follow the entry (#43, #74). */
 const fixOwnReminders = (context: PushContext, event: CalendarEvent, draft: ItemDraft): Promise<string | null> => {
   const fix = ownRemindersFix(event, draft, context.categories)
   return fix ? normalise(context, event, fix) : Promise.resolve(null)

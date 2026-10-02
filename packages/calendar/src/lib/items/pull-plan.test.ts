@@ -48,6 +48,16 @@ describe('decidePull', () => {
     expect(fields).not.toHaveProperty('sync')
   })
 
+  it("still has this person's own copy follow the merged entry (#74)", () => {
+    // The other person marked it done while this person had an unsent edit of the code.
+    const done = { ...event, extendedProperties: { private: { 'hb.category': 'coupon', 'hb.code': 'NEW', 'hb.status': 'done' } } }
+    const editing = { ...entry, dirty: ['code' as const], pendingOp: 'upsert' as const, sync: 'pending' as const }
+    expect(decide({ entry: editing, event: done })).toMatchObject({ draft: { code: 'OLD', status: 'done' }, kind: 'update', ownCopy: true })
+    // This person's own unsent status wins in the draft as well.
+    const reopened = { ...editing, dirty: ['status' as const], status: 'open' as const }
+    expect(decide({ entry: reopened, event: done })).toMatchObject({ draft: { code: 'NEW', status: 'open' }, ownCopy: true })
+  })
+
   it('deletes an entry whose event was deleted, unless it has unsent edits', () => {
     const cancelled = { ...event, status: 'cancelled' }
     expect(decide({ event: cancelled })).toEqual({ kind: 'delete' })

@@ -1,7 +1,7 @@
 import type { Category } from '../categories'
 import type { CalendarEvent } from './event'
 import { draftFrom, isRecurring } from './from-event'
-import { EDITABLE_FIELDS, type Item, type ItemDraft } from './model'
+import { EDITABLE_FIELDS, type Item, type ItemDraft, draftOf } from './model'
 import { isDate } from './dates'
 
 /** What to do with one event from Google Calendar. */
@@ -11,8 +11,10 @@ export type PullDecision =
   /** A new entry; `draft` also tells the caller what to normalise. */
   | { kind: 'create', draft: ItemDraft, fields: Record<string, unknown> }
   /**
-   * Overwrite the entry with Google's version (`normalise`: the entry has no local edits), or, for the
-   * other person's push of the version it already holds, only this person's etag (`ownCopy`).
+   * Overwrite the entry with Google's version (`normalise`: the entry has no local edits), or merge it
+   * into local edits, or, for the other person's push of the version it already holds, only this
+   * person's etag. `ownCopy`: this person's own copy of the event (reminders are per person) still has
+   * to follow `draft`, which the other person's push didn't change for them.
    */
   | { kind: 'update', draft: ItemDraft, fields: Record<string, unknown>, normalise: boolean, ownCopy?: boolean }
 
@@ -36,7 +38,11 @@ const rememberEtag = (event: CalendarEvent, uid: string): PullDecision => ({ dra
 const merged = (entry: Item, draft: ItemDraft, version: Record<string, string>): PullDecision => {
   const theirs = EDITABLE_FIELDS.filter(field => !entry.dirty.includes(field))
   const fields = { ...Object.fromEntries(theirs.map(field => [field, draft[field]])), ...version }
-  return { draft, fields, kind: 'update', normalise: false }
+  // The entry as it is after the merge: this person's own copy of the event follows it (#74). Their
+  // own push only rewrites the reminders when its own edits touched the status or the reminders.
+  const local = draftOf(entry)
+  const mine = { ...draft, ...Object.fromEntries(entry.dirty.map(field => [field, local[field]])) }
+  return { draft: mine, fields, kind: 'update', normalise: false, ownCopy: true }
 }
 
 const changed = ({ entry, event, uid, categories }: PullInput): PullDecision => {
