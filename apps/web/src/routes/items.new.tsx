@@ -1,5 +1,10 @@
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
-import { type ItemDraft, ItemForm, addItem, emptyDraft, reportWriteFailure, requestSyncAccess, useCategories } from '@household-brain/calendar'
+import { ItemForm } from '@household-brain/calendar/components/items/ItemForm'
+import { type ItemDraft, emptyDraft } from '@household-brain/calendar/lib/items/model'
+import { requestSyncAccess } from '@household-brain/calendar/lib/items/outbox'
+import { addItem } from '@household-brain/calendar/lib/items/store'
+import { useCategories } from '@household-brain/calendar/lib/items/use-items'
+import { reportWriteFailure } from '@household-brain/calendar/lib/items/write-failures'
 
 export const Route = createFileRoute('/items/new')({
   component: NewItem,

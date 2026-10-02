@@ -172,11 +172,16 @@ installing browsers), `deploy` about 2 minutes.
 ### Toolchain
 
 - **The repo is an Nx workspace** (pnpm workspaces): `apps/web` is the app, `packages/*` are
-  features and shared code, consumed as TypeScript source (`exports: ./src/index.ts`, no build
-  step). A new feature, e.g. a shopping list, becomes its own `packages/<name>` with an `index.ts`,
+  features and shared code, consumed as TypeScript source (modules exported by path, no build
+  step). A new feature, e.g. a shopping list, becomes its own `packages/<name>`,
   and `apps/web` routes render what it exports. Packages never import from `apps/web`.
   A new package also goes into the `workspace:*` exceptions in `npmpackagejsonlint.config.ts`
-  (exceptions are exact names), and gets its own `package.json`, `tsconfig.json` and `index.ts`.
+  (exceptions are exact names), and gets its own `package.json` and `tsconfig.json`.
+- **No barrel files.** No `index.ts` that re-exports a package's modules: barrels pull every module
+  into whatever imports one of them, which defeats tree shaking and code splitting. Packages
+  expose their modules by path through `exports` patterns in `package.json` (e.g.
+  `@household-brain/calendar/components/items/ItemList`), and code imports from the module that
+  defines what it needs.
 - Run tasks through Nx at the root: `pnpm typecheck`, `pnpm test` (`nx run-many`), `pnpm build`
   (`nx run @household-brain/web:build`). Nx caches results, so unchanged projects are skipped.
 

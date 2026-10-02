@@ -2,7 +2,7 @@ import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth'
 import { type ReactNode, useState } from 'react'
 import { useAccess } from '../lib/access'
 import { signInErrorMessage } from '../lib/sign-in-errors'
-import { auth } from '@household-brain/firebase'
+import { auth } from '@household-brain/firebase/firebase'
 import { signOutOfApp } from '../lib/session'
 
 const button = 'rounded-lg bg-orange-600 px-4 py-2 font-semibold text-white hover:bg-orange-700'

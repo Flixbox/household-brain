@@ -1,6 +1,8 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { ItemList, useCategories, useHousehold, useItems } from '@household-brain/calendar'
-import { auth } from '@household-brain/firebase'
+import { ItemList } from '@household-brain/calendar/components/items/ItemList'
+import { useHousehold } from '@household-brain/calendar/lib/calendar/use-household'
+import { useCategories, useItems } from '@household-brain/calendar/lib/items/use-items'
+import { auth } from '@household-brain/firebase/firebase'
 import { signOutOfApp } from '../lib/session'
 
 export const Route = createFileRoute('/')({

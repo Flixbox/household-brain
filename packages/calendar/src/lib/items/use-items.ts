@@ -1,7 +1,7 @@
 import { collection, onSnapshot, orderBy, query } from 'firebase/firestore'
 import { useEffect, useState } from 'react'
 import type { Category } from '../categories'
-import { db } from '@household-brain/firebase'
+import { db } from '@household-brain/firebase/firebase'
 import type { Item } from './model'
 import { itemsCollection } from './store'
 

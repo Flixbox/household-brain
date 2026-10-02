@@ -1,7 +1,7 @@
 import { type User, onAuthStateChanged } from 'firebase/auth'
 import { type Unsubscribe, doc, onSnapshot } from 'firebase/firestore'
 import { useEffect, useState } from 'react'
-import { auth, db } from '@household-brain/firebase'
+import { auth, db } from '@household-brain/firebase/firebase'
 
 export type Access =
   | { state: 'loading' }

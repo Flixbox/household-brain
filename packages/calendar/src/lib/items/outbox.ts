@@ -1,5 +1,5 @@
 import { collection, doc, onSnapshot, orderBy, query } from 'firebase/firestore'
-import { auth, db } from '@household-brain/firebase'
+import { auth, db } from '@household-brain/firebase/firebase'
 import { MEMBER_SCOPES, calendarToken, hasCalendarToken, loadGis } from '../google-token'
 import type { Item } from './model'
 import { type PushContext, pushItem } from './push'

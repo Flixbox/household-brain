@@ -1,6 +1,7 @@
 import { Outlet, createRootRoute } from '@tanstack/react-router'
 import { AccessGate } from '../components/AccessGate'
-import { OutboxRunner, SyncBar } from '@household-brain/calendar'
+import { OutboxRunner } from '@household-brain/calendar/components/OutboxRunner'
+import { SyncBar } from '@household-brain/calendar/components/SyncBar'
 import { ReloadPrompt } from '../components/ReloadPrompt'
 
 export const Route = createRootRoute({

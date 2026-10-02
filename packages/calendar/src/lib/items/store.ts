@@ -1,5 +1,5 @@
 import { arrayUnion, collection, doc, runTransaction, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore'
-import { auth, db } from '@household-brain/firebase'
+import { auth, db } from '@household-brain/firebase/firebase'
 import { EDITABLE_FIELDS, type Item, type ItemDraft, changedFields } from './model'
 import { newEventId } from './ids'
 import type { PushOutcome } from './push'

@@ -1,5 +1,5 @@
 import { type Timestamp, doc, getDoc, getDocFromServer, getDocs, query, runTransaction, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore'
-import { db } from '@household-brain/firebase'
+import { db } from '@household-brain/firebase/firebase'
 import type { CalendarEvent } from './event'
 import type { Item } from './model'
 import type { PullDecision } from './pull-plan'

@@ -1,6 +1,6 @@
 import { doc, onSnapshot } from 'firebase/firestore'
 import { useEffect, useState } from 'react'
-import { db } from '@household-brain/firebase'
+import { db } from '@household-brain/firebase/firebase'
 import type { HouseholdConfig } from './setup'
 
 export type HouseholdState =

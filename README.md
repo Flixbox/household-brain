@@ -597,8 +597,8 @@ policy only permits GitHub-owned actions and `google-github-actions/*` (§8).
 
 ## 10. Project layout
 
-An **Nx** workspace on **pnpm** workspaces. Packages are consumed as TypeScript source; only the
-app is built.
+An **Nx** workspace on **pnpm** workspaces. Packages are consumed as TypeScript source, their modules
+exported by path (no barrel files); only the app is built.
 
 ```
 household-brain/
