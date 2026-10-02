@@ -17,7 +17,7 @@ const $categories = queryStore<Category>(query(collection(db, 'categories'), ord
 export const useItems = (): Item[] | null => dataOf(useStore($items))
 
 /** The categories to list and offer, in their display order (retired ones only while in use). */
-export function useCategories(): Category[] {
+export const useCategories = (): Category[] => {
   const categories = dataOf(useStore($categories))
   const items = useItems()
   return useMemo(() => visibleCategories(categories ?? [], items ?? []), [categories, items])

@@ -40,7 +40,7 @@ export const watchDateGate = (onChange: () => unknown) => onSnapshot(collection(
  * The next date event to write, while the gate is open: for entries that are synced (their own event,
  * if they have a due date, is in Google) and have no local change waiting.
  */
-export function nextDateWork(items: readonly Item[], context: PushContext, ready: (item: Item) => boolean): DateWork | null {
+export const nextDateWork = (items: readonly Item[], context: PushContext, ready: (item: Item) => boolean): DateWork | null => {
   if (!open) {
     return null
   }
@@ -58,7 +58,7 @@ export function nextDateWork(items: readonly Item[], context: PushContext, ready
  * Writes one date event and records it. Throws on a transient failure (offline, rate limit), for the
  * outbox to retry later; a definite refusal is recorded with the error instead.
  */
-export async function runDateWork(context: PushContext, work: DateWork): Promise<void> {
+export const runDateWork = async (context: PushContext, work: DateWork): Promise<void> => {
   const refusal = await pushDateOp(context, work.item, work.op).then(() => null, (error: unknown) => {
     if (isTransient(error)) {
       throw error
@@ -72,7 +72,7 @@ export async function runDateWork(context: PushContext, work: DateWork): Promise
 }
 
 /** Forgets this session's writes and the gate (sign-out). */
-export function forgetDateWork() {
+export const forgetDateWork = () => {
   done.clear()
   open = false
 }

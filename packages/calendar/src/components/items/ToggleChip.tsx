@@ -4,8 +4,8 @@ import type { ReactNode } from 'react'
  * A toggle button shaped like a chip. It keeps one name; whether it is on is aria-pressed (and the
  * filled look).
  */
-export function ToggleChip({ pressed, onToggle, disabled = false, children }: { pressed: boolean, onToggle: () => void, disabled?: boolean, children: ReactNode }) {
-  return (
+export const ToggleChip = ({ pressed, onToggle, disabled = false, children }: { pressed: boolean, onToggle: () => void, disabled?: boolean, children: ReactNode }) =>
+  (
     <button
       type="button"
       aria-pressed={pressed}
@@ -16,4 +16,3 @@ export function ToggleChip({ pressed, onToggle, disabled = false, children }: { 
       {children}
     </button>
   )
-}

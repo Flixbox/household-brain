@@ -121,6 +121,9 @@ adapted to this repository:
   `gh pr edit --attach` doesn't work for the bot: it refuses a GitHub App token. To publish: clone
   the branch (`git clone --branch assets --single-branch --depth 1 …`), add the GIF, commit, and
   push with the bot's token. Never commit a GIF to the pull request's own branch.
+- The tests click faster than the video records: a step only shows on video if it waits for the
+  changed state (an assertion on it) before moving on. Crop to the part that changed and slow the
+  clip down (`SPEED`), or the GIF is a blur.
 - When the change has no visible part (CI, sync logic), say so in the description instead.
 
 ### 2. After every push
@@ -244,6 +247,11 @@ adapted to this repository:
 
 ### Code rules
 
+- **Arrow functions only; the `function` keyword is banned** (#67): `const name = (…) => …`, components
+  included. oxlint enforces it (`func-style: expression`, `react/function-component-definition`). An
+  arrow constant isn't hoisted: whatever runs at module load, such as a route file's
+  `createFileRoute({ component })`, comes after the definitions it uses (TypeScript and
+  `no-use-before-define` report it); calls inside other functions may point further down.
 - **No measured numbers in docs or comments** (durations, sizes, counts): they go stale. They belong
   in the PR or issue that measured them; a job's run history shows what is normal.
 - **`Date` is banned; use `Temporal`** (`temporal-polyfill`). Due dates are calendar dates at 17:00 in

@@ -26,23 +26,22 @@ export interface PullInput {
 
 const hasLocalEdits = (entry: Item) => entry.sync !== 'synced' && entry.pendingOp === 'upsert'
 
-function deleted({ entry }: PullInput): PullDecision {
+const deleted = ({ entry }: PullInput): PullDecision =>
   // An entry with unsent edits wins: its push writes the event back. Otherwise the deletion stands.
-  return !entry || hasLocalEdits(entry) ? { kind: 'skip' } : { kind: 'delete' }
-}
+  !entry || hasLocalEdits(entry) ? { kind: 'skip' } : { kind: 'delete' }
 
 /** The other person's push of the version this entry already holds: just this person's etag. */
-function rememberEtag(event: CalendarEvent, uid: string): PullDecision {
-  return { draft: draftFrom(event, []), fields: { [`etags.${uid}`]: event.etag ?? '' }, kind: 'update', normalise: false, ownCopy: true }
-}
+const rememberEtag = (event: CalendarEvent, uid: string): PullDecision => (
+  { draft: draftFrom(event, []), fields: { [`etags.${uid}`]: event.etag ?? '' }, kind: 'update', normalise: false, ownCopy: true }
+)
 
-function merged(entry: Item, draft: ItemDraft, version: Record<string, string>): PullDecision {
+const merged = (entry: Item, draft: ItemDraft, version: Record<string, string>): PullDecision => {
   const theirs = EDITABLE_FIELDS.filter(field => !entry.dirty.includes(field))
   const fields = { ...Object.fromEntries(theirs.map(field => [field, draft[field]])), ...version }
   return { draft, fields, kind: 'update', normalise: false }
 }
 
-function changed({ entry, event, uid, categories }: PullInput): PullDecision {
+const changed = ({ entry, event, uid, categories }: PullInput): PullDecision => {
   const draft = draftFrom(event, categories)
   const etag = event.etag ?? ''
   const googleUpdated = event.updated ?? ''
@@ -65,7 +64,7 @@ const comparable = (value: string | undefined) => (value && !value.includes('.')
  * Compares Google's `updated` with what the entry already has: "older" (a listing from before a
  * push), "same" (the version the entry holds, e.g. the other person's push), or "newer".
  */
-function versionOf(entry: Item | null, event: CalendarEvent): 'older' | 'same' | 'newer' {
+const versionOf = (entry: Item | null, event: CalendarEvent): 'older' | 'same' | 'newer' => {
   const mine = comparable(entry?.googleUpdated)
   const theirs = comparable(event.updated)
   if (!mine || !theirs) {
@@ -101,7 +100,7 @@ const isSettled = (entry: Item | null, event: CalendarEvent, uid: string) =>
  * - a deleted event: removes the entry, unless the entry has unsent edits;
  * - otherwise: Google's version replaces the entry.
  */
-export function decidePull(input: PullInput): PullDecision {
+export const decidePull = (input: PullInput): PullDecision => {
   const { entry, event, uid } = input
   const version = versionOf(entry, event)
   const cancelled = event.status === 'cancelled'

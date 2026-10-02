@@ -3,7 +3,7 @@ import { type Category, DEFAULT_CATEGORIES } from '../categories'
 import type { CalendarListEntry, Reminder } from './api'
 import { CALENDAR_NAME, DEFAULT_REMINDERS, type HouseholdConfig, type HouseholdStore, type SetupApi, TIME_ZONE, createHousehold, joinHousehold } from './setup'
 
-function fakeApi(listEntries: Record<string, CalendarListEntry> = {}, owned: CalendarListEntry[] = []) {
+const fakeApi = (listEntries: Record<string, CalendarListEntry> = {}, owned: CalendarListEntry[] = []) => {
   const calls: string[] = []
   const api: SetupApi = {
     findOwnedCalendars: async summary => {
@@ -30,7 +30,7 @@ function fakeApi(listEntries: Record<string, CalendarListEntry> = {}, owned: Cal
   return { api, calls }
 }
 
-function fakeStore(initial: HouseholdConfig | null = null, categories: readonly Category[] = []) {
+const fakeStore = (initial: HouseholdConfig | null = null, categories: readonly Category[] = []) => {
   const state = { categories: [...categories], config: initial }
   const store: HouseholdStore = {
     config: async () => state.config,

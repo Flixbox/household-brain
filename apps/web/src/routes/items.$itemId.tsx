@@ -2,11 +2,7 @@ import { Link, createFileRoute } from '@tanstack/react-router'
 import { EditForm } from '@household-brain/calendar/components/items/EditForm'
 import { useEntry } from '@household-brain/calendar/lib/items/use-entry'
 
-export const Route = createFileRoute('/items/$itemId')({
-  component: EditItem,
-})
-
-function EditItem() {
+const EditItem = () => {
   const entry = useEntry(Route.useParams().itemId)
   return (
     <section className="space-y-6">
@@ -20,3 +16,7 @@ function EditItem() {
     </section>
   )
 }
+
+export const Route = createFileRoute('/items/$itemId')({
+  component: EditItem,
+})

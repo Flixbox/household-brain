@@ -3,7 +3,7 @@
 const ALPHABET = '0123456789abcdefghijklmnopqrstuv'
 const LENGTH = 26
 
-export function newEventId(fillRandom: (bytes: Uint8Array<ArrayBuffer>) => unknown = bytes => crypto.getRandomValues(bytes)): string {
+export const newEventId = (fillRandom: (bytes: Uint8Array<ArrayBuffer>) => unknown = bytes => crypto.getRandomValues(bytes)): string => {
   const bytes = new Uint8Array(LENGTH)
   fillRandom(bytes)
   return [...bytes].map(byte => ALPHABET[byte % ALPHABET.length]).join('')

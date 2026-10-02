@@ -8,7 +8,7 @@ const small = 'text-sm font-medium text-orange-700 dark:text-orange-400'
  * More dates besides the due date ("Cancel by", "Valid from", …): a label (one of the suggestions or
  * any text) and a date each, added and removed freely. They show in the app only, without reminders.
  */
-export function ExtraDatesField({ dates, onChange }: { dates: EntryDate[], onChange: (dates: EntryDate[]) => void }) {
+export const ExtraDatesField = ({ dates, onChange }: { dates: EntryDate[], onChange: (dates: EntryDate[]) => void }) => {
   const update = (id: string, changes: Partial<EntryDate>) => onChange(dates.map(entry => (entry.id === id ? { ...entry, ...changes } : entry)))
   return (
     <fieldset className="grid gap-2">

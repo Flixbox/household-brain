@@ -35,7 +35,7 @@ const NO_DATES: EntryDate[] = []
  * something is edited, the form holds back a new version of the app, so leaving the app to copy a
  * code doesn't reload the page and lose the entry.
  */
-export function ItemForm({ initial, initialDates = NO_DATES, categories, onSave, withStatus = false }: Props) {
+export const ItemForm = ({ initial, initialDates = NO_DATES, categories, onSave, withStatus = false }: Props) => {
   const { dateRequired, dates: { change: setDates, dates }, draft, holdUpdates, remindersShown, saved, set } = useEntryForm(initial, { editing: withStatus, initialDates })
   const [saving, setSaving] = useState(false)
   const submit = (event: FormEvent) => {

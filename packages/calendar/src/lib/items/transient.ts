@@ -9,7 +9,7 @@ export class NeedsAccessError extends Error {
 }
 
 /** Failures worth retrying by themselves: no access yet, network, rate limits, server trouble. */
-export function isTransient(error: unknown): boolean {
+export const isTransient = (error: unknown): boolean => {
   if (error instanceof NeedsAccessError || !(error instanceof CalendarApiError)) {
     return true
   }

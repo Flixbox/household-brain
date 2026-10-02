@@ -22,7 +22,7 @@ export interface PushResult {
   remote: ItemDraft | null
 }
 
-export function recordFor({ latest, pushed, outcome, uid, remote }: PushResult): PushRecord {
+export const recordFor = ({ latest, pushed, outcome, uid, remote }: PushResult): PushRecord => {
   if (!latest) {
     return { kind: 'nothing' }
   }
@@ -56,8 +56,7 @@ export function recordFor({ latest, pushed, outcome, uid, remote }: PushResult):
 }
 
 /** A failed push is only recorded if nothing changed meanwhile; a newer change gets its own attempt. */
-export function errorFor(latest: Item | null, pushed: Item, message: string): PushRecord {
-  return latest?.rev === pushed.rev
+export const errorFor = (latest: Item | null, pushed: Item, message: string): PushRecord =>
+  latest?.rev === pushed.rev
     ? { fields: { sync: 'error', syncError: message }, kind: 'update' }
     : { kind: 'nothing' }
-}

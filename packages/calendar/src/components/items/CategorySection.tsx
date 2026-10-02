@@ -10,7 +10,7 @@ import { ItemRow } from './ItemRow'
  * `foldable` is false while searching: the section is shown open and its header is plain text, so
  * a tap can't change the remembered folding unseen.
  */
-export function CategorySection({ category, items, collapsed, foldable = true }: { category: Category, items: Item[], collapsed: boolean, foldable?: boolean }) {
+export const CategorySection = ({ category, items, collapsed, foldable = true }: { category: Category, items: Item[], collapsed: boolean, foldable?: boolean }) => {
   const listId = `category-${category.slug}`
   const open = items.filter(item => item.status === 'open').length
   return (

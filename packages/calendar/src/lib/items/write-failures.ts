@@ -6,14 +6,13 @@ import { atom } from 'nanostores'
 
 const $writeFailures = atom<string[]>([])
 
-export function reportWriteFailure(error: unknown) {
+export const reportWriteFailure = (error: unknown) => {
   $writeFailures.set([...$writeFailures.get(), error instanceof Error ? error.message : String(error)])
 }
 
-export function dismissWriteFailures() {
+export const dismissWriteFailures = () => {
   $writeFailures.set([])
 }
 
-export function useWriteFailures(): string[] {
-  return useStore($writeFailures)
-}
+export const useWriteFailures = (): string[] =>
+  useStore($writeFailures)

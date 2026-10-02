@@ -9,8 +9,8 @@ const choicesFor = (current: string): readonly string[] =>
 type Change = (event: { target: { value: string } }) => void
 
 /** The amount and its currency side by side; '' (an entry without one) shows as euros. */
-export function AmountField({ amount, currency, onAmount, onCurrency }: { amount: string, currency: string, onAmount: Change, onCurrency: Change }) {
-  return (
+export const AmountField = ({ amount, currency, onAmount, onCurrency }: { amount: string, currency: string, onAmount: Change, onCurrency: Change }) =>
+  (
     <div className="flex gap-2">
       <div className="flex-1">
         <Field label="Amount"><input inputMode="decimal" pattern="[0-9]+([.,][0-9]{1,2})?" title="A number, e.g. 9.99" className={textField} value={amount} onChange={onAmount} /></Field>
@@ -23,4 +23,3 @@ export function AmountField({ amount, currency, onAmount, onCurrency }: { amount
       </Field>
     </div>
   )
-}

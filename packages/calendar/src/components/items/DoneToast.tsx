@@ -2,7 +2,7 @@ import { useStore } from '@nanostores/react'
 import { $lastDone, undoDone } from '../../lib/items/swipe'
 
 /** "Marked … done" after a swipe, with Undo, for a few seconds. */
-export function DoneToast() {
+export const DoneToast = () => {
   const last = useStore($lastDone)
   if (!last) {
     return null

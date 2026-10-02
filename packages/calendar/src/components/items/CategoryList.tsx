@@ -9,7 +9,7 @@ import { ItemRow } from './ItemRow'
  * The entries by category. Each category collapses on its own, remembered per device; while
  * searching, every category with a match is open, or the match would stay hidden.
  */
-export function CategoryList({ board }: { board: Board }) {
+export const CategoryList = ({ board }: { board: Board }) => {
   const collapsed = collapsedSlugs(useStore($collapsed))
   return (
     <>

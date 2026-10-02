@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react'
 
 /** A labelled form control. A required one gets a star; the control itself carries `required`. */
-export function Field({ label, required = false, children }: { label: string, required?: boolean, children: ReactNode }) {
-  return (
+export const Field = ({ label, required = false, children }: { label: string, required?: boolean, children: ReactNode }) =>
+  (
     <label className="grid gap-1">
       <span className="text-sm font-medium">
         {label}
@@ -11,4 +11,3 @@ export function Field({ label, required = false, children }: { label: string, re
       {children}
     </label>
   )
-}

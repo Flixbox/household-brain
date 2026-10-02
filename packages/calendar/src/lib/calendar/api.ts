@@ -79,7 +79,7 @@ const id = encodeURIComponent
 const events = (calendarId: string) => `/calendars/${id(calendarId)}/events`
 const event = (calendarId: string, eventId: string) => `${events(calendarId)}/${id(eventId)}`
 
-async function ignoreStatus(statuses: number[], action: () => Promise<unknown>): Promise<boolean> {
+const ignoreStatus = async (statuses: number[], action: () => Promise<unknown>): Promise<boolean> => {
   try {
     await action()
     return true
@@ -91,7 +91,7 @@ async function ignoreStatus(statuses: number[], action: () => Promise<unknown>):
   }
 }
 
-function createCall(access: Access, fetchFn: Fetch): Call {
+const createCall = (access: Access, fetchFn: Fetch): Call => {
   const send = async ({ method, path, body = null, headers = {} }: ApiRequest) => fetchFn(`${BASE}${path}`, {
     body: body === null ? null : JSON.stringify(body),
     headers: { 'Authorization': `Bearer ${await access.token()}`, 'Content-Type': 'application/json', ...headers },
@@ -111,8 +111,8 @@ function createCall(access: Access, fetchFn: Fetch): Call {
   }
 }
 
-function calendarMethods(call: Call) {
-  return {
+const calendarMethods = (call: Call) => (
+  {
     findOwnedCalendars: async (summary: string) => {
       const list = await call<{ items?: CalendarListEntry[] }>({ method: 'GET', path: '/users/me/calendarList?minAccessRole=owner&maxResults=250' })
       return (list.items ?? []).filter(entry => entry.summary === summary)
@@ -131,10 +131,10 @@ function calendarMethods(call: Call) {
       await call({ body: { defaultReminders: reminders }, method: 'PATCH', path: `/users/me/calendarList/${id(calendarId)}` })
     },
   }
-}
+)
 
-function eventMethods(call: Call) {
-  return {
+const eventMethods = (call: Call) => (
+  {
     deleteEvent: async (calendarId: string, eventId: string) => {
       await ignoreStatus([404, 410], () => call({ method: 'DELETE', path: event(calendarId, eventId) }))
     },
@@ -153,9 +153,9 @@ function eventMethods(call: Call) {
     patchEvent: (target: EventTarget, body: CalendarEvent, etag: string) =>
       call<CalendarEvent>({ body, headers: { 'If-Match': etag }, method: 'PATCH', path: event(target.calendarId, target.eventId) }),
   }
-}
+)
 
-export function createCalendarApi(access: Access, fetchFn: Fetch = (input, init) => fetch(input, init)): CalendarApi {
+export const createCalendarApi = (access: Access, fetchFn: Fetch = (input, init) => fetch(input, init)): CalendarApi => {
   const call = createCall(access, fetchFn)
   return { ...calendarMethods(call), ...eventMethods(call) }
 }

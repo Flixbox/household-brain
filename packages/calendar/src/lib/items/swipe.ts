@@ -10,7 +10,7 @@ let clearTimer: ReturnType<typeof setTimeout> | null = null
 const UNDO_MS = 6000
 
 /** Marks an open entry done, and offers to undo it for a few seconds. */
-export function markDone(item: Item) {
+export const markDone = (item: Item) => {
   setItemStatus(item, 'done').catch(reportWriteFailure)
   $lastDone.set({ item })
   if (clearTimer) {
@@ -20,7 +20,7 @@ export function markDone(item: Item) {
 }
 
 /** Puts the entry marked done last back to open. */
-export function undoDone() {
+export const undoDone = () => {
   const last = $lastDone.get()
   if (last) {
     setItemStatus({ ...last.item, status: 'done' }, last.item.status).catch(reportWriteFailure)

@@ -5,7 +5,7 @@ import { useRegisterSW } from 'virtual:pwa-register/react'
 const CHECK_EVERY_MS = 60 * 60 * 1000
 
 /** Asks for a new version now, and every hour and whenever the app comes back on screen. */
-function watchForUpdates(registration: ServiceWorkerRegistration) {
+const watchForUpdates = (registration: ServiceWorkerRegistration) => {
   const check = () => {
     if (navigator.onLine) {
       registration.update().catch(() => null)
@@ -28,7 +28,7 @@ function watchForUpdates(registration: ServiceWorkerRegistration) {
  * the next time the app leaves the screen. While the app is on screen, a toast offers to reload
  * right away; "Later" only hides the toast.
  */
-export function ReloadPrompt() {
+export const ReloadPrompt = () => {
   const [dismissed, setDismissed] = useState(false)
   const { needRefresh: [needRefresh], updateServiceWorker } = useRegisterSW({
     onRegisteredSW: (_url, registration) => registration && watchForUpdates(registration),

@@ -15,7 +15,7 @@ import { SearchBox } from './SearchBox'
  * The board: a search field, the "All by date" and "Show completed" toggles, and the entries
  * (`boardFor`), by category or, with "All by date", in one list by due date.
  */
-export function ItemList({ items, categories }: { items: Item[], categories: Category[] }) {
+export const ItemList = ({ items, categories }: { items: Item[], categories: Category[] }) => {
   const query = useStore($search)
   const today = useStore($now).toPlainDate().toString()
   const board = boardFor({ categories, items, query, showCompleted: useStore($showCompleted), today })

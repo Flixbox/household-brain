@@ -15,9 +15,9 @@ const ignore = () => null
  * - forgets collapsed categories that no longer exist. Against the full list, not the visible one,
  *   so a hidden retired category keeps its collapsed state.
  */
-export function watchDefaultCategories(): () => void {
+export const watchDefaultCategories = (): () => void =>
   // With metadata changes, so the server's confirmation of an unchanged cached list arrives too.
-  return onSnapshot(collection(db, 'categories'), { includeMetadataChanges: true }, snapshot => {
+  onSnapshot(collection(db, 'categories'), { includeMetadataChanges: true }, snapshot => {
     if (snapshot.metadata.fromCache) {
       return
     }
@@ -30,4 +30,3 @@ export function watchDefaultCategories(): () => void {
       firestoreHouseholdStore.saveCategories(missing).catch(ignore)
     }
   }, ignore)
-}

@@ -52,7 +52,7 @@ let pullRequested = false
 let generation = 0
 const describe = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
-function publish() {
+const publish = () => {
   const pending = data.items.filter(item => item.sync === 'pending')
   $outbox.set({
     failed: data.items.filter(item => item.sync === 'error'),
@@ -64,7 +64,7 @@ function publish() {
   })
 }
 
-function retryLater(started: number) {
+const retryLater = (started: number) => {
   if (started !== generation) {
     return
   }
@@ -73,7 +73,7 @@ function retryLater(started: number) {
   timer = setTimeout(run, backoffMs)
 }
 
-async function pushOne(item: Item, context: PushContext, started: number): Promise<void> {
+const pushOne = async (item: Item, context: PushContext, started: number): Promise<void> => {
   try {
     const outcome = await pushItem(context, item)
     if (await recordPush(item, outcome, { categories: context.categories, uid: context.uid })) {
@@ -93,14 +93,13 @@ async function pushOne(item: Item, context: PushContext, started: number): Promi
 const nextDate = (context: PushContext | null) =>
   context && nextDateWork(data.items, context, item => item.sync === 'synced' && !unconfirmed.has(item.id))
 
-function nextToPush(): Item | undefined {
+const nextToPush = (): Item | undefined =>
   // Only entries the server already has: recording a push needs the server's copy, and offline
   // there is nothing to push anyway.
-  return data.items.find(item => item.sync === 'pending' && !unconfirmed.has(item.id) && recorded.get(item.id) !== item.rev)
-}
+  data.items.find(item => item.sync === 'pending' && !unconfirmed.has(item.id) && recorded.get(item.id) !== item.rev)
 
 /** Everything a pull or push needs, or null while something is still missing. */
-function readyContext(): PushContext | null {
+const readyContext = (): PushContext | null => {
   const uid = auth.currentUser?.uid
   const { categories, config } = data
   if (!uid || !config || !categories || performance.now() < pausedUntil || !hasCalendarToken(MEMBER_SCOPES, auth.currentUser?.email)) {
@@ -110,7 +109,7 @@ function readyContext(): PushContext | null {
 }
 
 /** Pulls from Google Calendar, at most once per few seconds; parallel callers share one pull. */
-function pullNow(context: PushContext): Promise<void> {
+const pullNow = (context: PushContext): Promise<void> => {
   if (performance.now() - pulledAt < PULL_REUSE_MS) {
     return Promise.resolve()
   }
@@ -135,7 +134,7 @@ function pullNow(context: PushContext): Promise<void> {
 }
 
 /** Pushes the next pending entry, or else writes the next date event. */
-async function pushNext(context: PushContext, started: number): Promise<void> {
+const pushNext = async (context: PushContext, started: number): Promise<void> => {
   const next = nextToPush()
   const date = next ? null : nextDate(context)
   if (next) {
@@ -149,7 +148,7 @@ async function pushNext(context: PushContext, started: number): Promise<void> {
  * One step: pull (always when `alwaysPull`, otherwise only before a push, so a write is based on
  * Google's latest), then push the next pending entry, and repeat while entries wait.
  */
-async function step(context: PushContext): Promise<boolean> {
+const step = async (context: PushContext): Promise<boolean> => {
   const started = generation
   busy = true
   try {
@@ -166,7 +165,7 @@ async function step(context: PushContext): Promise<boolean> {
   return started === generation
 }
 
-async function run(alwaysPull = false): Promise<void> {
+const run = async (alwaysPull = false): Promise<void> => {
   publish()
   if (busy) {
     // A pull asked for during a push (Sync now, foreground, timer) runs right after it.
@@ -183,7 +182,7 @@ async function run(alwaysPull = false): Promise<void> {
 }
 
 /** Runs the next step if entries still wait, or if a pull was asked for while this one was busy. */
-async function continueAfterStep(): Promise<void> {
+const continueAfterStep = async (): Promise<void> => {
   publish()
   const again = pullRequested
   pullRequested = false
@@ -198,8 +197,8 @@ async function continueAfterStep(): Promise<void> {
 
 const ignore = () => null
 
-function watch(): (() => void)[] {
-  return watchOutboxTriggers({
+const watch = (): (() => void)[] =>
+  watchOutboxTriggers({
     categories: categories => {
       data.categories = categories
       return run()
@@ -222,10 +221,9 @@ function watch(): (() => void)[] {
     pull: () => run(true),
     tokenChanged: () => run(),
   })
-}
 
 /** Forgets retries and pulls: the waiting, the last pull and its problem. */
-function forgetTiming() {
+const forgetTiming = () => {
   if (timer) {
     clearTimeout(timer)
   }
@@ -240,7 +238,7 @@ function forgetTiming() {
 }
 
 /** Back to a clean start (sign-out): nothing of the previous account's sync state carries over. */
-function reset() {
+const reset = () => {
   forgetTiming()
   generation += 1
   data = fresh()
@@ -251,7 +249,7 @@ function reset() {
 }
 
 /** Starts watching for pending entries; returns the function that stops it. */
-export function startOutbox(): () => void {
+export const startOutbox = (): () => void => {
   // Load Google's script now, so the consent window opens instantly when Save or "Sync now" is clicked.
   loadGis().catch(ignore)
   const stops = [...watch(), reset]
@@ -266,15 +264,14 @@ export function startOutbox(): () => void {
  * Asks Google for Calendar access while a click is still fresh, so pushing can start right away.
  * Never awaited before saving: saving must not depend on Google.
  */
-export function requestSyncAccess(): Promise<unknown> {
-  return calendarToken(MEMBER_SCOPES, auth.currentUser?.email).then(() => {
+export const requestSyncAccess = (): Promise<unknown> =>
+  calendarToken(MEMBER_SCOPES, auth.currentUser?.email).then(() => {
     pausedUntil = 0
     return run(true)
   }, ignore)
-}
 
 /** "Sync now": gets Google access (call it from a click) and pushes everything waiting. */
-export async function syncNow(): Promise<void> {
+export const syncNow = async (): Promise<void> => {
   await calendarToken(MEMBER_SCOPES, auth.currentUser?.email)
   pausedUntil = 0
   pulledAt = Number.NEGATIVE_INFINITY
@@ -286,7 +283,7 @@ export async function syncNow(): Promise<void> {
  * up with Google; what the pull brings arrives through the entries listener like any other change.
  * Nothing happens offline or without Google access; while a push runs, the pull runs right after it.
  */
-export function refreshNow(): Promise<void> {
+export const refreshNow = (): Promise<void> => {
   if (!navigator.onLine || !hasCalendarToken(MEMBER_SCOPES, auth.currentUser?.email)) {
     return Promise.resolve()
   }

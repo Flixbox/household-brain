@@ -27,7 +27,7 @@ export const RETRY_MS = 10_000
  * Read it through a subscription, never with `.get()` alone: on a store nobody reads, `.get()`
  * starts a listener just for that moment and returns `loading`.
  */
-export function liveStore<Value>(subscribe: Subscribe<Value>): ReadableAtom<Live<Value>> {
+export const liveStore = <Value>(subscribe: Subscribe<Value>): ReadableAtom<Live<Value>> => {
   const $store = atom<Live<Value>>(LOADING)
   onMount($store, () => {
     let stop: (() => void) | null = null

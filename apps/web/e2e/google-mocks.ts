@@ -16,7 +16,7 @@ const CORS = {
  * Replaces Google Identity Services with a stub that grants every requested scope, and the Google
  * Calendar API with an in-memory fake. Returns the Calendar requests the app made, for assertions.
  */
-export async function mockGoogle(page: Page, calendarId = 'household@group.calendar.google.test') {
+export const mockGoogle = async (page: Page, calendarId = 'household@group.calendar.google.test') => {
   await page.addInitScript(() => {
     Object.assign(window, {
       google: {
@@ -111,13 +111,13 @@ interface EventCall {
 
 /** Insert, get, patch (honouring If-Match) and delete for the fake calendar's events. */
 /** The events a listing returns: all of them, or with a sync token only those changed since, like Google. */
-function listed(events: Map<string, Record<string, unknown>>, url: string) {
+const listed = (events: Map<string, Record<string, unknown>>, url: string) => {
   const token = new URL(url).searchParams.get('syncToken')
   const since = token === null ? 0 : Number(/^sync-(?<version>\d+)$/u.exec(token)?.groups?.version ?? Number.NaN)
   return Number.isNaN(since) ? null : [...events.values()].filter(event => Number(String(event.etag).replaceAll(/[^0-9]/gu, '')) > since)
 }
 
-async function handleEvent({ request, path, body, events, latest, listing, stored, reply }: EventCall) {
+const handleEvent = async ({ request, path, body, events, latest, listing, stored, reply }: EventCall) => {
   const eventId = path.split('/events/')[1] ?? ''
   if (request.method() === 'GET' && !eventId && listing.refused) {
     await reply(listing.status, { error: { message: listing.status === 503 ? 'Backend Error' : 'Bad Request' } })
@@ -159,7 +159,7 @@ async function handleEvent({ request, path, body, events, latest, listing, store
 }
 
 /** A deterministic RFC 3339 `updated` time that grows with every write. */
-function updatedAt(version: number): string {
+const updatedAt = (version: number): string => {
   const pad = (value: number) => String(value).padStart(2, '0')
   return `2026-10-01T${pad(10 + Math.floor(version / 3600))}:${pad(Math.floor(version / 60) % 60)}:${pad(version % 60)}Z`
 }
@@ -167,7 +167,7 @@ function updatedAt(version: number): string {
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
 
 /** Google's patch semantics: nested objects merge, arrays are replaced, null removes a field. */
-function patched(existing: Record<string, unknown>, changes: Record<string, unknown>): Record<string, unknown> {
+const patched = (existing: Record<string, unknown>, changes: Record<string, unknown>): Record<string, unknown> => {
   const merged = Object.entries(changes).map(([key, value]): [string, unknown] => {
     const before = existing[key]
     return [key, isObject(value) && isObject(before) ? patched(before, value) : value]
@@ -176,7 +176,7 @@ function patched(existing: Record<string, unknown>, changes: Record<string, unkn
 }
 
 /** The two combinations Google rejects, which normalisation must avoid. */
-function invalidEvent(event: Record<string, unknown>): string | null {
+const invalidEvent = (event: Record<string, unknown>): string | null => {
   const start = event.start as Record<string, unknown> | undefined
   const reminders = event.reminders as { useDefault?: boolean, overrides?: unknown[] } | undefined
   if (start?.date && start.dateTime) {

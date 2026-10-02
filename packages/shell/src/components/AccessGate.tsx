@@ -9,7 +9,7 @@ const button = 'rounded-lg bg-orange-600 px-4 py-2 font-semibold text-white hove
 const secondaryButton = 'rounded-lg border border-stone-300 px-4 py-2 font-medium dark:border-stone-700'
 
 /** Google sign-in in its window; `signingIn` while that window is open. */
-function useSignIn() {
+const useSignIn = () => {
   const [signInError, setSignInError] = useState<string>()
   const [signingIn, setSigningIn] = useState(false)
   const signIn = async () => {
@@ -23,7 +23,7 @@ function useSignIn() {
 }
 
 /** Renders its children only for allowlisted accounts; every route sits behind it. */
-export function AccessGate({ children }: { children: ReactNode }) {
+export const AccessGate = ({ children }: { children: ReactNode }) => {
   const access = useAccess()
   const { signIn, signInError, signingIn } = useSignIn()
 

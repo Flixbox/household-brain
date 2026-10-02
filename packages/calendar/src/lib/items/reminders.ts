@@ -27,7 +27,7 @@ const largestFirst = (minutes: readonly number[]) => minutes.toSorted((one, othe
 const DEFAULT_MINUTES = largestFirst(DEFAULT_REMINDERS.map(reminder => reminder.minutes))
 
 /** The minutes an entry reminds at, largest first; the household default reads as its two reminders. */
-export function reminderMinutes(value: string | undefined): number[] {
+export const reminderMinutes = (value: string | undefined): number[] => {
   if (!value) {
     return DEFAULT_MINUTES
   }
@@ -38,7 +38,7 @@ export function reminderMinutes(value: string | undefined): number[] {
  * The stored text for a set of reminders: the household default as '', none as 'none'. Anything out of
  * Google's limits is dropped, so a value another client wrote can't break a push.
  */
-export function remindersValue(minutes: readonly number[]): string {
+export const remindersValue = (minutes: readonly number[]): string => {
   const valid = largestFirst([...new Set(minutes)].filter(minute => Number.isInteger(minute) && minute >= 0 && minute <= LONGEST))
     .slice(0, MAX_REMINDERS)
   if (valid.length === 0) {
@@ -52,7 +52,7 @@ export function remindersValue(minutes: readonly number[]): string {
  * malformed reads as the household default, also a list whose every time is out of Google's limits:
  * only 'none' itself means never.
  */
-export function remindersFromText(text: string | undefined): string {
+export const remindersFromText = (text: string | undefined): string => {
   if (text === 'none') {
     return text
   }

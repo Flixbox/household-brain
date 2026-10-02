@@ -14,7 +14,7 @@ export interface EuroRates {
 }
 
 /** The rates in the service's answer, `[{ quote: 'BRL', rate: 5.88 }, …]`; anything malformed is left out. */
-export function ratesOf(answer: unknown): Record<string, number> {
+export const ratesOf = (answer: unknown): Record<string, number> => {
   if (!Array.isArray(answer)) {
     return {}
   }

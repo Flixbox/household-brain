@@ -12,7 +12,7 @@ const apiFor = (scopes: readonly string[]) => createCalendarApi({
 })
 
 /** Owner: creates the household calendar (once) and connects the owner's own account. */
-export async function setUpHousehold(): Promise<string> {
+export const setUpHousehold = async (): Promise<string> => {
   const uid = auth.currentUser?.uid
   if (!uid) {
     throw new Error('Sign in first.')
@@ -24,7 +24,7 @@ export async function setUpHousehold(): Promise<string> {
 }
 
 /** Anyone: adds the household calendar to their Google Calendar with the two reminders. */
-export async function connectToHousehold(config: HouseholdConfig): Promise<string> {
+export const connectToHousehold = async (config: HouseholdConfig): Promise<string> => {
   await calendarToken(MEMBER_SCOPES, email())
   const changed = await joinHousehold(apiFor(MEMBER_SCOPES), config)
   return changed

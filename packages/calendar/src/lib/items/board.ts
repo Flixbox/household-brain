@@ -29,7 +29,7 @@ export interface Board {
  * cancelled entries show only with `showCompleted`. A search shows every matching entry, completed
  * ones included, and only the categories that have a match.
  */
-export function boardFor({ items, categories, query, showCompleted, today }: { items: readonly Item[], categories: readonly Category[], query: string, showCompleted: boolean, today: string }): Board {
+export const boardFor = ({ items, categories, query, showCompleted, today }: { items: readonly Item[], categories: readonly Category[], query: string, showCompleted: boolean, today: string }): Board => {
   const byDate = byNextDate(today)
   const searching = query.trim() !== ''
   const current = items.filter(item => item.pendingOp !== 'delete')

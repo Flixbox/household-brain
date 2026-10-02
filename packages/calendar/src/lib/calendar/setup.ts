@@ -36,7 +36,7 @@ export interface HouseholdStore {
  * Owner setup: creates the household calendar once and seeds the categories. Running it again is
  * harmless: an existing calendar is reused and existing categories are left alone.
  */
-export async function createHousehold(api: SetupApi, store: HouseholdStore, ownerUid: string): Promise<HouseholdConfig> {
+export const createHousehold = async (api: SetupApi, store: HouseholdStore, ownerUid: string): Promise<HouseholdConfig> => {
   let config = await store.config()
   if (!config) {
     // Reuse a calendar left by an earlier attempt (a retry after a failure, or a second tab), so the
@@ -66,7 +66,7 @@ const sameReminders = (actual: readonly Reminder[] | undefined) =>
  * that *their* default notifications on it are the two reminders. Reminders are per person in Google
  * Calendar, so the owner's settings never notify anyone else. Returns whether anything changed.
  */
-export async function joinHousehold(api: SetupApi, config: HouseholdConfig): Promise<boolean> {
+export const joinHousehold = async (api: SetupApi, config: HouseholdConfig): Promise<boolean> => {
   const entry = await api.getListEntry(config.calendarId)
   if (!entry) {
     await api.insertListEntry(config.calendarId, [...DEFAULT_REMINDERS])

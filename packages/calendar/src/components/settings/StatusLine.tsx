@@ -8,7 +8,7 @@ const tone = {
 } as const
 
 /** Always present, so screen readers announce every change of the message. */
-export function StatusLine({ status }: { status: TaskStatus }) {
+export const StatusLine = ({ status }: { status: TaskStatus }) => {
   const message = status.kind === 'done' || status.kind === 'failed' ? status.message : ''
   return (
     <p role="status" aria-live="polite" className={`min-h-5 text-sm ${tone[status.kind]}`}>

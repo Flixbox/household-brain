@@ -1,6 +1,6 @@
 /** Owner only: how to share the calendar. Done once in Google Calendar, so the app needs no sharing permission. */
-export function ShareSection() {
-  return (
+export const ShareSection = () =>
+  (
     <div className="space-y-3">
       <h2 className="text-xl font-semibold">Share with your household</h2>
       <p>Share the calendar once in Google Calendar, then the other person signs in here and connects:</p>
@@ -28,4 +28,3 @@ export function ShareSection() {
       </ol>
     </div>
   )
-}

@@ -52,7 +52,7 @@ export const STATUS_TAGS = { cancelled: 'Cancelled', done: 'Done' } as const
  * cancelled entry says so instead: `[Done] Amazon 10€`. An uncategorised one (an event added by hand)
  * keeps its own title.
  */
-export function summaryOf(item: Pick<Item, 'title' | 'category'> & Partial<Pick<Item, 'status'>>, categories: readonly Category[]): string {
+export const summaryOf = (item: Pick<Item, 'title' | 'category'> & Partial<Pick<Item, 'status'>>, categories: readonly Category[]): string => {
   const category = labelOf(item, categories)
   const tag = category && item.status && item.status !== 'open' ? STATUS_TAGS[item.status] : category?.label
   return tag ? `[${tag}] ${item.title}` : item.title
@@ -64,7 +64,7 @@ type Reminders = NonNullable<CalendarEvent['reminders']>
  * Open entries remind with each person's defaults, or with the entry's own reminders when it has
  * them (#35); done and cancelled ones don't remind at all.
  */
-export function remindersOf(item: Pick<Item, 'status'> & { reminders?: string }): Reminders {
+export const remindersOf = (item: Pick<Item, 'status'> & { reminders?: string }): Reminders => {
   if (item.status !== 'open') {
     return { overrides: [], useDefault: false }
   }
@@ -87,8 +87,8 @@ export const sameReminders = (actual: Reminders | undefined, expected: Reminders
   actual?.useDefault === expected.useDefault && minutesOf(actual) === minutesOf(expected)
 
 /** The entry's fields kept in the event's private properties; date events carry them too. */
-export function privateProperties(item: Item): Record<string, string> {
-  return {
+export const privateProperties = (item: Item): Record<string, string> => (
+  {
     'hb.amount': item.amount,
     // An uncategorised entry (an event added by hand) stays without one, so it stays untouched.
     ...item.category === 'uncategorised' ? {} : { 'hb.category': item.category },
@@ -104,7 +104,7 @@ export function privateProperties(item: Item): Record<string, string> {
     'hb.url': item.url,
     'hb.v': '1',
   }
-}
+)
 
 const groups = {
   date: (item: Item, { timeZone }: EventContext): CalendarEvent => ({
@@ -152,7 +152,7 @@ const PROPERTY_OF: Partial<Record<EditableField, string>> = {
 }
 
 /** The full event for a new entry: due 17:00–17:15, reminding while open (`remindersOf`). */
-export function eventFor(item: Item, context: EventContext): CalendarEvent {
+export const eventFor = (item: Item, context: EventContext): CalendarEvent => {
   // A new event has no all-day date to clear, so the patch-only `date: null` is left out.
   const { start, end } = groups.date(item, context)
   return {
@@ -170,7 +170,7 @@ export function eventFor(item: Item, context: EventContext): CalendarEvent {
  * Only the private properties of the changed fields. Google merges them key by key, so a property
  * someone else changed in the meantime is left alone, also when a conflict makes the patch go again.
  */
-function changedProperties(item: Item, dirty: readonly EditableField[]): CalendarEvent {
+const changedProperties = (item: Item, dirty: readonly EditableField[]): CalendarEvent => {
   const all = privateProperties(item)
   // An uncategorised entry leaves the event's category alone; any other property left out is cleared.
   const keys = dirty.flatMap(field => PROPERTY_OF[field] ?? []).filter(key => key in all || key !== 'hb.category')
@@ -181,7 +181,7 @@ function changedProperties(item: Item, dirty: readonly EditableField[]): Calenda
 }
 
 /** Only the parts of the event that the changed fields affect, for `events.patch`. */
-export function patchFor(item: Item, dirty: readonly EditableField[], context: EventContext): CalendarEvent {
+export const patchFor = (item: Item, dirty: readonly EditableField[], context: EventContext): CalendarEvent => {
   const touched = new Set(dirty.flatMap(field => GROUP_OF[field]))
   return Object.assign({}, ...[...touched].map(group => groups[group](item, context)), changedProperties(item, dirty)) as CalendarEvent
 }

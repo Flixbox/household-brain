@@ -18,7 +18,7 @@ interface Gesture {
  * The gesture's distance after a move: null when the move isn't part of it (another pointer), NaN
  * when it has ended without a pointerup (a mouse moving with no button held, e.g. let go outside).
  */
-function follow(gesture: Gesture | null, event: PointerEvent): number | null {
+const follow = (gesture: Gesture | null, event: PointerEvent): number | null => {
   if (!gesture || event.pointerId !== gesture.pointerId) {
     return null
   }
@@ -33,7 +33,7 @@ function follow(gesture: Gesture | null, event: PointerEvent): number | null {
 }
 
 /** Keeps the pointer's events coming to the row; a pointer the browser no longer knows is fine. */
-function capture(event: PointerEvent) {
+const capture = (event: PointerEvent) => {
   try {
     event.currentTarget.setPointerCapture(event.pointerId)
   } catch {
@@ -47,7 +47,7 @@ function capture(event: PointerEvent) {
  * also counts as a tap on the row's link. Vertical scrolling stays with the browser (the row sets
  * `touch-action: pan-y`).
  */
-export function useSwipeToDone(onDone: () => void, enabled: boolean) {
+export const useSwipeToDone = (onDone: () => void, enabled: boolean) => {
   const gesture = useRef<Gesture | null>(null)
   const moved = useRef(false)
   const [offset, setOffset] = useState(0)

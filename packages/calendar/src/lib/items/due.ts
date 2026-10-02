@@ -15,7 +15,7 @@ export interface Due {
 
 const days = (count: number) => (count === 1 ? '1 day' : `${count} days`)
 
-function ahead(count: number): string {
+const ahead = (count: number): string => {
   if (count === 0) {
     return 'today, 17:00'
   }
@@ -23,7 +23,7 @@ function ahead(count: number): string {
 }
 
 /** How urgent an entry due on `dueDate` (YYYY-MM-DD) at 17:00 is at `now`, and how to say when. */
-export function dueStatus(dueDate: string, now: Temporal.ZonedDateTime): Due {
+export const dueStatus = (dueDate: string, now: Temporal.ZonedDateTime): Due => {
   const date = Temporal.PlainDate.from(dueDate)
   const deadline = date.toZonedDateTime({ plainTime: DUE_TIME, timeZone: now.timeZoneId })
   const today = now.toPlainDate()
@@ -39,15 +39,14 @@ export function dueStatus(dueDate: string, now: Temporal.ZonedDateTime): Due {
  * What an entry's row says about when it is due: for an open entry its `dueStatus`, for a done or
  * cancelled one just that, uncoloured (being past its date doesn't make it overdue).
  */
-export function rowDue(item: { dueDate: string, status: 'open' | 'done' | 'cancelled' }, now: Temporal.ZonedDateTime): Due {
-  return item.status === 'open' ? dueStatus(item.dueDate, now) : { label: item.status, urgency: 'later' }
-}
+export const rowDue = (item: { dueDate: string, status: 'open' | 'done' | 'cancelled' }, now: Temporal.ZonedDateTime): Due =>
+  item.status === 'open' ? dueStatus(item.dueDate, now) : { label: item.status, urgency: 'later' }
 
 /**
  * When an entry started, for its row: "since …" once the start date has come, "from …" while it
  * is still ahead (a coupon not valid yet); null without one.
  */
-export function startLabel(startDate: string | null | undefined, now: Temporal.ZonedDateTime): string | null {
+export const startLabel = (startDate: string | null | undefined, now: Temporal.ZonedDateTime): string | null => {
   if (!startDate) {
     return null
   }

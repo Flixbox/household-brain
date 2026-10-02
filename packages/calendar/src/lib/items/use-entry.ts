@@ -8,7 +8,7 @@ export type Entry =
   | { state: 'ready', item: Item, categories: Category[] }
 
 /** One entry for the edit screen; "gone" once it is deleted (also while its deletion syncs). */
-export function useEntry(itemId: string): Entry {
+export const useEntry = (itemId: string): Entry => {
   const items = useItems()
   const categories = useCategories()
   const item = items?.find(entry => entry.id === itemId && entry.pendingOp !== 'delete')

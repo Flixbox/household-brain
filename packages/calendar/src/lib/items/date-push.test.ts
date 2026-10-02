@@ -8,7 +8,7 @@ import type { Item } from './model'
 const config = { calendarId: 'cal-1', ownerUid: 'owner', timeZone: 'Europe/Berlin' }
 const item = { dateEvents: { aaaaaaaa: { shape: 'x' } }, extraDates: [{ date: '2099-01-01', id: 'bbbbbbbb', label: 'Renews' }], id: 'eeeeeeeeeeeeeeeeeeeeeeeeee' } as unknown as Item
 
-function fakeApi(insertStatus?: number, patchStatuses: number[] = []) {
+const fakeApi = (insertStatus?: number, patchStatuses: number[] = []) => {
   const calls: string[] = []
   const api = {
     deleteEvent: async (_calendarId: string, eventId: string) => {

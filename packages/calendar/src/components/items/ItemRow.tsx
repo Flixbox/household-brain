@@ -16,7 +16,7 @@ import { DueColumn } from './DueColumn'
  * `category` names its category, for lists that mix categories ("All by date"). Swiping an open
  * entry to the left marks it done.
  */
-export function ItemRow({ item, category }: { item: Item, category?: string }) {
+export const ItemRow = ({ item, category }: { item: Item, category?: string }) => {
   const now = useStore($now)
   // The date that matters now; "+ more" says the entry has others (see them when it's opened).
   const next = nextDate(item, now.toPlainDate().toString())

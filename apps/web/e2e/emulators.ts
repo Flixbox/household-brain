@@ -3,13 +3,13 @@ const FIRESTORE = 'http://127.0.0.1:8080'
 const AUTH = 'http://127.0.0.1:9099'
 
 /** Wipes every emulator user and document between tests. */
-export async function resetEmulators() {
+export const resetEmulators = async () => {
   await fetch(`${AUTH}/emulator/v1/projects/${PROJECT}/accounts`, { method: 'DELETE' })
   await fetch(`${FIRESTORE}/emulator/v1/projects/${PROJECT}/databases/(default)/documents`, { method: 'DELETE' })
 }
 
 /** Adds a uid to the allowlist the way the owner does in the console: bypassing the rules. */
-export async function allowlist(uid: string) {
+export const allowlist = async (uid: string) => {
   const response = await fetch(
     `${FIRESTORE}/v1/projects/${PROJECT}/databases/(default)/documents/allowlist?documentId=${encodeURIComponent(uid)}`,
     {
@@ -28,7 +28,7 @@ export async function allowlist(uid: string) {
  * A PATCH, so it replaces a document that is still there (e.g. written late by a previous test's
  * page) instead of failing with "already exists".
  */
-export async function seedDocument(path: string, fields: Record<string, string | number>) {
+export const seedDocument = async (path: string, fields: Record<string, string | number>) => {
   const response = await fetch(
     `${FIRESTORE}/v1/projects/${PROJECT}/databases/(default)/documents/${path.split('/').map(encodeURIComponent).join('/')}`,
     {
@@ -43,7 +43,7 @@ export async function seedDocument(path: string, fields: Record<string, string |
 }
 
 /** Reads a document as the console would (bypassing the rules); null when it doesn't exist. */
-export async function readDocument(path: string): Promise<Record<string, unknown> | null> {
+export const readDocument = async (path: string): Promise<Record<string, unknown> | null> => {
   const response = await fetch(
     `${FIRESTORE}/v1/projects/${PROJECT}/databases/(default)/documents/${path.split('/').map(encodeURIComponent).join('/')}`,
     { headers: { Authorization: 'Bearer owner' } },
