@@ -18,6 +18,10 @@ jobs:
     name: Lint, typecheck, unit tests, build, secret scan
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      # Nx Cloud lets runs without a token only read the shared cache. Only pushes to main get the
+      # read-write token, so a pull request (a fork's included) can never write to it (#60).
+      NX_CLOUD_ACCESS_TOKEN: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.NX_CLOUD_ACCESS_TOKEN || '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -103,6 +107,19 @@ jobs:
             apps/web/playwright-report/
             apps/web/test-results/
           retention-days: 7
+
+  # The "Protect main" ruleset requires a check with this name: it passes only when every device did.
+  e2e-result:
+    name: Security rules and end-to-end tests (Firebase emulators)
+    needs: [e2e]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Every device passed
+        env:
+          RESULT: ${{ needs.e2e.result }}
+        run: test "$RESULT" = success
 
   deploy:
     name: Deploy to Firebase

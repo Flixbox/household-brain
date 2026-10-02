@@ -138,8 +138,8 @@ comments. Only wait in the foreground for something whose result you need for th
 | `MAIN_MOVED` | `main` moved under the PR (another merge). Rebase on `main`, run the checks, push once, so what gets merged is what was tested. |
 | `MAIN_GREEN` | (`--main` mode only) `main`'s newest run passed. |
 
-Normal durations, for comparison: `checks` about 1 minute, `e2e` about 3 minutes (most of it
-installing browsers), `deploy` about 2 minutes.
+Normal durations, for comparison: `checks` about 40 seconds, each device's `e2e` job about 1.5
+minutes, `deploy` about 40 seconds.
 
 ### 4. Comments and review
 
