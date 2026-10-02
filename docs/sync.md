@@ -28,7 +28,8 @@ keeps "pull before every write" cheap even when several edits happen in a row.
         and an `RRULE` if it repeats. A `409 Conflict` means it already exists, so it is treated as
         success.
       - Edited item: `events.patch` with **only the `dirty` fields** (plus the title prefix and
-        colour if the category changed), and `If-Match: <etags[myUid]>`.
+        colour if the category changed; for a status change also the `[Done]` / `[Cancelled]` tag,
+        colour and reminders, except on an event added by hand), and `If-Match: <etags[myUid]>`.
       - Deleted item: `events.delete`, where 404 and 410 count as success. Then delete the
         Firestore doc.
    3. On success: copy every field of Google's reply into the entry (it includes changes made in
@@ -96,7 +97,8 @@ for 3 seconds, so a burst of triggers causes one pull.
   removes a stray entry an older app version may have made from it (in Firestore only). Each app
   writes `syncState/{uid}.schema = 2` to say it knows these events.
 - **Writing date events** (`date-events.ts`, `date-outbox.ts`): every extra date gets its own event,
-  `<entryId>d<dateId>`, titled `[Category] Title · Label`, at 17:00 on its date, with the entry's
+  `<entryId>d<dateId>`, titled `[Category] Title · Label` (`[Done]` / `[Cancelled]` instead once done
+  or cancelled), at 17:00 on its date, with the entry's
   notes and private properties plus `hb.entry`, `hb.date`, `hb.label`.
   - **Gate:** only while **every** `syncState/{uid}` has `schema >= 2`, as the server reports it (not
     the local cache). Every app version writes that document on its first pull, so a person on an
@@ -148,7 +150,6 @@ for 3 seconds, so a burst of triggers causes one pull.
     pull, because reminders are per user. That is also why the other person's push of a status change
     is followed by this person's own reminder fix (`ownRemindersFix`), though the entry itself needs
     nothing else.
-    The other person's are fixed when their device pulls.
   - There is no `hb.category` but the title starts with a `[Label]` naming a category: record that
     category and add its colour. Without such a prefix the event is one added by hand: it is shown
     as uncategorised and not adjusted at all.
