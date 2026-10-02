@@ -1,6 +1,6 @@
 import { Temporal } from 'temporal-polyfill'
 import { describe, expect, it } from 'vitest'
-import { dueStatus, rowDue } from './due'
+import { dueStatus, rowDue, startLabel } from './due'
 
 const at = (dateTime: string) => Temporal.PlainDateTime.from(dateTime).toZonedDateTime('Europe/Berlin')
 
@@ -31,5 +31,16 @@ describe('rowDue', () => {
   it('describes a done or cancelled entry by its status, never as overdue', () => {
     expect(rowDue({ dueDate: '2026-10-01', status: 'done' }, at('2026-10-31T12:00'))).toEqual({ label: 'done', urgency: 'later' })
     expect(rowDue({ dueDate: '2026-11-01', status: 'cancelled' }, at('2026-10-31T12:00'))).toEqual({ label: 'cancelled', urgency: 'later' })
+  })
+})
+
+describe('startLabel', () => {
+  it('says since a start date that has come, from one still ahead, nothing without one', () => {
+    expect(startLabel('2026-08-15', at('2026-10-02T12:00'))).toBe('since 2026-08-15')
+    expect(startLabel('2026-10-02', at('2026-10-02T12:00'))).toBe('since 2026-10-02')
+    expect(startLabel('2026-11-01', at('2026-10-02T12:00'))).toBe('from 2026-11-01')
+    expect(startLabel('', at('2026-10-02T12:00'))).toBeNull()
+    expect(startLabel(null, at('2026-10-02T12:00'))).toBeNull()
+    expect(startLabel('next spring', at('2026-10-02T12:00'))).toBeNull()
   })
 })

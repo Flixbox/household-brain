@@ -17,6 +17,7 @@ const item: Item = {
   notes: 'Only online',
   pendingOp: null,
   rev: 'r1',
+  startDate: '2026-10-01',
   status: 'open',
   sync: 'pending',
   syncError: null,
@@ -31,7 +32,7 @@ describe('eventFor', () => {
       description: 'Only online',
       end: { dateTime: '2026-11-03T17:15:00', timeZone: 'Europe/Berlin' },
       extendedProperties: {
-        private: { 'hb.amount': '10', 'hb.category': 'coupon', 'hb.code': 'SUMMER25', 'hb.status': 'open', 'hb.url': 'https://shop.household-brain.test', 'hb.v': '1' },
+        private: { 'hb.amount': '10', 'hb.category': 'coupon', 'hb.code': 'SUMMER25', 'hb.start': '2026-10-01', 'hb.status': 'open', 'hb.url': 'https://shop.household-brain.test', 'hb.v': '1' },
       },
       id: 'abc123def456',
       reminders: { useDefault: true },

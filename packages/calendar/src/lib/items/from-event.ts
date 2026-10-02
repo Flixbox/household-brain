@@ -43,6 +43,8 @@ export function draftFrom(event: CalendarEvent, categories: readonly Category[])
     code: properties['hb.code'] ?? '',
     dueDate: dueDateOf(event),
     notes: event.description ?? '',
+    // Only a `YYYY-MM-DD` date; anything else another client wrote reads as no start date.
+    startDate: /^\d{4}-\d{2}-\d{2}$/u.test(properties['hb.start'] ?? '') ? properties['hb.start'] ?? '' : '',
     status: status === 'done' || status === 'cancelled' ? status : 'open',
     url: properties['hb.url'] ?? '',
   }

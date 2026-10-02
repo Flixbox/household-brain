@@ -47,6 +47,12 @@ the owner to track.
 **Keep each pull request tight: one topic.** Side findings, refactors and tooling tweaks go into
 their own follow-up PR, never along for the ride.
 
+**Nothing personal goes on GitHub: the repository is public.** Issues, pull requests, comments,
+commits, code and tests never contain the household's real entries: amounts, balances, codes, card
+or phone numbers, providers tied to the owner, names of people. Use made-up examples ("a gift card
+credit", "Coupon 10 €"). Editing a slip away isn't enough, because GitHub keeps the edit history:
+delete and recreate the issue (owner's `gh`), or tell the owner for a pull request.
+
 **Track queued work as GitHub issues.** Every idea or request that isn't being built right now gets
 an issue (assigned to the owner, an existing label such as `enhancement`), and the pull request that
 delivers it says `Closes #n`. Nothing waits only in a chat.

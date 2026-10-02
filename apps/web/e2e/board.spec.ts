@@ -220,3 +220,22 @@ test('each category has a line down its left in its Google Calendar colour', asy
   await expect(page.getByRole('region', { name: 'Coupon' })).toHaveCSS('border-left-color', 'rgb(244, 81, 30)')
   await expect(page.getByRole('region', { name: 'Membership' })).toHaveCSS('border-left-color', 'rgb(142, 36, 170)')
 })
+
+test('an optional start date shows on the entry, as since or from', async ({ page }) => {
+  const { google } = await mockGoogle(page)
+  await signInAllowlisted(page, 'owner@household-brain.test')
+  await page.getByRole('link', { name: 'Add Membership' }).click()
+  await page.getByLabel('Title').fill('Gym')
+  await page.getByLabel('Due date (17:00)').fill('2099-08-14')
+  await page.getByLabel('Start date (optional)').fill('2020-08-15')
+  await page.getByRole('button', { name: 'Save' }).click()
+
+  const gym = page.getByRole('region', { name: 'Membership' }).getByRole('link', { name: /Gym/u })
+  await expect(gym).toContainText('since 2020-08-15')
+  await expect.poll(() => google.live()[0]?.extendedProperties).toMatchObject({ private: { 'hb.start': '2020-08-15' } })
+
+  await gym.click()
+  await page.getByLabel('Start date (optional)').fill('2099-01-01')
+  await page.getByRole('button', { name: 'Save' }).click()
+  await expect(gym).toContainText('from 2099-01-01')
+})

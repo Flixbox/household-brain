@@ -3,6 +3,7 @@ import type { Category } from '../../lib/categories'
 import { type EditableField, type FormState, type ItemDraft, changedFields, editField, followUntouched, openForm } from '../../lib/items/model'
 import { primaryButton, textField } from '../settings/styles'
 import { Field } from './Field'
+import { StatusField } from './StatusField'
 import { LINK_PATTERN, normaliseLink } from '../../lib/items/link'
 
 interface Props {
@@ -48,15 +49,10 @@ export function ItemForm({ initial, categories, onSave, withStatus = false }: Pr
         </select>
       </Field>
       <Field label="Due date (17:00)" required><input required type="date" className={textField} value={draft.dueDate} onChange={set('dueDate')} /></Field>
-      {withStatus && (
-        <Field label="Status">
-          <select className={textField} value={draft.status} onChange={set('status')}>
-            <option value="open">Open</option>
-            <option value="done">Done</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
-        </Field>
-      )}
+      <Field label="Start date (optional)">
+        <input type="date" max={draft.dueDate || '9999-12-31'} title="When it started or becomes valid; not after the due date" className={textField} value={draft.startDate} onChange={set('startDate')} />
+      </Field>
+      {withStatus && <StatusField value={draft.status} onChange={set('status')} />}
       <Field label="Code"><input className={textField} value={draft.code} onChange={set('code')} /></Field>
       <Field label="Amount"><input inputMode="decimal" pattern="[0-9]+([.,][0-9]{1,2})?" title="A number, e.g. 9.99" className={textField} value={draft.amount} onChange={set('amount')} /></Field>
       <Field label="Link">
