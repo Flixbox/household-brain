@@ -76,9 +76,8 @@ export const draftOf = (item: Item): ItemDraft => Object.fromEntries(EDITABLE_FI
 
 /** The fields whose value differs between two drafts. */
 
-export function changedFields(before: ItemDraft, after: ItemDraft): EditableField[] {
-  return EDITABLE_FIELDS.filter(field => before[field] !== after[field])
-}
+export const changedFields = (before: ItemDraft, after: ItemDraft): EditableField[] =>
+  EDITABLE_FIELDS.filter(field => before[field] !== after[field])
 
 export interface FormState {
   /** What the form shows and saves. */
@@ -92,20 +91,18 @@ export interface FormState {
 export const openForm = (entry: ItemDraft): FormState => ({ draft: entry, latest: entry, touched: [] })
 
 /** The person typed in a field. */
-export function editField(state: FormState, field: EditableField, value: string): FormState {
-  return {
-    ...state,
-    draft: { ...state.draft, [field]: value },
-    touched: state.touched.includes(field) ? state.touched : [...state.touched, field],
-  }
-}
+export const editField = (state: FormState, field: EditableField, value: string): FormState => ({
+  ...state,
+  draft: { ...state.draft, [field]: value },
+  touched: state.touched.includes(field) ? state.touched : [...state.touched, field],
+})
 
 /**
  * A newer version of the entry arrived (e.g. from Google) while the form is open: every field the
  * person hasn't touched takes the new value; touched fields keep theirs, and win when saved.
  * Returns `state` itself when nothing changes.
  */
-export function followUntouched(state: FormState, next: ItemDraft): FormState {
+export const followUntouched = (state: FormState, next: ItemDraft): FormState => {
   if (changedFields(state.latest, next).length === 0) {
     return state
   }

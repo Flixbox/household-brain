@@ -6,13 +6,13 @@ import { auth } from '@household-brain/firebase/firebase'
 const handlers = new Set<() => void>()
 
 /** Runs `handler` whenever someone signs out of the app. Returns the function that unregisters it. */
-export function onSignOut(handler: () => void): () => void {
+export const onSignOut = (handler: () => void): () => void => {
   handlers.add(handler)
   return () => handlers.delete(handler)
 }
 
 /** Signs out of the app, after every feature has dropped what it kept for this person. */
-export async function signOutOfApp() {
+export const signOutOfApp = async () => {
   for (const handler of handlers) {
     handler()
   }

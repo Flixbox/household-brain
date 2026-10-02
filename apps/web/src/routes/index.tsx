@@ -4,11 +4,7 @@ import { useHousehold } from '@household-brain/calendar/lib/calendar/use-househo
 import { useCategories, useItems } from '@household-brain/calendar/lib/items/use-items'
 import { auth } from '@household-brain/firebase/firebase'
 
-export const Route = createFileRoute('/')({
-  component: Home,
-})
-
-function Home() {
+const Home = () => {
   const user = auth.currentUser
   const household = useHousehold()
   const items = useItems()
@@ -35,3 +31,7 @@ function Home() {
     </section>
   )
 }
+
+export const Route = createFileRoute('/')({
+  component: Home,
+})

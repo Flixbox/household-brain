@@ -7,13 +7,7 @@ import type { EntryDate } from '@household-brain/calendar/lib/items/dates'
 import { useCategories } from '@household-brain/calendar/lib/items/use-items'
 import { reportWriteFailure } from '@household-brain/calendar/lib/items/write-failures'
 
-export const Route = createFileRoute('/items/new')({
-  component: NewItem,
-  validateSearch: (search: Record<string, unknown>): { category?: string } =>
-    (typeof search.category === 'string' ? { category: search.category } : {}),
-})
-
-function NewItem() {
+const NewItem = () => {
   const { category } = Route.useSearch()
   const categories = useCategories()
   const navigate = useNavigate()
@@ -34,3 +28,9 @@ function NewItem() {
     </section>
   )
 }
+
+export const Route = createFileRoute('/items/new')({
+  component: NewItem,
+  validateSearch: (search: Record<string, unknown>): { category?: string } =>
+    (typeof search.category === 'string' ? { category: search.category } : {}),
+})

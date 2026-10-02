@@ -12,7 +12,7 @@ const errorBar = `${bar} wrap-anywhere bg-red-100 text-red-950 dark:bg-red-950 d
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
 /** Shows what is not in Google Calendar yet, and offers the click that Google access needs. */
-export function SyncBar() {
+export const SyncBar = () => {
   const { failed, missingCalendar, needsAccess, pullProblem, waiting } = useOutbox()
   const writeFailures = useWriteFailures()
   const [problem, setProblem] = useState('')

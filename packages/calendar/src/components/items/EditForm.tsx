@@ -9,7 +9,7 @@ import { reportWriteFailure } from '../../lib/items/write-failures'
 import { ItemForm } from './ItemForm'
 
 /** Edit and delete one entry. */
-export function EditForm({ item, categories }: { item: Item, categories: Category[] }) {
+export const EditForm = ({ item, categories }: { item: Item, categories: Category[] }) => {
   const navigate = useNavigate()
   // Fetch Google's latest now; when it arrives, the fields not edited yet follow it (ItemForm).
   useEffect(() => {

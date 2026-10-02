@@ -4,7 +4,7 @@ import type { Board } from '../../lib/items/board'
 import { ItemRow } from './ItemRow'
 
 /** What an empty list says: nothing while searching (the board says no entry matches). */
-function emptyNote({ searching, completed }: Board): string | null {
+const emptyNote = ({ searching, completed }: Board): string | null => {
   if (searching) {
     return null
   }
@@ -15,7 +15,7 @@ function emptyNote({ searching, completed }: Board): string | null {
  * "All by date": every listed entry in one list by due date, each labelled with its category. Its
  * header has the "+" the category headers have in the other view, without a category preselected.
  */
-export function DateList({ board, categories }: { board: Board, categories: Category[] }) {
+export const DateList = ({ board, categories }: { board: Board, categories: Category[] }) => {
   const labelOf = new Map(categories.map(category => [category.slug, category.label]))
   const items = board.flat
   const note = items.length === 0 ? emptyNote(board) : null

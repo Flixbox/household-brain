@@ -42,7 +42,7 @@ export const isDateEventId = (id: string | undefined) => /^[0-9a-v]{26}d[0-9a-v]
  * and matches its link (`hb.entry`, `hb.date`). Null for anything else, an entry's own event included.
  * A deleted one may come without its properties, so then the id alone tells.
  */
-export function entryOfEvent(event: CalendarEvent): string | null {
+export const entryOfEvent = (event: CalendarEvent): string | null => {
   const properties = event.extendedProperties?.private
   if (!properties && event.status === 'cancelled' && isDateEventId(event.id)) {
     return event.id?.slice(0, 26) ?? null
@@ -55,7 +55,7 @@ export function entryOfEvent(event: CalendarEvent): string | null {
  * The full event for one extra date: `[Category] Title · Label` at 17:00 on that date, with the
  * entry's notes and private properties plus the link back (`hb.entry`, `hb.date`, `hb.label`).
  */
-export function dateEventFor(item: Item, entryDate: EntryDate, { categories, timeZone }: EventContext): CalendarEvent {
+export const dateEventFor = (item: Item, entryDate: EntryDate, { categories, timeZone }: EventContext): CalendarEvent => {
   const label = entryDate.label.trim() || 'Date'
   return {
     colorId: labelOf(item, categories)?.colorId ?? '8',
@@ -89,7 +89,7 @@ export type DateOp =
  * event isn't in that shape yet (new, moved, relabelled, or a shared field changed), and a delete for
  * every event whose date is gone. Pure: the ledger (`dateEvents`) says what Google holds.
  */
-export function planDates(item: Item, context: EventContext): DateOp[] {
+export const planDates = (item: Item, context: EventContext): DateOp[] => {
   const ledger = item.dateEvents ?? {}
   const dates = writableDatesOf(item)
   const upserts = dates.flatMap((entryDate): DateOp[] => {
@@ -118,7 +118,7 @@ export const dateEventsAllowed = (syncStates: readonly { schema?: unknown }[]) =
  * has that date and doesn't know the event either (an insert that landed unrecorded). Not while the
  * entry's own deletion or the date's planned delete is still to be pushed: those remove it anyway.
  */
-export function isOrphanDate(entry: Item | null, dateId: string): boolean {
+export const isOrphanDate = (entry: Item | null, dateId: string): boolean => {
   if (!entry) {
     return true
   }

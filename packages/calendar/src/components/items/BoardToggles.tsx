@@ -4,7 +4,7 @@ import { CompletedToggle } from './CompletedToggle'
 import { ToggleChip } from './ToggleChip'
 
 /** "All by date", and "Show completed" except while searching (a search includes completed entries). */
-export function BoardToggles({ completed, searching }: { completed: number, searching: boolean }) {
+export const BoardToggles = ({ completed, searching }: { completed: number, searching: boolean }) => {
   const byDate = useStore($byDate)
   return (
     <div className="flex flex-wrap gap-2">

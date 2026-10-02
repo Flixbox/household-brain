@@ -25,7 +25,7 @@ interface Props {
  * A row's right-hand column: when it is due (relative, coloured by urgency, and the date). An entry
  * with no dates, such as a gift card credit that never expires, shows its amount and "no expiry".
  */
-export function DueColumn({ item, next, more, price, since, now }: Props) {
+export const DueColumn = ({ item, next, more, price, since, now }: Props) => {
   if (!next) {
     return (
       <span className="flex flex-col items-end text-sm">

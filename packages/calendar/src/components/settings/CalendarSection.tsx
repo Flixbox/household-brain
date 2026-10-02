@@ -4,7 +4,7 @@ import { useTask } from '../../lib/use-task'
 import { StatusLine } from './StatusLine'
 import { primaryButton } from './styles'
 
-export function CalendarSection({ household }: { household: HouseholdState }) {
+export const CalendarSection = ({ household }: { household: HouseholdState }) => {
   const { busy, run, status } = useTask()
   return (
     <div className="space-y-3">

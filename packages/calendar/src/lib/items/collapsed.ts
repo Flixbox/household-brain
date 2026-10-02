@@ -7,17 +7,16 @@ import { persistentJSON } from '@nanostores/persistent'
 export const $collapsed = persistentJSON<string[]>('hb:collapsed', [])
 
 /** The stored list, ignoring anything that isn't a list of slugs (an older or hand-edited value). */
-export function collapsedSlugs(stored: unknown = $collapsed.get()): string[] {
-  return Array.isArray(stored) ? stored.filter(slug => typeof slug === 'string') : []
-}
+export const collapsedSlugs = (stored: unknown = $collapsed.get()): string[] =>
+  Array.isArray(stored) ? stored.filter(slug => typeof slug === 'string') : []
 
-export function toggleCollapsed(slug: string) {
+export const toggleCollapsed = (slug: string) => {
   const current = collapsedSlugs()
   $collapsed.set(current.includes(slug) ? current.filter(other => other !== slug) : [...current, slug])
 }
 
 /** Drops slugs of categories that no longer exist. Call it only with the loaded categories. */
-export function pruneCollapsed(known: readonly string[]) {
+export const pruneCollapsed = (known: readonly string[]) => {
   const current = collapsedSlugs()
   const kept = current.filter(slug => known.includes(slug))
   if (kept.length !== current.length) {

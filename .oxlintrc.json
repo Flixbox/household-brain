@@ -32,6 +32,7 @@
       }
     ],
     "react/react-in-jsx-scope": "off", // the automatic JSX runtime needs no React import
+    "react/function-component-definition": ["error", { "namedComponents": "arrow-function", "unnamedComponents": "arrow-function" }], // components are arrow functions too (#67)
     "@stylistic/indent": [
       "error",
       2
@@ -141,7 +142,7 @@
     "react/jsx-no-literals": "off", // no i18n layer, plain text in JSX is fine
     "react/jsx-max-depth": "off", // layout depth is a design choice, not a defect
     "eslint/no-undef": "off", // TypeScript already checks undefined names
-    "eslint/func-style": "off", // declarations and arrow functions are both used deliberately
+    "eslint/func-style": ["error", "expression"], // arrow functions only, no `function` declarations (#67)
     "eslint/one-var": "off", // one declaration per variable is clearer
     "eslint/no-magic-numbers": "off", // too noisy for ports, sizes and timeouts
     "eslint/no-ternary": "off", // ternaries are fine for simple branches
@@ -155,10 +156,14 @@
         ]
       }
     ],
+    // Functions are arrow constants (#67): one may call another defined further down, as the call only
+    // runs later. A direct top-level use before the definition is still reported, but not one through a
+    // callback that runs at load (`[1].map(() => later())`): keep code that runs at load below what it uses.
     "eslint/no-use-before-define": [
       "error",
       {
-        "functions": false
+        "functions": false,
+        "variables": false
       }
     ]
   },

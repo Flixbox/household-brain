@@ -24,7 +24,7 @@ import { isTransient } from './transient'
 const isStatus = (error: unknown, status: number) => error instanceof CalendarApiError && error.status === status
 const describe = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
-async function normalise(context: PushContext, event: CalendarEvent, patch: CalendarEvent): Promise<string | null> {
+const normalise = async (context: PushContext, event: CalendarEvent, patch: CalendarEvent): Promise<string | null> => {
   const target = { calendarId: context.config.calendarId, eventId: event.id ?? '' }
   try {
     const updated = await context.api.patchEvent(target, patch, event.etag ?? '')
@@ -56,7 +56,7 @@ const removeDateEvents = (context: PushContext, entry: Item): Promise<string | n
   deleteDateEvents(context, entry).then(() => null, reportUnlessTransient(`the other dates of "${entry.title}"`))
 
 /** The entry a date event belongs to: the cached copy when it still has the date, else the server's. */
-async function ownerOf(entryId: string, dateId: string): Promise<Item | null> {
+const ownerOf = async (entryId: string, dateId: string): Promise<Item | null> => {
   const cached = await readEntryFromCache(entryId)
   return cached && !isOrphanDate(cached, dateId) ? cached : readEntryFromServer(entryId)
 }
@@ -66,7 +66,7 @@ async function ownerOf(entryId: string, dateId: string): Promise<Item | null> {
  * or date is gone is deleted in Google, e.g. an insert that landed unrecorded, or (in a full listing)
  * one whose entry an app version from before date events deleted.
  */
-async function applyDateEvent(context: PushContext, event: CalendarEvent, entryId: string): Promise<string | null> {
+const applyDateEvent = async (context: PushContext, event: CalendarEvent, entryId: string): Promise<string | null> => {
   const eventId = event.id ?? ''
   const dateId = eventId.slice(entryId.length + 1)
   await dropStray(eventId)
@@ -85,7 +85,7 @@ async function applyDateEvent(context: PushContext, event: CalendarEvent, entryI
  * An entry's own event deleted in Google: when that deletes the entry here, its date events go first.
  * Null when nothing was removed, else the problem (or '' for none).
  */
-async function removeDatesOfDeleted(context: PushContext, event: CalendarEvent): Promise<string | null> {
+const removeDatesOfDeleted = async (context: PushContext, event: CalendarEvent): Promise<string | null> => {
   const { categories, uid } = context
   const entry = event.status === 'cancelled' ? await readEntryFromServer(event.id ?? '') : null
   if (!entry || decidePull({ categories, entry, event, uid }).kind !== 'delete') {
@@ -99,7 +99,7 @@ async function removeDatesOfDeleted(context: PushContext, event: CalendarEvent):
  * deleted in Google, the entry's date events go too; a failure there is reported, but the entry is
  * still removed (an incremental listing won't bring the deletion again).
  */
-async function applyEntryEvent(context: PushContext, event: CalendarEvent): Promise<string | null> {
+const applyEntryEvent = async (context: PushContext, event: CalendarEvent): Promise<string | null> => {
   const { categories, uid } = context
   const removed = await removeDatesOfDeleted(context, event)
   const decision = await applyPulled(event, entry => decidePull({ categories, entry, event, uid }))
@@ -114,13 +114,13 @@ async function applyEntryEvent(context: PushContext, event: CalendarEvent): Prom
 }
 
 /** The other person's push: this person's reminders still have to follow the status (#43). */
-function fixOwnReminders(context: PushContext, event: CalendarEvent, draft: ItemDraft): Promise<string | null> {
+const fixOwnReminders = (context: PushContext, event: CalendarEvent, draft: ItemDraft): Promise<string | null> => {
   const fix = ownRemindersFix(event, draft, context.categories)
   return fix ? normalise(context, event, fix) : Promise.resolve(null)
 }
 
 /** After merging: created and replaced entries are brought into shape and get this person's etag. */
-async function settleEntryEvent(context: PushContext, event: CalendarEvent, decision: PullDecision): Promise<string | null> {
+const settleEntryEvent = async (context: PushContext, event: CalendarEvent, decision: PullDecision): Promise<string | null> => {
   const { categories, config, uid } = context
   const fresh = decision.kind === 'create' || (decision.kind === 'update' && decision.normalise)
   // Created and replaced entries get this person's etag only here, after the adjustment.
@@ -149,7 +149,7 @@ interface Listing {
 }
 
 /** All pages of one listing; Google hands out pages one after another. */
-async function listAll(context: PushContext, cursor: EventCursor, events: CalendarEvent[] = []): Promise<Listing> {
+const listAll = async (context: PushContext, cursor: EventCursor, events: CalendarEvent[] = []): Promise<Listing> => {
   const page: EventPage = await context.api.listEvents(context.config.calendarId, cursor)
   const all = [...events, ...page.items ?? []]
   return page.nextPageToken
@@ -157,7 +157,7 @@ async function listAll(context: PushContext, cursor: EventCursor, events: Calend
     : { events: all, ...page.nextSyncToken ? { nextSyncToken: page.nextSyncToken } : {} }
 }
 
-async function pullPages(context: PushContext, syncToken: string | null): Promise<string[]> {
+const pullPages = async (context: PushContext, syncToken: string | null): Promise<string[]> => {
   const listedSince = syncToken ? null : await serverNow(context.uid)
   const { events, nextSyncToken } = await listAll(context, syncToken ? { syncToken } : {})
   // Entries first, in Google's order (later changes to the same entry must land last), then the
@@ -181,7 +181,7 @@ async function pullPages(context: PushContext, syncToken: string | null): Promis
 /** People whose schema marker this app already wrote since it started. */
 const marked = new Set<string>()
 
-export async function pullChanges(context: PushContext): Promise<string[]> {
+export const pullChanges = async (context: PushContext): Promise<string[]> => {
   // Best effort and not awaited: offline it would wait for the server, and a failure mustn't stop
   // the pull. Tried again next session (or next pull) if it fails.
   if (!marked.has(context.uid)) {

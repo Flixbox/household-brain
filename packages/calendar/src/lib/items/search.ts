@@ -5,7 +5,7 @@ import type { Item } from './model'
 export const $search = atom('')
 
 /** Empties the search, e.g. on sign-out, so the next person doesn't open a filtered board. */
-export function clearSearch() {
+export const clearSearch = () => {
   $search.set('')
 }
 
@@ -13,7 +13,7 @@ export function clearSearch() {
 const plain = (text: string) => text.normalize('NFKD').replaceAll(/\p{M}/gu, '').toLowerCase().replaceAll('ß', 'ss')
 
 /** Whether an entry matches every word of the query, in its title, code, notes, link or amount. */
-export function matchesSearch(item: Pick<Item, 'title' | 'code' | 'notes' | 'url' | 'amount'>, query: string): boolean {
+export const matchesSearch = (item: Pick<Item, 'title' | 'code' | 'notes' | 'url' | 'amount'>, query: string): boolean => {
   const words = plain(query).split(/\s+/u).filter(word => word !== '')
   const haystack = plain([item.title, item.code, item.notes, item.url, item.amount].join(' '))
   return words.every(word => haystack.includes(word))

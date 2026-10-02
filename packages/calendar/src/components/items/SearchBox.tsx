@@ -3,7 +3,7 @@ import { $search } from '../../lib/items/search'
 import { textField } from '../settings/styles'
 
 /** The board's search field. */
-export function SearchBox() {
+export const SearchBox = () => {
   const query = useStore($search)
   return (
     <input

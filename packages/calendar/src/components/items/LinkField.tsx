@@ -3,7 +3,7 @@ import { textField } from '../settings/styles'
 import { Field } from './Field'
 
 /** The link field, with a button that opens the link in a new tab once it is a web address (#65). */
-export function LinkField({ value, onChange }: { value: string, onChange: (event: { target: { value: string } }) => void }) {
+export const LinkField = ({ value, onChange }: { value: string, onChange: (event: { target: { value: string } }) => void }) => {
   const href = openableLink(value)
   return (
     // The button sits beside the label, not in it, or it would become part of the field's name.

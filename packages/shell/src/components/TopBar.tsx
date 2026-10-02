@@ -2,7 +2,7 @@ import { useStore } from '@nanostores/react'
 import { $menuOpen, openMenu } from '../lib/menu'
 
 /** The bar at the top of every signed-in page: the app's name and the button that opens the menu. */
-export function TopBar() {
+export const TopBar = () => {
   const open = useStore($menuOpen)
   return (
     <header className="mb-6 flex items-center justify-between">

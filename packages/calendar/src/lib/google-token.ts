@@ -77,7 +77,7 @@ let gisLoaded: Promise<void> | null = null
  * clicked, the consent popup opens straight away: a popup opened too long after the click is
  * blocked, especially on iOS Safari.
  */
-export function loadGis(): Promise<void> {
+export const loadGis = (): Promise<void> => {
   if (window.google?.accounts.oauth2) {
     return Promise.resolve()
   }
@@ -95,7 +95,7 @@ export function loadGis(): Promise<void> {
 const usable = (token: Token | null, scopes: readonly string[], account: string | null | undefined): token is Token =>
   token !== null && Boolean(account) && token.account === account && now() < token.usableUntil && scopes.every(scope => token.scopes.includes(scope))
 
-function requestToken(scopes: readonly string[], hint?: string | null): Promise<TokenResponse> {
+const requestToken = (scopes: readonly string[], hint?: string | null): Promise<TokenResponse> => {
   const oauth2 = window.google?.accounts.oauth2
   if (!oauth2) {
     return Promise.reject(new Error('Google sign-in is unavailable'))
@@ -112,7 +112,7 @@ function requestToken(scopes: readonly string[], hint?: string | null): Promise<
   })
 }
 
-function popupProblem(error: { type: string, message?: string }): string {
+const popupProblem = (error: { type: string, message?: string }): string => {
   switch (error.type) {
     case 'popup_failed_to_open': {
       return 'The Google window could not open. Allow pop-ups for this site and try again.'
@@ -127,7 +127,7 @@ function popupProblem(error: { type: string, message?: string }): string {
 }
 
 /** Checks a GIS token response; exported for tests. */
-export function acceptToken(response: TokenResponse, scopes: readonly string[], account: string): Token {
+export const acceptToken = (response: TokenResponse, scopes: readonly string[], account: string): Token => {
   if (response.error) {
     throw new Error(`Google refused Calendar access: ${response.error}`)
   }
@@ -149,7 +149,7 @@ export function acceptToken(response: TokenResponse, scopes: readonly string[], 
  * too narrow, or about to expire. Call it from a click handler the first time: Google may need to
  * show its consent popup.
  */
-export async function calendarToken(scopes: readonly string[], account: string | null | undefined): Promise<string> {
+export const calendarToken = async (scopes: readonly string[], account: string | null | undefined): Promise<string> => {
   const current = $calendarToken.get()
   if (usable(current, scopes, account)) {
     return current.value
@@ -167,11 +167,10 @@ export async function calendarToken(scopes: readonly string[], account: string |
 }
 
 /** Whether a usable token for `account` covering `scopes` is cached, so work can run without asking Google. */
-export function hasCalendarToken(scopes: readonly string[], account: string | null | undefined): boolean {
-  return usable($calendarToken.get(), scopes, account)
-}
+export const hasCalendarToken = (scopes: readonly string[], account: string | null | undefined): boolean =>
+  usable($calendarToken.get(), scopes, account)
 
 /** Forgets the cached token, e.g. on sign-out or when Google rejects it. */
-export function forgetCalendarToken() {
+export const forgetCalendarToken = () => {
   $calendarToken.set(null)
 }

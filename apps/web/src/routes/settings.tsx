@@ -6,11 +6,7 @@ import { useHousehold } from '@household-brain/calendar/lib/calendar/use-househo
 import { loadGis } from '@household-brain/calendar/lib/google-token'
 import { auth } from '@household-brain/firebase/firebase'
 
-export const Route = createFileRoute('/settings')({
-  component: Settings,
-})
-
-function Settings() {
+const Settings = () => {
   const household = useHousehold()
   useEffect(() => {
     // Preloading is best effort: a failure resurfaces, with its message, when a button is clicked.
@@ -28,3 +24,7 @@ function Settings() {
     </section>
   )
 }
+
+export const Route = createFileRoute('/settings')({
+  component: Settings,
+})

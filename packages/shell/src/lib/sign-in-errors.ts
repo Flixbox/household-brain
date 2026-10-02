@@ -2,7 +2,7 @@
  * Turns a failed Google sign-in into something the person can act on. Returns null when nothing
  * should be shown (the person closed the popup themselves).
  */
-export function signInErrorMessage(error: unknown): string | null {
+export const signInErrorMessage = (error: unknown): string | null => {
   const code = typeof error === 'object' && error !== null && 'code' in error ? String(error.code) : ''
   switch (code) {
     case 'auth/popup-closed-by-user':

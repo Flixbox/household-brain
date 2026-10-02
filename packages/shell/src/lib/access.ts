@@ -17,7 +17,7 @@ export type Access =
  * from the cache alone. Each sign-in gets its own listener, torn down on sign-out or account switch,
  * so a slow answer for one account can never be shown for another.
  */
-export function useAccess(): Access {
+export const useAccess = (): Access => {
   const [access, setAccess] = useState<Access>({ state: 'loading' })
 
   useEffect(() => {

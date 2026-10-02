@@ -21,7 +21,7 @@ const RETRY_MS = 15 * 60_000
 let lastTry = Number.NEGATIVE_INFINITY
 
 /** Fetches today's rates unless they are already here or the last try was too recent; exported for tests. */
-export async function refreshEuroRates(today: string) {
+export const refreshEuroRates = async (today: string) => {
   if ($euroRates.get()?.checked === today || performance.now() - lastTry < RETRY_MS) {
     return
   }
@@ -38,7 +38,7 @@ export async function refreshEuroRates(today: string) {
 }
 
 /** An entry's amount for display, fetching today's euro rates first when it is in another currency. */
-export function usePrice({ amount, currency }: Pick<Item, 'amount' | 'currency'>, today: string): string | null {
+export const usePrice = ({ amount, currency }: Pick<Item, 'amount' | 'currency'>, today: string): string | null => {
   const foreign = isForeign(currency)
   useEffect(() => {
     if (foreign) {

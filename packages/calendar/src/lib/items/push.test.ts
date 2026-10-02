@@ -12,7 +12,7 @@ const base: Item = {
   pendingOp: 'upsert', reminders: '', rev: 'r1', startDate: '', status: 'open', sync: 'pending', syncError: null, title: 'Amazon', url: '',
 }
 
-function fakeApi(behaviour: Partial<Record<'insert' | 'patch' | 'delete' | 'get', number[]>> = {}) {
+const fakeApi = (behaviour: Partial<Record<'insert' | 'patch' | 'delete' | 'get', number[]>> = {}) => {
   const calls: string[] = []
   const failNext = (kind: 'insert' | 'patch' | 'delete' | 'get') => {
     const status = behaviour[kind]?.shift()

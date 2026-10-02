@@ -3,7 +3,7 @@ import { $showCompleted, toggleShowCompleted } from '../../lib/items/show-comple
 import { ToggleChip } from './ToggleChip'
 
 /** "Show completed (n)". It stays while it is on, so it can be switched off even once nothing is completed. */
-export function CompletedToggle({ completed }: { completed: number }) {
+export const CompletedToggle = ({ completed }: { completed: number }) => {
   const showCompleted = useStore($showCompleted)
   if (completed === 0 && !showCompleted) {
     return null

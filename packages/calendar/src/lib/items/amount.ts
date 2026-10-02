@@ -3,7 +3,7 @@ import { type EuroRates, isForeign } from './currency'
 const EURO = new Intl.NumberFormat('de-DE', { currency: 'EUR', style: 'currency' })
 const PLAIN_NUMBER = /^\d+(?:[.,]\d{1,2})?$/u
 
-function foreignLabel(value: number, currency: string, euroRates?: EuroRates | null): string {
+const foreignLabel = (value: number, currency: string, euroRates?: EuroRates | null): string => {
   const own = new Intl.NumberFormat('de-DE', { currency, style: 'currency' }).format(value)
   const rate = euroRates?.rates[currency]
   // "≈" sticks to the euro value, so a narrow column wraps before it.
@@ -16,7 +16,7 @@ function foreignLabel(value: number, currency: string, euroRates?: EuroRates | n
  * approximate euro value once a rate is known: "199,99 R$ ≈ 34,04 €". Null when there is none, also
  * for an entry stored without the field at all (an older or stray document).
  */
-export function amountLabel(amount: string | null | undefined, currency?: string, euroRates?: EuroRates | null): string | null {
+export const amountLabel = (amount: string | null | undefined, currency?: string, euroRates?: EuroRates | null): string | null => {
   const text = (amount ?? '').trim()
   if (text === '') {
     return null

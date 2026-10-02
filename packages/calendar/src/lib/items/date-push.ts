@@ -11,7 +11,7 @@ const isStatus = (error: unknown, status: number) => error instanceof CalendarAp
  * so there is no merge: an insert, or on 409 (it exists, maybe deleted in Google) a full patch
  * against the etag just read, which also brings a deleted one back.
  */
-async function upsert(context: PushContext, event: CalendarEvent): Promise<void> {
+const upsert = async (context: PushContext, event: CalendarEvent): Promise<void> => {
   try {
     await context.api.insertEvent(context.config.calendarId, event)
   } catch (error) {
@@ -29,7 +29,7 @@ async function upsert(context: PushContext, event: CalendarEvent): Promise<void>
 }
 
 /** Writes an existing event in full; `date: null` turns one made all-day in Google back into a timed one. */
-async function overwrite({ api, config }: PushContext, event: CalendarEvent): Promise<void> {
+const overwrite = async ({ api, config }: PushContext, event: CalendarEvent): Promise<void> => {
   const eventId = event.id ?? ''
   const { etag = '' } = await api.getEvent(config.calendarId, eventId)
   const { id: _id, start, end, ...rest } = event
@@ -41,13 +41,12 @@ async function overwrite({ api, config }: PushContext, event: CalendarEvent): Pr
 }
 
 /** Carries out one planned write; deleting a missing event is harmless. */
-export function pushDateOp(context: PushContext, item: Item, op: DateOp): Promise<void> {
-  return op.kind === 'upsert'
+export const pushDateOp = (context: PushContext, item: Item, op: DateOp): Promise<void> =>
+  op.kind === 'upsert'
     ? upsert(context, op.event)
     : context.api.deleteEvent(context.config.calendarId, dateEventId(item.id, op.dateId))
-}
 
 /** Deletes every date event an entry may have in Google, before the entry's own event goes. */
-export async function deleteDateEvents({ api, config }: PushContext, item: Item): Promise<void> {
+export const deleteDateEvents = async ({ api, config }: PushContext, item: Item): Promise<void> => {
   await Promise.all(dateEventIdsOf(item).map(eventId => api.deleteEvent(config.calendarId, eventId)))
 }

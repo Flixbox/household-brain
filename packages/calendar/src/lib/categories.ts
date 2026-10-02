@@ -27,7 +27,7 @@ export const DEFAULT_CATEGORIES: readonly Category[] = [
 export const RETIRED_DEFAULTS: readonly string[] = ['document']
 
 /** The categories to offer and list: all of them, minus retired defaults no entry uses. */
-export function visibleCategories<Entry extends Pick<Category, 'slug'>>(categories: readonly Entry[], items: readonly { category: string }[]): Entry[] {
+export const visibleCategories = <Entry extends Pick<Category, 'slug'>>(categories: readonly Entry[], items: readonly { category: string }[]): Entry[] => {
   const used = new Set(items.map(item => item.category))
   return categories.filter(category => !RETIRED_DEFAULTS.includes(category.slug) || used.has(category.slug))
 }
@@ -37,7 +37,7 @@ export function visibleCategories<Entry extends Pick<Category, 'slug'>>(categori
  * without setting the household up again. Nothing for a household that has no categories at all:
  * seeding those is the setup's job.
  */
-export function missingDefaults(existing: readonly Pick<Category, 'slug'>[]): Category[] {
+export const missingDefaults = (existing: readonly Pick<Category, 'slug'>[]): Category[] => {
   if (existing.length === 0) {
     return []
   }

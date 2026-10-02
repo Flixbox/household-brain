@@ -35,7 +35,7 @@ interface Inserted {
   existed: boolean
 }
 
-async function insert(context: PushContext, item: Item): Promise<Inserted> {
+const insert = async (context: PushContext, item: Item): Promise<Inserted> => {
   const { api, config } = context
   try {
     return { event: await api.insertEvent(config.calendarId, eventFor(item, eventContext(context))), existed: false }
@@ -53,7 +53,7 @@ async function insert(context: PushContext, item: Item): Promise<Inserted> {
   }
 }
 
-async function restore(context: PushContext, item: Item, target: EventTarget): Promise<CalendarEvent> {
+const restore = async (context: PushContext, item: Item, target: EventTarget): Promise<CalendarEvent> => {
   // The event was deleted in Google while the entry still exists here: write it back in full. A
   // deleted event keeps its id, so the insert answers 409 and the event is revived with a patch.
   const { api, config } = context
@@ -77,7 +77,7 @@ interface Attempt {
 }
 
 /** After a failed patch: revive a deleted event, or retry once on a conflict (the local edit wins). */
-async function recover(context: PushContext, { item, target, changes }: Attempt, error: unknown): Promise<CalendarEvent> {
+const recover = async (context: PushContext, { item, target, changes }: Attempt, error: unknown): Promise<CalendarEvent> => {
   if (isStatus(error, 404) || isStatus(error, 410)) {
     return restore(context, item, target)
   }
@@ -94,7 +94,7 @@ async function recover(context: PushContext, { item, target, changes }: Attempt,
   return context.api.patchEvent(target, changes, current.etag ?? '')
 }
 
-async function patch(context: PushContext, item: Item, etag: string): Promise<CalendarEvent> {
+const patch = async (context: PushContext, item: Item, etag: string): Promise<CalendarEvent> => {
   const target = { calendarId: context.config.calendarId, eventId: item.id }
   const changes = patchFor(item, item.dirty, eventContext(context))
   try {
@@ -108,7 +108,7 @@ async function patch(context: PushContext, item: Item, etag: string): Promise<Ca
  * An entry without a due date has no event. When it had one (its date was just removed, or someone
  * pushed it before), that event is deleted; a missing one is fine. Its extra dates' events stay.
  */
-async function unschedule(context: PushContext, item: Item): Promise<PushOutcome> {
+const unschedule = async (context: PushContext, item: Item): Promise<PushOutcome> => {
   // An entry that was in Google: recorded etags, or a date just removed from a synced one. A new
   // entry without a date never was, so it costs no call.
   const hadEvent = Object.keys(item.etags).length > 0 || (item.dirty.includes('dueDate') && Boolean(item.googleUpdated))
@@ -128,14 +128,14 @@ async function unschedule(context: PushContext, item: Item): Promise<PushOutcome
 }
 
 /** A deleted entry: its date events go first, then its own event. */
-async function remove(context: PushContext, item: Item): Promise<PushOutcome> {
+const remove = async (context: PushContext, item: Item): Promise<PushOutcome> => {
   await deleteDateEvents(context, item)
   await context.api.deleteEvent(context.config.calendarId, item.id)
   return { kind: 'deleted' }
 }
 
 /** Pushes one pending entry to Google Calendar. */
-export async function pushItem(context: PushContext, item: Item): Promise<PushOutcome> {
+export const pushItem = async (context: PushContext, item: Item): Promise<PushOutcome> => {
   if (item.pendingOp === 'delete') {
     return remove(context, item)
   }

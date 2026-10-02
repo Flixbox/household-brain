@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { RETRY_MS, type Subscribe, dataOf, liveStore } from './live'
 
 /** A fake Firestore listener the test drives by hand. */
-function fakeListener() {
+const fakeListener = () => {
   const calls = { started: 0, stopped: 0 }
   let push: ((data: string) => void) | null = null
   let fail: ((error: Error) => void) | null = null

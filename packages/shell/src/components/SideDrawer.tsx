@@ -9,7 +9,7 @@ const item = 'block w-full rounded-lg px-3 py-2 text-left font-medium hover:bg-s
  * The app menu: a modal drawer from the right with what the app puts in it (`children`) and
  * "Sign out". A native dialog, so focus stays inside and Escape closes it; so does a tap beside it.
  */
-export function SideDrawer({ children }: { children: ReactNode }) {
+export const SideDrawer = ({ children }: { children: ReactNode }) => {
   const open = useStore($menuOpen)
   const dialog = useRef<HTMLDialogElement>(null)
   // Leaving the signed-in pages (e.g. losing access) leaves no open menu behind for the next visit.

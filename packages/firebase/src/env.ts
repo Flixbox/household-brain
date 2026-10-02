@@ -9,7 +9,7 @@ const REQUIRED = {
 } as const satisfies Record<string, keyof ImportMetaEnv>
 
 /** Builds the Firebase options from the Vite env, failing loudly when a value is missing. */
-export function firebaseOptionsFrom(env: Partial<Record<string, string | undefined>>): FirebaseOptions {
+export const firebaseOptionsFrom = (env: Partial<Record<string, string | undefined>>): FirebaseOptions => {
   const missing = Object.values(REQUIRED).filter(key => !env[key])
   if (missing.length > 0) {
     throw new Error(`Missing Firebase config: ${missing.join(', ')}`)

@@ -27,8 +27,8 @@ interface Triggers {
 
 const ignore = () => null
 
-function watchFirestore(triggers: Triggers): (() => void)[] {
-  return [
+const watchFirestore = (triggers: Triggers): (() => void)[] =>
+  [
     onSnapshot(query(itemsCollection, orderBy('updatedAt')), { includeMetadataChanges: true }, snapshot => triggers.items(
       snapshot.docs.map(entry => entry.data() as Item),
       new Set(snapshot.docs.filter(entry => entry.metadata.hasPendingWrites).map(entry => entry.id)),
@@ -39,14 +39,13 @@ function watchFirestore(triggers: Triggers): (() => void)[] {
     onSnapshot(doc(db, 'meta', 'config'), snapshot =>
       triggers.config(snapshot.exists() ? snapshot.data() as HouseholdConfig : null), ignore),
   ]
-}
 
 /**
  * What wakes the outbox: changes in Firestore, coming back online, a Calendar token arriving or
  * going, and pulls once a minute and whenever the app comes back to the foreground, while it is
  * visible. Returns the functions that stop each.
  */
-export function watchOutboxTriggers(triggers: Triggers): (() => void)[] {
+export const watchOutboxTriggers = (triggers: Triggers): (() => void)[] => {
   const pullIfVisible = () => (document.visibilityState === 'visible' ? triggers.pull() : null)
   globalThis.addEventListener('online', triggers.online)
   document.addEventListener('visibilitychange', pullIfVisible)
