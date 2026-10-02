@@ -11,6 +11,7 @@ describe('matchesSearch', () => {
     expect(matchesSearch(item, 'online')).toBe(true)
     expect(matchesSearch(item, 'household-brain')).toBe(true)
     expect(matchesSearch(item, '9.99')).toBe(true)
+    expect(matchesSearch({ ...item, title: 'Straße' }, 'strasse')).toBe(true)
   })
 
   it('needs every word to match', () => {

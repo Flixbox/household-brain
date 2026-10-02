@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { resetEmulators, seedDocument } from './emulators'
 import { mockGoogle } from './google-mocks'
-import { signInAllowlisted } from './session'
+import { openMenu, signInAllowlisted, signInAs } from './session'
 
 const CALENDAR = 'household@group.calendar.google.test'
 
@@ -217,6 +217,8 @@ test('searching shows only matching entries, in their categories, even folded on
   const search = page.getByRole('searchbox', { name: 'Search entries' })
   await search.fill('muller')
   await expect(coupons.getByRole('link', { name: /Café Müller/u })).toBeVisible()
+  // While searching a category can't be folded, so a tap can't change it unseen.
+  await expect(coupons.getByRole('button', { name: /Coupon/u })).toHaveCount(0)
   await expect(page.getByRole('region', { name: 'Membership' })).toHaveCount(0)
 
   await search.fill('fit2026')
@@ -229,4 +231,11 @@ test('searching shows only matching entries, in their categories, even folded on
   await search.fill('')
   await expect(page.getByRole('region', { name: 'Membership' })).toBeVisible()
   await expect(coupons.getByRole('link', { name: /Café Müller/u })).toBeHidden()
+
+  // The next person on this device doesn't open a board filtered by someone else's search.
+  await search.fill('gym')
+  await openMenu(page)
+  await page.getByRole('dialog', { name: 'Menu' }).getByRole('button', { name: 'Sign out' }).click()
+  await signInAs(page, 'owner@household-brain.test')
+  await expect(page.getByRole('searchbox', { name: 'Search entries' })).toHaveValue('')
 })

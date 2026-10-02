@@ -29,6 +29,7 @@ export function ItemList({ items, categories }: { items: Item[], categories: Cat
           key={section.category.slug}
           category={section.category}
           collapsed={!board.searching && collapsed.includes(section.category.slug)}
+          foldable={!board.searching}
           items={section.items}
         />
       ))}
