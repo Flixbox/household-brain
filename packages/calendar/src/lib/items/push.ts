@@ -2,7 +2,7 @@ import type { Category } from '../categories'
 import { type CalendarApi, CalendarApiError, type EventTarget } from '../calendar/api'
 import type { HouseholdConfig } from '../calendar/setup'
 import { deleteDateEvents } from './date-push'
-import { type CalendarEvent, eventFor, patchFor } from './event'
+import { type CalendarEvent, eventFor, patchFor, remindersPatch } from './event'
 import { isDate } from './dates'
 import type { Item } from './model'
 
@@ -65,7 +65,8 @@ async function restore(context: PushContext, item: Item, target: EventTarget): P
       throw error
     }
     const { etag = '' } = await api.getEvent(config.calendarId, item.id)
-    return api.patchEvent(target, { ...full, status: 'confirmed' }, etag)
+    // As a patch, the reminders clear any overrides explicitly: Google rejects defaults next to them.
+    return api.patchEvent(target, { ...full, reminders: remindersPatch(item), status: 'confirmed' }, etag)
   }
 }
 

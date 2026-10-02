@@ -11,7 +11,7 @@
 #   scripts/pr-gif.sh gif <video.webm> <from> <to> <out.gif>   cut seconds <from>..<to> into a GIF;
 #                                                              SPEED=0.5 plays it at half speed
 #
-# Then attach it: gh pr edit <pr> --attach '<out.gif>#<what it shows>' (gh 2.99 or newer).
+# Then publish it on the `assets` branch and embed it in the pull request (.ai/AGENTS.md says how).
 set -euo pipefail
 
 GH=${GH:-gh}

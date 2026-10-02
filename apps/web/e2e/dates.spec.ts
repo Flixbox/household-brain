@@ -75,7 +75,7 @@ test("while someone's app doesn't know date events yet, extra dates stay out of 
   await page.getByRole('button', { name: 'Save' }).click()
   const summaries = () => google.live().map(event => event.summary).toSorted()
   await expect.poll(summaries).toEqual(['[Membership] Streaming'])
-  await expect.poll(async () => (await readDocument(`syncState/${uid}`))?.schema).toEqual({ integerValue: '3' })
+  await expect.poll(async () => (await readDocument(`syncState/${uid}`))?.schema).toEqual({ integerValue: '4' })
   // Opening the entry pulls again; then wait until the app has made no Google request for a full
   // second. The outbox acts on its triggers at once, so had the gate been open, the date event would
   // have been written by then (whatever the pull reuse window).
@@ -107,6 +107,13 @@ test("while someone's app doesn't know date events yet, extra dates stay out of 
     await expect.poll(summaries).toEqual(['[Membership] Streaming'])
     // Added again, for the next step.
     await row.click()
+    // An entry's own reminders are offered only while every app handles them: once the other app
+    // reports that, they show; back on an older version, they go again.
+    const reminders = page.getByRole('group', { name: 'Reminders' })
+    await seedDocument('syncState/older-app', { schema: 4, syncToken: 'sync-1' })
+    await expect(reminders).toBeVisible()
+    await seedDocument('syncState/older-app', { schema: 3, syncToken: 'sync-1' })
+    await expect(reminders).toHaveCount(0)
     await page.getByRole('button', { name: '+ Add date' }).click()
     await page.getByLabel('Label of date 1').fill('Cancel by')
     await page.getByLabel('Date 1', { exact: true }).fill('2099-11-30')

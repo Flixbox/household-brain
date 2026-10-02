@@ -14,6 +14,7 @@ const entry = (overrides: Partial<Item>): Item => ({
   id: overrides.title ?? 'id',
   notes: '',
   pendingOp: null,
+  reminders: '',
   rev: 'r1',
   startDate: '',
   status: 'open',

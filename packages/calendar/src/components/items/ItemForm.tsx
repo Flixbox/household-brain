@@ -6,11 +6,10 @@ import { primaryButton, textField } from '../settings/styles'
 import { Field } from './Field'
 import { StatusField } from './StatusField'
 import { ExtraDatesField } from './ExtraDatesField'
-import { useEntryDates } from './use-entry-dates'
 import type { EntryDate } from '../../lib/items/dates'
 import { LinkField } from './LinkField'
-import { holdUpdatesValue } from '../../lib/update-hold'
 import { AmountField } from './AmountField'
+import { RemindersField } from './RemindersField'
 
 interface Props {
   initial: ItemDraft
@@ -37,19 +36,19 @@ const NO_DATES: EntryDate[] = []
  * code doesn't reload the page and lose the entry.
  */
 export function ItemForm({ initial, initialDates = NO_DATES, categories, onSave, withStatus = false }: Props) {
-  const { dateRequired, draft, edited, finished, latest, set } = useEntryForm(initial, { editing: withStatus })
+  const { dateRequired, dates: { change: setDates, dates }, draft, holdUpdates, remindersShown, saved, set } = useEntryForm(initial, { editing: withStatus, initialDates })
   const [saving, setSaving] = useState(false)
-  const { change: setDates, dates, touched } = useEntryDates(initialDates)
   const submit = (event: FormEvent) => {
     event.preventDefault()
     if (saving) {
       return null
     }
     setSaving(true)
-    return onSave(finished, { dates: dates.map(entry => ({ ...entry, label: entry.label.trim() })), datesChanged: touched, latest })
+    const { draft: finished, ...rest } = saved
+    return onSave(finished, rest)
   }
   return (
-    <form className="grid gap-4" onSubmit={submit} data-hold-updates={holdUpdatesValue(edited || touched)}>
+    <form className="grid gap-4" onSubmit={submit} data-hold-updates={holdUpdates}>
       <Field label="Title" required><input required pattern=".*\S.*" title="Enter a title" className={textField} value={draft.title} onChange={set('title')} /></Field>
       <Field label="Category" required>
         <select required className={textField} value={draft.category} onChange={set('category')}>
@@ -64,6 +63,7 @@ export function ItemForm({ initial, initialDates = NO_DATES, categories, onSave,
         <input type="date" max={draft.dueDate || '9999-12-31'} title="When it started or becomes valid; not after the due date" className={textField} value={draft.startDate} onChange={set('startDate')} />
       </Field>
       <ExtraDatesField dates={dates} onChange={setDates} />
+      {remindersShown && <RemindersField value={draft.reminders} onChange={set('reminders')} />}
       {withStatus && <StatusField value={draft.status} onChange={set('status')} />}
       <Field label="Code"><input className={textField} value={draft.code} onChange={set('code')} /></Field>
       <AmountField amount={draft.amount} currency={draft.currency} onAmount={set('amount')} onCurrency={set('currency')} />

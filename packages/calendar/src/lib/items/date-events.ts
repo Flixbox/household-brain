@@ -13,8 +13,15 @@ const DATE_EVENTS_SCHEMA = 2
 /** The `syncState/{uid}.schema` from which an app version handles entries without a due date (#33). */
 export const UNDATED_SCHEMA = 3
 
+/**
+ * The `syncState/{uid}.schema` from which an app version handles an entry's own reminders (#35). An
+ * older one writes an entry's date events without them, and the two versions would keep rewriting
+ * each other's events.
+ */
+export const REMINDERS_SCHEMA = 4
+
 /** Written per person to `syncState/{uid}.schema`: what this app version handles (the newest of the above). */
-export const APP_SCHEMA = UNDATED_SCHEMA
+export const APP_SCHEMA = REMINDERS_SCHEMA
 
 /** Whether every person's app that ever synced handles `schema`; one older version is enough to say no. */
 export const everyAppHandles = (syncStates: readonly { schema?: unknown }[], schema: number) =>

@@ -8,7 +8,7 @@ const context = { categories: DEFAULT_CATEGORIES, timeZone: 'Europe/Berlin' }
 const cancelBy = { date: '2099-11-30', id: '01234567', label: 'Cancel by' }
 const draft: Item = {
   amount: '', category: 'membership', code: '', currency: '', dirty: [], dueDate: '2099-12-14', etags: {}, extraDates: [cancelBy], id: 'abcdefghijklmnopqrstuv0123', notes: 'Shared',
-  pendingOp: null, rev: 'r1', startDate: '', status: 'open', sync: 'synced', syncError: null, title: 'Streaming', url: '',
+  pendingOp: null, reminders: '', rev: 'r1', startDate: '', status: 'open', sync: 'synced', syncError: null, title: 'Streaming', url: '',
 }
 const written = dateEventFor(draft, cancelBy, context)
 const item: Item = { ...draft, dateEvents: { [cancelBy.id]: { shape: shapeOf(written) } } }
@@ -45,6 +45,17 @@ describe('a date event changed in Google', () => {
     expect(change({ ...asGoogle, start: { ...asGoogle.start, dateTime: '2099-11-30T09:00:00+01:00' } })).toEqual({ kind: 'rewrite' })
     expect(change({ ...asGoogle, reminders: { overrides: [{ method: 'popup', minutes: 10 }], useDefault: false } })).toEqual({ kind: 'rewrite' })
     expect(change({ ...asGoogle, extendedProperties: { private: { ...written.extendedProperties?.private, 'hb.code': 'X' } } })).toEqual({ kind: 'rewrite' })
+  })
+
+  it("with the entry's own reminders: fits only when this person's copy has them, in any order", () => {
+    const own = { ...draft, reminders: '10080,1440' }
+    const ownWritten = dateEventFor(own, cancelBy, context)
+    const entry = { ...own, dateEvents: { [cancelBy.id]: { shape: shapeOf(ownWritten) } } }
+    const asTheirs = { ...asGoogle, extendedProperties: ownWritten.extendedProperties }
+    // The other person's write left this person's copy at the defaults: put back as this person.
+    expect(change({ ...asTheirs, reminders: { useDefault: true } }, entry)).toEqual({ kind: 'rewrite' })
+    const reversed = [{ method: 'popup', minutes: 1440 }, { method: 'popup', minutes: 10080 }]
+    expect(change({ ...asTheirs, reminders: { overrides: reversed, useDefault: false } }, entry)).toEqual({ kind: 'none' })
   })
 
   it('while the app has its own change for that event, or the entry is being deleted: the app wins', () => {

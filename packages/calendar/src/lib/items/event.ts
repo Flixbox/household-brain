@@ -1,4 +1,5 @@
 import { isForeign } from './currency'
+import { reminderMinutes } from './reminders'
 import type { Category } from '../categories'
 import type { EditableField, Item } from './model'
 
@@ -57,9 +58,33 @@ export function summaryOf(item: Pick<Item, 'title' | 'category'> & Partial<Pick<
   return tag ? `[${tag}] ${item.title}` : item.title
 }
 
-/** Open entries remind with each person's defaults; done and cancelled ones don't remind at all. */
-export const remindersOf = (item: Pick<Item, 'status'>): NonNullable<CalendarEvent['reminders']> =>
-  (item.status === 'open' ? { useDefault: true } : { overrides: [], useDefault: false })
+type Reminders = NonNullable<CalendarEvent['reminders']>
+
+/**
+ * Open entries remind with each person's defaults, or with the entry's own reminders when it has
+ * them (#35); done and cancelled ones don't remind at all.
+ */
+export function remindersOf(item: Pick<Item, 'status'> & { reminders?: string }): Reminders {
+  if (item.status !== 'open') {
+    return { overrides: [], useDefault: false }
+  }
+  if (!item.reminders) {
+    return { useDefault: true }
+  }
+  return { overrides: reminderMinutes(item.reminders).map(minutes => ({ method: 'popup', minutes })), useDefault: false }
+}
+
+/** The reminders as a write sends them: overrides cleared explicitly, as Google rejects them next to the defaults. */
+export const remindersPatch = (item: Pick<Item, 'status'> & { reminders?: string }): Reminders => {
+  const { overrides = [], useDefault } = remindersOf(item)
+  return { overrides, useDefault }
+}
+
+const minutesOf = (reminders: Reminders | undefined) => (reminders?.overrides ?? []).map(reminder => reminder.minutes).toSorted((one, other) => one - other).join(',')
+
+/** Whether a person's reminders on an event are the ones expected (popup or not, only the times count). */
+export const sameReminders = (actual: Reminders | undefined, expected: Reminders) =>
+  actual?.useDefault === expected.useDefault && minutesOf(actual) === minutesOf(expected)
 
 /** The entry's fields kept in the event's private properties; date events carry them too. */
 export function privateProperties(item: Item): Record<string, string> {
@@ -68,6 +93,8 @@ export function privateProperties(item: Item): Record<string, string> {
     // An uncategorised entry (an event added by hand) stays without one, so it stays untouched.
     ...item.category === 'uncategorised' ? {} : { 'hb.category': item.category },
     'hb.code': item.code,
+    // Like the currency: only when the entry has reminders of its own, so other events stay as they were.
+    ...item.reminders ? { 'hb.reminders': item.reminders } : {},
     // Only when it isn't euros, so the events of every other entry stay as they were. Back in euros,
     // a patch of the entry's own event clears it; its extra dates' events keep the old value, which
     // nothing reads back (the entry's own event is the one a pull reads the currency from).
@@ -89,7 +116,7 @@ const groups = {
   notes: (item: Item): CalendarEvent => ({ description: item.notes }),
   // In a patch, overrides are cleared explicitly: Google merges nested fields, and rejects default
   // reminders next to overrides someone added in Google.
-  reminders: (item: Item): CalendarEvent => ({ reminders: { overrides: [], useDefault: remindersOf(item).useDefault } }),
+  reminders: (item: Item): CalendarEvent => ({ reminders: remindersPatch(item) }),
   // The status tag replaces the category's; an uncategorised event (added by hand) is left alone.
   tag: (item: Item, context: EventContext): CalendarEvent => (item.category === 'uncategorised' ? {} : groups.title(item, context)),
   title: (item: Item, { categories }: EventContext): CalendarEvent => ({
@@ -105,6 +132,7 @@ const GROUP_OF: Record<EditableField, (keyof typeof groups)[]> = {
   currency: [],
   dueDate: ['date'],
   notes: ['notes'],
+  reminders: ['reminders'],
   startDate: [],
   status: ['tag', 'reminders'],
   title: ['title'],
@@ -117,12 +145,13 @@ const PROPERTY_OF: Partial<Record<EditableField, string>> = {
   category: 'hb.category',
   code: 'hb.code',
   currency: 'hb.currency',
+  reminders: 'hb.reminders',
   startDate: 'hb.start',
   status: 'hb.status',
   url: 'hb.url',
 }
 
-/** The full event for a new entry: due 17:00–17:15, with each person's default reminders while open. */
+/** The full event for a new entry: due 17:00–17:15, reminding while open (`remindersOf`). */
 export function eventFor(item: Item, context: EventContext): CalendarEvent {
   // A new event has no all-day date to clear, so the patch-only `date: null` is left out.
   const { start, end } = groups.date(item, context)
