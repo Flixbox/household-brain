@@ -126,3 +126,27 @@ test('a double-tapped Save creates one entry, and deleting it while it syncs rem
   // At most one insert: the delete may even win before the entry was ever sent.
   expect(requests.filter(request => request.method === 'POST' && request.path.endsWith('/events')).length).toBeLessThanOrEqual(1)
 })
+
+test('a category collapses, shows its open count, and stays collapsed after a reload', async ({ page }) => {
+  await mockGoogle(page)
+  await signInAllowlisted(page, 'owner@household-brain.test')
+  await page.getByRole('link', { name: 'Add Coupon' }).click()
+  await page.getByLabel('Title').fill('Cinema')
+  await page.getByLabel('Due date (17:00)').fill('2026-12-01')
+  await page.getByRole('button', { name: 'Save' }).click()
+
+  const coupons = page.getByRole('region', { name: 'Coupon' })
+  const header = coupons.getByRole('button', { name: /Coupon/u })
+  await expect(coupons.getByRole('heading', { name: /Coupon/u })).toBeVisible()
+  await expect(header).toHaveAttribute('aria-expanded', 'true')
+  await expect(header).toContainText('1 open')
+  await header.click()
+  await expect(header).toHaveAttribute('aria-expanded', 'false')
+  await expect(coupons.getByRole('link', { name: /Cinema/u })).toBeHidden()
+
+  await page.reload()
+  await expect(header).toHaveAttribute('aria-expanded', 'false')
+  await expect(page.getByRole('region', { name: 'Membership' }).getByRole('button', { name: /Membership/u })).toHaveAttribute('aria-expanded', 'true')
+  await header.click()
+  await expect(coupons.getByRole('link', { name: /Cinema/u })).toBeVisible()
+})

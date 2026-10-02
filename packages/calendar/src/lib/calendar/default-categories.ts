@@ -2,14 +2,18 @@ import { collection, onSnapshot } from 'firebase/firestore'
 import { db } from '@household-brain/firebase/firebase'
 import { type Category, missingDefaults } from '../categories'
 import { firestoreHouseholdStore } from './store'
+import { pruneCollapsed } from '../items/collapsed'
 
 const ignore = () => null
 
 /**
- * Adds default categories a set-up household doesn't have yet (one added to the defaults after the
- * household was set up). Acts only on the server's answer: the offline cache may simply not know
- * every category yet. Two devices adding the same category is harmless. Retired defaults are only
- * hidden, never deleted (`visibleCategories`).
+ * Keeps this device in line with the household's categories, acting only on the server's answer
+ * (the offline cache may simply not know every category yet):
+ * - adds default categories a set-up household doesn't have yet (one added to the defaults after the
+ *   household was set up); two devices adding the same category is harmless. Retired defaults are
+ *   only hidden, never deleted (`visibleCategories`);
+ * - forgets collapsed categories that no longer exist. Against the full list, not the visible one,
+ *   so a hidden retired category keeps its collapsed state.
  */
 export function watchDefaultCategories(): () => void {
   // With metadata changes, so the server's confirmation of an unchanged cached list arrives too.
@@ -17,7 +21,11 @@ export function watchDefaultCategories(): () => void {
     if (snapshot.metadata.fromCache) {
       return
     }
-    const missing = missingDefaults(snapshot.docs.map(entry => entry.data() as Category))
+    const categories = snapshot.docs.map(entry => entry.data() as Category)
+    if (categories.length > 0) {
+      pruneCollapsed(categories.map(category => category.slug))
+    }
+    const missing = missingDefaults(categories)
     if (missing.length > 0) {
       firestoreHouseholdStore.saveCategories(missing).catch(ignore)
     }
