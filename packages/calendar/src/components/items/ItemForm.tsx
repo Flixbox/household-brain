@@ -6,6 +6,7 @@ import { primaryButton, textField } from '../settings/styles'
 import { Field } from './Field'
 import { StatusField } from './StatusField'
 import { ExtraDatesField } from './ExtraDatesField'
+import { useEntryDates } from './use-entry-dates'
 import type { EntryDate } from '../../lib/items/dates'
 import { LINK_PATTERN, normaliseLink } from '../../lib/items/link'
 
@@ -16,9 +17,9 @@ interface Props {
   initialDates?: EntryDate[]
   /**
    * `latest` is the newest version of the entry the form has seen (save what differs from it);
-   * `dates` are its extra dates.
+   * `dates` are its extra dates, `datesChanged` whether they were changed here.
    */
-  onSave: (draft: ItemDraft, saved: { latest: ItemDraft, dates: EntryDate[] }) => Promise<unknown>
+  onSave: (draft: ItemDraft, saved: { latest: ItemDraft, dates: EntryDate[], datesChanged: boolean }) => Promise<unknown>
   /** Offer the status (open, done, cancelled): when editing, not when adding. */
   withStatus?: boolean
 }
@@ -32,14 +33,14 @@ const NO_DATES: EntryDate[] = []
 export function ItemForm({ initial, initialDates = NO_DATES, categories, onSave, withStatus = false }: Props) {
   const { draft, latest, set } = useEntryForm(initial)
   const [saving, setSaving] = useState(false)
-  const [dates, setDates] = useState(initialDates)
+  const { change: setDates, dates, touched } = useEntryDates(initialDates)
   const submit = (event: FormEvent) => {
     event.preventDefault()
     if (saving) {
       return null
     }
     setSaving(true)
-    return onSave({ ...draft, title: draft.title.trim(), url: normaliseLink(draft.url) }, { dates: dates.map(entry => ({ ...entry, label: entry.label.trim() })), latest })
+    return onSave({ ...draft, title: draft.title.trim(), url: normaliseLink(draft.url) }, { dates: dates.map(entry => ({ ...entry, label: entry.label.trim() })), datesChanged: touched, latest })
   }
   return (
     <form className="grid gap-4" onSubmit={submit}>

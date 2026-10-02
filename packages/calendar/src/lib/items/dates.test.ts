@@ -16,6 +16,8 @@ describe('entry dates', () => {
     expect(nextDate(membership, '2026-10-02').label).toBe('Cancel by')
     expect(nextDate(membership, '2026-12-01').label).toBe('Due')
     expect(nextDate(membership, '2027-01-01').label).toBe('Due')
+    // An overdue due date wins over a later extra date.
+    expect(nextDate({ dueDate: '2026-10-01', extraDates: [{ date: '2026-12-01', id: 'x', label: 'Renews' }] }, '2026-10-02').label).toBe('Due')
     expect(nextDate({ dueDate: '2026-12-14' }, '2026-10-02').label).toBe('Due')
   })
 

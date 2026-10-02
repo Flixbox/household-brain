@@ -20,8 +20,8 @@ shell owns the bar, the drawer and "Sign out"; the app passes in its links.
   - If `localStorage` is unavailable (private mode, blocked storage), it falls back to in-memory
     state, which means everything is expanded.
   - Slugs of deleted categories are pruned on load.
-- Items are sorted by their next date (the first of the due date and the extra dates from today on,
-  or the last once all have passed), with ties broken by title. The row shows that date, and "+
+- Items are sorted by their next date: a passed due date first (the entry is overdue), otherwise the
+  first of the due date and the extra dates from today on, or the last once all have passed; with ties broken by title. The row shows that date, and "+
   more" when the entry has other dates.
 - Each card shows the title, the relative due date ("tomorrow, 17:00", "in 5 days", "overdue by 2
   days") plus the absolute date, the amount, and the code with a copy button.

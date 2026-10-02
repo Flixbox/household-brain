@@ -25,8 +25,14 @@ export function datesOf(item: Pick<Item, 'dueDate' | 'extraDates'>): EntryDate[]
     .toSorted((left, right) => left.date.localeCompare(right.date))
 }
 
-/** The date that matters now: the first one from `today` on, or the last one once all have passed. */
+/**
+ * The date that matters now. A passed due date wins (the entry is overdue, whatever comes later);
+ * otherwise the first date from `today` on, or the last one once all have passed.
+ */
 export function nextDate(item: Pick<Item, 'dueDate' | 'extraDates'>, today: string): EntryDate {
+  if (item.dueDate !== '' && item.dueDate < today) {
+    return { date: item.dueDate, id: 'due', label: 'Due' }
+  }
   const dates = datesOf(item)
   return dates.find(entry => entry.date >= today) ?? dates.at(-1) ?? { date: item.dueDate, id: 'due', label: 'Due' }
 }

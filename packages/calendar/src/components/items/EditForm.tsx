@@ -23,9 +23,10 @@ export function EditForm({ item, categories }: { item: Item, categories: Categor
   // Each handler asks Google first, inside the click, and saves without waiting for the server.
   // Saved: what differs from the newest version the form has seen, i.e. only fields typed in here
   // (untouched fields already equal it), so a change from Google never counts as one made here.
-  const save = (draft: ItemDraft, { latest, dates }: { latest: ItemDraft, dates: EntryDate[] }) => {
+  const save = (draft: ItemDraft, { latest, dates, datesChanged }: { latest: ItemDraft, dates: EntryDate[], datesChanged: boolean }) => {
     requestSyncAccess()
-    const datesSaved = sameDates(item.extraDates, dates) ? Promise.resolve() : setExtraDates(item.id, dates)
+    // Only dates changed here are written: an untouched list may be older than what's stored.
+    const datesSaved = datesChanged && !sameDates(item.extraDates, dates) ? setExtraDates(item.id, dates) : Promise.resolve()
     return after(Promise.all([editItem(item.id, latest, draft), datesSaved]))
   }
   const remove = () => {

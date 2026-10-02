@@ -248,7 +248,7 @@ test('an entry can have more dates; the list shows the next one with "+ more"', 
   await page.getByLabel('Due date (17:00)').fill('2099-12-14')
   await page.getByRole('button', { name: '+ Add date' }).click()
   await page.getByLabel('Label of date 1').fill('Cancel by')
-  await page.getByLabel('Date 1').fill('2099-11-30')
+  await page.getByLabel('Date 1', { exact: true }).fill('2099-11-30')
   await page.getByRole('button', { name: 'Save' }).click()
 
   const row = page.getByRole('region', { name: 'Membership' }).getByRole('link', { name: /Streaming/u })
