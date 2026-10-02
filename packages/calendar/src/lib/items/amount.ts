@@ -6,7 +6,8 @@ const PLAIN_NUMBER = /^\d+(?:[.,]\d{1,2})?$/u
 function foreignLabel(value: number, currency: string, euroRates?: EuroRates | null): string {
   const own = new Intl.NumberFormat('de-DE', { currency, style: 'currency' }).format(value)
   const rate = euroRates?.rates[currency]
-  return rate ? `${own} ≈ ${EURO.format(value / rate)}` : own
+  // "≈" sticks to the euro value, so a narrow column wraps before it.
+  return rate ? `${own} ≈\u00A0${EURO.format(value / rate)}` : own
 }
 
 /**

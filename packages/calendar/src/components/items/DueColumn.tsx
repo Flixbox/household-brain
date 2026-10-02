@@ -29,7 +29,7 @@ export function DueColumn({ item, next, more, price, since, now }: Props) {
   if (!next) {
     return (
       <span className="flex flex-col items-end text-sm">
-        {price && <span className="text-base font-semibold tabular-nums">{price}</span>}
+        {price && <span className="max-w-36 text-right text-base font-semibold tabular-nums">{price}</span>}
         <span className="text-xs text-stone-500">{item.status === 'open' ? 'no expiry' : item.status}</span>
       </span>
     )

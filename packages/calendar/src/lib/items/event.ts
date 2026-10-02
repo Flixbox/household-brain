@@ -68,7 +68,9 @@ export function privateProperties(item: Item): Record<string, string> {
     // An uncategorised entry (an event added by hand) stays without one, so it stays untouched.
     ...item.category === 'uncategorised' ? {} : { 'hb.category': item.category },
     'hb.code': item.code,
-    // Only when it isn't euros, so the events of every other entry stay as they were.
+    // Only when it isn't euros, so the events of every other entry stay as they were. Back in euros,
+    // a patch of the entry's own event clears it; its extra dates' events keep the old value, which
+    // nothing reads back (the entry's own event is the one a pull reads the currency from).
     ...isForeign(item.currency) ? { 'hb.currency': item.currency } : {},
     'hb.start': item.startDate ?? '',
     'hb.status': item.status,
