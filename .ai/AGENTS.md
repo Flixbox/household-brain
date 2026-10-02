@@ -47,6 +47,10 @@ the owner to track.
 **Keep each pull request tight: one topic.** Side findings, refactors and tooling tweaks go into
 their own follow-up PR, never along for the ride.
 
+**Track queued work as GitHub issues.** Every idea or request that isn't being built right now gets
+an issue (assigned to the owner, an existing label such as `enhancement`), and the pull request that
+delivers it says `Closes #n`. Nothing waits only in a chat.
+
 **Keep going without being asked.** Once a pull request is deployed and its browser check is done,
 start the next planned piece of work, or fix what the owner reported, without waiting to be told.
 Ask only for decisions that belong to the owner (security trade-offs, spec changes, scope).

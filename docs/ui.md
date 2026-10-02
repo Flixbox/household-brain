@@ -25,8 +25,8 @@ shell owns the bar, the drawer and "Sign out"; the app passes in its links.
   else is neutral.
 - Memberships and contracts with `noticeDays` also show **"cancel by <dueDate − noticeDays>"**.
 - `done` and `cancelled` items are hidden behind a "Show completed (n)" toggle, a per-device preference
-  (`hb:show-completed`, `@nanostores/persistent`), off by default. Swiping marks an item
-  done; long-pressing edits it.
+  (`hb:show-completed`, `@nanostores/persistent`), off by default. Swiping an open entry to
+  the left marks it done, with "Undo" for a few seconds; tapping an entry edits it.
 - A search field above the categories finds entries by title, code, notes, link or amount (every
   word must match; case and accents are ignored). While searching it lists every match, completed
   ones included, only in categories that have a match, and those open even if folded. It isn't

@@ -1,6 +1,7 @@
 import { Link, Outlet, createRootRoute } from '@tanstack/react-router'
 import { OutboxRunner } from '@household-brain/calendar/components/OutboxRunner'
 import { SyncBar } from '@household-brain/calendar/components/SyncBar'
+import { DoneToast } from '@household-brain/calendar/components/items/DoneToast'
 import { AppShell } from '@household-brain/shell/components/AppShell'
 import { closeMenu } from '@household-brain/shell/lib/menu'
 
@@ -21,6 +22,7 @@ export const Route = createRootRoute({
       <div className="space-y-6">
         <SyncBar />
         <Outlet />
+        <DoneToast />
       </div>
     </AppShell>
   ),
