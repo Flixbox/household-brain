@@ -14,6 +14,8 @@ describe('amountLabel', () => {
   it('has nothing to show for no amount, and shows anything else as typed', () => {
     expect(amountLabel('')).toBeNull()
     expect(amountLabel('  ')).toBeNull()
+    // A document stored without the field (older or stray) must not break the row.
+    expect(amountLabel(null)).toBeNull()
     expect(amountLabel('about 10')).toBe('about 10')
   })
 })
