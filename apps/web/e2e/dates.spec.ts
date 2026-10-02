@@ -69,4 +69,12 @@ test("while someone's app doesn't know date events yet, extra dates stay out of 
   await seedDocument('syncState/older-app', { schema: 2, syncToken: 'sync-1' })
   await expect.poll(summaries).toEqual(['[Membership] Streaming', '[Membership] Streaming · Cancel by'])
   expect(requests.filter(isDateInsert)).toHaveLength(1)
+
+  await test.step('an entry deleted in Google takes its date event with it', async () => {
+    const entryEvent = google.live().find(event => event.summary === '[Membership] Streaming')
+    google.delete(String(entryEvent?.id))
+    await page.goto('/')
+    await expect(page.getByRole('region', { name: 'Membership' })).not.toContainText('Streaming')
+    await expect.poll(summaries).toEqual([])
+  })
 })

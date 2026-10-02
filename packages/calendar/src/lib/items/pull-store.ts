@@ -81,6 +81,12 @@ export function dropStray(eventId: string): Promise<void> {
   })
 }
 
+/** An entry as the server has it now (a date event's owner must not be judged from a stale cache). */
+export async function readEntryFromServer(id: string): Promise<Item | null> {
+  const snapshot = await getDocFromServer(itemDoc(id))
+  return snapshot.exists() ? snapshot.data() as Item : null
+}
+
 /** Tells the other devices this person's app recognises date events (see DATE_EVENTS_SCHEMA). */
 export function markSchema(uid: string, schema: number): Promise<void> {
   return setDoc(syncStateDoc(uid), { schema }, { merge: true })

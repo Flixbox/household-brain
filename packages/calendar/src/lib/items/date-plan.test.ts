@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_CATEGORIES } from '../categories'
-import { dateEventFor, dateEventIdsOf, dateEventsAllowed, planDates, shapeOf } from './date-events'
+import { dateEventFor, dateEventIdsOf, dateEventsAllowed, isOrphanDate, planDates, shapeOf } from './date-events'
 import type { Item } from './model'
 
 const context = { categories: DEFAULT_CATEGORIES, timeZone: 'Europe/Berlin' }
@@ -57,5 +57,18 @@ describe('date events of an entry that came from Google with a longer id', () =>
     const imported = { ...base, id: 'longgoogleeventid0123456789abcdef' }
     expect(planDates(imported, context)).toEqual([])
     expect(dateEventIdsOf(imported)).toEqual([])
+  })
+})
+
+describe('a date event left in Google', () => {
+  it('is an orphan once its entry is gone, or the entry neither has the date nor knows the event', () => {
+    expect(isOrphanDate(null, cancelBy.id)).toBe(true)
+    expect(isOrphanDate({ ...base, extraDates: [] }, cancelBy.id)).toBe(true)
+  })
+
+  it('is kept while the entry has the date, knows the event, or is about to be deleted with it', () => {
+    expect(isOrphanDate(base, cancelBy.id)).toBe(false)
+    expect(isOrphanDate({ ...base, dateEvents: { [cancelBy.id]: { shape: 'x' } }, extraDates: [] }, cancelBy.id)).toBe(false)
+    expect(isOrphanDate({ ...base, extraDates: [], pendingOp: 'delete' }, cancelBy.id)).toBe(false)
   })
 })

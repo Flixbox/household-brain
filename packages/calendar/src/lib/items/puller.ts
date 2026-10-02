@@ -2,8 +2,8 @@ import { CalendarApiError, type EventCursor, type EventPage } from '../calendar/
 import type { CalendarEvent } from './event'
 import { normalisationFor } from './from-event'
 import { decidePull } from './pull-plan'
-import { applyPulled, dropStray, markSchema, readSyncToken, recordEtag, removeVanished, saveSyncToken, serverNow } from './pull-store'
-import { DATE_EVENTS_SCHEMA, entryOfEvent } from './date-events'
+import { applyPulled, dropStray, markSchema, readEntryFromServer, readSyncToken, recordEtag, removeVanished, saveSyncToken, serverNow } from './pull-store'
+import { DATE_EVENTS_SCHEMA, entryOfEvent, isOrphanDate } from './date-events'
 import type { PushContext } from './push'
 import { isTransient } from './transient'
 
@@ -40,10 +40,23 @@ async function normalise(context: PushContext, event: CalendarEvent, patch: Cale
   }
 }
 
-/** An extra date's event belongs to its entry and is never an entry of its own (#34). */
-async function applyDateEvent(event: CalendarEvent): Promise<null> {
-  await dropStray(event.id ?? '')
-  return null
+/**
+ * An extra date's event belongs to its entry and is never an entry of its own (#34). One whose entry
+ * or date is gone is deleted in Google, so its reminders stop.
+ */
+async function applyDateEvent(context: PushContext, event: CalendarEvent, entryId: string): Promise<string | null> {
+  const eventId = event.id ?? ''
+  await dropStray(eventId)
+  const dateId = eventId.slice(entryId.length + 1)
+  if (event.status === 'cancelled' || !isOrphanDate(await readEntryFromServer(entryId), dateId)) {
+    return null
+  }
+  return context.api.deleteEvent(context.config.calendarId, eventId).then(() => null, (error: unknown) => {
+    if (isTransient(error)) {
+      throw error
+    }
+    return `Couldn't remove the leftover "${event.summary ?? eventId}" from Google Calendar: ${describe(error)}`
+  })
 }
 
 /** An entry's own event: merged into the entry, and brought back into shape when needed. */
@@ -63,8 +76,10 @@ async function applyEntryEvent(context: PushContext, event: CalendarEvent): Prom
   return null
 }
 
-const applyEvent = (context: PushContext, event: CalendarEvent): Promise<string | null> =>
-  (entryOfEvent(event) ? applyDateEvent(event) : applyEntryEvent(context, event))
+function applyEvent(context: PushContext, event: CalendarEvent): Promise<string | null> {
+  const entryId = entryOfEvent(event)
+  return entryId ? applyDateEvent(context, event, entryId) : applyEntryEvent(context, event)
+}
 
 interface Listing {
   events: CalendarEvent[]
