@@ -1,6 +1,6 @@
 import { collection, doc, onSnapshot, orderBy, query } from 'firebase/firestore'
 import { auth, db } from '@household-brain/firebase/firebase'
-import { MEMBER_SCOPES, calendarToken, hasCalendarToken, loadGis } from '../google-token'
+import { $calendarToken, MEMBER_SCOPES, calendarToken, hasCalendarToken, loadGis } from '../google-token'
 import type { Item } from './model'
 import { type PushContext, pushItem } from './push'
 import { pullChanges } from './puller'
@@ -64,7 +64,7 @@ function publish() {
     failed: data.items.filter(item => item.sync === 'error'),
     missingCalendar: pending.length > 0 && data.configLoaded && data.config === null,
     // Without a token this device neither pushes nor pulls, so it is offered whenever a calendar exists.
-    needsAccess: data.config !== null && !hasCalendarToken(MEMBER_SCOPES),
+    needsAccess: data.config !== null && !hasCalendarToken(MEMBER_SCOPES, auth.currentUser?.email),
     pullProblem,
     waiting: pending.length,
   }
@@ -106,7 +106,7 @@ function nextToPush(): Item | undefined {
 function readyContext(): PushContext | null {
   const uid = auth.currentUser?.uid
   const { categories, config } = data
-  if (!uid || !config || !categories || performance.now() < pausedUntil || !hasCalendarToken(MEMBER_SCOPES)) {
+  if (!uid || !config || !categories || performance.now() < pausedUntil || !hasCalendarToken(MEMBER_SCOPES, auth.currentUser?.email)) {
     return null
   }
   return { api: outboxApi, categories, config, uid }
@@ -209,6 +209,9 @@ function watchDevice(): (() => void)[] {
   document.addEventListener('visibilitychange', pullIfVisible)
   const every = setInterval(pullIfVisible, PULL_EVERY_MS)
   return [
+    // A token from another tab (shared through storage), or one forgotten after a 401: update the bar
+    // and use it straight away.
+    $calendarToken.listen(() => run()),
     () => globalThis.removeEventListener('online', online),
     () => document.removeEventListener('visibilitychange', pullIfVisible),
     () => clearInterval(every),

@@ -101,8 +101,15 @@ I sign in with my account, and my wife signs in with hers. Each device does two 
      lets the app create the "Household Brain" calendar. It does **not** cover sharing: Google's
      `acl.insert` needs `calendar` or `calendar.acls`. Sharing is done once by hand instead (§4.1),
      so the app never asks for that extra sensitive permission.
-   - The token is valid for about **1 hour** and is kept **in memory only**. No refresh token exists
-     anywhere.
+   - The token is valid for about **1 hour**. It is kept in `localStorage` (`hb:calendar-token`,
+     through `@nanostores/persistent`), so a reload or reopening the app within that hour needs no
+     click; sign-out clears it. It is tied to the account the app requested it for (the signed-in
+     person's email, passed to Google as a hint) and never used for another signed-in person, even if
+     a Firebase session ends without our sign-out. Google may still let someone pick a different
+     account in its chooser; the app doesn't verify which one issued the token. Its deadline is wall-clock
+     time (`Temporal.Now`, via `temporal-polyfill`), not `performance.now()`, which stops while some
+     phones sleep. No refresh token exists anywhere. The trade-off: script injected into
+     the page could read a calendar-only token that expires within the hour.
    - Renewal is silent (`prompt: ''`, `hint: <email from Firebase Auth>`) when Google's session
      cookie is present. Safari or iOS may occasionally show the account-chooser popup instead.
    - It is requested lazily: only when a Calendar call is about to happen and the token is missing

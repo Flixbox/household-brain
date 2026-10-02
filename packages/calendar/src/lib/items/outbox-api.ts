@@ -9,7 +9,7 @@ import { NeedsAccessError } from './transient'
  */
 export const outboxApi = createCalendarApi({
   forgetToken: forgetCalendarToken,
-  token: () => (hasCalendarToken(MEMBER_SCOPES)
+  token: () => (hasCalendarToken(MEMBER_SCOPES, auth.currentUser?.email)
     ? calendarToken(MEMBER_SCOPES, auth.currentUser?.email)
     : Promise.reject(new NeedsAccessError())),
 })
