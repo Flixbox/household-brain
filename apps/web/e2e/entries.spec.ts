@@ -68,7 +68,7 @@ test('an entry is added, edited and deleted, and each change reaches Google Cale
   await expect.poll(() => google.live().length).toBe(0)
 })
 
-test('without Google access an entry waits, and "Sync now" sends it', async ({ page }) => {
+test('without Google access an entry waits, "Sync now" sends it, and a reload keeps the access', async ({ page }) => {
   const { google } = await mockGoogle(page)
   await page.addInitScript(() => {
     // The first token request fails, as when Google's window is closed; later ones succeed.
@@ -94,6 +94,11 @@ test('without Google access an entry waits, and "Sync now" sends it', async ({ p
   await page.getByRole('button', { name: 'Sync now' }).click()
   await expect(page.getByText('not yet in Google Calendar')).toHaveCount(0)
   expect(google.live()).toEqual([expect.objectContaining({ summary: '[Coupon] Gym' })])
+
+  // The token is kept across a reload, so Google isn't asked again and no "Sync now" is offered.
+  await page.reload()
+  await expect(page.getByRole('region', { name: 'Coupon' }).getByRole('link', { name: /Gym/u })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Sync now' })).toHaveCount(0)
 })
 
 test('a double-tapped Save creates one entry, and deleting it while it syncs removes the event too', async ({ page }) => {

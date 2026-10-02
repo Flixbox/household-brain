@@ -1,6 +1,6 @@
 import { collection, doc, onSnapshot, orderBy, query } from 'firebase/firestore'
 import { auth, db } from '@household-brain/firebase/firebase'
-import { MEMBER_SCOPES, calendarToken, hasCalendarToken, loadGis } from '../google-token'
+import { $calendarToken, MEMBER_SCOPES, calendarToken, hasCalendarToken, loadGis } from '../google-token'
 import type { Item } from './model'
 import { type PushContext, pushItem } from './push'
 import { pullChanges } from './puller'
@@ -209,6 +209,9 @@ function watchDevice(): (() => void)[] {
   document.addEventListener('visibilitychange', pullIfVisible)
   const every = setInterval(pullIfVisible, PULL_EVERY_MS)
   return [
+    // A token from another tab (shared through storage), or one forgotten after a 401: update the bar
+    // and use it straight away.
+    $calendarToken.listen(() => run()),
     () => globalThis.removeEventListener('online', online),
     () => document.removeEventListener('visibilitychange', pullIfVisible),
     () => clearInterval(every),

@@ -1,5 +1,7 @@
-// Google Calendar access tokens from Google Identity Services (GIS). Tokens live only in memory and
-// last about an hour; there is no refresh token anywhere (README section 3.1).
+// Google Calendar access tokens from Google Identity Services (GIS). A token lasts about an hour and
+// is kept in localStorage through a persistent store, so a reload doesn't lose it; there is no
+// refresh token anywhere (README section 3.1).
+import { persistentJSON } from '@nanostores/persistent'
 
 const GIS_SCRIPT = 'https://accounts.google.com/gsi/client'
 const CALENDAR = 'https://www.googleapis.com/auth/calendar'
@@ -41,14 +43,22 @@ declare global {
 
 export interface Token {
   value: string
-  /** `performance.now()` deadline; a monotonic clock, unaffected by the wall clock. */
+  /**
+   * Deadline in epoch milliseconds (`now()`). Wall-clock time, because it has to survive a reload;
+   * should the clock be off, Google answers 401 and the API wrapper forgets the token and asks again.
+   */
   usableUntil: number
-  scopes: Set<string>
+  scopes: string[]
 }
 
 const REFRESH_MARGIN_MS = 2 * 60_000
 
-let current: Token | null = null
+/** The current token, kept across reloads; `null` when there is none. */
+export const $calendarToken = persistentJSON<Token | null>('hb:calendar-token', null)
+
+/** Epoch milliseconds, without `Date`: the page's start time plus the time since. */
+const now = () => performance.timeOrigin + performance.now()
+
 let pending: Promise<Token> | null = null
 let gisLoaded: Promise<void> | null = null
 
@@ -72,7 +82,8 @@ export function loadGis(): Promise<void> {
   return gisLoaded
 }
 
-const covers = (token: Token, scopes: readonly string[]) => scopes.every(scope => token.scopes.has(scope))
+const usable = (token: Token | null, scopes: readonly string[]): token is Token =>
+  token !== null && now() < token.usableUntil && scopes.every(scope => token.scopes.includes(scope))
 
 function requestToken(scopes: readonly string[], hint?: string | null): Promise<TokenResponse> {
   const oauth2 = window.google?.accounts.oauth2
@@ -116,8 +127,8 @@ export function acceptToken(response: TokenResponse, scopes: readonly string[]):
     throw new Error(`Calendar access is incomplete. Please allow every permission (missing: ${missing.join(', ')})`)
   }
   return {
-    scopes: granted,
-    usableUntil: performance.now() + response.expires_in * 1000 - REFRESH_MARGIN_MS,
+    scopes: [...granted],
+    usableUntil: now() + response.expires_in * 1000 - REFRESH_MARGIN_MS,
     value: response.access_token,
   }
 }
@@ -128,9 +139,8 @@ export function acceptToken(response: TokenResponse, scopes: readonly string[]):
  * show its consent popup.
  */
 export async function calendarToken(scopes: readonly string[], hint?: string | null): Promise<string> {
-  // The clock behind performance.now() stops while some phones sleep, so a token can outlive this check; the API
-  // wrapper then gets a 401, calls forgetCalendarToken() and asks again.
-  if (current && covers(current, scopes) && performance.now() < current.usableUntil) {
+  const current = $calendarToken.get()
+  if (usable(current, scopes)) {
     return current.value
   }
   // One request at a time: parallel callers share it instead of opening several Google windows.
@@ -140,16 +150,17 @@ export async function calendarToken(scopes: readonly string[], hint?: string | n
     .finally(() => {
       pending = null
     })
-  current = await pending
-  return current.value
+  const token = await pending
+  $calendarToken.set(token)
+  return token.value
 }
 
 /** Whether a usable token covering `scopes` is cached, so work can run without asking Google. */
 export function hasCalendarToken(scopes: readonly string[]): boolean {
-  return current !== null && covers(current, scopes) && performance.now() < current.usableUntil
+  return usable($calendarToken.get(), scopes)
 }
 
-/** Forgets the cached token, e.g. on sign-out. */
+/** Forgets the cached token, e.g. on sign-out or when Google rejects it. */
 export function forgetCalendarToken() {
-  current = null
+  $calendarToken.set(null)
 }

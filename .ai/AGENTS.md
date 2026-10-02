@@ -42,6 +42,10 @@ deploy is green. Never stack pull requests or work on two in parallel: the owner
 which rewrites the history a stacked branch is built on, and every open PR is one more thing for
 the owner to track.
 
+**Keep going without being asked.** Once a pull request is deployed and its browser check is done,
+start the next planned piece of work, or fix what the owner reported, without waiting to be told.
+Ask only for decisions that belong to the owner (security trade-offs, spec changes, scope).
+
 **Run long things in the background and keep working.** Test suites, builds, installs, CI and PR
 watchers, reviewer agents: start them in the background (their exit is the notification) and do the
 next useful thing meanwhile, such as reading review findings, updating the PR description or the
@@ -74,6 +78,8 @@ docs. Only wait in the foreground for something whose result you need for the ve
      PR lacks (`MAIN_MOVED`). Between PRs, `babysit-pr.sh --main` watches `main`'s CI on its own.
    - A plain approval is reported as `APPROVED` only. One with text also comes as `ACTIVITY`, so a
      request written into the approval gets answered before auto-merge.
+   - The bot's own replies in review threads are skipped; its reviews (the reviewer agent posts as
+     the same bot) are not.
 
 ### 3. When the babysitter reports
 
@@ -187,6 +193,10 @@ installing browsers), `deploy` about 2 minutes.
 - **The shell knows no features.** `packages/shell` is the frame (layout, sign-in gate, update
   prompt, sign-out); features never import from it for wiring, and it never imports from them.
   `apps/web/src/main.tsx` connects the two, e.g. `onSignOut(forgetCalendarToken)`.
+- **State lives in nanostores.** Plain `nanostores` atoms for in-memory state shared outside React,
+  `@nanostores/persistent` for state that survives a reload (the Calendar token, UI preferences),
+  read in components with `useStore` from `@nanostores/react`. No hand-rolled listener sets and no
+  direct `localStorage` calls.
 - **No barrel files.** No `index.ts` that re-exports a package's modules: barrels pull every module
   into whatever imports one of them, which defeats tree shaking and code splitting. Packages
   expose their modules by path through `exports` patterns in `package.json` (e.g.

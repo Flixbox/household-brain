@@ -30,6 +30,9 @@ GH=${GH:-gh}
 # Comments are read with the owner's login: a pending (unsubmitted) review is only visible to its
 # author, and the owner leaves those. Override with ACTIVITY_GH.
 ACTIVITY_GH=${ACTIVITY_GH:-gh}
+# The agent's own replies in review threads are not news to it. Its reviews (the reviewer agent posts
+# as the same bot) still are.
+SELF=${SELF:-flixbox-ai-agent[bot]}
 pr=$1
 [[ $pr == --main ]] && pr=main
 limit=$(( ${2:-20} * 60 ))
@@ -55,9 +58,9 @@ activity() { # one line per item: "<kind> <id> <author> <text>"
   "$ACTIVITY_GH" api --paginate "repos/$REPO/issues/$pr/comments" \
     --jq '.[] | "comment \(.id) \(.user.login): \((.body // "") | gsub("\\s+"; " ") | .[0:200])"' &&
   "$ACTIVITY_GH" api --paginate "repos/$REPO/pulls/$pr/reviews" \
-    --jq '.[] | select(.state != "APPROVED" or (.body // "") != "") | "review \(.id) \(.user.login) \(.state): \((.body // "") | gsub("\\s+"; " ") | .[0:200])"' &&
+    --jq '.[] | select(.state != "APPROVED" or (.body // "") != "") | select(.user.login != "'"$SELF"'" or (.body // "") != "") | "review \(.id) \(.user.login) \(.state): \((.body // "") | gsub("\\s+"; " ") | .[0:200])"' &&
   "$ACTIVITY_GH" api --paginate "repos/$REPO/pulls/$pr/comments" \
-    --jq '.[] | "review-comment \(.id) \(.user.login) \(.path): \((.body // "") | gsub("\\s+"; " ") | .[0:200])"'
+    --jq '.[] | select(.user.login != "'"$SELF"'" or .in_reply_to_id == null) | "review-comment \(.id) \(.user.login) \(.path): \((.body // "") | gsub("\\s+"; " ") | .[0:200])"'
 }
 
 ids() { awk 'NF >= 2 { print $1, $2 }' | sort -u; }
