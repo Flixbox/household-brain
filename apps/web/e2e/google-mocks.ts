@@ -1,6 +1,6 @@
 import type { Page, Route } from '@playwright/test'
 
-export interface CalendarRequest {
+interface CalendarRequest {
   method: string
   path: string
   body: unknown

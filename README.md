@@ -1,72 +1,91 @@
 # Household Brain
 
-A progressive web app for two people (me and my wife, **each with our own Google account**) that
-keeps track of everything with a due date: expiring coupons, memberships and subscriptions, public transport tickets, warranties, contract notice periods, and so on.
-Items are grouped by **category**, and within each category they are **sorted by due date**.
+A progressive web app for a two-person household (each with their own Google account) that keeps
+track of everything with a due date: coupons, memberships and subscriptions, transport tickets,
+warranties, contract notice periods, paperwork, and credit that never expires.
 
-- **Google Calendar** is where the items live: one calendar I own and **share with my wife**. The app
-  syncs with it in both directions, and Google Calendar sends both of us the reminders.
-- **Firebase on the free Spark plan** provides login, live sync between devices, offline storage and
-  hosting. **There is no backend server, no Cloud Functions and no secrets.**
+- **Google Calendar** holds the entries: one calendar the owner shares with the other person. The
+  app syncs with it both ways, and Google Calendar sends each person the reminders.
+- **Firebase on the free Spark plan** provides sign-in, live sync between devices, offline storage
+  and hosting. There is no backend server, no Cloud Functions and no secret.
+
+How it works is explained where it happens, in short comments next to the code. Decisions and their
+history live in the GitHub issues.
 
 ## Quick start
 
-Machine setup (Volta, pnpm, Java 21 for the emulators) and every command are in
-[docs/toolchain.md](docs/toolchain.md).
-
 ```sh
 pnpm install
-pnpm dev              # Vite dev server on http://localhost:5173
-pnpm lint && pnpm typecheck && pnpm test
-pnpm test:emulated    # Firebase emulators, rules tests and Playwright end-to-end tests (needs Java 21)
+pnpm dev               # Vite dev server on http://localhost:5173
+pnpm lint              # oxlint, npm-package-json-lint, fallow
+pnpm typecheck && pnpm test
+pnpm test:emulated     # Firebase emulators: rules tests and Playwright e2e (needs Java 21)
 ```
 
-## Project layout
+**Machine setup (once):**
 
-An **Nx** workspace on **pnpm** workspaces. Packages are consumed as TypeScript source, their modules
+```sh
+brew install volta && volta install node@26 pnpm   # Node is pinned in package.json (volta.node), pnpm in packageManager
+brew install openjdk@21                            # the Firestore emulator needs Java 21
+pnpm exec playwright install chromium webkit       # e2e runs desktop Chrome, Pixel 9 and iPhone 17
+brew install --cask gcloud-cli && gcloud init      # only for the one-time Google Cloud setup below
+```
+
+## Layout
+
+An Nx workspace on pnpm workspaces. Packages are consumed as TypeScript source, their modules
 exported by path (no barrel files); only the app is built.
 
 ```
-household-brain/
-├─ apps/web/                      # the PWA: Vite + React, routes, PWA config, e2e tests
-│  ├─ src/main.tsx, src/routes/   # wires the features into the shell; thin route files
-│  ├─ e2e/                        # Playwright against the Firebase emulators
-│  ├─ .env.production, .env.e2e   # public Firebase config; emulator-only config
-│  └─ vite.config.ts, playwright.config.ts, pwa-assets.config.ts, public/
-├─ packages/calendar/             # the calendar feature (@household-brain/calendar)
-│  └─ src/
-│     ├─ lib/calendar/            # Google Calendar API, household setup, sharing
-│     ├─ lib/items/               # entries: model, event mapping, outbox push, pull, Firestore
-│     ├─ lib/google-token.ts      # GIS token client
-│     └─ components/              # entry list/form, settings sections, sync bar
-├─ packages/shell/                # app chrome (@household-brain/shell): page frame, sign-in gate with the
-│                                 #   allowlist, update prompt, sign-out (features register what to forget)
-├─ packages/firebase/             # Firebase app, Auth, Firestore, env checks (@household-brain/firebase)
-├─ tests/rules/                   # Firestore security-rules tests
-├─ firestore.rules, firestore.indexes.json, firebase.json   # hosting serves apps/web/dist
-├─ nx.json, pnpm-workspace.yaml, package.json               # workspace root
-├─ .oxlintrc.json, npmpackagejsonlint.config.ts, .gitleaks.toml
-├─ scripts/babysit-pr.sh
-├─ .github/workflows/ci.yml, .github/dependabot.yml
-└─ .ai/AGENTS.md (AGENTS.md, CLAUDE.md link to it)
+apps/web/            the PWA (Vite + React): routes, PWA config, Playwright e2e against the emulators
+packages/calendar/   the calendar feature: Google Calendar API, entries, outbox push, pull, Firestore
+packages/shell/      the frame: layout, sign-in gate with the allowlist, update prompt, sign-out
+packages/firebase/   Firebase app, Auth, Firestore, live stores, env checks
+tests/rules/         Firestore security-rules tests
+.ai/AGENTS.md        notes for agents working here (AGENTS.md and CLAUDE.md link to it)
 ```
 
-## Documentation
+CI (`.github/workflows/ci.yml`) runs checks, the e2e suite and, on `main`, the deploy.
 
-The specification lives in [`docs/`](docs/); it is the source of truth for how the app works, and
-changes to it go through pull requests like code.
+## One-time setup (by hand)
 
-| Topic | |
-| --- | --- |
-| [Goals and non-goals](docs/goals.md) | What the app is for, and what it deliberately isn't |
-| [Architecture](docs/architecture.md) | The parts and how they fit, and how it stays on the free Spark plan |
-| [Login and access control](docs/access.md) | Google sign-in, the Calendar token, Firestore rules, Google Cloud setup |
-| [How items are stored](docs/storage.md) | The event format in Google Calendar and the Firestore mirror |
-| [Sync](docs/sync.md) | Pull before push, writes from the app, the pull, offline behaviour |
-| [UI](docs/ui.md) | The board, the add/edit form, the menu, settings, the PWA |
-| [Repository, CI/CD and secrets](docs/repository.md) | CI jobs, deploys, branch rules |
-| [Toolchain](docs/toolchain.md) | Tools, commands and code rules |
-| [Milestones](docs/milestones.md) | The build plan |
-| [Decisions](docs/decisions.md) | Choices made and why |
+The Firebase project is a Google Cloud project; everything below happens in it.
 
-Agents working in this repo also read [`.ai/AGENTS.md`](.ai/AGENTS.md).
+**Google Cloud**
+- Enable the **Google Calendar API**.
+- OAuth consent screen: External, with the app name and a support email. Publish it to **In
+  production** (Testing mode asks for consent again every week). An unverified app is fine for
+  personal use: click through the warning once.
+- OAuth client: **Web application**. Authorised JavaScript origins: `https://<project>.web.app`,
+  `https://<project>.firebaseapp.com` and `http://localhost:5173`. No redirect URI.
+- Restrict the browser API key to those websites (plus `http://localhost/*`) and to the Identity
+  Toolkit, Secure Token, Firestore and App Check APIs.
+
+**Firebase**
+- Authentication: enable the Google provider. `authDomain` is `<project>.web.app`, the origin the app
+  is served from, so sign-in works in iOS home-screen apps.
+- Firestore: the rules in `firestore.rules` let only allowlisted accounts in. **Allowlist each
+  person** by creating `allowlist/<uid>` in the console (the uid is under Authentication → Users after
+  their first sign-in; copy it from there). The app itself can never write the allowlist.
+- **New sign-ups are switched off** once everyone has signed in (Authentication → Settings → User
+  actions). To add a person: switch sign-up on, let them sign in once, allowlist them, switch it off.
+
+**The household calendar**
+- The owner creates it from the app's Settings ("Create the household calendar").
+- Then shares it by hand: Google Calendar → Settings → *Household Brain* → *Share with specific
+  people* → the other person's account, with *Make changes to events*. (Sharing from the app would
+  need the broader `calendar.acls` permission.)
+- The other person opens Settings → "Connect my Google Calendar", which adds the calendar with their
+  own reminders.
+
+**Deploys from CI, without a stored secret**
+- GitHub OIDC → Google **Workload Identity Federation** → a deploy service account with Firebase
+  Hosting Admin, Firebase Rules Admin, Cloud Datastore Index Admin and Service Usage Consumer.
+- The provider's condition accepts only this repository's numeric id, `refs/heads/main` and the
+  `production` environment, so forks and other branches can't deploy.
+- Repository settings: fork PR workflows need approval; `GITHUB_TOKEN` is read-only; only
+  GitHub-owned and `google-github-actions/*` actions, pinned to full SHAs; the `production`
+  environment deploys from `main` only; `main` can't be deleted or force-pushed.
+- Manual fallback: `pnpm exec firebase deploy --only hosting,firestore:rules,firestore:indexes`.
+
+Licence: Unlicense.

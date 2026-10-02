@@ -1,0 +1,24 @@
+{
+  // fallow: unused code, duplication and architecture boundaries (#59). Runs in `pnpm lint`.
+  "$schema": "https://docs.fallow.tools/schema/fallowrc.json",
+  // vite-plugin-pwa loads it by name (`pwaAssets: { config: true }` in apps/web/vite.config.ts).
+  "entry": ["apps/web/pwa-assets.config.ts"],
+  // Loaded by vite-plugin-pwa's generated register module, not imported by our code.
+  "ignoreDependencies": ["workbox-window"],
+  "boundaries": {
+    "zones": [
+      { "name": "app", "patterns": ["apps/web/src/**"] },
+      { "name": "shell", "patterns": ["packages/shell/src/**"] },
+      { "name": "calendar", "patterns": ["packages/calendar/src/**"] },
+      { "name": "firebase", "patterns": ["packages/firebase/src/**"] }
+    ],
+    "rules": [
+      // apps/web connects the features to the shell; nothing imports from it.
+      { "from": "app", "allow": ["shell", "calendar", "firebase"] },
+      // The shell knows no features, and features never import from it for wiring.
+      { "from": "shell", "allow": ["firebase"] },
+      { "from": "calendar", "allow": ["firebase"] },
+      { "from": "firebase", "allow": [] }
+    ]
+  }
+}

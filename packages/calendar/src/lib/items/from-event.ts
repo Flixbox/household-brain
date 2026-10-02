@@ -27,7 +27,7 @@ function categoryAndTitle(event: CalendarEvent, categories: readonly Category[])
 }
 
 /** An event someone put into the calendar by hand, without the app's category or a category prefix. */
-export function isForeign(event: CalendarEvent, categories: readonly Category[]): boolean {
+function isForeign(event: CalendarEvent, categories: readonly Category[]): boolean {
   return !event.extendedProperties?.private?.['hb.category'] && !prefixCategory(event, categories).category
 }
 

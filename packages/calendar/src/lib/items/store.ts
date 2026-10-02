@@ -11,7 +11,7 @@ import { type PushRecord, errorFor, recordFor } from './record'
 
 export const itemsCollection = collection(db, 'items')
 const itemDoc = (id: string) => doc(db, 'items', id)
-export const stamp = () => ({ rev: newEventId(), updatedAt: serverTimestamp(), updatedBy: auth.currentUser?.uid ?? '' })
+const stamp = () => ({ rev: newEventId(), updatedAt: serverTimestamp(), updatedBy: auth.currentUser?.uid ?? '' })
 
 // The write functions return Firestore's promise, which only settles once the server confirmed the
 // write. Callers must not wait for it before moving on: offline it never settles, yet the change is
