@@ -70,6 +70,9 @@ docs. Only wait in the foreground for something whose result you need for the ve
      it continues with the next one.
    - It runs from a copy, because bash reads a script while running it.
    - It stays armed through the merge and reports the deploy. Don't poll by hand alongside it.
+   - It watches `main` too: failing or hanging runs (`MAIN_FAILED`, `MAIN_SLOW`) and new commits the
+     PR lacks (`MAIN_MOVED`). Between PRs, `babysit-pr.sh --main` watches `main`'s CI on its own.
+   - Approvals are reported as `APPROVED` only, not again as `ACTIVITY`.
 
 ### 3. When the babysitter reports
 
@@ -82,9 +85,11 @@ docs. Only wait in the foreground for something whose result you need for the ve
 | `CI_SLOW` | More than 20 minutes: something hangs. Cancel the run (`gh run cancel <run>`: the bot can only read Actions, so this uses the owner's login), read the logs (`agent-gh api repos/Flixbox/household-brain/actions/jobs/<job-id>/logs`), fix the hang **and** the missing time limit. A flaky download can just be re-run (`gh run rerun <run> --failed`, owner's login again). |
 | `CONFLICT` | Rebase on `main`, run the checks, push once, reply on the PR. |
 | `ACTIVITY` | Answer every comment (section 4), including those of a pending review. |
-| `DEPLOYED` | Report it and start the next PR. Optionally, a minute later, check the live app in the browser (section 5); never wait on that check. |
+| `DEPLOYED` | A minute later, check the live app in the browser (section 5): mandatory, but never blocking. Report, and start the next PR. |
 | `DEPLOY_FAILED` | Fix it in a follow-up PR (never push to `main`). |
 | `MAIN_FAILED` / `MAIN_SLOW` | `main` is broken or hanging, whichever PR caused it. That comes first: fix it in a follow-up PR, or re-run a flaky job, before continuing. |
+| `MAIN_MOVED` | `main` moved under the PR (another merge). Rebase on `main`, run the checks, push once, so what gets merged is what was tested. |
+| `MAIN_GREEN` | (`--main` mode only) `main`'s newest run passed. |
 
 Normal durations, for comparison: `checks` about 1 minute, `e2e` about 3 minutes (most of it
 installing browsers), `deploy` about 2 minutes.
@@ -113,9 +118,10 @@ installing browsers), `deploy` about 2 minutes.
   `DEPLOYED` or `DEPLOY_FAILED`.
 - **If the deploy fails, open a follow-up pull request** with the fix. Never push to `main`
   directly; it only accepts PRs with green CI.
-- **Optional: one minute after a deploy, check the live app in the browser** (Claude in Chrome). It
-  is a nice extra, never a gate: don't hold up the next PR for it, and if the browser doesn't
-  cooperate, skip it and say so. When you do it:
+- **One minute after every deploy, check the live app in the browser** (Claude in Chrome). This is
+  **mandatory, but never blocking**: if the check finds something broken, or the browser breaks or
+  times out, go on with the next PR anyway and fix what broke there (or in a follow-up PR first,
+  if the live app is unusable). Say in the report what the check showed. The check:
   1. Open `https://household-brain-sf.web.app` and **reload** it, so the new service worker and build
      are the ones running. If an "update available" prompt appears, take it.
   2. Check that the page renders, sign-in or the signed-in screen works, and the browser console
@@ -177,6 +183,9 @@ installing browsers), `deploy` about 2 minutes.
   and `apps/web` routes render what it exports. Packages never import from `apps/web`.
   A new package also goes into the `workspace:*` exceptions in `npmpackagejsonlint.config.ts`
   (exceptions are exact names), and gets its own `package.json` and `tsconfig.json`.
+- **The shell knows no features.** `packages/shell` is the frame (layout, sign-in gate, update
+  prompt, sign-out); features never import from it for wiring, and it never imports from them.
+  `apps/web/src/main.tsx` connects the two, e.g. `onSignOut(forgetCalendarToken)`.
 - **No barrel files.** No `index.ts` that re-exports a package's modules: barrels pull every module
   into whatever imports one of them, which defeats tree shaking and code splitting. Packages
   expose their modules by path through `exports` patterns in `package.json` (e.g.

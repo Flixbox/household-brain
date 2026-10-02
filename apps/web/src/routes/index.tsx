@@ -3,7 +3,7 @@ import { ItemList } from '@household-brain/calendar/components/items/ItemList'
 import { useHousehold } from '@household-brain/calendar/lib/calendar/use-household'
 import { useCategories, useItems } from '@household-brain/calendar/lib/items/use-items'
 import { auth } from '@household-brain/firebase/firebase'
-import { signOutOfApp } from '../lib/session'
+import { signOutOfApp } from '@household-brain/shell/lib/session'
 
 export const Route = createFileRoute('/')({
   component: Home,

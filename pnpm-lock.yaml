@@ -239,6 +239,9 @@ importers:
       '@household-brain/firebase':
         specifier: workspace:*
         version: link:../../packages/firebase
+      '@household-brain/shell':
+        specifier: workspace:*
+        version: link:../../packages/shell
       '@tanstack/react-router':
         specifier: 1.170.40
         version: 1.170.40(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -272,6 +275,18 @@ importers:
       firebase:
         specifier: 12.19.0
         version: 12.19.0
+
+  packages/shell:
+    dependencies:
+      '@household-brain/firebase':
+        specifier: workspace:*
+        version: link:../firebase
+      firebase:
+        specifier: 12.19.0
+        version: 12.19.0
+      react:
+        specifier: 19.3.0
+        version: 19.3.0
 
 packages:
 

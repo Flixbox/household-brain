@@ -1,8 +1,13 @@
 import { RouterProvider, createRouter } from '@tanstack/react-router'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { forgetCalendarToken } from '@household-brain/calendar/lib/google-token'
+import { onSignOut } from '@household-brain/shell/lib/session'
 import './index.css'
 import { routeTree } from './routeTree.gen'
+
+// The features, wired into the shell.
+onSignOut(forgetCalendarToken)
 
 const router = createRouter({ routeTree })
 
