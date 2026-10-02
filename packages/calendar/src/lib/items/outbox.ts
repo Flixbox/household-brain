@@ -64,7 +64,7 @@ function publish() {
     failed: data.items.filter(item => item.sync === 'error'),
     missingCalendar: pending.length > 0 && data.configLoaded && data.config === null,
     // Without a token this device neither pushes nor pulls, so it is offered whenever a calendar exists.
-    needsAccess: data.config !== null && !hasCalendarToken(MEMBER_SCOPES),
+    needsAccess: data.config !== null && !hasCalendarToken(MEMBER_SCOPES, auth.currentUser?.email),
     pullProblem,
     waiting: pending.length,
   }
@@ -106,7 +106,7 @@ function nextToPush(): Item | undefined {
 function readyContext(): PushContext | null {
   const uid = auth.currentUser?.uid
   const { categories, config } = data
-  if (!uid || !config || !categories || performance.now() < pausedUntil || !hasCalendarToken(MEMBER_SCOPES)) {
+  if (!uid || !config || !categories || performance.now() < pausedUntil || !hasCalendarToken(MEMBER_SCOPES, auth.currentUser?.email)) {
     return null
   }
   return { api: outboxApi, categories, config, uid }

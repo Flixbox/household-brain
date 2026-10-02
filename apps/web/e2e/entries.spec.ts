@@ -69,7 +69,7 @@ test('an entry is added, edited and deleted, and each change reaches Google Cale
 })
 
 test('without Google access an entry waits, "Sync now" sends it, and a reload keeps the access', async ({ page }) => {
-  const { google } = await mockGoogle(page)
+  const { google, requests } = await mockGoogle(page)
   await page.addInitScript(() => {
     // The first token request fails, as when Google's window is closed; later ones succeed.
     const original = (window as unknown as { google: { accounts: { oauth2: { initTokenClient: (config: object) => unknown } } } }).google.accounts.oauth2
@@ -95,9 +95,12 @@ test('without Google access an entry waits, "Sync now" sends it, and a reload ke
   await expect(page.getByText('not yet in Google Calendar')).toHaveCount(0)
   expect(google.live()).toEqual([expect.objectContaining({ summary: '[Coupon] Gym' })])
 
-  // The token is kept across a reload, so Google isn't asked again and no "Sync now" is offered.
+  // The token is kept across a reload: the reloaded app reads Google Calendar straight away, which it
+  // only does with a token, and offers no "Sync now". (This test's first token request is refused,
+  // so a reload that asked Google again would show the button.)
+  const before = requests.length
   await page.reload()
-  await expect(page.getByRole('region', { name: 'Coupon' }).getByRole('link', { name: /Gym/u })).toBeVisible()
+  await expect.poll(() => requests.length).toBeGreaterThan(before)
   await expect(page.getByRole('button', { name: 'Sync now' })).toHaveCount(0)
 })
 

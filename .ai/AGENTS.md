@@ -23,7 +23,8 @@ that work with the owner's account.
     '!f() { test "$1" = get || exit 0; echo username=x-access-token; echo "password=$(agent-gh-token)"; }; f'
   ```
 
-- **Pull requests and comments:** `agent-gh pr create …`, `agent-gh pr comment …`.
+- **Pull requests and comments:** `agent-gh pr create --assignee Flixbox …`, `agent-gh pr comment …`.
+  Every pull request is assigned to the owner (`Flixbox`), always.
 - **Babysitter:** `GH=agent-gh /tmp/babysit-pr.sh <number>`. It still reads comments with the owner's
   login, because only the owner's account can see the owner's pending (unsubmitted) reviews.
 - **What the bot can't do**, on purpose: change repository settings or rulesets, merge past checks,

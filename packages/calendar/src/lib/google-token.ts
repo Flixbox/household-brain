@@ -2,6 +2,7 @@
 // is kept in localStorage through a persistent store, so a reload doesn't lose it; there is no
 // refresh token anywhere (README section 3.1).
 import { persistentJSON } from '@nanostores/persistent'
+import { Temporal } from 'temporal-polyfill'
 
 const GIS_SCRIPT = 'https://accounts.google.com/gsi/client'
 const CALENDAR = 'https://www.googleapis.com/auth/calendar'
@@ -43,6 +44,8 @@ declare global {
 
 export interface Token {
   value: string
+  /** The Google account (email) it was issued for: a token never serves another account. */
+  account: string
   /**
    * Deadline in epoch milliseconds (`now()`). Wall-clock time, because it has to survive a reload;
    * should the clock be off, Google answers 401 and the API wrapper forgets the token and asks again.
@@ -56,8 +59,8 @@ const REFRESH_MARGIN_MS = 2 * 60_000
 /** The current token, kept across reloads; `null` when there is none. */
 export const $calendarToken = persistentJSON<Token | null>('hb:calendar-token', null)
 
-/** Epoch milliseconds, without `Date`: the page's start time plus the time since. */
-const now = () => performance.timeOrigin + performance.now()
+/** Wall-clock epoch milliseconds. Not `performance.now()`: that clock stops while some phones sleep. */
+const now = () => Temporal.Now.instant().epochMilliseconds
 
 let pending: Promise<Token> | null = null
 let gisLoaded: Promise<void> | null = null
@@ -82,8 +85,8 @@ export function loadGis(): Promise<void> {
   return gisLoaded
 }
 
-const usable = (token: Token | null, scopes: readonly string[]): token is Token =>
-  token !== null && now() < token.usableUntil && scopes.every(scope => token.scopes.includes(scope))
+const usable = (token: Token | null, scopes: readonly string[], account: string | null | undefined): token is Token =>
+  token !== null && Boolean(account) && token.account === account && now() < token.usableUntil && scopes.every(scope => token.scopes.includes(scope))
 
 function requestToken(scopes: readonly string[], hint?: string | null): Promise<TokenResponse> {
   const oauth2 = window.google?.accounts.oauth2
@@ -117,7 +120,7 @@ function popupProblem(error: { type: string, message?: string }): string {
 }
 
 /** Checks a GIS token response; exported for tests. */
-export function acceptToken(response: TokenResponse, scopes: readonly string[]): Token {
+export function acceptToken(response: TokenResponse, scopes: readonly string[], account: string): Token {
   if (response.error) {
     throw new Error(`Google refused Calendar access: ${response.error}`)
   }
@@ -127,6 +130,7 @@ export function acceptToken(response: TokenResponse, scopes: readonly string[]):
     throw new Error(`Calendar access is incomplete. Please allow every permission (missing: ${missing.join(', ')})`)
   }
   return {
+    account,
     scopes: [...granted],
     usableUntil: now() + response.expires_in * 1000 - REFRESH_MARGIN_MS,
     value: response.access_token,
@@ -138,15 +142,15 @@ export function acceptToken(response: TokenResponse, scopes: readonly string[]):
  * too narrow, or about to expire. Call it from a click handler the first time: Google may need to
  * show its consent popup.
  */
-export async function calendarToken(scopes: readonly string[], hint?: string | null): Promise<string> {
+export async function calendarToken(scopes: readonly string[], account: string | null | undefined): Promise<string> {
   const current = $calendarToken.get()
-  if (usable(current, scopes)) {
+  if (usable(current, scopes, account)) {
     return current.value
   }
   // One request at a time: parallel callers share it instead of opening several Google windows.
   pending ??= loadGis()
-    .then(() => requestToken(scopes, hint))
-    .then(response => acceptToken(response, scopes))
+    .then(() => requestToken(scopes, account))
+    .then(response => acceptToken(response, scopes, account ?? ''))
     .finally(() => {
       pending = null
     })
@@ -155,9 +159,9 @@ export async function calendarToken(scopes: readonly string[], hint?: string | n
   return token.value
 }
 
-/** Whether a usable token covering `scopes` is cached, so work can run without asking Google. */
-export function hasCalendarToken(scopes: readonly string[]): boolean {
-  return usable($calendarToken.get(), scopes)
+/** Whether a usable token for `account` covering `scopes` is cached, so work can run without asking Google. */
+export function hasCalendarToken(scopes: readonly string[], account: string | null | undefined): boolean {
+  return usable($calendarToken.get(), scopes, account)
 }
 
 /** Forgets the cached token, e.g. on sign-out or when Google rejects it. */
