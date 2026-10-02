@@ -16,8 +16,15 @@ const appEvent: CalendarEvent = {
 describe('draftFrom', () => {
   it('reads an event the app wrote', () => {
     expect(draftFrom(appEvent, DEFAULT_CATEGORIES)).toEqual({
-      amount: '10', category: 'coupon', code: 'X1', dueDate: '2026-11-03', notes: 'Only online', startDate: '2026-10-01', status: 'open', title: 'Amazon', url: '',
+      amount: '10', category: 'coupon', code: 'X1', currency: '', dueDate: '2026-11-03', notes: 'Only online', startDate: '2026-10-01', status: 'open', title: 'Amazon', url: '',
     })
+  })
+
+  it('reads another currency, and euros or anything malformed as none', () => {
+    const inCurrency = (code: string) => draftFrom({ ...appEvent, extendedProperties: { private: { ...appEvent.extendedProperties?.private, 'hb.currency': code } } }, DEFAULT_CATEGORIES).currency
+    expect(inCurrency('BRL')).toBe('BRL')
+    expect(inCurrency('EUR')).toBe('')
+    expect(inCurrency('real')).toBe('')
   })
 
   it("reads a done or cancelled entry's title without its status tag", () => {

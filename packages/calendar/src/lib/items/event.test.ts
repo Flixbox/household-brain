@@ -10,6 +10,7 @@ const item: Item = {
   amount: '10',
   category: 'coupon',
   code: 'SUMMER25',
+  currency: '',
   dirty: [],
   dueDate: '2026-11-03',
   etags: {},
@@ -60,6 +61,13 @@ describe('patchFor', () => {
     expect(patchFor(item, ['code'], context)).toEqual({ extendedProperties: { private: { 'hb.code': 'SUMMER25', 'hb.v': '1' } } })
     expect(patchFor(item, ['code', 'url'], context)).toEqual({ extendedProperties: { private: { 'hb.code': 'SUMMER25', 'hb.url': item.url, 'hb.v': '1' } } })
     expect(patchFor({ ...item, category: 'uncategorised' }, ['category'], context).extendedProperties).toBeUndefined()
+  })
+
+  it('stores another currency, and clears it again when the entry is back in euros', () => {
+    expect(eventFor(item, context).extendedProperties?.private).not.toHaveProperty('hb.currency')
+    expect(eventFor({ ...item, currency: 'BRL' }, context).extendedProperties?.private).toMatchObject({ 'hb.currency': 'BRL' })
+    expect(patchFor({ ...item, currency: 'BRL' }, ['currency'], context)).toEqual({ extendedProperties: { private: { 'hb.currency': 'BRL', 'hb.v': '1' } } })
+    expect(patchFor(item, ['currency'], context)).toEqual({ extendedProperties: { private: { 'hb.currency': '', 'hb.v': '1' } } })
   })
 })
 

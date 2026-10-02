@@ -39,6 +39,9 @@ export function dueDateOf(event: CalendarEvent): string {
   return (event.start?.date ?? event.start?.dateTime ?? '').slice(0, 10)
 }
 
+/** An ISO 4217 code another currency is stored as; euros, and anything else, read as ''. */
+const currencyOf = (code: string | undefined) => (code && code !== 'EUR' && /^[A-Z]{3}$/u.test(code) ? code : '')
+
 /** The entry fields an event carries. */
 export function draftFrom(event: CalendarEvent, categories: readonly Category[]): ItemDraft {
   const properties = event.extendedProperties?.private ?? {}
@@ -47,6 +50,7 @@ export function draftFrom(event: CalendarEvent, categories: readonly Category[])
     ...categoryAndTitle(event, categories),
     amount: properties['hb.amount'] ?? '',
     code: properties['hb.code'] ?? '',
+    currency: currencyOf(properties['hb.currency']),
     dueDate: dueDateOf(event),
     notes: event.description ?? '',
     // Only a `YYYY-MM-DD` date; anything else another client wrote reads as no start date.

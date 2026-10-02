@@ -1,3 +1,4 @@
+import { isForeign } from './currency'
 import type { Category } from '../categories'
 import type { EditableField, Item } from './model'
 
@@ -67,6 +68,8 @@ export function privateProperties(item: Item): Record<string, string> {
     // An uncategorised entry (an event added by hand) stays without one, so it stays untouched.
     ...item.category === 'uncategorised' ? {} : { 'hb.category': item.category },
     'hb.code': item.code,
+    // Only when it isn't euros, so the events of every other entry stay as they were.
+    ...isForeign(item.currency) ? { 'hb.currency': item.currency } : {},
     'hb.start': item.startDate ?? '',
     'hb.status': item.status,
     'hb.url': item.url,
@@ -97,6 +100,7 @@ const GROUP_OF: Record<EditableField, (keyof typeof groups)[]> = {
   amount: [],
   category: ['title'],
   code: [],
+  currency: [],
   dueDate: ['date'],
   notes: ['notes'],
   startDate: [],
@@ -110,6 +114,7 @@ const PROPERTY_OF: Partial<Record<EditableField, string>> = {
   amount: 'hb.amount',
   category: 'hb.category',
   code: 'hb.code',
+  currency: 'hb.currency',
   startDate: 'hb.start',
   status: 'hb.status',
   url: 'hb.url',
@@ -136,7 +141,8 @@ export function eventFor(item: Item, context: EventContext): CalendarEvent {
  */
 function changedProperties(item: Item, dirty: readonly EditableField[]): CalendarEvent {
   const all = privateProperties(item)
-  const keys = dirty.flatMap(field => PROPERTY_OF[field] ?? []).filter(key => key in all)
+  // An uncategorised entry leaves the event's category alone; any other property left out is cleared.
+  const keys = dirty.flatMap(field => PROPERTY_OF[field] ?? []).filter(key => key in all || key !== 'hb.category')
   if (keys.length === 0) {
     return {}
   }

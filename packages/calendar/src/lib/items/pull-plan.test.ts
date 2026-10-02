@@ -15,7 +15,7 @@ const event: CalendarEvent = {
 }
 
 const entry: Item = {
-  amount: '', category: 'coupon', code: 'OLD', dirty: [], dueDate: '2026-11-01', etags: { owner: '"g1"' }, id: 'evt1', notes: '',
+  amount: '', category: 'coupon', code: 'OLD', currency: '', dirty: [], dueDate: '2026-11-01', etags: { owner: '"g1"' }, id: 'evt1', notes: '',
   pendingOp: null, rev: 'r1', startDate: '', status: 'open', sync: 'synced', syncError: null, title: 'Amazon', url: '',
 }
 

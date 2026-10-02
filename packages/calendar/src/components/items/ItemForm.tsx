@@ -10,7 +10,7 @@ import { useEntryDates } from './use-entry-dates'
 import type { EntryDate } from '../../lib/items/dates'
 import { LINK_PATTERN, normaliseLink } from '../../lib/items/link'
 import { holdUpdatesValue } from '../../lib/update-hold'
-import { useUndatedAllowed } from '../../lib/items/use-undated'
+import { AmountField } from './AmountField'
 
 interface Props {
   initial: ItemDraft
@@ -37,9 +37,7 @@ const NO_DATES: EntryDate[] = []
  * code doesn't reload the page and lose the entry.
  */
 export function ItemForm({ initial, initialDates = NO_DATES, categories, onSave, withStatus = false }: Props) {
-  const { draft, edited, latest, set } = useEntryForm(initial)
-  // Without a due date only once every app handles that; an entry that already has none may stay so.
-  const dateRequired = !useUndatedAllowed() && !(withStatus && initial.dueDate === '')
+  const { dateRequired, draft, edited, latest, set } = useEntryForm(initial, { editing: withStatus })
   const [saving, setSaving] = useState(false)
   const { change: setDates, dates, touched } = useEntryDates(initialDates)
   const submit = (event: FormEvent) => {
@@ -68,7 +66,7 @@ export function ItemForm({ initial, initialDates = NO_DATES, categories, onSave,
       <ExtraDatesField dates={dates} onChange={setDates} />
       {withStatus && <StatusField value={draft.status} onChange={set('status')} />}
       <Field label="Code"><input className={textField} value={draft.code} onChange={set('code')} /></Field>
-      <Field label="Amount"><input inputMode="decimal" pattern="[0-9]+([.,][0-9]{1,2})?" title="A number, e.g. 9.99" className={textField} value={draft.amount} onChange={set('amount')} /></Field>
+      <AmountField amount={draft.amount} currency={draft.currency} onAmount={set('amount')} onCurrency={set('currency')} />
       <Field label="Link">
         <input inputMode="url" autoCapitalize="none" pattern={LINK_PATTERN} title="A web address, e.g. example.de or https://example.de/deal" placeholder="example.de" className={textField} value={draft.url} onChange={set('url')} />
       </Field>

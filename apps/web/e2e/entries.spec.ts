@@ -145,6 +145,14 @@ test('entries: categories and the form, added, edited, deleted, and a double-tap
     await page.getByLabel('Due date (17:00)').fill('2027-01-31')
     await page.getByRole('button', { name: 'Save' }).click()
     await expect.poll(() => creditEvent()?.start).toMatchObject({ dateTime: '2027-01-31T17:00:00' })
+
+    // In another currency it shows in that one, with its euro value at the day's rate.
+    await page.route('https://api.frankfurter.dev/**', route => route.fulfill({ json: [{ base: 'EUR', date: '2027-01-01', quote: 'USD', rate: 1.25 }] }))
+    await credit.click()
+    await page.getByLabel('Currency').selectOption('USD')
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(credit).toContainText(/25,00\s\$\s≈\s20,00\s€/u)
+    await expect.poll(() => creditEvent()).toMatchObject({ extendedProperties: { private: expect.objectContaining({ 'hb.currency': 'USD' }) } })
   })
 })
 
