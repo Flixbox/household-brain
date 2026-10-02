@@ -57,7 +57,8 @@ export function useSwipeToDone(onDone: () => void, enabled: boolean) {
   }
   const handlers = {
     handleClickCapture: (event: MouseEvent) => {
-      if (moved.current) {
+      // `detail` is 0 for a click from the keyboard (Enter), which never follows a swipe.
+      if (moved.current && event.detail > 0) {
         event.preventDefault()
         event.stopPropagation()
       }
