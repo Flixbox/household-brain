@@ -259,6 +259,13 @@ test('"All by date" lists every entry in one list by due date, labelled with its
   await expect(list.getByRole('link')).toHaveText([/Early gym.*Membership/u, /Late coupon.*Coupon/u])
   await expect(page.getByRole('region', { name: 'Coupon' })).toHaveCount(0)
 
+  // A search with no match says so once, not also "no entries".
+  await page.getByRole('searchbox', { name: 'Search entries' }).fill('sushi')
+  await expect(page.getByText('No entries match “sushi”.')).toBeVisible()
+  await expect(page.getByText('No entries yet.')).toHaveCount(0)
+  await expect(page.getByText('No open entries.')).toHaveCount(0)
+  await page.getByRole('searchbox', { name: 'Search entries' }).fill('')
+
   // Adding works in this view too: its "+" opens the form without a category.
   await list.getByRole('link', { name: 'Add entry' }).click()
   await expect(page.getByLabel('Category')).toHaveValue('')

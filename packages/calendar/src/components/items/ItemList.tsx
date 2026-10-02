@@ -23,7 +23,7 @@ export function ItemList({ items, categories }: { items: Item[], categories: Cat
       <SearchBox />
       {board.searching && board.empty && <p className="text-stone-500">No entries match “{query.trim()}”.</p>}
       <BoardToggles completed={board.completed} searching={board.searching} />
-      {byDate ? <DateList items={board.flat} categories={categories} /> : <CategoryList board={board} />}
+      {byDate ? <DateList board={board} categories={categories} /> : <CategoryList board={board} />}
     </div>
   )
 }
