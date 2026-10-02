@@ -31,7 +31,7 @@ const items = [
   entry({ pendingOp: 'delete', title: 'Pizza being deleted' }),
   entry({ category: 'party', title: 'Pizza party' }),
 ]
-const board = (query: string, showCompleted = false) => boardFor({ categories: DEFAULT_CATEGORIES, items, query, showCompleted })
+const board = (query: string, showCompleted = false) => boardFor({ categories: DEFAULT_CATEGORIES, items, query, showCompleted, today: '2026-10-02' })
 const titles = (section?: { items: Item[] }) => section?.items.map(item => item.title)
 
 describe('boardFor', () => {
@@ -59,5 +59,12 @@ describe('boardFor', () => {
     expect(titles(result.sections[0])).toEqual(['Old pizza', 'Pizza'])
     expect(result.other.map(item => item.title)).toEqual(['Pizza party'])
     expect(board('sushi').empty).toBe(true)
+  })
+
+  it('sorts by the next date, which can be an extra date before the due date', () => {
+    const early = entry({ dueDate: '2026-12-31', extraDates: [{ date: '2026-10-10', id: 'c', label: 'Cancel by' }], title: 'Has a deadline' })
+    const result = boardFor({ categories: DEFAULT_CATEGORIES, items: [...items, early], query: '', showCompleted: false, today: '2026-10-02' })
+    // Its deadline on 10-10 comes before Cinema (11-01) and Pizza (12-01), although it's due 12-31.
+    expect(titles(result.sections[0])).toEqual(['Has a deadline', 'Cinema', 'Pizza'])
   })
 })

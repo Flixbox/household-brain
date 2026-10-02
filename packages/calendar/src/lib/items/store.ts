@@ -1,5 +1,6 @@
 import { arrayUnion, collection, doc, runTransaction, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore'
 import { auth, db } from '@household-brain/firebase/firebase'
+import type { EntryDate } from './dates'
 import { EDITABLE_FIELDS, type Item, type ItemDraft, changedFields, draftOf } from './model'
 import { newEventId } from './ids'
 import type { PushOutcome } from './push'
@@ -14,10 +15,10 @@ export const stamp = () => ({ rev: newEventId(), updatedAt: serverTimestamp(), u
 // already in the local cache and shown everywhere.
 
 /** Saves a new entry, marked for pushing. Returns its id at once and the server write separately. */
-export function addItem(draft: ItemDraft): { id: string, written: Promise<void> } {
+export function addItem(draft: ItemDraft, extraDates: EntryDate[] = []): { id: string, written: Promise<void> } {
   const id = newEventId()
   const written = setDoc(itemDoc(id), {
-    ...draft, ...stamp(), dirty: [...EDITABLE_FIELDS], etags: {}, id, pendingOp: 'upsert', sync: 'pending', syncError: null,
+    ...draft, ...stamp(), dirty: [...EDITABLE_FIELDS], etags: {}, extraDates, id, pendingOp: 'upsert', sync: 'pending', syncError: null,
   })
   return { id, written }
 }
@@ -41,6 +42,13 @@ export function editItem(id: string, opened: ItemDraft, draft: ItemDraft): Promi
 export function setItemStatus(item: Item, status: Item['status']): Promise<void> {
   const before = draftOf(item)
   return editItem(item.id, before, { ...before, status })
+}
+
+/**
+ * Saves an entry's extra dates. They live in the app only for now, so nothing is pushed to Google.
+ */
+export function setExtraDates(id: string, extraDates: EntryDate[]): Promise<void> {
+  return updateDoc(itemDoc(id), { ...stamp(), extraDates })
 }
 
 /**

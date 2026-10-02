@@ -1,8 +1,11 @@
 import type { Category } from '../categories'
 import type { Item } from './model'
 import { matchesSearch } from './search'
+import { nextDate } from './dates'
 
-const byDueDate = (left: Item, right: Item) => left.dueDate.localeCompare(right.dueDate) || left.title.localeCompare(right.title)
+/** By each entry's next date (its due date, or an extra date coming first), then by title. */
+const byNextDate = (today: string) => (left: Item, right: Item) =>
+  nextDate(left, today).date.localeCompare(nextDate(right, today).date) || left.title.localeCompare(right.title)
 
 export interface Board {
   searching: boolean
@@ -23,19 +26,20 @@ export interface Board {
  * cancelled entries show only with `showCompleted`. A search shows every matching entry, completed
  * ones included, and only the categories that have a match.
  */
-export function boardFor({ items, categories, query, showCompleted }: { items: readonly Item[], categories: readonly Category[], query: string, showCompleted: boolean }): Board {
+export function boardFor({ items, categories, query, showCompleted, today }: { items: readonly Item[], categories: readonly Category[], query: string, showCompleted: boolean, today: string }): Board {
+  const byDate = byNextDate(today)
   const searching = query.trim() !== ''
   const current = items.filter(item => item.pendingOp !== 'delete')
   const listed = current.filter(item => (searching ? matchesSearch(item, query) : showCompleted || item.status === 'open'))
   const known = new Set(categories.map(category => category.slug))
   const sections = categories
-    .map(category => ({ category, items: listed.filter(item => item.category === category.slug).toSorted(byDueDate) }))
+    .map(category => ({ category, items: listed.filter(item => item.category === category.slug).toSorted(byDate) }))
     .filter(section => !searching || section.items.length > 0)
   return {
     completed: current.filter(item => item.status !== 'open').length,
     empty: listed.length === 0,
-    flat: listed.toSorted(byDueDate),
-    other: listed.filter(item => !known.has(item.category)).toSorted(byDueDate),
+    flat: listed.toSorted(byDate),
+    other: listed.filter(item => !known.has(item.category)).toSorted(byDate),
     searching,
     sections,
   }

@@ -1,3 +1,5 @@
+import type { EntryDate } from './dates'
+
 /** An entry as the app keeps it in Firestore (`items/{id}`); the id is also the Google event id. */
 export interface Item {
   id: string
@@ -24,6 +26,11 @@ export interface Item {
    * tell whether the entry changed meanwhile (a server timestamp can't: it is still empty locally).
    */
   rev: string
+  /**
+   * More dates besides the due date (#34), e.g. "Cancel by". For now they live in the app only (shared
+   * through Firestore); only the due date is a Google Calendar event. Absent on older entries.
+   */
+  extraDates?: EntryDate[]
   /** Google's `updated` time of the event this entry last matched; older listings are ignored. */
   googleUpdated?: string
   updatedAt?: unknown

@@ -5,6 +5,7 @@ import { type Urgency, rowDue, startLabel } from '../../lib/items/due'
 import { $now } from '../../lib/items/now'
 import { requestSyncAccess } from '../../lib/items/outbox'
 import { markDone } from '../../lib/items/swipe'
+import { extraDatesOf, nextDate } from '../../lib/items/dates'
 import { useSwipeToDone } from './use-swipe'
 
 const URGENCY_TEXT: Record<Urgency, string> = {
@@ -21,7 +22,10 @@ const URGENCY_TEXT: Record<Urgency, string> = {
  */
 export function ItemRow({ item, category }: { item: Item, category?: string }) {
   const now = useStore($now)
-  const due = rowDue(item, now)
+  // The date that matters now; "+ more" says the entry has others (see them when it's opened).
+  const next = nextDate(item, now.toPlainDate().toString())
+  const more = item.status === 'open' && extraDatesOf(item).length > 0 ? ' + more' : ''
+  const due = rowDue({ dueDate: next.date, status: item.status }, now)
   const since = startLabel(item.startDate, now)
   const { handlers, offset } = useSwipeToDone(() => {
     // Asks Google for access while the gesture still counts as a click, like Save does.
@@ -51,8 +55,8 @@ export function ItemRow({ item, category }: { item: Item, category?: string }) {
           {item.code !== '' && <span className="font-mono text-sm break-all text-stone-600 select-all dark:text-stone-400">{item.code}</span>}
         </span>
         <span className="flex flex-col items-end text-sm">
-          <span className={URGENCY_TEXT[due.urgency]}>{due.label}</span>
-          <span className="text-xs text-stone-500 tabular-nums">{item.dueDate}</span>
+          <span className={URGENCY_TEXT[due.urgency]}>{due.label}{more}</span>
+          <span className="text-xs text-stone-500 tabular-nums">{next.date}{more}</span>
           {since && <span className="text-xs text-stone-500 tabular-nums">{since}</span>}
         </span>
         {item.sync !== 'synced' && (

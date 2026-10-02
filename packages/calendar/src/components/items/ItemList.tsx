@@ -5,6 +5,7 @@ import { boardFor } from '../../lib/items/board'
 import { $byDate } from '../../lib/items/by-date'
 import { $search } from '../../lib/items/search'
 import { $showCompleted } from '../../lib/items/show-completed'
+import { $now } from '../../lib/items/now'
 import { BoardToggles } from './BoardToggles'
 import { CategoryList } from './CategoryList'
 import { DateList } from './DateList'
@@ -16,7 +17,8 @@ import { SearchBox } from './SearchBox'
  */
 export function ItemList({ items, categories }: { items: Item[], categories: Category[] }) {
   const query = useStore($search)
-  const board = boardFor({ categories, items, query, showCompleted: useStore($showCompleted) })
+  const today = useStore($now).toPlainDate().toString()
+  const board = boardFor({ categories, items, query, showCompleted: useStore($showCompleted), today })
   const byDate = useStore($byDate)
   return (
     <div className="space-y-6">

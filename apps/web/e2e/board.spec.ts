@@ -239,3 +239,30 @@ test('an optional start date shows on the entry, as since or from', async ({ pag
   await page.getByRole('button', { name: 'Save' }).click()
   await expect(gym).toContainText('from 2099-01-01')
 })
+
+test('an entry can have more dates; the list shows the next one with "+ more"', async ({ page }) => {
+  const { google } = await mockGoogle(page)
+  await signInAllowlisted(page, 'owner@household-brain.test')
+  await page.getByRole('link', { name: 'Add Membership' }).click()
+  await page.getByLabel('Title').fill('Streaming')
+  await page.getByLabel('Due date (17:00)').fill('2099-12-14')
+  await page.getByRole('button', { name: '+ Add date' }).click()
+  await page.getByLabel('Label of date 1').fill('Cancel by')
+  await page.getByLabel('Date 1').fill('2099-11-30')
+  await page.getByRole('button', { name: 'Save' }).click()
+
+  const row = page.getByRole('region', { name: 'Membership' }).getByRole('link', { name: /Streaming/u })
+  await expect(row).toContainText('2099-11-30 + more')
+  await expect(row).toContainText(/in \d+ days \+ more/u)
+  // Only the due date is a Google Calendar event for now.
+  await expect.poll(() => google.live().map(event => event.summary)).toEqual(['[Membership] Streaming'])
+
+  // Kept across a reload, and editable: removing it leaves just the due date.
+  await page.reload()
+  await row.click()
+  await expect(page.getByLabel('Label of date 1')).toHaveValue('Cancel by')
+  await page.getByRole('button', { name: 'Remove date 1' }).click()
+  await page.getByRole('button', { name: 'Save' }).click()
+  await expect(row).toContainText('2099-12-14')
+  await expect(row).not.toContainText('+ more')
+})
