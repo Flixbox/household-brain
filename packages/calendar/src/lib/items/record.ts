@@ -30,10 +30,21 @@ export function recordFor({ latest, pushed, outcome, uid, remote }: PushResult):
   if (outcome.kind === 'deleted') {
     return unchanged ? { kind: 'delete' } : { kind: 'nothing' }
   }
+  const stillDirty = () => latest.dirty.filter(field => !(pushed.dirty.includes(field) && latest[field] === pushed[field]))
+  if (outcome.kind === 'unscheduled') {
+    // No event any more: no etags, and the deletion's time, so listings from before it stay older. A
+    // date added meanwhile stays pending and is inserted next.
+    return {
+      fields: unchanged
+        ? { dirty: [], etags: {}, googleUpdated: outcome.updated, pendingOp: null, sync: 'synced', syncError: null }
+        : { dirty: stillDirty(), etags: {}, ...outcome.updated ? { googleUpdated: outcome.updated } : {} },
+      kind: 'update',
+    }
+  }
   const etag = { [`etags.${uid}`]: outcome.event.etag ?? '' }
   // Changed meanwhile: fields that were just pushed and haven't changed since are in Google now, so
-  // they are no longer unsent changes; a later push must not send them again over newer values.
-  const stillDirty = () => latest.dirty.filter(field => !(pushed.dirty.includes(field) && latest[field] === pushed[field]))
+  // they are no longer unsent changes; a later push must not send them again over newer values
+  // (`stillDirty`).
   // Google's reply holds the whole event: the fields just written, plus anything changed in Google
   // meanwhile. Taking all of it keeps the entry identical to the event.
   return {

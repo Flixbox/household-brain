@@ -15,6 +15,8 @@ export const DEFAULT_CATEGORIES: readonly Category[] = [
   { colorId: '5', label: 'Contract', slug: 'contract', sortOrder: 5 },
   { colorId: '9', label: 'Insurance', slug: 'insurance', sortOrder: 6 },
   { colorId: '1', label: 'Paperwork', slug: 'paperwork', sortOrder: 7 },
+  // Credit that never expires, e.g. on a gift card: its entries usually have no date at all (#33).
+  { colorId: '10', label: 'Balance', slug: 'balance', sortOrder: 8 },
 ]
 
 /**

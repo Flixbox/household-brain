@@ -2,6 +2,7 @@ import type { Category } from '../categories'
 import type { CalendarEvent } from './event'
 import { draftFrom, isRecurring } from './from-event'
 import { EDITABLE_FIELDS, type Item, type ItemDraft } from './model'
+import { isDate } from './dates'
 
 /** What to do with one event from Google Calendar. */
 export type PullDecision =
@@ -76,6 +77,14 @@ function versionOf(entry: Item | null, event: CalendarEvent): 'older' | 'same' |
   return theirs === mine ? 'same' : 'newer'
 }
 
+/**
+ * A deleted event of an entry without a due date and nothing to send: the app deleted it on purpose
+ * when the date was removed. (A live one newer than that, e.g. restored from Google Calendar's trash,
+ * goes the usual way and brings its date back.)
+ */
+const isUnscheduledDeletion = (entry: Item | null, event: CalendarEvent) =>
+  event.status === 'cancelled' && entry !== null && !isDate(entry.dueDate) && !hasLocalEdits(entry)
+
 /** Our own write coming back, or an entry whose deletion is about to be pushed. */
 const isSettled = (entry: Item | null, event: CalendarEvent, uid: string) =>
   entry !== null && (entry.etags[uid] === event.etag || entry.pendingOp === 'delete')
@@ -88,6 +97,7 @@ const isSettled = (entry: Item | null, event: CalendarEvent, uid: string) =>
  * - unknown: a new, synced entry;
  * - an entry with unsent local edits: Google's values for every field not edited locally;
  * - an entry waiting to be deleted: skip (the delete is pushed);
+ * - the deleted event of an entry without a due date and nothing to send: skip (deleted on purpose);
  * - a deleted event: removes the entry, unless the entry has unsent edits;
  * - otherwise: Google's version replaces the entry.
  */
@@ -95,7 +105,7 @@ export function decidePull(input: PullInput): PullDecision {
   const { entry, event, uid } = input
   const version = versionOf(entry, event)
   const cancelled = event.status === 'cancelled'
-  if (version === 'older' || (isRecurring(event) && !cancelled)) {
+  if (version === 'older' || (isRecurring(event) && !cancelled) || isUnscheduledDeletion(entry, event)) {
     return { kind: 'skip' }
   }
   if (cancelled) {

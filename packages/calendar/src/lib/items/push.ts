@@ -3,6 +3,7 @@ import { type CalendarApi, CalendarApiError, type EventTarget } from '../calenda
 import type { HouseholdConfig } from '../calendar/setup'
 import { deleteDateEvents } from './date-push'
 import { type CalendarEvent, eventFor, patchFor } from './event'
+import { isDate } from './dates'
 import type { Item } from './model'
 
 /** Everything a push needs besides the entry. */
@@ -19,6 +20,11 @@ export type PushOutcome =
   /** `event`: Google's full event after the write, which may include changes made in Google meanwhile. */
   | { kind: 'synced', event: CalendarEvent }
   | { kind: 'deleted' }
+  /**
+   * An entry without a due date (a balance): it has no event, and one it had was deleted. `updated`
+   * is Google's time of that deletion (or the entry's last known one), so older listings stay older.
+   */
+  | { kind: 'unscheduled', updated: string }
 
 const isStatus = (error: unknown, status: number) => error instanceof CalendarApiError && error.status === status
 const eventContext = ({ config, categories }: PushContext) => ({ categories, timeZone: config.timeZone })
@@ -97,12 +103,43 @@ async function patch(context: PushContext, item: Item, etag: string): Promise<Ca
   }
 }
 
+/**
+ * An entry without a due date has no event. When it had one (its date was just removed, or someone
+ * pushed it before), that event is deleted; a missing one is fine. Its extra dates' events stay.
+ */
+async function unschedule(context: PushContext, item: Item): Promise<PushOutcome> {
+  // An entry that was in Google: recorded etags, or a date just removed from a synced one. A new
+  // entry without a date never was, so it costs no call.
+  const hadEvent = Object.keys(item.etags).length > 0 || (item.dirty.includes('dueDate') && Boolean(item.googleUpdated))
+  if (!hadEvent) {
+    return { kind: 'unscheduled', updated: item.googleUpdated ?? '' }
+  }
+  await context.api.deleteEvent(context.config.calendarId, item.id)
+  // A deleted event can still be read: its `updated` is when it was deleted. Only "not there" is
+  // fine; anything else (offline, rate limit) retries, so the version guard is never lost.
+  const gone = await context.api.getEvent(context.config.calendarId, item.id).catch((error: unknown) => {
+    if (isStatus(error, 404) || isStatus(error, 410)) {
+      return null
+    }
+    throw error
+  })
+  return { kind: 'unscheduled', updated: gone?.updated ?? '' }
+}
+
+/** A deleted entry: its date events go first, then its own event. */
+async function remove(context: PushContext, item: Item): Promise<PushOutcome> {
+  await deleteDateEvents(context, item)
+  await context.api.deleteEvent(context.config.calendarId, item.id)
+  return { kind: 'deleted' }
+}
+
 /** Pushes one pending entry to Google Calendar. */
 export async function pushItem(context: PushContext, item: Item): Promise<PushOutcome> {
   if (item.pendingOp === 'delete') {
-    await deleteDateEvents(context, item)
-    await context.api.deleteEvent(context.config.calendarId, item.id)
-    return { kind: 'deleted' }
+    return remove(context, item)
+  }
+  if (!isDate(item.dueDate)) {
+    return unschedule(context, item)
   }
   const etag = item.etags[context.uid]
   if (etag) {

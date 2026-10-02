@@ -5,6 +5,7 @@ import type { Item } from './model'
 import type { DateEventChange } from './date-pull'
 import type { PullDecision } from './pull-plan'
 import { newEventId } from './ids'
+import { isDate } from './dates'
 import { itemsCollection } from './store'
 
 const itemDoc = (id: string) => doc(db, 'items', id)
@@ -58,7 +59,8 @@ export async function removeVanished(eventIds: ReadonlySet<string>, listedSince:
   }
   const synced = await getDocs(query(itemsCollection, where('sync', '==', 'synced')))
   // The same check as the transaction's, so date events only go for entries about to go too.
-  const vanished = synced.docs.filter(entry => !eventIds.has(entry.id) && untouched(entry))
+  // An entry without a due date has no event, so it is never "vanished".
+  const vanished = synced.docs.filter(entry => !eventIds.has(entry.id) && isDate(entry.get('dueDate')) && untouched(entry))
   // Their date events go first. A transient failure stops here, so the entries stay for the next full
   // listing; a refusal is reported by `beforeDelete` and the entries still go.
   await Promise.all(vanished.map(entry => beforeDelete(entry.data() as Item)))
@@ -168,7 +170,7 @@ export async function readEntryFromCache(id: string): Promise<Item | null> {
   return snapshot?.exists() ? snapshot.data() as Item : null
 }
 
-/** Tells the other devices this person's app recognises date events (see DATE_EVENTS_SCHEMA). */
+/** Tells the other devices what this person's app handles (see APP_SCHEMA). */
 export function markSchema(uid: string, schema: number): Promise<void> {
   return setDoc(syncStateDoc(uid), { schema }, { merge: true })
 }

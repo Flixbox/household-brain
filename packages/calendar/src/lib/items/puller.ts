@@ -3,7 +3,7 @@ import type { CalendarEvent } from './event'
 import { normalisationFor, ownRemindersFix } from './from-event'
 import { type PullDecision, decidePull } from './pull-plan'
 import { applyDateChange, applyPulled, dropStray, forgetDateEvents, markSchema, readEntryFromCache, readEntryFromServer, readSyncToken, recordEtag, removeVanished, saveSyncToken, serverNow } from './pull-store'
-import { DATE_EVENTS_SCHEMA, entryOfEvent, isOrphanDate } from './date-events'
+import { APP_SCHEMA, entryOfEvent, isOrphanDate } from './date-events'
 import { deleteDateEvents } from './date-push'
 import { dateEventChange } from './date-pull'
 import type { Item, ItemDraft } from './model'
@@ -186,7 +186,7 @@ export async function pullChanges(context: PushContext): Promise<string[]> {
   // the pull. Tried again next session (or next pull) if it fails.
   if (!marked.has(context.uid)) {
     marked.add(context.uid)
-    markSchema(context.uid, DATE_EVENTS_SCHEMA).catch(() => marked.delete(context.uid))
+    markSchema(context.uid, APP_SCHEMA).catch(() => marked.delete(context.uid))
   }
   const syncToken = await readSyncToken(context.uid)
   try {

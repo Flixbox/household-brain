@@ -13,12 +13,18 @@ describe('entry dates', () => {
   })
 
   it('picks the next date from today on, or the last one once all have passed', () => {
-    expect(nextDate(membership, '2026-10-02').label).toBe('Cancel by')
-    expect(nextDate(membership, '2026-12-01').label).toBe('Due')
-    expect(nextDate(membership, '2027-01-01').label).toBe('Due')
+    expect(nextDate(membership, '2026-10-02')?.label).toBe('Cancel by')
+    expect(nextDate(membership, '2026-12-01')?.label).toBe('Due')
+    expect(nextDate(membership, '2027-01-01')?.label).toBe('Due')
     // An overdue due date wins over a later extra date.
-    expect(nextDate({ dueDate: '2026-10-01', extraDates: [{ date: '2026-12-01', id: 'x', label: 'Renews' }] }, '2026-10-02').label).toBe('Due')
-    expect(nextDate({ dueDate: '2026-12-14' }, '2026-10-02').label).toBe('Due')
+    expect(nextDate({ dueDate: '2026-10-01', extraDates: [{ date: '2026-12-01', id: 'x', label: 'Renews' }] }, '2026-10-02')?.label).toBe('Due')
+    expect(nextDate({ dueDate: '2026-12-14' }, '2026-10-02')?.label).toBe('Due')
+  })
+
+  it('has no dates and no next date for a balance that never expires, unless it has an extra date', () => {
+    expect(datesOf({ dueDate: '' })).toEqual([])
+    expect(nextDate({ dueDate: '' }, '2026-10-02')).toBeNull()
+    expect(nextDate({ dueDate: '', extraDates: [{ date: '2026-12-01', id: 'x', label: 'Check' }] }, '2026-10-02')?.label).toBe('Check')
   })
 
   it('compares lists of dates by value', () => {

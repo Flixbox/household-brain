@@ -75,7 +75,7 @@ test("while someone's app doesn't know date events yet, extra dates stay out of 
   await page.getByRole('button', { name: 'Save' }).click()
   const summaries = () => google.live().map(event => event.summary).toSorted()
   await expect.poll(summaries).toEqual(['[Membership] Streaming'])
-  await expect.poll(async () => (await readDocument(`syncState/${uid}`))?.schema).toEqual({ integerValue: '2' })
+  await expect.poll(async () => (await readDocument(`syncState/${uid}`))?.schema).toEqual({ integerValue: '3' })
   // Opening the entry pulls again; then wait until the app has made no Google request for a full
   // second. The outbox acts on its triggers at once, so had the gate been open, the date event would
   // have been written by then (whatever the pull reuse window).

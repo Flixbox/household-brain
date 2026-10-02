@@ -23,6 +23,8 @@ shell owns the bar, the drawer and "Sign out"; the app passes in its links.
 - Items are sorted by their next date: a passed due date first (the entry is overdue), otherwise the
   first of the due date and the extra dates from today on, or the last once all have passed; with ties broken by title. The row shows that date, and "+
   more" when the entry has other dates.
+- The due date is optional. An entry without any date (a balance, #33) sorts after every dated entry
+  and shows its amount prominently and "no expiry" instead of a due label.
 - Each card shows the title; under it the price in slightly smaller text (only when an amount is set; a
   plain number as euros, e.g. "9,99 €", anything else as typed), the category in mixed lists, and the code; on the right the relative
   due date ("tomorrow, 17:00", "in 5 days", "overdue by 2 days") plus the absolute date.
@@ -43,7 +45,8 @@ shell owns the bar, the drawer and "Sign out"; the app passes in its links.
 
 **Add / edit sheet**
 
-- Fields: title, category (chips), **due date (date only, always 17:00)**, more dates (optional,
+- Fields: title, category (chips), **due date (date only, always 17:00; optional once every
+  person's app handles entries without one, see [sync](sync.md))**, more dates (optional,
   each with a label such as "Cancel by" or "Valid from" and a date; for now they live in the app
   only, without reminders: #34), an optional start date
   (not after the due date; the row shows "since …" or, while still ahead, "from …"), status (open / done /

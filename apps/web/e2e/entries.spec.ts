@@ -91,6 +91,61 @@ test('entries: categories and the form, added, edited, deleted, and a double-tap
     // At most one insert: the delete may even win before the entry was ever sent.
     expect(requests.slice(before).filter(request => request.method === 'POST' && request.path.endsWith('/events')).length).toBeLessThanOrEqual(1)
   })
+
+  // Last: its row would otherwise sit where the double-tapped Save's second tap lands on a phone.
+  await test.step('a balance without a date stays in the app, and gets an event only while it has a date', async () => {
+    // Balance is a newer default: this older household gets it through the top-up. On a desktop the
+    // double-tapped Save's second click lands on its header (the last on the board) and folds it, which
+    // the device remembers: unfold it first.
+    const balanceHeader = page.getByRole('region', { name: 'Balance' }).getByRole('button', { name: /Balance/u })
+    if (await balanceHeader.getAttribute('aria-expanded') === 'false') {
+      await balanceHeader.click()
+    }
+    // The due date is optional now that every app that synced (just this one) handles entries without one.
+    await page.getByRole('link', { name: 'Add Balance' }).click()
+    await expect(page.locator('form label > span').filter({ hasText: '*' })).toHaveText(['Title*', 'Category*'])
+    await page.getByLabel('Title').fill('Gift card credit')
+    await page.getByLabel('Amount').fill('25')
+    await page.getByRole('button', { name: 'Save' }).click()
+    const credit = page.getByRole('region', { name: 'Balance' }).getByRole('link', { name: /Gift card credit/u })
+    await expect(credit).toContainText(/25,00\s€/u)
+    await expect(credit).toContainText('no expiry')
+    await expect(page.getByText('not yet in Google Calendar')).toHaveCount(0)
+    const creditEvent = () => google.live().find(event => String(event.summary).includes('Gift card credit'))
+    expect(creditEvent()).toBeUndefined()
+
+    // Given a date, it is an ordinary entry with an event; without it again, the event goes.
+    await credit.click()
+    await page.getByLabel('Due date (17:00)').fill('2026-12-31')
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(credit).toContainText('2026-12-31')
+    await expect.poll(() => creditEvent()?.summary).toBe('[Balance] Gift card credit')
+    await credit.click()
+    await page.getByLabel('Due date (17:00)').fill('')
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(credit).toContainText('no expiry')
+    await expect.poll(() => creditEvent()).toBeUndefined()
+
+    // The pull that sees the event deleted keeps the entry: wait for one after a reload, then for
+    // the app to go quiet, before looking.
+    const before = requests.length
+    await page.reload()
+    await expect.poll(() => requests.slice(before).some(request => request.method === 'GET' && request.path.endsWith('/events'))).toBe(true)
+    await expect.poll(async () => {
+      const seen = requests.length
+      await new Promise(resolve => {
+        setTimeout(resolve, 1000)
+      })
+      return requests.length === seen
+    }, { timeout: 15_000 }).toBe(true)
+    await expect(credit).toContainText('no expiry')
+
+    // Given a date again, the deleted event comes back.
+    await credit.click()
+    await page.getByLabel('Due date (17:00)').fill('2027-01-31')
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect.poll(() => creditEvent()?.start).toMatchObject({ dateTime: '2027-01-31T17:00:00' })
+  })
 })
 
 test('without Google access an entry waits, "Sync now" sends it, and a reload keeps the access', async ({ page }) => {
