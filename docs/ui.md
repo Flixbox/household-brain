@@ -40,7 +40,8 @@ shell owns the bar, the drawer and "Sign out"; the app passes in its links.
 
 **Add / edit sheet**
 
-- Fields: title, category (chips), **due date (date only, always 17:00)**, status (open / done /
+- Fields: title, category (chips), **due date (date only, always 17:00)**, an optional start date
+  (not after the due date; the row shows "since …" or, while still ahead, "from …"), status (open / done /
   cancelled; when editing only, a new entry is open), repeat (none / monthly /
   yearly / custom), amount, code, link, notes, notice period.
 - There is **no reminder or time field.** Every entry gets 17:00 and the 2-day and 1-day

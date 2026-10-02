@@ -5,6 +5,8 @@ export interface Item {
   category: string
   /** ISO calendar date, `YYYY-MM-DD`; always due at 17:00 Europe/Berlin. */
   dueDate: string
+  /** Optional `YYYY-MM-DD` it started or becomes valid (a membership's start, a coupon's first day); '' if none. */
+  startDate: string
   status: 'open' | 'done' | 'cancelled'
   code: string
   amount: string
@@ -29,7 +31,7 @@ export interface Item {
   updatedBy?: string
 }
 
-export const EDITABLE_FIELDS = ['title', 'category', 'dueDate', 'status', 'code', 'amount', 'url', 'notes'] as const
+export const EDITABLE_FIELDS = ['title', 'category', 'dueDate', 'startDate', 'status', 'code', 'amount', 'url', 'notes'] as const
 export type EditableField = typeof EDITABLE_FIELDS[number]
 export type ItemDraft = Pick<Item, EditableField>
 
@@ -39,14 +41,16 @@ export const emptyDraft = (category = ''): ItemDraft => ({
   code: '',
   dueDate: '',
   notes: '',
+  startDate: '',
   status: 'open',
   title: '',
   url: '',
 })
 
+/** The editable fields of an entry; a field older entries don't have yet (e.g. `startDate`) is ''. */
+export const draftOf = (item: Item): ItemDraft => Object.fromEntries(EDITABLE_FIELDS.map(field => [field, item[field] ?? ''])) as ItemDraft
+
 /** The fields whose value differs between two drafts. */
-/** The editable fields of an entry. */
-export const draftOf = (item: Item): ItemDraft => Object.fromEntries(EDITABLE_FIELDS.map(field => [field, item[field]])) as ItemDraft
 
 export function changedFields(before: ItemDraft, after: ItemDraft): EditableField[] {
   return EDITABLE_FIELDS.filter(field => before[field] !== after[field])

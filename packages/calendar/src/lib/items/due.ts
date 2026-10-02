@@ -42,3 +42,15 @@ export function dueStatus(dueDate: string, now: Temporal.ZonedDateTime): Due {
 export function rowDue(item: { dueDate: string, status: 'open' | 'done' | 'cancelled' }, now: Temporal.ZonedDateTime): Due {
   return item.status === 'open' ? dueStatus(item.dueDate, now) : { label: item.status, urgency: 'later' }
 }
+
+/**
+ * When an entry started, for its row: "since …" once the start date has come, "from …" while it
+ * is still ahead (a coupon not valid yet); null without one.
+ */
+export function startLabel(startDate: string | null | undefined, now: Temporal.ZonedDateTime): string | null {
+  if (!startDate) {
+    return null
+  }
+  const notYet = Temporal.PlainDate.compare(Temporal.PlainDate.from(startDate), now.toPlainDate()) > 0
+  return `${notYet ? 'from' : 'since'} ${startDate}`
+}

@@ -54,6 +54,7 @@ function privateProperties(item: Item): Record<string, string> {
     // An uncategorised entry (an event added by hand) stays without one, so it stays untouched.
     ...item.category === 'uncategorised' ? {} : { 'hb.category': item.category },
     'hb.code': item.code,
+    'hb.start': item.startDate ?? '',
     'hb.status': item.status,
     'hb.url': item.url,
     'hb.v': '1',
@@ -80,6 +81,7 @@ const GROUP_OF: Record<EditableField, (keyof typeof groups)[]> = {
   code: [],
   dueDate: ['date'],
   notes: ['notes'],
+  startDate: [],
   status: [],
   title: ['title'],
   url: [],
@@ -90,6 +92,7 @@ const PROPERTY_OF: Partial<Record<EditableField, string>> = {
   amount: 'hb.amount',
   category: 'hb.category',
   code: 'hb.code',
+  startDate: 'hb.start',
   status: 'hb.status',
   url: 'hb.url',
 }

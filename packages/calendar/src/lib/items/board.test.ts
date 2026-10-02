@@ -14,6 +14,7 @@ const entry = (overrides: Partial<Item>): Item => ({
   notes: '',
   pendingOp: null,
   rev: 'r1',
+  startDate: '',
   status: 'open',
   sync: 'synced',
   syncError: null,

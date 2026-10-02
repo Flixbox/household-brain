@@ -7,7 +7,7 @@ const context = { categories: DEFAULT_CATEGORIES, timeZone: 'Europe/Berlin' }
 const appEvent: CalendarEvent = {
   description: 'Only online',
   end: { dateTime: '2026-11-03T17:15:00+01:00', timeZone: 'Europe/Berlin' },
-  extendedProperties: { private: { 'hb.amount': '10', 'hb.category': 'coupon', 'hb.code': 'X1', 'hb.status': 'done', 'hb.url': '' } },
+  extendedProperties: { private: { 'hb.amount': '10', 'hb.category': 'coupon', 'hb.code': 'X1', 'hb.start': '2026-10-01', 'hb.status': 'done', 'hb.url': '' } },
   reminders: { useDefault: true },
   start: { dateTime: '2026-11-03T17:00:00+01:00', timeZone: 'Europe/Berlin' },
   summary: '[Coupon] Amazon',
@@ -16,7 +16,7 @@ const appEvent: CalendarEvent = {
 describe('draftFrom', () => {
   it('reads an event the app wrote', () => {
     expect(draftFrom(appEvent, DEFAULT_CATEGORIES)).toEqual({
-      amount: '10', category: 'coupon', code: 'X1', dueDate: '2026-11-03', notes: 'Only online', status: 'done', title: 'Amazon', url: '',
+      amount: '10', category: 'coupon', code: 'X1', dueDate: '2026-11-03', notes: 'Only online', startDate: '2026-10-01', status: 'done', title: 'Amazon', url: '',
     })
   })
 

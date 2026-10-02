@@ -1,7 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import { useStore } from '@nanostores/react'
 import type { Item } from '../../lib/items/model'
-import { type Urgency, rowDue } from '../../lib/items/due'
+import { type Urgency, rowDue, startLabel } from '../../lib/items/due'
 import { $now } from '../../lib/items/now'
 import { requestSyncAccess } from '../../lib/items/outbox'
 import { markDone } from '../../lib/items/swipe'
@@ -20,7 +20,9 @@ const URGENCY_TEXT: Record<Urgency, string> = {
  * entry to the left marks it done.
  */
 export function ItemRow({ item, category }: { item: Item, category?: string }) {
-  const due = rowDue(item, useStore($now))
+  const now = useStore($now)
+  const due = rowDue(item, now)
+  const since = startLabel(item.startDate, now)
   const { handlers, offset } = useSwipeToDone(() => {
     // Asks Google for access while the gesture still counts as a click, like Save does.
     requestSyncAccess()
@@ -51,6 +53,7 @@ export function ItemRow({ item, category }: { item: Item, category?: string }) {
         <span className="flex flex-col items-end text-sm">
           <span className={URGENCY_TEXT[due.urgency]}>{due.label}</span>
           <span className="text-xs text-stone-500 tabular-nums">{item.dueDate}</span>
+          {since && <span className="text-xs text-stone-500 tabular-nums">{since}</span>}
         </span>
         {item.sync !== 'synced' && (
           <span className={`size-2 rounded-full ${item.sync === 'error' ? 'bg-red-600' : 'bg-orange-500'}`}>

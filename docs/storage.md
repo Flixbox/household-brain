@@ -49,6 +49,7 @@
   | `hb.amount` / `hb.currency` | `9.99` / `EUR` | Optional |
   | `hb.code` | `SUMMER25` | Coupon code, member number, … |
   | `hb.url` | `https://…` | |
+  | `hb.start` | `2026-08-15` | Optional start date (when it started or becomes valid); empty if none |
   | `hb.noticeDays` | `30` | Notice period, which gives a "cancel by" date |
   | `hb.v` | `1` | Schema version |
 

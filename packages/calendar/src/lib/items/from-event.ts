@@ -43,6 +43,7 @@ export function draftFrom(event: CalendarEvent, categories: readonly Category[])
     code: properties['hb.code'] ?? '',
     dueDate: dueDateOf(event),
     notes: event.description ?? '',
+    startDate: properties['hb.start'] ?? '',
     status: status === 'done' || status === 'cancelled' ? status : 'open',
     url: properties['hb.url'] ?? '',
   }
