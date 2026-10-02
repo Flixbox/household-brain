@@ -44,8 +44,10 @@ describe('decidePull', () => {
     expect(decision).toMatchObject({ kind: 'update', normalise: false })
     const { fields } = decision as { fields: Record<string, unknown> }
     expect(fields).not.toHaveProperty('code')
-    expect(fields).toMatchObject({ 'dueDate': '2026-11-03', 'etags.owner': '"g2"', 'title': 'Amazon (from Google)' })
+    expect(fields).toMatchObject({ dueDate: '2026-11-03', title: 'Amazon (from Google)' })
     expect(fields).not.toHaveProperty('sync')
+    // This person's etag comes only once their own copy is checked, so an interrupted check runs again.
+    expect(fields).not.toHaveProperty('etags.owner')
   })
 
   it("still has this person's own copy follow the merged entry (#74)", () => {
@@ -69,10 +71,9 @@ describe('decidePull', () => {
     expect(decide({ entry: { ...entry, googleUpdated: '2026-10-01T10:00:05Z' }, event: { ...event, updated: '2026-10-01T10:00:04.999Z' } })).toEqual({ kind: 'skip' })
   })
 
-  it('only remembers this person\'s etag for the version the entry already holds', () => {
+  it('takes nothing from the version the entry already holds, and leaves this person\'s etag for after their own copy is checked', () => {
     const decision = decide({ entry: { ...entry, googleUpdated: '2026-10-01T10:00:05.000Z' }, event: { ...event, updated: '2026-10-01T10:00:05Z' } })
-    expect(decision).toMatchObject({ fields: { 'etags.owner': '"g2"' }, kind: 'update', normalise: false })
-    expect(Object.keys((decision as { fields: object }).fields)).toEqual(['etags.owner'])
+    expect(decision).toMatchObject({ fields: {}, kind: 'update', normalise: false, ownCopy: true })
   })
 
   it('leaves repeating events alone until repeating entries exist', () => {

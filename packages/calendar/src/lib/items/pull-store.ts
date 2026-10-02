@@ -24,7 +24,7 @@ export const applyPulled = (event: CalendarEvent, decide: (entry: Item | null) =
       transaction.delete(ref)
     } else if (decision.kind === 'create') {
       transaction.set(ref, { ...decision.fields, ...pullStamp() })
-    } else if (decision.kind === 'update') {
+    } else if (decision.kind === 'update' && (decision.normalise || Object.keys(decision.fields).length > 0)) {
       // Merging Google's values into an entry with unsent edits keeps its revision: those edits are
       // still the ones to push. Replacing an entry is a new revision.
       transaction.update(ref, decision.normalise ? { ...decision.fields, ...pullStamp() } : decision.fields)

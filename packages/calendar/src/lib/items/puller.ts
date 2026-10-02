@@ -114,9 +114,14 @@ const applyEntryEvent = async (context: PushContext, event: CalendarEvent): Prom
 }
 
 /** The other person's push, alone or merged into local edits: this person's reminders still follow the entry (#43, #74). */
-const fixOwnReminders = (context: PushContext, event: CalendarEvent, draft: ItemDraft): Promise<string | null> => {
+const fixOwnReminders = async (context: PushContext, event: CalendarEvent, draft: ItemDraft): Promise<string | null> => {
   const fix = ownRemindersFix(event, draft, context.categories)
-  return fix ? normalise(context, event, fix) : Promise.resolve(null)
+  if (fix) {
+    // Records this person's etag once the fix is written; a failed or interrupted one comes again.
+    return normalise(context, event, fix)
+  }
+  await recordEtag(event.id ?? '', context.uid, event)
+  return null
 }
 
 /** After merging: created and replaced entries are brought into shape and get this person's etag. */
