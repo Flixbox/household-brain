@@ -74,14 +74,27 @@ test('an entry marked done leaves the board until "Show completed", and Google g
   await page.getByRole('button', { name: 'Save' }).click()
   await expect(coupons.getByRole('link', { name: /Pizza/u })).toBeHidden()
   await expect.poll(() => google.live()[0]?.extendedProperties).toMatchObject({ private: { 'hb.status': 'done' } })
+  // In Google Calendar it says done instead of its category, and no longer reminds anyone.
+  expect(google.live()[0]).toMatchObject({ reminders: { overrides: [], useDefault: false }, summary: '[Done] Pizza' })
 
   const toggle = page.getByRole('button', { name: 'Show completed (1)' })
   await expect(toggle).toHaveAttribute('aria-pressed', 'false')
   await toggle.click()
   await expect(toggle).toHaveAttribute('aria-pressed', 'true')
   await expect(coupons.getByRole('link', { name: /Pizza/u })).toContainText('done')
+  // The app shows its title without the tag.
+  await expect(coupons.getByRole('link', { name: /Pizza/u })).not.toContainText('[Done]')
   await toggle.click()
   await expect(coupons.getByRole('link', { name: /Pizza/u })).toBeHidden()
+
+  await test.step('reopened, it has its category and reminders again', async () => {
+    await toggle.click()
+    await coupons.getByRole('link', { name: /Pizza/u }).click()
+    await page.getByLabel('Status').selectOption('open')
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect.poll(() => google.live()[0]?.summary).toBe('[Coupon] Pizza')
+    expect(google.live()[0]).toMatchObject({ reminders: { useDefault: true } })
+  })
 })
 
 test('searching shows only matching entries, in their categories, even folded ones', async ({ page }) => {
@@ -189,6 +202,8 @@ test('swiping an entry left marks it done, with Undo', async ({ page }) => {
   // A swipe isn't a tap: the board stays, no edit form.
   await expect(page.getByRole('heading', { name: 'Edit entry' })).toHaveCount(0)
   await expect.poll(() => google.live()[0]?.extendedProperties).toMatchObject({ private: { 'hb.status': 'done' } })
+  // In Google Calendar it says done instead of its category, and no longer reminds anyone.
+  expect(google.live()[0]).toMatchObject({ reminders: { overrides: [], useDefault: false }, summary: '[Done] Pizza' })
 
   await page.getByRole('button', { name: 'Undo' }).click()
   await expect(row).toBeVisible()

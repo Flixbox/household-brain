@@ -20,7 +20,7 @@ const NONE: DateEventChange = { kind: 'none' }
 function fits(event: CalendarEvent, expected: CalendarEvent, timeZone: string): boolean {
   const theirs = event.extendedProperties?.private ?? {}
   return isAt(event.start, DUE_TIME, timeZone) && isAt(event.end, END_TIME, timeZone)
-    && event.reminders?.useDefault === true && !event.reminders.overrides?.length
+    && event.reminders?.useDefault === expected.reminders?.useDefault && !event.reminders?.overrides?.length
     && event.summary === expected.summary && (event.description ?? '') === (expected.description ?? '')
     && event.colorId === expected.colorId
     && Object.entries(expected.extendedProperties?.private ?? {}).every(([key, value]) => (theirs[key] ?? '') === value)

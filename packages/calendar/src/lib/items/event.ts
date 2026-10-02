@@ -42,11 +42,23 @@ export interface EventContext {
 export const labelOf = (item: Pick<Item, 'category'>, categories: readonly Category[]) =>
   categories.find(category => category.slug === item.category)
 
-/** `[Coupon] Amazon 10€`: the prefix keeps entries readable in Google Calendar itself. */
-export function summaryOf(item: Pick<Item, 'title' | 'category'>, categories: readonly Category[]): string {
+/** The title tag of a done or cancelled entry, which replaces its category's (#43). */
+export const STATUS_TAGS = { cancelled: 'Cancelled', done: 'Done' } as const
+
+/**
+ * `[Coupon] Amazon 10€`: the prefix keeps entries readable in Google Calendar itself. A done or
+ * cancelled entry says so instead: `[Done] Amazon 10€`. An uncategorised one (an event added by hand)
+ * keeps its own title.
+ */
+export function summaryOf(item: Pick<Item, 'title' | 'category'> & Partial<Pick<Item, 'status'>>, categories: readonly Category[]): string {
   const category = labelOf(item, categories)
-  return category ? `[${category.label}] ${item.title}` : item.title
+  const tag = category && item.status && item.status !== 'open' ? STATUS_TAGS[item.status] : category?.label
+  return tag ? `[${tag}] ${item.title}` : item.title
 }
+
+/** Open entries remind with each person's defaults; done and cancelled ones don't remind at all. */
+export const remindersOf = (item: Pick<Item, 'status'>): NonNullable<CalendarEvent['reminders']> =>
+  (item.status === 'open' ? { useDefault: true } : { overrides: [], useDefault: false })
 
 /** The entry's fields kept in the event's private properties; date events carry them too. */
 export function privateProperties(item: Item): Record<string, string> {
@@ -70,6 +82,7 @@ const groups = {
     start: { date: null, dateTime: `${item.dueDate}T${DUE_TIME}`, timeZone },
   }),
   notes: (item: Item): CalendarEvent => ({ description: item.notes }),
+  reminders: (item: Item): CalendarEvent => ({ reminders: remindersOf(item) }),
   title: (item: Item, { categories }: EventContext): CalendarEvent => ({
     colorId: labelOf(item, categories)?.colorId ?? '8',
     summary: summaryOf(item, categories),
@@ -83,7 +96,7 @@ const GROUP_OF: Record<EditableField, (keyof typeof groups)[]> = {
   dueDate: ['date'],
   notes: ['notes'],
   startDate: [],
-  status: [],
+  status: ['title', 'reminders'],
   title: ['title'],
   url: [],
 }
@@ -98,7 +111,7 @@ const PROPERTY_OF: Partial<Record<EditableField, string>> = {
   url: 'hb.url',
 }
 
-/** The full event for a new entry: due 17:00–17:15, and each person's default reminders apply. */
+/** The full event for a new entry: due 17:00–17:15, with each person's default reminders while open. */
 export function eventFor(item: Item, context: EventContext): CalendarEvent {
   // A new event has no all-day date to clear, so the patch-only `date: null` is left out.
   const { start, end } = groups.date(item, context)
@@ -108,7 +121,7 @@ export function eventFor(item: Item, context: EventContext): CalendarEvent {
     ...groups.notes(item),
     end: { dateTime: end?.dateTime, timeZone: end?.timeZone },
     extendedProperties: { private: privateProperties(item) },
-    reminders: { useDefault: true },
+    reminders: remindersOf(item),
     start: { dateTime: start?.dateTime, timeZone: start?.timeZone },
   }
 }

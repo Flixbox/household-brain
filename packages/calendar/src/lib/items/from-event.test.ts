@@ -7,7 +7,7 @@ const context = { categories: DEFAULT_CATEGORIES, timeZone: 'Europe/Berlin' }
 const appEvent: CalendarEvent = {
   description: 'Only online',
   end: { dateTime: '2026-11-03T17:15:00+01:00', timeZone: 'Europe/Berlin' },
-  extendedProperties: { private: { 'hb.amount': '10', 'hb.category': 'coupon', 'hb.code': 'X1', 'hb.start': '2026-10-01', 'hb.status': 'done', 'hb.url': '' } },
+  extendedProperties: { private: { 'hb.amount': '10', 'hb.category': 'coupon', 'hb.code': 'X1', 'hb.start': '2026-10-01', 'hb.status': 'open', 'hb.url': '' } },
   reminders: { useDefault: true },
   start: { dateTime: '2026-11-03T17:00:00+01:00', timeZone: 'Europe/Berlin' },
   summary: '[Coupon] Amazon',
@@ -16,8 +16,16 @@ const appEvent: CalendarEvent = {
 describe('draftFrom', () => {
   it('reads an event the app wrote', () => {
     expect(draftFrom(appEvent, DEFAULT_CATEGORIES)).toEqual({
-      amount: '10', category: 'coupon', code: 'X1', dueDate: '2026-11-03', notes: 'Only online', startDate: '2026-10-01', status: 'done', title: 'Amazon', url: '',
+      amount: '10', category: 'coupon', code: 'X1', dueDate: '2026-11-03', notes: 'Only online', startDate: '2026-10-01', status: 'open', title: 'Amazon', url: '',
     })
+  })
+
+  it("reads a done or cancelled entry's title without its status tag", () => {
+    const done = { ...appEvent, extendedProperties: { private: { ...appEvent.extendedProperties?.private, 'hb.status': 'done' } }, summary: '[Done] Amazon' }
+    expect(draftFrom(done, DEFAULT_CATEGORIES)).toMatchObject({ category: 'coupon', status: 'done', title: 'Amazon' })
+    expect(draftFrom({ ...done, summary: '[Cancelled] Amazon' }, DEFAULT_CATEGORIES).title).toBe('Amazon')
+    // Without the app's category, "[Done]" is just part of someone's title.
+    expect(draftFrom({ start: { date: '2026-12-01' }, summary: '[Done] Bake' }, DEFAULT_CATEGORIES).title).toBe('[Done] Bake')
   })
 
   it('takes the category from a title prefix of an event made in Google Calendar', () => {
@@ -47,6 +55,12 @@ describe('normalisationFor', () => {
       reminders: { overrides: [], useDefault: true },
       start: { date: null, dateTime: '2026-11-04T17:00:00', timeZone: 'Europe/Berlin' },
     })
+  })
+
+  it('expects no reminders on a done or cancelled entry, and removes default ones', () => {
+    const done: CalendarEvent = { ...appEvent, extendedProperties: { private: { ...appEvent.extendedProperties?.private, 'hb.status': 'done' } }, summary: '[Done] Amazon' }
+    expect(normalisationFor({ ...done, reminders: { overrides: [], useDefault: false } }, draftFrom(done, DEFAULT_CATEGORIES), context)).toBeNull()
+    expect(normalisationFor(done, draftFrom(done, DEFAULT_CATEGORIES), context)).toEqual({ reminders: { overrides: [], useDefault: false } })
   })
 
   it('never rewrites events put in by hand, or repeating events', () => {
