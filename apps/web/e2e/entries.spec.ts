@@ -94,8 +94,14 @@ test('entries: categories and the form, added, edited, deleted, and a double-tap
 
   // Last: its row would otherwise sit where the double-tapped Save's second tap lands on a phone.
   await test.step('a balance without a date stays in the app, and gets an event only while it has a date', async () => {
-    // Balance is a newer default: this older household gets it through the top-up. The due date is
-    // optional now that every app that synced (just this one) handles entries without one.
+    // Balance is a newer default: this older household gets it through the top-up. On a desktop the
+    // double-tapped Save's second click lands on its header (the last on the board) and folds it, which
+    // the device remembers: unfold it first.
+    const balanceHeader = page.getByRole('region', { name: 'Balance' }).getByRole('button', { name: /Balance/u })
+    if (await balanceHeader.getAttribute('aria-expanded') === 'false') {
+      await balanceHeader.click()
+    }
+    // The due date is optional now that every app that synced (just this one) handles entries without one.
     await page.getByRole('link', { name: 'Add Balance' }).click()
     await expect(page.locator('form label > span').filter({ hasText: '*' })).toHaveText(['Title*', 'Category*'])
     await page.getByLabel('Title').fill('Gift card credit')

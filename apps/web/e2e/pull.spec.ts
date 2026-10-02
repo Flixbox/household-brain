@@ -49,7 +49,8 @@ test('events made in Google Calendar: taken in and shaped, left alone when put i
     await expect(page.getByText('Not synced with Google Calendar on this device yet.')).toBeVisible()
     await page.getByRole('button', { name: 'Sync now' }).click()
     const gym = page.getByRole('region', { name: 'Membership' }).getByRole('link', { name: /Gym/u })
-    await expect(gym).toContainText('2026-12-01')
+    // The first pull does the most work (shaping this event, the ones put in by hand, the stray).
+    await expect(gym).toContainText('2026-12-01', { timeout: 15_000 })
 
     // The event was brought into shape: due 17:00, default reminders, category recorded.
     await expect.poll(() => gymEvent()).toMatchObject({
