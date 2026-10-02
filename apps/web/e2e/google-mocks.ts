@@ -35,7 +35,7 @@ export async function mockGoogle(page: Page, calendarId = 'household@group.calen
   const requests: CalendarRequest[] = []
   const calendarList = new Map<string, Record<string, unknown>>()
   const events = new Map<string, Record<string, unknown>>()
-  const listing = { refused: false }
+  const listing = { refused: false, status: 503 }
   let version = 0
   const stored = (id: string, event: object) => {
     version += 1
@@ -85,9 +85,13 @@ export async function mockGoogle(page: Page, calendarId = 'household@group.calen
     edit: (id: string, changes: Record<string, unknown>) => stored(id, { ...events.get(id), ...changes }),
     /** Events that exist (Google keeps deleted ones as "cancelled"). */
     live: () => [...events.values()].filter(event => event.status !== 'cancelled'),
-    /** Makes event listings fail with 503 (the app retries later), to control when pulls see changes. */
-    refuseListings: (refused: boolean) => {
+    /**
+     * Makes event listings fail: by default with 503 (the app retries later), to control when pulls
+     * see changes; with another status to make the pull fail for real.
+     */
+    refuseListings: (refused: boolean, status = 503) => {
       listing.refused = refused
+      listing.status = status
     },
   }
   return { events, google, requests }
@@ -98,7 +102,7 @@ interface EventCall {
   path: string
   body: unknown
   events: Map<string, Record<string, unknown>>
-  listing: { refused: boolean }
+  listing: { refused: boolean, status: number }
   stored: (id: string, event: object) => Record<string, unknown> | undefined
   reply: (status: number, body: unknown) => Promise<void>
 }
@@ -107,7 +111,7 @@ interface EventCall {
 async function handleEvent({ request, path, body, events, listing, stored, reply }: EventCall) {
   const eventId = path.split('/events/')[1] ?? ''
   if (request.method() === 'GET' && !eventId && listing.refused) {
-    await reply(503, { error: { message: 'Backend Error' } })
+    await reply(listing.status, { error: { message: listing.status === 503 ? 'Backend Error' : 'Bad Request' } })
     return
   }
   if (request.method() === 'GET' && !eventId) {

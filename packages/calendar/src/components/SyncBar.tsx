@@ -6,7 +6,9 @@ import { retryItem } from '../lib/items/store'
 import { dismissWriteFailures, reportWriteFailure, useWriteFailures } from '../lib/items/write-failures'
 
 const bar = 'flex flex-wrap items-center gap-3 rounded-lg px-4 py-3 text-sm'
-const errorBar = `${bar} bg-red-100 text-red-950 dark:bg-red-950 dark:text-red-100`
+// Google's error messages can hold long URLs without spaces; let them wrap anywhere, or they widen the
+// page on a phone.
+const errorBar = `${bar} wrap-anywhere bg-red-100 text-red-950 dark:bg-red-950 dark:text-red-100`
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
 /** Shows what is not in Google Calendar yet, and offers the click that Google access needs. */

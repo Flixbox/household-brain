@@ -44,6 +44,11 @@ let pulling: Promise<void> | null = null
 let pulledAt = Number.NEGATIVE_INFINITY
 let pullProblem: string | null = null
 let pullRequested = false
+/**
+ * Bumped by `reset`. A run still in flight for the previous account checks it after every wait, and
+ * then leaves the outbox's state (busy, pull, problem, retries) to the next one.
+ */
+let generation = 0
 const describe = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
 function publish() {
@@ -58,13 +63,16 @@ function publish() {
   })
 }
 
-function retryLater() {
+function retryLater(started: number) {
+  if (started !== generation) {
+    return
+  }
   backoffMs = Math.min(Math.max(backoffMs * 2, MIN_BACKOFF_MS), MAX_BACKOFF_MS)
   pausedUntil = performance.now() + backoffMs
   timer = setTimeout(run, backoffMs)
 }
 
-async function pushOne(item: Item, context: PushContext): Promise<void> {
+async function pushOne(item: Item, context: PushContext, started: number): Promise<void> {
   try {
     const outcome = await pushItem(context, item)
     const remote = outcome.kind === 'synced' ? draftFrom(outcome.event, context.categories) : null
@@ -74,7 +82,7 @@ async function pushOne(item: Item, context: PushContext): Promise<void> {
     backoffMs = 0
   } catch (error) {
     if (isTransient(error)) {
-      retryLater()
+      retryLater(started)
     } else {
       await recordPushError(item, describe(error))
     }
@@ -102,15 +110,22 @@ function pullNow(context: PushContext): Promise<void> {
   if (performance.now() - pulledAt < PULL_REUSE_MS) {
     return Promise.resolve()
   }
+  const started = generation
   pulling ??= pullChanges(context)
     .then(problems => {
-      pullProblem = problems.length > 0 ? problems.join(' · ') : null
+      if (started === generation) {
+        pullProblem = problems.length > 0 ? problems.join(' · ') : null
+      }
     }, (error: unknown) => {
-      pullProblem = isTransient(error) ? pullProblem : describe(error)
+      if (started === generation) {
+        pullProblem = isTransient(error) ? pullProblem : describe(error)
+      }
     })
     .finally(() => {
-      pulling = null
-      pulledAt = performance.now()
+      if (started === generation) {
+        pulling = null
+        pulledAt = performance.now()
+      }
     })
   return pulling
 }
@@ -119,17 +134,22 @@ function pullNow(context: PushContext): Promise<void> {
  * One step: pull (always when `alwaysPull`, otherwise only before a push, so a write is based on
  * Google's latest), then push the next pending entry, and repeat while entries wait.
  */
-async function step(context: PushContext): Promise<void> {
+async function step(context: PushContext): Promise<boolean> {
+  const started = generation
   busy = true
   try {
     await pullNow(context)
     const next = nextToPush()
-    if (next) {
-      await pushOne(next, context)
+    if (next && started === generation) {
+      await pushOne(next, context, started)
     }
   } finally {
-    busy = false
+    if (started === generation) {
+      busy = false
+    }
   }
+  // False once a sign-out came in between: this run's account is gone, so it stops here.
+  return started === generation
 }
 
 async function run(alwaysPull = false): Promise<void> {
@@ -143,8 +163,9 @@ async function run(alwaysPull = false): Promise<void> {
   if (!context || (!alwaysPull && !nextToPush())) {
     return
   }
-  await step(context)
-  await continueAfterStep()
+  if (await step(context)) {
+    await continueAfterStep()
+  }
 }
 
 /** Runs the next step if entries still wait, or if a pull was asked for while this one was busy. */
@@ -203,10 +224,25 @@ function watchDevice(): (() => void)[] {
   ]
 }
 
-function reset() {
+/** Forgets retries and pulls: the waiting, the last pull and its problem. */
+function forgetTiming() {
   if (timer) {
     clearTimeout(timer)
   }
+  timer = null
+  busy = false
+  pulling = null
+  backoffMs = 0
+  pausedUntil = 0
+  pulledAt = Number.NEGATIVE_INFINITY
+  pullProblem = null
+  pullRequested = false
+}
+
+/** Back to a clean start (sign-out): nothing of the previous account's sync state carries over. */
+function reset() {
+  forgetTiming()
+  generation += 1
   data = fresh()
   recorded.clear()
   unconfirmed = new Set()
