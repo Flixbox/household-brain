@@ -7,8 +7,11 @@ const TAP_SLOP_PX = 10
 interface Gesture {
   pointerId: number
   startX: number
-  /** How far it has moved so far (never to the right). */
+  startY: number
+  /** How far it has moved to the left so far (never to the right). */
   dx: number
+  /** Whether it has moved further than a tap, in any direction: then it isn't a tap. */
+  moved: boolean
 }
 
 /**
@@ -23,6 +26,9 @@ function follow(gesture: Gesture | null, event: PointerEvent): number | null {
     return Number.NaN
   }
   gesture.dx = Math.min(0, event.clientX - gesture.startX)
+  if (Math.hypot(event.clientX - gesture.startX, event.clientY - gesture.startY) > TAP_SLOP_PX) {
+    gesture.moved = true
+  }
   return gesture.dx
 }
 
@@ -60,7 +66,7 @@ export function useSwipeToDone(onDone: () => void, enabled: boolean) {
     handlePointerCancel: reset,
     handlePointerDown: (event: PointerEvent) => {
       if (enabled && !gesture.current && event.isPrimary) {
-        gesture.current = { dx: 0, pointerId: event.pointerId, startX: event.clientX }
+        gesture.current = { dx: 0, moved: false, pointerId: event.pointerId, startX: event.clientX, startY: event.clientY }
         moved.current = false
         capture(event)
       }
@@ -70,7 +76,7 @@ export function useSwipeToDone(onDone: () => void, enabled: boolean) {
       if (dx !== null && Number.isNaN(dx)) {
         reset()
       } else if (dx !== null) {
-        if (Math.abs(dx) > TAP_SLOP_PX) {
+        if (gesture.current?.moved) {
           moved.current = true
         }
         setOffset(dx)

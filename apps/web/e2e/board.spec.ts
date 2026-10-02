@@ -194,6 +194,16 @@ test('swiping an entry left marks it done, with Undo', async ({ page }) => {
   await expect(row).toBeVisible()
   await expect.poll(() => google.live()[0]?.extendedProperties).toMatchObject({ private: { 'hb.status': 'open' } })
 
+  // A press dragged away downwards isn't a tap either: the entry doesn't open.
+  const box = await row.boundingBox()
+  if (box) {
+    await page.mouse.move(box.x + 20, box.y + box.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(box.x + 20, box.y + box.height / 2 + 80, { steps: 5 })
+    await page.mouse.up()
+  }
+  await expect(page.getByRole('heading', { name: 'Edit entry' })).toHaveCount(0)
+
   // A gesture the browser cancels (e.g. it starts scrolling) never marks done, whatever the
   // coordinates on the cancel event.
   await row.dispatchEvent('pointerdown', { clientX: 300, isPrimary: true, pointerId: 7, pointerType: 'touch' })
