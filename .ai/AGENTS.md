@@ -138,9 +138,6 @@ comments. Only wait in the foreground for something whose result you need for th
 | `MAIN_MOVED` | `main` moved under the PR (another merge). Rebase on `main`, run the checks, push once, so what gets merged is what was tested. |
 | `MAIN_GREEN` | (`--main` mode only) `main`'s newest run passed. |
 
-Normal durations, for comparison: `checks` about 40 seconds, each device's `e2e` job about 1.5
-minutes, `deploy` about 40 seconds.
-
 ### 4. Comments and review
 
 - **Every comment gets an answer.** Fix what is asked, in one push, then reply in the thread saying
@@ -224,6 +221,8 @@ minutes, `deploy` about 40 seconds.
 
 ### Code rules
 
+- **No measured numbers in docs or comments** (durations, sizes, counts): they go stale. They belong
+  in the PR or issue that measured them; a job's run history shows what is normal.
 - **`Date` is banned; use `Temporal`** (`temporal-polyfill`). Due dates are calendar dates at 17:00 in
   `Europe/Berlin`, which `Temporal.PlainDate` and `ZonedDateTime` model; `Date` silently mixes UTC,
   local time and daylight saving. oxlint enforces it. Convert only at the edges (Google's RFC 3339
