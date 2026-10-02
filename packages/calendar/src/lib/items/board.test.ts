@@ -42,6 +42,11 @@ describe('boardFor', () => {
     expect(result.other.map(item => item.title)).toEqual(['Pizza party'])
   })
 
+  it('also lists every listed entry in one list by due date', () => {
+    // 11-01 Cinema, then the 11-03 ties by title (Gym, Pizza party), then 12-01 Pizza.
+    expect(board('').flat.map(item => item.title)).toEqual(['Cinema', 'Gym', 'Pizza party', 'Pizza'])
+  })
+
   it('adds completed entries only when asked to', () => {
     expect(titles(board('', true).sections[0])).toEqual(['Cinema', 'Old pizza', 'Pizza'])
   })
