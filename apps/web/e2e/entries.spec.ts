@@ -74,6 +74,25 @@ test('entries: categories and the form, added, edited, deleted, and a double-tap
     await expect.poll(() => google.live().length).toBe(0)
   })
 
+  await test.step('a double-tapped Save creates one entry, and deleting it while it syncs removes the event too', async () => {
+    const before = requests.length
+    await page.getByRole('link', { name: 'Add Coupon' }).click()
+    await page.getByLabel('Title').fill('Cinema')
+    await page.getByLabel('Due date (17:00)').fill('2026-12-24')
+    await page.getByRole('button', { name: 'Save' }).dblclick()
+    const row = page.getByRole('region', { name: 'Coupon' }).getByRole('link', { name: /Cinema/u })
+    await expect(row).toHaveCount(1)
+
+    await row.click()
+    await page.getByRole('button', { name: 'Delete entry' }).click()
+    await expect(row).toHaveCount(0)
+    await expect(page.getByText('not yet in Google Calendar')).toHaveCount(0)
+    expect(google.live().length, requests.slice(before).map(request => `${request.method} ${request.path}`).join(' | ')).toBe(0)
+    // At most one insert: the delete may even win before the entry was ever sent.
+    expect(requests.slice(before).filter(request => request.method === 'POST' && request.path.endsWith('/events')).length).toBeLessThanOrEqual(1)
+  })
+
+  // Last: its row would otherwise sit where the double-tapped Save's second tap lands on a phone.
   await test.step('a balance without a date stays in the app, and gets an event only while it has a date', async () => {
     // Balance is a newer default: this older household gets it through the top-up.
     await page.getByRole('link', { name: 'Add Balance' }).click()
@@ -101,24 +120,6 @@ test('entries: categories and the form, added, edited, deleted, and a double-tap
     // The pull that sees the event deleted keeps the entry.
     await page.reload()
     await expect(credit).toContainText('no expiry')
-  })
-
-  await test.step('a double-tapped Save creates one entry, and deleting it while it syncs removes the event too', async () => {
-    const before = requests.length
-    await page.getByRole('link', { name: 'Add Coupon' }).click()
-    await page.getByLabel('Title').fill('Cinema')
-    await page.getByLabel('Due date (17:00)').fill('2026-12-24')
-    await page.getByRole('button', { name: 'Save' }).dblclick()
-    const row = page.getByRole('region', { name: 'Coupon' }).getByRole('link', { name: /Cinema/u })
-    await expect(row).toHaveCount(1)
-
-    await row.click()
-    await page.getByRole('button', { name: 'Delete entry' }).click()
-    await expect(row).toHaveCount(0)
-    await expect(page.getByText('not yet in Google Calendar')).toHaveCount(0)
-    expect(google.live().length, requests.slice(before).map(request => `${request.method} ${request.path}`).join(' | ')).toBe(0)
-    // At most one insert: the delete may even win before the entry was ever sent.
-    expect(requests.slice(before).filter(request => request.method === 'POST' && request.path.endsWith('/events')).length).toBeLessThanOrEqual(1)
   })
 })
 
