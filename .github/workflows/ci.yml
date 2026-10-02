@@ -35,7 +35,7 @@ jobs:
       - run: pnpm build
       - name: Production build has no emulator wiring
         run: |
-          if grep -rlE 'e2eSignIn|127\.0\.0\.1:(9099|8080)' dist/; then
+          if grep -rlE 'e2eSignIn|127\.0\.0\.1:(9099|8080)' apps/web/dist/; then
             echo '::error::The production build contains emulator code'; exit 1
           fi
       - name: Scan history for secrets (gitleaks)
@@ -87,8 +87,8 @@ jobs:
         with:
           name: playwright-report
           path: |
-            playwright-report/
-            test-results/
+            apps/web/playwright-report/
+            apps/web/test-results/
           retention-days: 7
 
   deploy:

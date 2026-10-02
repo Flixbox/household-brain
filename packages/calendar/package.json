@@ -1,0 +1,21 @@
+{
+  "name": "@household-brain/calendar",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "license": "Unlicense",
+  "exports": {
+    "./lib/*": "./src/lib/*.ts",
+    "./components/*": "./src/components/*.tsx"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@household-brain/firebase": "workspace:*",
+    "@tanstack/react-router": "1.170.40",
+    "firebase": "12.19.0",
+    "react": "19.3.0"
+  }
+}

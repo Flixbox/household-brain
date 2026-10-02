@@ -2,16 +2,18 @@
   "compilerOptions": {
         "target": "es2023",
     "lib": ["ES2023", "DOM"],
-    "types": ["node"],
+    "module": "esnext",
+    "types": ["vite/client"],
+    "allowArbitraryExtensions": true,
     "skipLibCheck": true,
 
     /* Bundler mode */
-    "module": "esnext",
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
     "noEmit": true,
+    "jsx": "react-jsx",
 
     /* Linting */
     "noUnusedLocals": true,
@@ -19,5 +21,5 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["vitest.rules.config.ts", "npmpackagejsonlint.config.ts", "tests"]
+  "include": ["src"]
 }

@@ -157,14 +157,14 @@
   },
   "ignorePatterns": [
     "dist",
-    "src/routeTree.gen.ts",
+    "apps/web/src/routeTree.gen.ts",
     "playwright-report",
     "test-results"
   ],
   "overrides": [
     {
       "files": [
-        "src/routes/**"
+        "apps/web/src/routes/**"
       ],
       "rules": {
         "react/only-export-components": "off"
@@ -172,11 +172,11 @@
     },
     {
       "files": [
-        "*.config.ts",
-        "vite.config.ts",
-        "playwright.config.ts",
-        "vitest*.config.ts",
-        "pwa-assets.config.ts"
+        "**/*.config.ts",
+        "**/vite.config.ts",
+        "**/playwright.config.ts",
+        "**/vitest*.config.ts",
+        "**/pwa-assets.config.ts"
       ],
       "rules": {
         "import/no-default-export": "off",
@@ -186,7 +186,7 @@
     {
       "files": [
         "tests/**",
-        "e2e/**"
+        "apps/web/e2e/**"
       ],
       "rules": {
         "import/no-nodejs-modules": "off"
@@ -203,7 +203,7 @@
     {
       // Test fakes implement async interfaces without needing to await anything, and a test is a
       // linear script: splitting it to satisfy size limits would hide the steps it checks.
-      "files": ["**/*.test.ts", "tests/**", "e2e/**"],
+      "files": ["**/*.test.ts", "tests/**", "apps/web/e2e/**"],
       "rules": {
         "eslint/require-await": "off",
         "eslint/max-statements": "off",
