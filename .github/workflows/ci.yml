@@ -18,10 +18,12 @@ jobs:
     name: Lint, typecheck, unit tests, build, secret scan
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Nx Cloud lets runs without a token only read the shared cache. The read-write token is a secret
+    # of the `nx-cache` environment, which only `main` may use: a branch that rewrites this file still
+    # can't read it, and fork pull requests get no secrets at all (#60). Elsewhere: no environment.
+    environment: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'nx-cache' || '' }}
     env:
-      # Nx Cloud lets runs without a token only read the shared cache. Only pushes to main get the
-      # read-write token, so a pull request (a fork's included) can never write to it (#60).
-      NX_CLOUD_ACCESS_TOKEN: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.NX_CLOUD_ACCESS_TOKEN || '' }}
+      NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
