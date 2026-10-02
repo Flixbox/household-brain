@@ -22,11 +22,11 @@ export function EditForm({ item, categories }: { item: Item, categories: Categor
     return navigate({ to: '/' })
   }
   // Each handler asks Google first, inside the click, and saves without waiting for the server.
-  // Only the fields edited here are saved, compared with what they were before the edit, so a
-  // change arriving from Google meanwhile never counts as one made here.
-  const save = (draft: ItemDraft, base: ItemDraft) => {
+  // Saved: what differs from the newest version the form has seen, i.e. only fields typed in here
+  // (untouched fields already equal it), so a change from Google never counts as one made here.
+  const save = (draft: ItemDraft, latest: ItemDraft) => {
     requestSyncAccess()
-    return after(editItem(item.id, base, draft))
+    return after(editItem(item.id, latest, draft))
   }
   const remove = () => {
     requestSyncAccess()
