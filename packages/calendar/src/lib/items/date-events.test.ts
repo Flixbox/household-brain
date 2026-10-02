@@ -23,3 +23,11 @@ describe('date events', () => {
     expect(isDateEventId(entryId)).toBe(false)
   })
 })
+
+describe('a deleted date event without its properties', () => {
+  it('is still recognised by its id', () => {
+    const entryId = 'abcdefghijklmnopqrstuv0123'
+    expect(entryOfEvent({ id: dateEventId(entryId, '01234567'), status: 'cancelled' })).toBe(entryId)
+    expect(entryOfEvent({ id: entryId, status: 'cancelled' })).toBeNull()
+  })
+})

@@ -29,6 +29,26 @@ test('an entry can have more dates; the list shows the next one with "+ more"', 
   // recognises them (on its first pull).
   const summaries = () => google.live().map(event => event.summary).toSorted()
   await expect.poll(summaries).toEqual(['[Membership] Streaming', '[Membership] Streaming · Cancel by'])
+  const dateEventId = String(google.live().find(event => String(event.summary).endsWith('· Cancel by'))?.id)
+
+  await test.step('other edits to a date event in Google Calendar are put back', async () => {
+    // In the same session that inserted it, without a reload: putting it back is a new write, not a
+    // repeat of the insert the outbox remembers having done.
+    google.edit(dateEventId, { summary: 'Renamed in Google' })
+    await row.click()
+    await expect.poll(summaries).toEqual(['[Membership] Streaming', '[Membership] Streaming · Cancel by'])
+    await page.getByRole('link', { name: 'Cancel' }).click()
+  })
+
+  await test.step('a date event moved in Google Calendar moves the date in the app', async () => {
+    google.edit(dateEventId, {
+      end: { dateTime: '2099-11-28T17:15:00+01:00', timeZone: 'Europe/Berlin' },
+      start: { dateTime: '2099-11-28T17:00:00+01:00', timeZone: 'Europe/Berlin' },
+    })
+    await page.reload()
+    await expect(row).toContainText('2099-11-28 + more')
+    await expect.poll(() => google.live().find(event => event.id === dateEventId)?.start).toMatchObject({ dateTime: '2099-11-28T17:00:00' })
+  })
 
   // Kept across a reload, and editable: removing it leaves just the due date.
   await page.reload()
@@ -69,6 +89,23 @@ test("while someone's app doesn't know date events yet, extra dates stay out of 
   await seedDocument('syncState/older-app', { schema: 2, syncToken: 'sync-1' })
   await expect.poll(summaries).toEqual(['[Membership] Streaming', '[Membership] Streaming · Cancel by'])
   expect(requests.filter(isDateInsert)).toHaveLength(1)
+
+  await test.step('a date event deleted in Google Calendar removes the date in the app', async () => {
+    const row = page.getByRole('region', { name: 'Membership' }).getByRole('link', { name: /Streaming/u })
+    await page.goto('/')
+    await expect(row).toContainText('2099-11-30 + more')
+    google.delete(String(google.live().find(event => String(event.summary).endsWith('· Cancel by'))?.id))
+    await page.reload()
+    await expect(row).not.toContainText('+ more')
+    await expect.poll(summaries).toEqual(['[Membership] Streaming'])
+    // Added again, for the next step.
+    await row.click()
+    await page.getByRole('button', { name: '+ Add date' }).click()
+    await page.getByLabel('Label of date 1').fill('Cancel by')
+    await page.getByLabel('Date 1', { exact: true }).fill('2099-11-30')
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect.poll(summaries).toEqual(['[Membership] Streaming', '[Membership] Streaming · Cancel by'])
+  })
 
   await test.step('an entry deleted in Google takes its date event with it', async () => {
     const entryEvent = google.live().find(event => event.summary === '[Membership] Streaming')

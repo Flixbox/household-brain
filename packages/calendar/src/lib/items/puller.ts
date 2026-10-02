@@ -2,9 +2,10 @@ import { CalendarApiError, type EventCursor, type EventPage } from '../calendar/
 import type { CalendarEvent } from './event'
 import { normalisationFor } from './from-event'
 import { type PullDecision, decidePull } from './pull-plan'
-import { applyPulled, dropStray, forgetDateEvents, markSchema, readEntryFromCache, readEntryFromServer, readSyncToken, recordEtag, removeVanished, saveSyncToken, serverNow } from './pull-store'
+import { applyDateChange, applyPulled, dropStray, forgetDateEvents, markSchema, readEntryFromCache, readEntryFromServer, readSyncToken, recordEtag, removeVanished, saveSyncToken, serverNow } from './pull-store'
 import { DATE_EVENTS_SCHEMA, entryOfEvent, isOrphanDate } from './date-events'
 import { deleteDateEvents } from './date-push'
+import { dateEventChange } from './date-pull'
 import type { Item } from './model'
 import type { PushContext } from './push'
 import { isTransient } from './transient'
@@ -69,10 +70,15 @@ async function applyDateEvent(context: PushContext, event: CalendarEvent, entryI
   const eventId = event.id ?? ''
   const dateId = eventId.slice(entryId.length + 1)
   await dropStray(eventId)
-  if (event.status === 'cancelled' || !isOrphanDate(await ownerOf(entryId, dateId), dateId)) {
+  if (!isOrphanDate(await ownerOf(entryId, dateId), dateId)) {
+    // Moved or deleted in Google: the entry follows; edited otherwise: it is put back (#34).
+    const eventContext = { categories: context.categories, timeZone: context.config.timeZone }
+    await applyDateChange(entryId, dateId, entry => dateEventChange({ dateId, event, item: entry }, eventContext))
     return null
   }
-  return context.api.deleteEvent(context.config.calendarId, eventId).then(() => null, reportUnlessTransient(`the leftover "${event.summary ?? eventId}"`))
+  return event.status === 'cancelled'
+    ? null
+    : context.api.deleteEvent(context.config.calendarId, eventId).then(() => null, reportUnlessTransient(`the leftover "${event.summary ?? eventId}"`))
 }
 
 /**

@@ -23,9 +23,14 @@ export const isDateEventId = (id: string | undefined) => /^[0-9a-v]{26}d[0-9a-v]
 /**
  * The entry an event belongs to when it is one of its extra dates' events: its id has that shape
  * and matches its link (`hb.entry`, `hb.date`). Null for anything else, an entry's own event included.
+ * A deleted one may come without its properties, so then the id alone tells.
  */
 export function entryOfEvent(event: CalendarEvent): string | null {
-  const { 'hb.date': dateId, 'hb.entry': entryId } = event.extendedProperties?.private ?? {}
+  const properties = event.extendedProperties?.private
+  if (!properties && event.status === 'cancelled' && isDateEventId(event.id)) {
+    return event.id?.slice(0, 26) ?? null
+  }
+  const { 'hb.date': dateId, 'hb.entry': entryId } = properties ?? {}
   return isDateEventId(event.id) && entryId && dateId && event.id === dateEventId(entryId, dateId) ? entryId : null
 }
 
