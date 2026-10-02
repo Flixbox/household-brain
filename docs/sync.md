@@ -97,8 +97,12 @@ for 3 seconds, so a burst of triggers causes one pull.
 - **Writing date events** (`date-events.ts`, `date-outbox.ts`): every extra date gets its own event,
   `<entryId>d<dateId>`, titled `[Category] Title · Label`, at 17:00 on its date, with the entry's
   notes and private properties plus `hb.entry`, `hb.date`, `hb.label`.
-  - **Gate:** only while **every** `syncState/{uid}` has `schema >= 2`. Every app version since the
-    first pull writes that document, so a person on an older version closes the gate, live.
+  - **Gate:** only while **every** `syncState/{uid}` has `schema >= 2`, as the server reports it (not
+    the local cache). Every app version writes that document on its first pull, so a person on an
+    older version closes the gate, live. **When someone leaves the household**, delete their
+    `syncState/{uid}` along with their allowlist entry, or an old marker of theirs can keep it closed.
+  - Only extra dates whose event id has the date-event shape: an entry that came from Google keeps
+    that event's id, which may be longer, so its extra dates stay in the app.
   - **Ledger:** `items/{id}.dateEvents.<dateId>.shape` is the event as last written. `planDates`
     compares it with the entry and plans an upsert (new date, moved, relabelled, or a shared field
     changed) or a delete (date removed). The outbox writes one per step, after the entry's own event is

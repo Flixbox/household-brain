@@ -11,18 +11,30 @@ const isStatus = (error: unknown, status: number) => error instanceof CalendarAp
  * so there is no merge: an insert, or on 409 (it exists, maybe deleted in Google) a full patch
  * against the etag just read, which also brings a deleted one back.
  */
-async function upsert({ api, config }: PushContext, event: CalendarEvent): Promise<void> {
+async function upsert(context: PushContext, event: CalendarEvent): Promise<void> {
   try {
-    await api.insertEvent(config.calendarId, event)
+    await context.api.insertEvent(context.config.calendarId, event)
   } catch (error) {
     if (!isStatus(error, 409)) {
       throw error
     }
-    const eventId = event.id ?? ''
-    const { etag = '' } = await api.getEvent(config.calendarId, eventId)
-    const { id: _id, ...full } = event
-    await api.patchEvent({ calendarId: config.calendarId, eventId }, { ...full, status: 'confirmed' }, etag)
+    // Someone else may write it between the read and the patch (412): read and patch once more.
+    await overwrite(context, event).catch((conflict: unknown) => {
+      if (!isStatus(conflict, 412)) {
+        throw conflict
+      }
+      return overwrite(context, event)
+    })
   }
+}
+
+/** Writes an existing event in full; `date: null` turns one made all-day in Google back into a timed one. */
+async function overwrite({ api, config }: PushContext, event: CalendarEvent): Promise<void> {
+  const eventId = event.id ?? ''
+  const { etag = '' } = await api.getEvent(config.calendarId, eventId)
+  const { id: _id, start, end, ...rest } = event
+  const full = { ...rest, end: { ...end, date: null }, start: { ...start, date: null }, status: 'confirmed' }
+  await api.patchEvent({ calendarId: config.calendarId, eventId }, full, etag)
 }
 
 /** Carries out one planned write; deleting a missing event is harmless. */

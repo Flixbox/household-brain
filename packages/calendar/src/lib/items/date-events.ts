@@ -50,6 +50,13 @@ export function dateEventFor(item: Item, entryDate: EntryDate, { categories, tim
 /** An event as written, as text: what the ledger keeps and compares. */
 export const shapeOf = (event: CalendarEvent) => JSON.stringify(event)
 
+/**
+ * The extra dates that can have an event: their id must be one every app recognises. An entry that
+ * came from Google keeps that event's id, which can be longer than the app's own; its extra dates
+ * stay in the app.
+ */
+const writableDatesOf = (item: Item) => extraDatesOf(item).filter(entryDate => isDateEventId(dateEventId(item.id, entryDate.id)))
+
 /** One write to Google for an extra date's event. */
 export type DateOp =
   | { kind: 'upsert', dateId: string, event: CalendarEvent, shape: string }
@@ -62,7 +69,7 @@ export type DateOp =
  */
 export function planDates(item: Item, context: EventContext): DateOp[] {
   const ledger = item.dateEvents ?? {}
-  const dates = extraDatesOf(item)
+  const dates = writableDatesOf(item)
   const upserts = dates.flatMap((entryDate): DateOp[] => {
     const event = dateEventFor(item, entryDate, context)
     const shape = shapeOf(event)
@@ -75,7 +82,7 @@ export function planDates(item: Item, context: EventContext): DateOp[] {
 
 /** Every date event an entry may have in Google: recorded ones, and ones whose insert may have landed unrecorded. */
 export const dateEventIdsOf = (item: Item) =>
-  [...new Set([...Object.keys(item.dateEvents ?? {}), ...extraDatesOf(item).map(entryDate => entryDate.id)])].map(dateId => dateEventId(item.id, dateId))
+  [...new Set([...Object.keys(item.dateEvents ?? {}), ...writableDatesOf(item).map(entryDate => entryDate.id)])].map(dateId => dateEventId(item.id, dateId))
 
 /**
  * Whether date events may be written: every person whose app has ever synced (`syncState/{uid}`, which

@@ -51,3 +51,11 @@ describe('date events', () => {
     expect(dateEventsAllowed([])).toBe(false)
   })
 })
+
+describe('date events of an entry that came from Google with a longer id', () => {
+  it('are never planned, since no app would recognise them', () => {
+    const imported = { ...base, id: 'longgoogleeventid0123456789abcdef' }
+    expect(planDates(imported, context)).toEqual([])
+    expect(dateEventIdsOf(imported)).toEqual([])
+  })
+})

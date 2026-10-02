@@ -273,10 +273,8 @@ test('an entry can have more dates; the list shows the next one with "+ more"', 
 test("while someone's app doesn't know date events yet, extra dates stay out of Google", async ({ page }) => {
   // Another person whose app synced but predates date events: no schema marker.
   await seedDocument('syncState/older-app', { syncToken: 'sync-1' })
-  const { google } = await mockGoogle(page)
+  const { google, requests } = await mockGoogle(page)
   const uid = await signInAllowlisted(page, 'owner@household-brain.test')
-  // This app has synced and marked itself, so only the other person holds the date events back.
-  await expect.poll(async () => (await readDocument(`syncState/${uid}`))?.schema).toEqual({ integerValue: '2' })
   await page.getByRole('link', { name: 'Add Membership' }).click()
   await page.getByLabel('Title').fill('Streaming')
   await page.getByLabel('Due date (17:00)').fill('2099-12-14')
@@ -286,9 +284,16 @@ test("while someone's app doesn't know date events yet, extra dates stay out of 
   await page.getByRole('button', { name: 'Save' }).click()
   const summaries = () => google.live().map(event => event.summary).toSorted()
   await expect.poll(summaries).toEqual(['[Membership] Streaming'])
-  await expect(page.getByRole('region', { name: 'Membership' })).toContainText('2099-11-30 + more')
+  // This app has pulled and marked itself, and the entry is synced: had the gate been open, its date
+  // event would have gone out in the very next step.
+  await expect.poll(async () => (await readDocument(`syncState/${uid}`))?.schema).toEqual({ integerValue: '2' })
+  await expect(page.getByText('not yet in Google Calendar')).toHaveCount(0)
 
-  // Once that person's app is updated too, the date event follows.
+  // Once that person's app is updated too, the date event follows, and only now.
+  const opened = requests.length
   await seedDocument('syncState/older-app', { schema: 2, syncToken: 'sync-1' })
   await expect.poll(summaries).toEqual(['[Membership] Streaming', '[Membership] Streaming · Cancel by'])
+  const dateInserts = requests.flatMap((request, index) => (request.method === 'POST' && JSON.stringify(request.body).includes('Cancel by') ? [index] : []))
+  expect(dateInserts).toHaveLength(1)
+  expect(dateInserts[0]).toBeGreaterThanOrEqual(opened)
 })

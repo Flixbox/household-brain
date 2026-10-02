@@ -13,7 +13,9 @@ export interface DateWork {
   op: DateOp
 }
 
-const keyOf = ({ item, op }: DateWork) => `${item.id}/${op.dateId}/${op.kind === 'upsert' ? op.shape : 'deleted'}`
+/** A write is the step from what the ledger says to the target, so going back to an earlier shape is a new one. */
+const keyOf = ({ item, op }: DateWork) =>
+  `${item.id}/${op.dateId}/${item.dateEvents?.[op.dateId]?.shape ?? ''}>${op.kind === 'upsert' ? op.shape : 'deleted'}`
 
 /**
  * Writes carried out in this session. Until the recorded ledger arrives through the snapshot, the
@@ -26,10 +28,13 @@ const done = new Set<string>()
 let open = false
 
 /** Follows the `syncState` collection, which says which app versions are in use; calls `onChange` after each update. */
-export const watchDateGate = (onChange: () => unknown) => onSnapshot(collection(db, 'syncState'), snapshot => {
-  open = dateEventsAllowed(snapshot.docs.map(entry => entry.data()))
+export const watchDateGate = (onChange: () => unknown) => onSnapshot(collection(db, 'syncState'), { includeMetadataChanges: true }, snapshot => {
+  // Only the server's answer counts: the local cache may hold just this person's document.
+  open = !snapshot.metadata.fromCache && dateEventsAllowed(snapshot.docs.map(entry => entry.data()))
   onChange()
-}, () => null)
+}, () => {
+  open = false
+})
 
 /**
  * The next date event to write, while the gate is open: for entries whose own event is in Google and
@@ -54,18 +59,15 @@ export function nextDateWork(items: readonly Item[], context: PushContext, ready
  * outbox to retry later; a definite refusal is recorded with the error instead.
  */
 export async function runDateWork(context: PushContext, work: DateWork): Promise<void> {
-  try {
-    await pushDateOp(context, work.item, work.op)
-    done.add(keyOf(work))
-    await recordDateOp(work.item, work.op)
-  } catch (error) {
+  const refusal = await pushDateOp(context, work.item, work.op).then(() => null, (error: unknown) => {
     if (isTransient(error)) {
       throw error
     }
-    done.add(keyOf(work))
-    if (work.op.kind === 'upsert') {
-      await recordDateOp(work.item, work.op, error instanceof Error ? error.message : String(error))
-    }
+    return error instanceof Error ? error.message : String(error)
+  })
+  done.add(keyOf(work))
+  if (refusal === null || work.op.kind === 'upsert') {
+    await recordDateOp(work.item, work.op, refusal)
   }
 }
 
