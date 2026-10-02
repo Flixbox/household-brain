@@ -1,53 +1,42 @@
 import { useStore } from '@nanostores/react'
 import type { Category } from '../../lib/categories'
 import type { Item } from '../../lib/items/model'
+import { boardFor } from '../../lib/items/board'
 import { $collapsed, collapsedSlugs } from '../../lib/items/collapsed'
-import { $showCompleted, toggleShowCompleted } from '../../lib/items/show-completed'
+import { $search } from '../../lib/items/search'
+import { $showCompleted } from '../../lib/items/show-completed'
 import { CategorySection } from './CategorySection'
+import { CompletedToggle } from './CompletedToggle'
 import { ItemRow } from './ItemRow'
-
-const byDueDate = (left: Item, right: Item) => left.dueDate.localeCompare(right.dueDate) || left.title.localeCompare(right.title)
+import { SearchBox } from './SearchBox'
 
 /**
- * Entries grouped by category, each group sorted by due date. Each category collapses on its own;
- * which ones are collapsed is remembered per device. Done and cancelled entries show only after
- * "Show completed" (also per device). Deleted entries waiting to sync are hidden.
+ * The board: a search field, "Show completed", and the entries grouped by category (`boardFor`).
+ * Each category collapses on its own, remembered per device; while searching, every category with
+ * a match is open, or the match would stay hidden.
  */
 export function ItemList({ items, categories }: { items: Item[], categories: Category[] }) {
   const collapsed = collapsedSlugs(useStore($collapsed))
-  const showCompleted = useStore($showCompleted)
-  const current = items.filter(item => item.pendingOp !== 'delete')
-  const completed = current.filter(item => item.status !== 'open').length
-  const visible = showCompleted ? current : current.filter(item => item.status === 'open')
-  const known = new Set(categories.map(category => category.slug))
-  // Events put into the calendar by hand, or whose category was removed.
-  const other = visible.filter(item => !known.has(item.category)).toSorted(byDueDate)
+  const query = useStore($search)
+  const board = boardFor({ categories, items, query, showCompleted: useStore($showCompleted) })
   return (
     <div className="space-y-6">
-      {/* Stays while it is on, so it can be switched off even once nothing is completed. */}
-      {(completed > 0 || showCompleted) && (
-        // A toggle keeps one name; whether it is on is aria-pressed (and the filled look).
-        <button
-          type="button"
-          aria-pressed={showCompleted}
-          onClick={toggleShowCompleted}
-          className="rounded-full border border-stone-300 px-3 py-1 text-sm font-medium aria-pressed:border-orange-600 aria-pressed:bg-orange-600 aria-pressed:text-white dark:border-stone-700"
-        >
-          {`Show completed (${completed})`}
-        </button>
-      )}
-      {categories.map(category => (
+      <SearchBox />
+      {board.searching && board.empty && <p className="text-stone-500">No entries match “{query.trim()}”.</p>}
+      {!board.searching && <CompletedToggle completed={board.completed} />}
+      {board.sections.map(section => (
         <CategorySection
-          key={category.slug}
-          category={category}
-          collapsed={collapsed.includes(category.slug)}
-          items={visible.filter(item => item.category === category.slug).toSorted(byDueDate)}
+          key={section.category.slug}
+          category={section.category}
+          collapsed={!board.searching && collapsed.includes(section.category.slug)}
+          foldable={!board.searching}
+          items={section.items}
         />
       ))}
-      {other.length > 0 && (
+      {board.other.length > 0 && (
         <section aria-label="Uncategorised" className="space-y-1">
           <h2 className="text-lg font-semibold">Uncategorised</h2>
-          <ul>{other.map(item => <ItemRow key={item.id} item={item} />)}</ul>
+          <ul>{board.other.map(item => <ItemRow key={item.id} item={item} />)}</ul>
         </section>
       )}
     </div>

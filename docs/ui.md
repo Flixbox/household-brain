@@ -27,7 +27,11 @@ shell owns the bar, the drawer and "Sign out"; the app passes in its links.
 - `done` and `cancelled` items are hidden behind a "Show completed (n)" toggle, a per-device preference
   (`hb:show-completed`, `@nanostores/persistent`), off by default. Swiping marks an item
   done; long-pressing edits it.
-- There is a global search and an "All by date" flat-list toggle.
+- A search field above the categories finds entries by title, code, notes, link or amount (every
+  word must match; case and accents are ignored). While searching it lists every match, completed
+  ones included, only in categories that have a match, and those open even if folded. It isn't
+  remembered across reloads.
+- There is an "All by date" flat-list toggle.
 
 **Add / edit sheet**
 
