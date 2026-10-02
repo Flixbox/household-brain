@@ -7,8 +7,18 @@ import type { Item } from './model'
  * what they look like, and the plan that brings Google in line with the entry.
  */
 
-/** Written per person to `syncState/{uid}.schema`: this app version recognises date events. */
+/** The `syncState/{uid}.schema` from which an app version recognises date events. */
 export const DATE_EVENTS_SCHEMA = 2
+
+/** The `syncState/{uid}.schema` from which an app version handles entries without a due date (#33). */
+export const UNDATED_SCHEMA = 3
+
+/** Written per person to `syncState/{uid}.schema`: what this app version handles (the newest of the above). */
+export const APP_SCHEMA = UNDATED_SCHEMA
+
+/** Whether every person's app that ever synced handles `schema`; one older version is enough to say no. */
+export const everyAppHandles = (syncStates: readonly { schema?: unknown }[], schema: number) =>
+  syncStates.length > 0 && syncStates.every(state => typeof state.schema === 'number' && state.schema >= schema)
 
 /** The id of the event for an entry's extra date; never a valid entry id (those are 26 characters). */
 export const dateEventId = (entryId: string, dateId: string) => `${entryId}d${dateId}`
@@ -93,8 +103,7 @@ export const dateEventIdsOf = (item: Item) =>
  * Whether date events may be written: every person whose app has ever synced (`syncState/{uid}`, which
  * every app version writes) runs a version that recognises them. One person on an older version closes it.
  */
-export const dateEventsAllowed = (syncStates: readonly { schema?: unknown }[]) =>
-  syncStates.length > 0 && syncStates.every(state => typeof state.schema === 'number' && state.schema >= DATE_EVENTS_SCHEMA)
+export const dateEventsAllowed = (syncStates: readonly { schema?: unknown }[]) => everyAppHandles(syncStates, DATE_EVENTS_SCHEMA)
 
 /**
  * Whether a date event in Google has nothing left in the app to belong to, so it should go: its entry

@@ -24,7 +24,7 @@ test('entries: categories and the form, added, edited, deleted, and a double-tap
 
     await page.getByRole('link', { name: 'Add Paperwork' }).click()
     const stars = page.locator('form label > span').filter({ hasText: '*' })
-    await expect(stars).toHaveText(['Title*', 'Category*'])
+    await expect(stars).toHaveText(['Title*', 'Category*', 'Due date (17:00)*'])
     await page.getByRole('link', { name: 'Cancel' }).click()
   })
 
@@ -94,8 +94,10 @@ test('entries: categories and the form, added, edited, deleted, and a double-tap
 
   // Last: its row would otherwise sit where the double-tapped Save's second tap lands on a phone.
   await test.step('a balance without a date stays in the app, and gets an event only while it has a date', async () => {
-    // Balance is a newer default: this older household gets it through the top-up.
+    // Balance is a newer default: this older household gets it through the top-up. The due date is
+    // optional now that every app that synced (just this one) handles entries without one.
     await page.getByRole('link', { name: 'Add Balance' }).click()
+    await expect(page.locator('form label > span').filter({ hasText: '*' })).toHaveText(['Title*', 'Category*'])
     await page.getByLabel('Title').fill('Gift card credit')
     await page.getByLabel('Amount').fill('25')
     await page.getByRole('button', { name: 'Save' }).click()
@@ -117,9 +119,26 @@ test('entries: categories and the form, added, edited, deleted, and a double-tap
     await page.getByRole('button', { name: 'Save' }).click()
     await expect(credit).toContainText('no expiry')
     await expect.poll(() => creditEvent()).toBeUndefined()
-    // The pull that sees the event deleted keeps the entry.
+
+    // The pull that sees the event deleted keeps the entry: wait for one after a reload, then for
+    // the app to go quiet, before looking.
+    const before = requests.length
     await page.reload()
+    await expect.poll(() => requests.slice(before).some(request => request.method === 'GET' && request.path.endsWith('/events'))).toBe(true)
+    await expect.poll(async () => {
+      const seen = requests.length
+      await new Promise(resolve => {
+        setTimeout(resolve, 1000)
+      })
+      return requests.length === seen
+    }, { timeout: 15_000 }).toBe(true)
     await expect(credit).toContainText('no expiry')
+
+    // Given a date again, the deleted event comes back.
+    await credit.click()
+    await page.getByLabel('Due date (17:00)').fill('2027-01-31')
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect.poll(() => creditEvent()?.start).toMatchObject({ dateTime: '2027-01-31T17:00:00' })
   })
 })
 

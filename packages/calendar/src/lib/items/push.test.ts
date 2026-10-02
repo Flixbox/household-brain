@@ -124,13 +124,15 @@ describe('pushItem', () => {
 describe('pushItem for an entry without a due date', () => {
   it('writes no event for a new one', async () => {
     const { calls, context } = fakeApi()
-    expect(await pushItem(context(), { ...base, dueDate: '' })).toEqual({ kind: 'unscheduled' })
+    // A new entry has every field dirty, but was never in Google: no call at all.
+    expect(await pushItem(context(), { ...base, dirty: ['dueDate', 'title'], dueDate: '' })).toEqual({ kind: 'unscheduled', updated: '' })
     expect(calls).toEqual([])
   })
 
   it('deletes the event of one whose date was just removed', async () => {
     const { calls, context } = fakeApi()
-    expect(await pushItem(context(), { ...base, dirty: ['dueDate'], dueDate: '', etags: { owner: '"v1"' } })).toEqual({ kind: 'unscheduled' })
-    expect(calls).toEqual(['delete evt1'])
+    const outcome = await pushItem(context(), { ...base, dirty: ['dueDate'], dueDate: '', etags: { owner: '"v1"' }, googleUpdated: '2026-10-01T10:00:00.000Z' })
+    expect(outcome).toMatchObject({ kind: 'unscheduled' })
+    expect(calls).toEqual(['delete evt1', 'get evt1'])
   })
 })

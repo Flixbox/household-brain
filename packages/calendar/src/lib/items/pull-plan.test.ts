@@ -76,11 +76,15 @@ describe('decidePull', () => {
 })
 
 describe('decidePull for an entry without a due date', () => {
-  const balance = { ...entry, dueDate: '', etags: {} }
+  const balance = { ...entry, dueDate: '', etags: {}, googleUpdated: '2026-10-02T18:00:00.000Z' }
 
-  it('ignores its old event, also when Google lists it deleted (the app deleted it on purpose)', () => {
-    expect(decide({ entry: balance, event: { ...event, status: 'cancelled' } })).toEqual({ kind: 'skip' })
-    expect(decide({ entry: balance })).toEqual({ kind: 'skip' })
+  it('keeps it when Google lists its event deleted (the app deleted it on purpose)', () => {
+    expect(decide({ entry: balance, event: { ...event, status: 'cancelled', updated: '2026-10-02T18:00:00.000Z' } })).toEqual({ kind: 'skip' })
+  })
+
+  it('ignores a listing from before the date was removed, but takes the date back from a newer live event (e.g. restored)', () => {
+    expect(decide({ entry: balance, event: { ...event, updated: '2026-10-01T09:00:00.000Z' } })).toEqual({ kind: 'skip' })
+    expect(decide({ entry: balance, event: { ...event, updated: '2026-10-03T09:00:00.000Z' } })).toMatchObject({ draft: { dueDate: '2026-11-03' }, kind: 'update' })
   })
 
   it('still merges while its own change (e.g. removing the date) waits to be sent', () => {

@@ -94,10 +94,18 @@ against, so they don't wait on it).
 
 - **Not touched at all:** repeating events (`recurrence` or `recurringEventId`), until repeating
   entries exist; and events older than what the entry already has (`updated` ≤ `googleUpdated`).
-- **An entry without a due date** (a balance, #33) has no event. The push deletes the event of an entry
-  whose date was removed (outcome `unscheduled`, which clears its etags). The pull skips anything
-  Google lists under its id, a deletion included, unless the entry has a change of its own waiting.
-  A full listing never removes it as vanished.
+- **An entry without a due date** (a balance, #33) has no event.
+  - The push deletes the event of an entry whose date was removed (outcome `unscheduled`). It clears
+    the etags and records the deletion's `updated` as `googleUpdated`, so listings from before it stay
+    older. A new entry without a date makes no call at all.
+  - The pull skips that deleted event, unless the entry has a change of its own waiting. A live event
+    newer than the deletion (restored from Google Calendar's trash, or revived by the other person's
+    stale push) goes the usual way and brings its date back. A full listing never removes an undated
+    entry as vanished.
+  - **Gate:** saving without a date is only offered once every `syncState/{uid}` has `schema >= 3`
+    (`useUndatedAllowed`). An older version would take the missing event for a deletion and remove
+    the entry, and can't show it. Each app writes the newest schema it handles (`APP_SCHEMA`); date
+    events still need `>= 2`.
 - **An extra date's event** (one with `hb.entry`, #34) never becomes an entry: the pull skips it, and
   removes a stray entry an older app version may have made from it (in Firestore only). Each app
   writes `syncState/{uid}.schema = 2` to say it knows these events.

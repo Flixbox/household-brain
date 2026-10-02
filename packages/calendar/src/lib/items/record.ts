@@ -32,10 +32,11 @@ export function recordFor({ latest, pushed, outcome, uid, remote }: PushResult):
   }
   const stillDirty = () => latest.dirty.filter(field => !(pushed.dirty.includes(field) && latest[field] === pushed[field]))
   if (outcome.kind === 'unscheduled') {
-    // No event any more: no etags. A date added meanwhile stays pending and is inserted next.
+    // No event any more: no etags, and the deletion's time, so listings from before it stay older. A
+    // date added meanwhile stays pending and is inserted next.
     return {
       fields: unchanged
-        ? { dirty: [], etags: {}, googleUpdated: '', pendingOp: null, sync: 'synced', syncError: null }
+        ? { dirty: [], etags: {}, googleUpdated: outcome.updated, pendingOp: null, sync: 'synced', syncError: null }
         : { dirty: stillDirty(), etags: {} },
       kind: 'update',
     }

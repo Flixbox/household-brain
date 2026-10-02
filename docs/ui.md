@@ -45,7 +45,8 @@ shell owns the bar, the drawer and "Sign out"; the app passes in its links.
 
 **Add / edit sheet**
 
-- Fields: title, category (chips), **due date (date only, always 17:00)**, more dates (optional,
+- Fields: title, category (chips), **due date (date only, always 17:00; optional once every
+  person's app handles entries without one, see [sync](sync.md))**, more dates (optional,
   each with a label such as "Cancel by" or "Valid from" and a date; for now they live in the app
   only, without reminders: #34), an optional start date
   (not after the due date; the row shows "since …" or, while still ahead, "from …"), status (open / done /

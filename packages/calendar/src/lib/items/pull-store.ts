@@ -170,7 +170,7 @@ export async function readEntryFromCache(id: string): Promise<Item | null> {
   return snapshot?.exists() ? snapshot.data() as Item : null
 }
 
-/** Tells the other devices this person's app recognises date events (see DATE_EVENTS_SCHEMA). */
+/** Tells the other devices what this person's app handles (see APP_SCHEMA). */
 export function markSchema(uid: string, schema: number): Promise<void> {
   return setDoc(syncStateDoc(uid), { schema }, { merge: true })
 }

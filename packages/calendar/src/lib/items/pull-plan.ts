@@ -78,10 +78,12 @@ function versionOf(entry: Item | null, event: CalendarEvent): 'older' | 'same' |
 }
 
 /**
- * An entry without a due date and nothing to send: it has no event, so whatever Google lists under
- * its id is a version from before its date was removed.
+ * A deleted event of an entry without a due date and nothing to send: the app deleted it on purpose
+ * when the date was removed. (A live one newer than that, e.g. restored from Google Calendar's trash,
+ * goes the usual way and brings its date back.)
  */
-const isUnscheduled = (entry: Item | null) => entry !== null && !isDate(entry.dueDate) && !hasLocalEdits(entry)
+const isUnscheduledDeletion = (entry: Item | null, event: CalendarEvent) =>
+  event.status === 'cancelled' && entry !== null && !isDate(entry.dueDate) && !hasLocalEdits(entry)
 
 /** Our own write coming back, or an entry whose deletion is about to be pushed. */
 const isSettled = (entry: Item | null, event: CalendarEvent, uid: string) =>
@@ -95,7 +97,7 @@ const isSettled = (entry: Item | null, event: CalendarEvent, uid: string) =>
  * - unknown: a new, synced entry;
  * - an entry with unsent local edits: Google's values for every field not edited locally;
  * - an entry waiting to be deleted: skip (the delete is pushed);
- * - an entry without a due date and nothing to send: skip (it has no event; its old one is gone);
+ * - the deleted event of an entry without a due date and nothing to send: skip (deleted on purpose);
  * - a deleted event: removes the entry, unless the entry has unsent edits;
  * - otherwise: Google's version replaces the entry.
  */
@@ -103,8 +105,7 @@ export function decidePull(input: PullInput): PullDecision {
   const { entry, event, uid } = input
   const version = versionOf(entry, event)
   const cancelled = event.status === 'cancelled'
-  // Unscheduled is checked before a deletion: removing an entry's due date deletes its event on purpose.
-  if (version === 'older' || (isRecurring(event) && !cancelled) || isUnscheduled(entry)) {
+  if (version === 'older' || (isRecurring(event) && !cancelled) || isUnscheduledDeletion(entry, event)) {
     return { kind: 'skip' }
   }
   if (cancelled) {

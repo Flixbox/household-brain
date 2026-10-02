@@ -73,7 +73,8 @@ meta/config                          { calendarId, timeZone: "Europe/Berlin", ow
 syncState/{uid}                      { syncToken, listingStartedAt, schema }   ← one per person (sync tokens are per user; schema 2 = knows date events)
 categories/{slug}                    { slug, label, colorId, sortOrder }   ← an icon comes with the board UI
 items/{eventId}                      {
-  title, category, dueDate: "YYYY-MM-DD", rrule?: string,
+  title, category, dueDate: "YYYY-MM-DD" | "",   // "" = no due date: no event (a balance, #33)
+  rrule?: string,
   status, amount?, currency?, code?, url?, notes?, noticeDays?, startDate?: "YYYY-MM-DD",
   extraDates?: { id, label, date: "YYYY-MM-DD" }[],   // more dates (#34), each its own event
   dateEvents?: { [dateId]: { shape, error? } },       // what Google holds for them (the ledger)

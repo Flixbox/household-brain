@@ -20,8 +20,11 @@ export type PushOutcome =
   /** `event`: Google's full event after the write, which may include changes made in Google meanwhile. */
   | { kind: 'synced', event: CalendarEvent }
   | { kind: 'deleted' }
-  /** An entry without a due date (a balance): it has no event, and one it had was deleted. */
-  | { kind: 'unscheduled' }
+  /**
+   * An entry without a due date (a balance): it has no event, and one it had was deleted. `updated`
+   * is Google's time of that deletion (or the entry's last known one), so older listings stay older.
+   */
+  | { kind: 'unscheduled', updated: string }
 
 const isStatus = (error: unknown, status: number) => error instanceof CalendarApiError && error.status === status
 const eventContext = ({ config, categories }: PushContext) => ({ categories, timeZone: config.timeZone })
@@ -105,10 +108,16 @@ async function patch(context: PushContext, item: Item, etag: string): Promise<Ca
  * pushed it before), that event is deleted; a missing one is fine. Its extra dates' events stay.
  */
 async function unschedule(context: PushContext, item: Item): Promise<PushOutcome> {
-  if (Object.keys(item.etags).length > 0 || item.dirty.includes('dueDate')) {
-    await context.api.deleteEvent(context.config.calendarId, item.id)
+  // An entry that was in Google: recorded etags, or a date just removed from a synced one. A new
+  // entry without a date never was, so it costs no call.
+  const hadEvent = Object.keys(item.etags).length > 0 || (item.dirty.includes('dueDate') && Boolean(item.googleUpdated))
+  if (!hadEvent) {
+    return { kind: 'unscheduled', updated: item.googleUpdated ?? '' }
   }
-  return { kind: 'unscheduled' }
+  await context.api.deleteEvent(context.config.calendarId, item.id)
+  // A deleted event can still be read: its `updated` is when it was deleted.
+  const gone = await context.api.getEvent(context.config.calendarId, item.id).catch(() => null)
+  return { kind: 'unscheduled', updated: gone?.updated ?? '' }
 }
 
 /** A deleted entry: its date events go first, then its own event. */

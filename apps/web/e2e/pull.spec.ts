@@ -87,7 +87,7 @@ test('events made in Google Calendar: taken in and shaped, left alone when put i
     await expect.poll(() => readDocument(`items/${strayId}`)).toBeNull()
     await expect(page.getByRole('link', { name: /Something|Stray/u })).toHaveCount(0)
     // This app version says so, for the devices that will write date events.
-    await expect.poll(async () => (await readDocument(`syncState/${uid}`))?.schema).toEqual({ integerValue: '2' })
+    await expect.poll(async () => (await readDocument(`syncState/${uid}`))?.schema).toEqual({ integerValue: '3' })
   })
 })
 

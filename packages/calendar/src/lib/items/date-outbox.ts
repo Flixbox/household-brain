@@ -37,8 +37,8 @@ export const watchDateGate = (onChange: () => unknown) => onSnapshot(collection(
 })
 
 /**
- * The next date event to write, while the gate is open: for entries whose own event is in Google and
- * has no local change waiting.
+ * The next date event to write, while the gate is open: for entries that are synced (their own event,
+ * if they have a due date, is in Google) and have no local change waiting.
  */
 export function nextDateWork(items: readonly Item[], context: PushContext, ready: (item: Item) => boolean): DateWork | null {
   if (!open) {

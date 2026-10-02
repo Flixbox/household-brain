@@ -44,9 +44,9 @@ describe('errorFor', () => {
 })
 
 describe('recordFor an entry without a due date', () => {
-  it('has no event any more: no etags, synced', () => {
-    expect(recordFor({ latest: pushed, outcome: { kind: 'unscheduled' }, pushed, remote: null, uid: 'owner' })).toEqual({
-      fields: { dirty: [], etags: {}, googleUpdated: '', pendingOp: null, sync: 'synced', syncError: null },
+  it('has no event any more: no etags, synced, and the deletion time as its version', () => {
+    expect(recordFor({ latest: pushed, outcome: { kind: 'unscheduled', updated: '2026-10-02T18:00:00.000Z' }, pushed, remote: null, uid: 'owner' })).toEqual({
+      fields: { dirty: [], etags: {}, googleUpdated: '2026-10-02T18:00:00.000Z', pendingOp: null, sync: 'synced', syncError: null },
       kind: 'update',
     })
   })
@@ -54,7 +54,7 @@ describe('recordFor an entry without a due date', () => {
   it('keeps a date added meanwhile pending, so its event is inserted next', () => {
     const sent = { ...pushed, dirty: ['dueDate'], dueDate: '' } as Item
     const dated = { ...sent, dueDate: '2026-12-24', rev: 'r2' } as Item
-    expect(recordFor({ latest: dated, outcome: { kind: 'unscheduled' }, pushed: sent, remote: null, uid: 'owner' }))
+    expect(recordFor({ latest: dated, outcome: { kind: 'unscheduled', updated: '' }, pushed: sent, remote: null, uid: 'owner' }))
       .toEqual({ fields: { dirty: ['dueDate'], etags: {} }, kind: 'update' })
   })
 })
