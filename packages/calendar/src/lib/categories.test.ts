@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_CATEGORIES, RETIRED_DEFAULTS, missingDefaults } from './categories'
+import { DEFAULT_CATEGORIES, RETIRED_DEFAULTS, missingDefaults, visibleCategories } from './categories'
 
 describe('missingDefaults', () => {
   it('returns the defaults a set-up household is missing', () => {
@@ -19,5 +19,17 @@ describe('missingDefaults', () => {
 describe('RETIRED_DEFAULTS', () => {
   it('names no current default', () => {
     expect(DEFAULT_CATEGORIES.filter(category => RETIRED_DEFAULTS.includes(category.slug))).toEqual([])
+  })
+})
+
+describe('visibleCategories', () => {
+  const categories = [{ slug: 'coupon' }, { slug: 'document' }]
+
+  it('hides a retired default no entry uses', () => {
+    expect(visibleCategories(categories, [{ category: 'coupon' }])).toEqual([{ slug: 'coupon' }])
+  })
+
+  it('keeps a retired default while an entry uses it', () => {
+    expect(visibleCategories(categories, [{ category: 'document' }])).toEqual(categories)
   })
 })

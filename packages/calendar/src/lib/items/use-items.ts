@@ -1,6 +1,6 @@
 import { collection, onSnapshot, orderBy, query } from 'firebase/firestore'
-import { useEffect, useState } from 'react'
-import type { Category } from '../categories'
+import { useEffect, useMemo, useState } from 'react'
+import { type Category, visibleCategories } from '../categories'
 import { db } from '@household-brain/firebase/firebase'
 import type { Item } from './model'
 import { itemsCollection } from './store'
@@ -14,11 +14,12 @@ export function useItems(): Item[] | null {
   return items
 }
 
-/** The categories, in their display order. */
+/** The categories to list and offer, in their display order (retired ones only while in use). */
 export function useCategories(): Category[] {
   const [categories, setCategories] = useState<Category[]>([])
+  const items = useItems()
   useEffect(() => onSnapshot(query(collection(db, 'categories'), orderBy('sortOrder')), snapshot => {
     setCategories(snapshot.docs.map(entry => entry.data() as Category))
   }), [])
-  return categories
+  return useMemo(() => visibleCategories(categories, items ?? []), [categories, items])
 }

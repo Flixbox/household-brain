@@ -18,10 +18,17 @@ export const DEFAULT_CATEGORIES: readonly Category[] = [
 ]
 
 /**
- * Former defaults that existing households drop again, as long as no entry uses them.
+ * Former defaults, hidden while no entry uses them (`visibleCategories`). They are never deleted:
+ * an entry still waiting to sync on some device may use one, and must keep its category.
  * "Document expiry" gave way to the broader "Paperwork".
  */
 export const RETIRED_DEFAULTS: readonly string[] = ['document']
+
+/** The categories to offer and list: all of them, minus retired defaults no entry uses. */
+export function visibleCategories<Entry extends Pick<Category, 'slug'>>(categories: readonly Entry[], items: readonly { category: string }[]): Entry[] {
+  const used = new Set(items.map(item => item.category))
+  return categories.filter(category => !RETIRED_DEFAULTS.includes(category.slug) || used.has(category.slug))
+}
 
 /**
  * The defaults a set-up household doesn't have yet, so a category added to the defaults appears

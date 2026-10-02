@@ -12,7 +12,7 @@ test.beforeEach(async () => {
   await seedDocument('categories/membership', { colorId: '3', label: 'Membership', slug: 'membership', sortOrder: 2 })
 })
 
-test('an older household gets new default categories and loses unused retired ones; the form stars only required fields', async ({ page }) => {
+test('an older household gets new default categories and no longer sees unused retired ones; the form stars only required fields', async ({ page }) => {
   await seedDocument('categories/document', { colorId: '8', label: 'Document expiry', slug: 'document', sortOrder: 7 })
   await mockGoogle(page)
   await signInAllowlisted(page, 'owner@household-brain.test')
