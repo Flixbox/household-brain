@@ -112,8 +112,9 @@ interface EventCall {
 /** Insert, get, patch (honouring If-Match) and delete for the fake calendar's events. */
 /** The events a listing returns: all of them, or with a sync token only those changed since, like Google. */
 function listed(events: Map<string, Record<string, unknown>>, url: string) {
-  const since = Number(new URL(url).searchParams.get('syncToken')?.replace('sync-', '') ?? '0')
-  return [...events.values()].filter(event => Number(String(event.etag).replaceAll(/[^0-9]/gu, '')) > since)
+  const token = new URL(url).searchParams.get('syncToken')
+  const since = token === null ? 0 : Number(/^sync-(?<version>\d+)$/u.exec(token)?.groups?.version ?? Number.NaN)
+  return Number.isNaN(since) ? null : [...events.values()].filter(event => Number(String(event.etag).replaceAll(/[^0-9]/gu, '')) > since)
 }
 
 async function handleEvent({ request, path, body, events, latest, listing, stored, reply }: EventCall) {
@@ -123,8 +124,10 @@ async function handleEvent({ request, path, body, events, latest, listing, store
     return
   }
   if (request.method() === 'GET' && !eventId) {
-    // A list, deleted events included: everything, or with a sync token only what changed since.
-    await reply(200, { items: listed(events, request.url()), nextSyncToken: `sync-${latest()}` })
+    // A list, deleted events included: everything, or with a sync token only what changed since. A
+    // token this fake never issued is refused like an expired one.
+    const items = listed(events, request.url())
+    await (items ? reply(200, { items, nextSyncToken: `sync-${latest()}` }) : reply(410, { error: { message: 'Sync token is no longer valid' } }))
     return
   }
   const found = events.get(eventId)

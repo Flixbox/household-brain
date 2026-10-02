@@ -1,8 +1,8 @@
 import { CalendarApiError, type EventCursor, type EventPage } from '../calendar/api'
 import type { CalendarEvent } from './event'
 import { normalisationFor } from './from-event'
-import { decidePull } from './pull-plan'
-import { applyPulled, dropStray, markSchema, readEntryFromCache, readEntryFromServer, readSyncToken, recordEtag, removeVanished, saveSyncToken, serverNow } from './pull-store'
+import { type PullDecision, decidePull } from './pull-plan'
+import { applyPulled, dropStray, forgetDateEvents, markSchema, readEntryFromCache, readEntryFromServer, readSyncToken, recordEtag, removeVanished, saveSyncToken, serverNow } from './pull-store'
 import { DATE_EVENTS_SCHEMA, entryOfEvent, isOrphanDate } from './date-events'
 import { deleteDateEvents } from './date-push'
 import type { Item } from './model'
@@ -75,11 +75,17 @@ async function applyDateEvent(context: PushContext, event: CalendarEvent, entryI
   return context.api.deleteEvent(context.config.calendarId, eventId).then(() => null, reportUnlessTransient(`the leftover "${event.summary ?? eventId}"`))
 }
 
-/** An entry's own event deleted in Google: when that deletes the entry here, its date events go first. */
+/**
+ * An entry's own event deleted in Google: when that deletes the entry here, its date events go first.
+ * Null when nothing was removed, else the problem (or '' for none).
+ */
 async function removeDatesOfDeleted(context: PushContext, event: CalendarEvent): Promise<string | null> {
   const { categories, uid } = context
   const entry = event.status === 'cancelled' ? await readEntryFromServer(event.id ?? '') : null
-  return entry && decidePull({ categories, entry, event, uid }).kind === 'delete' ? removeDateEvents(context, entry) : null
+  if (!entry || decidePull({ categories, entry, event, uid }).kind !== 'delete') {
+    return null
+  }
+  return await removeDateEvents(context, entry) ?? ''
 }
 
 /**
@@ -88,13 +94,19 @@ async function removeDatesOfDeleted(context: PushContext, event: CalendarEvent):
  * still removed (an incremental listing won't bring the deletion again).
  */
 async function applyEntryEvent(context: PushContext, event: CalendarEvent): Promise<string | null> {
-  const problem = await removeDatesOfDeleted(context, event)
-  return await mergeEntryEvent(context, event) ?? problem
+  const { categories, uid } = context
+  const removed = await removeDatesOfDeleted(context, event)
+  const decision = await applyPulled(event, entry => decidePull({ categories, entry, event, uid }))
+  // Edited here between the read and the transaction, so the entry stays: its date events are rewritten.
+  if (removed !== null && decision.kind !== 'delete') {
+    await forgetDateEvents(event.id ?? '')
+  }
+  return await settleEntryEvent(context, event, decision) ?? (removed || null)
 }
 
-async function mergeEntryEvent(context: PushContext, event: CalendarEvent): Promise<string | null> {
+/** After merging: created and replaced entries are brought into shape and get this person's etag. */
+async function settleEntryEvent(context: PushContext, event: CalendarEvent, decision: PullDecision): Promise<string | null> {
   const { categories, config, uid } = context
-  const decision = await applyPulled(event, entry => decidePull({ categories, entry, event, uid }))
   const fresh = decision.kind === 'create' || (decision.kind === 'update' && decision.normalise)
   // Created and replaced entries get this person's etag only here, after the adjustment.
   if (!fresh) {
