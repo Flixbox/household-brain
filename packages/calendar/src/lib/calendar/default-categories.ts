@@ -12,7 +12,8 @@ const ignore = () => null
  * hidden, never deleted (`visibleCategories`).
  */
 export function watchDefaultCategories(): () => void {
-  return onSnapshot(collection(db, 'categories'), snapshot => {
+  // With metadata changes, so the server's confirmation of an unchanged cached list arrives too.
+  return onSnapshot(collection(db, 'categories'), { includeMetadataChanges: true }, snapshot => {
     if (snapshot.metadata.fromCache) {
       return
     }
