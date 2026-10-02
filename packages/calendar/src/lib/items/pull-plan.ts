@@ -1,7 +1,7 @@
 import type { Category } from '../categories'
 import type { CalendarEvent } from './event'
 import { draftFrom, isRecurring } from './from-event'
-import { EDITABLE_FIELDS, type Item, type ItemDraft } from './model'
+import { EDITABLE_FIELDS, type Item, type ItemDraft, draftOf } from './model'
 import { isDate } from './dates'
 
 /** What to do with one event from Google Calendar. */
@@ -11,8 +11,10 @@ export type PullDecision =
   /** A new entry; `draft` also tells the caller what to normalise. */
   | { kind: 'create', draft: ItemDraft, fields: Record<string, unknown> }
   /**
-   * Overwrite the entry with Google's version (`normalise`: the entry has no local edits), or, for the
-   * other person's push of the version it already holds, only this person's etag (`ownCopy`).
+   * Overwrite the entry with Google's version (`normalise`: the entry has no local edits), merge it
+   * into local edits, or, for the other person's push of the version it already holds, change nothing
+   * (`fields` empty). `ownCopy`: this person's own copy of the event (reminders are per person) still
+   * has to follow `draft`, and their etag is recorded only once it does (`fixOwnReminders` in the puller).
    */
   | { kind: 'update', draft: ItemDraft, fields: Record<string, unknown>, normalise: boolean, ownCopy?: boolean }
 
@@ -30,18 +32,25 @@ const deleted = ({ entry }: PullInput): PullDecision =>
   // An entry with unsent edits wins: its push writes the event back. Otherwise the deletion stands.
   !entry || hasLocalEdits(entry) ? { kind: 'skip' } : { kind: 'delete' }
 
-/** The other person's push of the version this entry already holds: just this person's etag. */
-const rememberEtag = (event: CalendarEvent, uid: string): PullDecision => ({ draft: draftFrom(event, []), fields: { [`etags.${uid}`]: event.etag ?? '' }, kind: 'update', normalise: false, ownCopy: true })
+/**
+ * The other person's push of the version this entry already holds: nothing to merge. This person's
+ * etag is recorded once their own copy fits (`ownCopy`), so an interrupted fix is tried again.
+ */
+const rememberEtag = (event: CalendarEvent): PullDecision => ({ draft: draftFrom(event, []), fields: {}, kind: 'update', normalise: false, ownCopy: true })
 
-const merged = (entry: Item, draft: ItemDraft, version: Record<string, string>): PullDecision => {
+const merged = (entry: Item, draft: ItemDraft): PullDecision => {
   const theirs = EDITABLE_FIELDS.filter(field => !entry.dirty.includes(field))
-  const fields = { ...Object.fromEntries(theirs.map(field => [field, draft[field]])), ...version }
-  return { draft, fields, kind: 'update', normalise: false }
+  // This person's etag and the version are recorded only after their own copy is checked (`ownCopy`).
+  const fields = Object.fromEntries(theirs.map(field => [field, draft[field]]))
+  // The entry as it is after the merge: this person's own copy of the event follows it (#74). Their
+  // own push only rewrites the reminders when its own edits touched the status or the reminders.
+  const local = draftOf(entry)
+  const mine = { ...draft, ...Object.fromEntries(entry.dirty.map(field => [field, local[field]])) }
+  return { draft: mine, fields, kind: 'update', normalise: false, ownCopy: true }
 }
 
-const changed = ({ entry, event, uid, categories }: PullInput): PullDecision => {
+const changed = ({ entry, event, categories }: PullInput): PullDecision => {
   const draft = draftFrom(event, categories)
-  const etag = event.etag ?? ''
   const googleUpdated = event.updated ?? ''
   const synced = { dirty: [], googleUpdated, pendingOp: null, sync: 'synced', syncError: null }
   if (!entry) {
@@ -50,7 +59,7 @@ const changed = ({ entry, event, uid, categories }: PullInput): PullDecision => 
     return { draft, fields: { ...draft, ...synced, etags: {}, id: event.id }, kind: 'create' }
   }
   if (hasLocalEdits(entry)) {
-    return merged(entry, draft, { [`etags.${uid}`]: etag, googleUpdated })
+    return merged(entry, draft)
   }
   return { draft, fields: { ...draft, ...synced }, kind: 'update', normalise: true }
 }
@@ -111,5 +120,5 @@ export const decidePull = (input: PullInput): PullDecision => {
   if (isSettled(entry, event, uid)) {
     return { kind: 'skip' }
   }
-  return version === 'same' && entry ? rememberEtag(event, uid) : changed(input)
+  return version === 'same' && entry ? rememberEtag(event) : changed(input)
 }

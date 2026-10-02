@@ -113,10 +113,16 @@ const applyEntryEvent = async (context: PushContext, event: CalendarEvent): Prom
   return settled ?? (removed || null)
 }
 
-/** The other person's push: this person's reminders still have to follow the status (#43). */
-const fixOwnReminders = (context: PushContext, event: CalendarEvent, draft: ItemDraft): Promise<string | null> => {
+/** The other person's push, alone or merged into local edits: this person's reminders still follow the entry (#43, #74). */
+const fixOwnReminders = async (context: PushContext, event: CalendarEvent, draft: ItemDraft): Promise<string | null> => {
   const fix = ownRemindersFix(event, draft, context.categories)
-  return fix ? normalise(context, event, fix) : Promise.resolve(null)
+  if (fix) {
+    // Records this person's etag once the fix is written. An interruption or a transient failure stops
+    // the pull before its sync token is saved, so the fix runs again; Google refusing it doesn't.
+    return normalise(context, event, fix)
+  }
+  await recordEtag(event.id ?? '', context.uid, event)
+  return null
 }
 
 /** After merging: created and replaced entries are brought into shape and get this person's etag. */

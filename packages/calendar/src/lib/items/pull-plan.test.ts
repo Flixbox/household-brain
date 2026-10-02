@@ -44,8 +44,20 @@ describe('decidePull', () => {
     expect(decision).toMatchObject({ kind: 'update', normalise: false })
     const { fields } = decision as { fields: Record<string, unknown> }
     expect(fields).not.toHaveProperty('code')
-    expect(fields).toMatchObject({ 'dueDate': '2026-11-03', 'etags.owner': '"g2"', 'title': 'Amazon (from Google)' })
+    expect(fields).toMatchObject({ dueDate: '2026-11-03', title: 'Amazon (from Google)' })
     expect(fields).not.toHaveProperty('sync')
+    // This person's etag comes only once their own copy is checked, so an interrupted check runs again.
+    expect(fields).not.toHaveProperty('etags.owner')
+  })
+
+  it("still has this person's own copy follow the merged entry (#74)", () => {
+    // The other person marked it done while this person had an unsent edit of the code.
+    const done = { ...event, extendedProperties: { private: { 'hb.category': 'coupon', 'hb.code': 'NEW', 'hb.status': 'done' } } }
+    const editing = { ...entry, dirty: ['code' as const], pendingOp: 'upsert' as const, sync: 'pending' as const }
+    expect(decide({ entry: editing, event: done })).toMatchObject({ draft: { code: 'OLD', status: 'done' }, kind: 'update', ownCopy: true })
+    // This person's own unsent status wins in the draft as well.
+    const reopened = { ...editing, dirty: ['status' as const], status: 'open' as const }
+    expect(decide({ entry: reopened, event: done })).toMatchObject({ draft: { code: 'NEW', status: 'open' }, ownCopy: true })
   })
 
   it('deletes an entry whose event was deleted, unless it has unsent edits', () => {
@@ -59,10 +71,9 @@ describe('decidePull', () => {
     expect(decide({ entry: { ...entry, googleUpdated: '2026-10-01T10:00:05Z' }, event: { ...event, updated: '2026-10-01T10:00:04.999Z' } })).toEqual({ kind: 'skip' })
   })
 
-  it('only remembers this person\'s etag for the version the entry already holds', () => {
+  it('takes nothing from the version the entry already holds, and leaves this person\'s etag for after their own copy is checked', () => {
     const decision = decide({ entry: { ...entry, googleUpdated: '2026-10-01T10:00:05.000Z' }, event: { ...event, updated: '2026-10-01T10:00:05Z' } })
-    expect(decision).toMatchObject({ fields: { 'etags.owner': '"g2"' }, kind: 'update', normalise: false })
-    expect(Object.keys((decision as { fields: object }).fields)).toEqual(['etags.owner'])
+    expect(decision).toMatchObject({ fields: {}, kind: 'update', normalise: false, ownCopy: true })
   })
 
   it('leaves repeating events alone until repeating entries exist', () => {

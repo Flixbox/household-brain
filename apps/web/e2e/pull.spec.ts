@@ -108,17 +108,25 @@ test('edits racing Google Calendar: a waiting edit, a conflict, an open form cat
     await expect(page.getByText('not yet in Google Calendar')).toHaveCount(0)
     const id = String(titled('Cinema')?.id)
 
-    // Google: someone moves the date. Here: the code is edited, which pulls first, then pushes.
-    google.edit(id, { end: { dateTime: '2026-12-27T17:15:00', timeZone: 'Europe/Berlin' }, start: { dateTime: '2026-12-27T17:00:00', timeZone: 'Europe/Berlin' } })
+    // Google: someone moves the date and gives it a reminder a week ahead. Here: the code is edited,
+    // which pulls first, then pushes.
+    const written = (byId(id)?.extendedProperties as { private?: Record<string, string> } | undefined)?.private ?? {}
+    google.edit(id, {
+      end: { dateTime: '2026-12-27T17:15:00', timeZone: 'Europe/Berlin' },
+      extendedProperties: { private: { ...written, 'hb.reminders': '10080' } },
+      start: { dateTime: '2026-12-27T17:00:00', timeZone: 'Europe/Berlin' },
+    })
     await page.getByRole('link', { name: /Cinema/u }).click()
     await page.getByLabel('Code').fill('POPCORN')
     await page.getByRole('button', { name: 'Save' }).click()
 
     await expect(page.getByRole('link', { name: /Cinema/u })).toContainText('2026-12-27')
     await expect.poll(() => byId(id)).toMatchObject({
-      extendedProperties: { private: { 'hb.code': 'POPCORN' } },
+      extendedProperties: { private: { 'hb.code': 'POPCORN', 'hb.reminders': '10080' } },
       start: { dateTime: '2026-12-27T17:00:00' },
     })
+    // This person's own copy follows the merged entry too, although their edit didn't touch it (#74).
+    await expect.poll(() => byId(id)?.reminders).toEqual({ overrides: [{ method: 'popup', minutes: 10080 }], useDefault: false })
   })
 
   await test.step('an edit made here keeps a field someone else changed in Google meanwhile', async () => {
