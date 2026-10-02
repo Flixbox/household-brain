@@ -7,7 +7,9 @@ const CHECK_EVERY_MS = 60 * 60 * 1000
 /** Asks for a new version now, and every hour and whenever the app comes back on screen. */
 function watchForUpdates(registration: ServiceWorkerRegistration) {
   const check = () => {
-    registration.update().catch(() => null)
+    if (navigator.onLine) {
+      registration.update().catch(() => null)
+    }
   }
   const onVisibility = () => {
     if (document.visibilityState === 'visible') {
@@ -19,10 +21,12 @@ function watchForUpdates(registration: ServiceWorkerRegistration) {
 }
 
 /**
- * Keeps the app on the newest version. A new version is installed as soon as it is found and
- * applied the moment the app leaves the screen (switching apps, locking the phone), so nobody
- * loses what they are typing and no phone keeps running an old build for days. While the app is
- * on screen, a toast offers to reload right away; "Later" only hides the toast.
+ * Keeps old versions of the app rare. A new version is installed as soon as it is found and
+ * applied when the app leaves the screen (switching apps, locking the phone), so a phone that is
+ * never closed doesn't run an old build for days. Not while something on the page carries
+ * `data-hold-updates`: an edited form, or a Google window that is open on top of the app. Then
+ * the next time the app leaves the screen. While the app is on screen, a toast offers to reload
+ * right away; "Later" only hides the toast.
  */
 export function ReloadPrompt() {
   const [dismissed, setDismissed] = useState(false)
@@ -34,7 +38,7 @@ export function ReloadPrompt() {
       return
     }
     const applyWhenHidden = () => {
-      if (document.visibilityState === 'hidden') {
+      if (document.visibilityState === 'hidden' && !document.querySelector('[data-hold-updates]')) {
         updateServiceWorker(true).catch(() => null)
       }
     }

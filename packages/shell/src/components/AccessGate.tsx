@@ -8,25 +8,32 @@ import { signOutOfApp } from '../lib/session'
 const button = 'rounded-lg bg-orange-600 px-4 py-2 font-semibold text-white hover:bg-orange-700'
 const secondaryButton = 'rounded-lg border border-stone-300 px-4 py-2 font-medium dark:border-stone-700'
 
+/** Google sign-in in its window; `signingIn` while that window is open. */
+function useSignIn() {
+  const [signInError, setSignInError] = useState<string>()
+  const [signingIn, setSigningIn] = useState(false)
+  const signIn = async () => {
+    setSignInError('')
+    setSigningIn(true)
+    const failure: unknown = await signInWithPopup(auth, new GoogleAuthProvider()).then(() => null, (error: unknown) => error)
+    setSigningIn(false)
+    setSignInError(failure ? signInErrorMessage(failure) ?? '' : '')
+  }
+  return { signIn, signInError, signingIn }
+}
+
 /** Renders its children only for allowlisted accounts; every route sits behind it. */
 export function AccessGate({ children }: { children: ReactNode }) {
   const access = useAccess()
-  const [signInError, setSignInError] = useState<string>()
-
-  const signIn = async () => {
-    setSignInError('')
-    try {
-      await signInWithPopup(auth, new GoogleAuthProvider())
-    } catch (error) {
-      setSignInError(signInErrorMessage(error) ?? '')
-    }
-  }
+  const { signIn, signInError, signingIn } = useSignIn()
 
   if (access.state === 'allowed') {
     return children
   }
   return (
-    <section className="space-y-6">
+    // While the Google window is open, no new version may load (`ReloadPrompt`): on a phone the
+    // window hides the app.
+    <section className="space-y-6" data-hold-updates={signingIn ? '' : null}>
       <h1 className="text-3xl font-bold">Household Brain</h1>
       {access.state === 'loading' && <p>Loading…</p>}
       {access.state === 'signed-out' && (

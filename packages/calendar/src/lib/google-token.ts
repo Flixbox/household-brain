@@ -3,6 +3,7 @@
 // refresh token anywhere (docs/access.md).
 import { persistentJSON } from '@nanostores/persistent'
 import { Temporal } from 'temporal-polyfill'
+import { holdUpdatesWhile } from './update-hold'
 
 const GIS_SCRIPT = 'https://accounts.google.com/gsi/client'
 const CALENDAR = 'https://www.googleapis.com/auth/calendar'
@@ -148,8 +149,8 @@ export async function calendarToken(scopes: readonly string[], account: string |
     return current.value
   }
   // One request at a time: parallel callers share it instead of opening several Google windows.
-  pending ??= loadGis()
-    .then(() => requestToken(scopes, account))
+  // The Google window can hide the app on a phone; no new version may load meanwhile.
+  pending ??= holdUpdatesWhile(loadGis().then(() => requestToken(scopes, account)))
     .then(response => acceptToken(response, scopes, account ?? ''))
     .finally(() => {
       pending = null
