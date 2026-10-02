@@ -24,5 +24,7 @@ describe('reminders', () => {
     expect(remindersFromText('1440,2880')).toBe('')
     expect(remindersFromText('60,10080')).toBe('10080,60')
     expect(remindersFromText('soon')).toBe('')
+    // Every time out of Google's limits: still the default, never "no reminders".
+    expect(remindersFromText('50000')).toBe('')
   })
 })

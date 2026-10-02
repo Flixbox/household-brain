@@ -107,6 +107,8 @@ test("while someone's app doesn't know date events yet, extra dates stay out of 
     await expect.poll(summaries).toEqual(['[Membership] Streaming'])
     // Added again, for the next step.
     await row.click()
+    // That other app still can't handle an entry's own reminders, so the form doesn't offer them yet.
+    await expect(page.getByRole('group', { name: 'Reminders' })).toHaveCount(0)
     await page.getByRole('button', { name: '+ Add date' }).click()
     await page.getByLabel('Label of date 1').fill('Cancel by')
     await page.getByLabel('Date 1', { exact: true }).fill('2099-11-30')

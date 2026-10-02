@@ -104,8 +104,9 @@ export function ownRemindersFix(event: CalendarEvent, draft: ItemDraft, categori
 
 /**
  * What an event made or changed directly in Google Calendar needs to fit the app's rules, as an
- * `events.patch` body, or null when it already fits: due 17:00–17:15, the person's own default
- * reminders (none once done or cancelled), and a category with its title prefix and colour.
+ * `events.patch` body, or null when it already fits: due 17:00–17:15, the entry's reminders (the
+ * person's own defaults unless it has its own; none once done or cancelled), and a category with its
+ * title prefix and colour.
  */
 export function normalisationFor(event: CalendarEvent, draft: ItemDraft, context: EventContext): CalendarEvent | null {
   // Events put into the calendar by hand (a birthday, an appointment) are shown but never rewritten.

@@ -36,7 +36,7 @@ const NO_DATES: EntryDate[] = []
  * code doesn't reload the page and lose the entry.
  */
 export function ItemForm({ initial, initialDates = NO_DATES, categories, onSave, withStatus = false }: Props) {
-  const { dateRequired, dates: { change: setDates, dates }, draft, holdUpdates, saved, set } = useEntryForm(initial, { editing: withStatus, initialDates })
+  const { dateRequired, dates: { change: setDates, dates }, draft, holdUpdates, remindersShown, saved, set } = useEntryForm(initial, { editing: withStatus, initialDates })
   const [saving, setSaving] = useState(false)
   const submit = (event: FormEvent) => {
     event.preventDefault()
@@ -63,7 +63,7 @@ export function ItemForm({ initial, initialDates = NO_DATES, categories, onSave,
         <input type="date" max={draft.dueDate || '9999-12-31'} title="When it started or becomes valid; not after the due date" className={textField} value={draft.startDate} onChange={set('startDate')} />
       </Field>
       <ExtraDatesField dates={dates} onChange={setDates} />
-      <RemindersField value={draft.reminders} onChange={set('reminders')} />
+      {remindersShown && <RemindersField value={draft.reminders} onChange={set('reminders')} />}
       {withStatus && <StatusField value={draft.status} onChange={set('status')} />}
       <Field label="Code"><input className={textField} value={draft.code} onChange={set('code')} /></Field>
       <AmountField amount={draft.amount} currency={draft.currency} onAmount={set('amount')} onCurrency={set('currency')} />

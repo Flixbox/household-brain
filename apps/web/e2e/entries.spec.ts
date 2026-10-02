@@ -79,6 +79,8 @@ test('entries: categories and the form, added, edited, deleted, and a double-tap
     await expect(page.getByRole('button', { name: '2 days' })).toHaveAttribute('aria-pressed', 'true')
     await page.getByRole('button', { name: '1 week' }).click()
     await page.getByRole('button', { name: '2 days' }).click()
+    await expect(page.getByRole('button', { name: '1 week' })).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.getByRole('button', { name: '2 days' })).toHaveAttribute('aria-pressed', 'false')
     await page.getByRole('button', { name: 'Save' }).click()
     await synced()
     await expect.poll(() => google.live().find(event => event.summary === '[Coupon] Amazon')).toMatchObject({

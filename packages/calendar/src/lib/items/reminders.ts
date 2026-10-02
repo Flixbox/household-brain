@@ -47,6 +47,15 @@ export function remindersValue(minutes: readonly number[]): string {
   return valid.join(',') === DEFAULT_MINUTES.join(',') ? '' : valid.join(',')
 }
 
-/** The stored text read from another client (Google's private property), normalised. */
-export const remindersFromText = (text: string | undefined) =>
-  (!text || !/^(?:none|\d+(?:,\d+)*)$/u.test(text) ? '' : remindersValue(reminderMinutes(text)))
+/**
+ * The stored text read from another client (Google's private property), normalised. Anything
+ * malformed reads as the household default, also a list whose every time is out of Google's limits:
+ * only 'none' itself means never.
+ */
+export function remindersFromText(text: string | undefined): string {
+  if (text === 'none') {
+    return text
+  }
+  const value = text && /^\d+(?:,\d+)*$/u.test(text) ? remindersValue(reminderMinutes(text)) : ''
+  return value === 'none' ? '' : value
+}

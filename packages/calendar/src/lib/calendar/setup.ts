@@ -10,7 +10,8 @@ export const TIME_ZONE = 'Europe/Berlin'
 /**
  * Every open entry notifies each person 2 days and 1 day before its 17:00 due time. Reminders are per
  * person in Google Calendar, so these are each person's default notifications on the shared calendar,
- * set by their own device; events just use the defaults (`useDefault: true`).
+ * set by their own device; events use the defaults (`useDefault: true`) unless the entry has reminders
+ * of its own (#35).
  */
 export const DEFAULT_REMINDERS: readonly Reminder[] = [
   { method: 'popup', minutes: 2 * 24 * 60 },

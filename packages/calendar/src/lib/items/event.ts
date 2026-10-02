@@ -151,7 +151,7 @@ const PROPERTY_OF: Partial<Record<EditableField, string>> = {
   url: 'hb.url',
 }
 
-/** The full event for a new entry: due 17:00–17:15, with each person's default reminders while open. */
+/** The full event for a new entry: due 17:00–17:15, reminding while open (`remindersOf`). */
 export function eventFor(item: Item, context: EventContext): CalendarEvent {
   // A new event has no all-day date to clear, so the patch-only `date: null` is left out.
   const { start, end } = groups.date(item, context)

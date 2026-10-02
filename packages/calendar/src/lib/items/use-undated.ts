@@ -2,7 +2,7 @@ import { collection, onSnapshot } from 'firebase/firestore'
 import { useStore } from '@nanostores/react'
 import { db } from '@household-brain/firebase/firebase'
 import { dataOf, liveStore } from '@household-brain/firebase/live'
-import { UNDATED_SCHEMA, everyAppHandles } from './date-events'
+import { REMINDERS_SCHEMA, UNDATED_SCHEMA, everyAppHandles } from './date-events'
 
 /**
  * Each person's sync state: which app version they run, as far as it says (`schema`). Only the
@@ -21,3 +21,6 @@ const $syncStates = liveStore<{ schema?: unknown }[]>((next, fail) =>
  * older version would take its missing event for a deletion and remove it, and can't show it (#33).
  */
 export const useUndatedAllowed = () => everyAppHandles(dataOf(useStore($syncStates)) ?? [], UNDATED_SCHEMA)
+
+/** Whether entries may get their own reminders: only once every person's app handles them (#35). */
+export const useRemindersAllowed = () => everyAppHandles(dataOf(useStore($syncStates)) ?? [], REMINDERS_SCHEMA)
