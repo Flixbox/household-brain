@@ -57,7 +57,7 @@ describe('patchFor', () => {
   })
 
   it('sends only the changed fields\' private properties, so others\' concurrent ones survive', () => {
-    expect(patchFor(item, ['status'], context)).toEqual({ extendedProperties: { private: { 'hb.status': item.status, 'hb.v': '1' } } })
+    expect(patchFor(item, ['code'], context)).toEqual({ extendedProperties: { private: { 'hb.code': 'SUMMER25', 'hb.v': '1' } } })
     expect(patchFor(item, ['code', 'url'], context)).toEqual({ extendedProperties: { private: { 'hb.code': 'SUMMER25', 'hb.url': item.url, 'hb.v': '1' } } })
     expect(patchFor({ ...item, category: 'uncategorised' }, ['category'], context).extendedProperties).toBeUndefined()
   })
@@ -69,5 +69,32 @@ describe('newEventId', () => {
     expect(id).toHaveLength(26)
     expect(isEventId(id)).toBe(true)
     expect(newEventId(bytes => bytes.fill(255))).toBe('v'.repeat(26))
+  })
+})
+
+describe('a done or cancelled entry', () => {
+  it('is tagged instead of its category and has no reminders', () => {
+    const done = { ...item, status: 'done' as const }
+    expect(eventFor(done, context)).toMatchObject({ reminders: { overrides: [], useDefault: false }, summary: '[Done] Amazon' })
+    expect(eventFor({ ...item, status: 'cancelled' }, context).summary).toBe('[Cancelled] Amazon')
+    expect(eventFor(item, context)).toMatchObject({ reminders: { useDefault: true }, summary: '[Coupon] Amazon' })
+  })
+
+  it('changes its title and reminders when the status changes, keeping its colour', () => {
+    expect(patchFor({ ...item, status: 'done' }, ['status'], context)).toEqual({
+      colorId: '6',
+      extendedProperties: { private: { 'hb.status': 'done', 'hb.v': '1' } },
+      reminders: { overrides: [], useDefault: false },
+      summary: '[Done] Amazon',
+    })
+    // Reopened: overrides someone added in Google are cleared, or Google refuses the defaults.
+    expect(patchFor(item, ['status'], context)).toMatchObject({ reminders: { overrides: [], useDefault: true }, summary: '[Coupon] Amazon' })
+  })
+
+  it('keeps the own title and colour of an uncategorised event (one added by hand)', () => {
+    const handMade = { ...item, category: 'uncategorised', status: 'done' as const }
+    expect(eventFor(handMade, context).summary).toBe('Amazon')
+    expect(patchFor(handMade, ['status'], context)).not.toHaveProperty('colorId')
+    expect(patchFor(handMade, ['status'], context)).not.toHaveProperty('summary')
   })
 })

@@ -23,11 +23,13 @@ keeps "pull before every write" cheap even when several edits happen in a row.
       Google's value, and `etags.<myUid>` is updated.
    2. **Push:**
       - New item: `events.insert` with the client-generated id, 17:00–17:15 Europe/Berlin,
-        `reminders.useDefault: true`, the category title prefix and colour, the `hb.*` properties,
+        `reminders.useDefault: true` (none at all for a done or cancelled entry), the category title
+        prefix (`[Done]` / `[Cancelled]` instead once done or cancelled) and colour, the `hb.*` properties,
         and an `RRULE` if it repeats. A `409 Conflict` means it already exists, so it is treated as
         success.
       - Edited item: `events.patch` with **only the `dirty` fields** (plus the title prefix and
-        colour if the category changed), and `If-Match: <etags[myUid]>`.
+        colour if the category changed; for a status change also the `[Done]` / `[Cancelled]` tag,
+        colour and reminders, except on an event added by hand), and `If-Match: <etags[myUid]>`.
       - Deleted item: `events.delete`, where 404 and 410 count as success. Then delete the
         Firestore doc.
    3. On success: copy every field of Google's reply into the entry (it includes changes made in
@@ -95,7 +97,8 @@ for 3 seconds, so a burst of triggers causes one pull.
   removes a stray entry an older app version may have made from it (in Firestore only). Each app
   writes `syncState/{uid}.schema = 2` to say it knows these events.
 - **Writing date events** (`date-events.ts`, `date-outbox.ts`): every extra date gets its own event,
-  `<entryId>d<dateId>`, titled `[Category] Title · Label`, at 17:00 on its date, with the entry's
+  `<entryId>d<dateId>`, titled `[Category] Title · Label` (`[Done]` / `[Cancelled]` instead once done
+  or cancelled), at 17:00 on its date, with the entry's
   notes and private properties plus `hb.entry`, `hb.date`, `hb.label`.
   - **Gate:** only while **every** `syncState/{uid}` has `schema >= 2`, as the server reports it (not
     the local cache). Every app version writes that document on its first pull, so a person on an
@@ -108,7 +111,8 @@ for 3 seconds, so a burst of triggers causes one pull.
     changed) or a delete (date removed). The outbox writes one per step, after the entry's own event is
     synced and no local change waits.
   - **Upsert:** insert; on 409, a full patch against the etag just read (which also revives an event
-    deleted in Google) and clears reminder overrides (Google rejects them next to the defaults).
+    deleted in Google) and clears reminder overrides (Google rejects them next to the defaults); a
+    done or cancelled entry's date events get no reminders.
   - **Changed in Google** (`date-pull.ts`, `dateEventChange`, applied in a transaction):
     - **moved:** the entry takes the new date;
     - **deleted:** the entry drops the date (a deletion may come without properties, so a deleted
@@ -141,9 +145,11 @@ for 3 seconds, so a burst of triggers causes one pull.
   shape with one etag-guarded `events.patch` per event:
   - The start is not 17:00 Europe/Berlin, or it is an all-day event: keep the date, set
     17:00–17:15.
-  - The event has its own reminder overrides instead of `useDefault: true`: reset it. This only
-    affects the reminders of the user whose device runs the pull, because reminders are per user.
-    The other person's are fixed when their device pulls.
+  - The event's reminders don't match the entry's status (default reminders while open, none once done
+    or cancelled, #43): reset them. This only affects the reminders of the user whose device runs the
+    pull, because reminders are per user. That is also why the other person's push of a status change
+    is followed by this person's own reminder fix (`ownRemindersFix`), though the entry itself needs
+    nothing else.
   - There is no `hb.category` but the title starts with a `[Label]` naming a category: record that
     category and add its colour. Without such a prefix the event is one added by hand: it is shown
     as uncategorised and not adjusted at all.

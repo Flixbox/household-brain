@@ -72,3 +72,12 @@ describe('a date event left in Google', () => {
     expect(isOrphanDate({ ...base, extraDates: [], pendingOp: 'delete' }, cancelBy.id)).toBe(false)
   })
 })
+
+describe('date events of a done entry', () => {
+  it('say done instead of the category and have no reminders', () => {
+    expect(dateEventFor({ ...base, status: 'done' }, cancelBy, context)).toMatchObject({
+      reminders: { overrides: [], useDefault: false },
+      summary: '[Done] Streaming · Cancel by',
+    })
+  })
+})

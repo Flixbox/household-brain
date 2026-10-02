@@ -1,5 +1,5 @@
 import { type EntryDate, extraDatesOf } from './dates'
-import { type CalendarEvent, DUE_TIME, END_TIME, type EventContext, labelOf, privateProperties, summaryOf } from './event'
+import { type CalendarEvent, DUE_TIME, END_TIME, type EventContext, labelOf, privateProperties, remindersOf, summaryOf } from './event'
 import type { Item } from './model'
 
 /**
@@ -46,7 +46,7 @@ export function dateEventFor(item: Item, entryDate: EntryDate, { categories, tim
     end: { dateTime: `${entryDate.date}T${END_TIME}`, timeZone },
     extendedProperties: { private: { ...privateProperties(item), 'hb.date': entryDate.id, 'hb.entry': item.id, 'hb.label': label } },
     id: dateEventId(item.id, entryDate.id),
-    reminders: { useDefault: true },
+    reminders: remindersOf(item),
     start: { dateTime: `${entryDate.date}T${DUE_TIME}`, timeZone },
     summary: `${summaryOf(item, categories)} · ${label}`,
   }

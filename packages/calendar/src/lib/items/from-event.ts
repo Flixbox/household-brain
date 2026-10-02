@@ -1,8 +1,9 @@
 import type { Category } from '../categories'
-import { type CalendarEvent, DUE_TIME, END_TIME, type EventContext, summaryOf } from './event'
+import { type CalendarEvent, DUE_TIME, END_TIME, type EventContext, STATUS_TAGS, remindersOf, summaryOf } from './event'
 import type { ItemDraft } from './model'
 
 const PREFIX = /^\[(?<label>[^\]]+)\]\s*(?<rest>.*)$/u
+const STATUS_PREFIX = new RegExp(`^\\[(?:${Object.values(STATUS_TAGS).join('|')})\\]\\s*(?<rest>.*)$`, 'u')
 
 function prefixCategory(event: CalendarEvent, categories: readonly Category[]) {
   const { label = '', rest = '' } = PREFIX.exec(event.summary ?? '')?.groups ?? {}
@@ -17,7 +18,12 @@ function prefixCategory(event: CalendarEvent, categories: readonly Category[]) {
 function categoryAndTitle(event: CalendarEvent, categories: readonly Category[]): { category: string, title: string } {
   const { category, rest } = prefixCategory(event, categories)
   const stored = event.extendedProperties?.private?.['hb.category']
-  return { category: stored ?? category?.slug ?? 'uncategorised', title: category ? rest : event.summary ?? '' }
+  // A done or cancelled entry's event carries `[Done]` / `[Cancelled]` instead of its category; only
+  // then is it a tag (an open entry may well be called "[Done] …").
+  const status = event.extendedProperties?.private?.['hb.status']
+  const tagged = stored && (status === 'done' || status === 'cancelled') ? STATUS_PREFIX.exec(event.summary ?? '')?.groups?.rest ?? null : null
+  const title = tagged ?? (category ? rest : event.summary ?? '')
+  return { category: stored ?? category?.slug ?? 'uncategorised', title }
 }
 
 /** An event someone put into the calendar by hand, without the app's category or a category prefix. */
@@ -75,10 +81,26 @@ function categoryFix(event: CalendarEvent, draft: ItemDraft, categories: readonl
   }
 }
 
+/** Default reminders while open; none at all once done or cancelled (#43). */
+const remindersFit = (event: CalendarEvent, draft: ItemDraft) =>
+  event.reminders?.useDefault === remindersOf(draft).useDefault && !event.reminders?.overrides?.length
+
+/**
+ * Google keeps reminders per person, so the other person's push of a done entry silenced only theirs:
+ * this person's reminders on the event, as a patch, or null when they already fit the entry's status.
+ * Events added by hand and repeating ones are left alone.
+ */
+export function ownRemindersFix(event: CalendarEvent, draft: ItemDraft, categories: readonly Category[]): CalendarEvent | null {
+  if (isForeign(event, categories) || isRecurring(event) || remindersFit(event, draft)) {
+    return null
+  }
+  return { reminders: { overrides: [], useDefault: remindersOf(draft).useDefault } }
+}
+
 /**
  * What an event made or changed directly in Google Calendar needs to fit the app's rules, as an
  * `events.patch` body, or null when it already fits: due 17:00–17:15, the person's own default
- * reminders, and a category with its title prefix and colour.
+ * reminders (none once done or cancelled), and a category with its title prefix and colour.
  */
 export function normalisationFor(event: CalendarEvent, draft: ItemDraft, context: EventContext): CalendarEvent | null {
   // Events put into the calendar by hand (a birthday, an appointment) are shown but never rewritten.
@@ -88,7 +110,7 @@ export function normalisationFor(event: CalendarEvent, draft: ItemDraft, context
   const patch: CalendarEvent = {
     ...timeFix(event, draft, context.timeZone),
     // Overrides must be cleared explicitly: Google rejects default reminders next to overrides.
-    ...event.reminders?.useDefault === true ? {} : { reminders: { overrides: [], useDefault: true } },
+    ...remindersFit(event, draft) ? {} : { reminders: { overrides: [], useDefault: remindersOf(draft).useDefault } },
     ...categoryFix(event, draft, context.categories),
   }
   return Object.keys(patch).length > 0 ? patch : null

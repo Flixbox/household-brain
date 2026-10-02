@@ -22,7 +22,9 @@
 - **Reminders: each person's default notifications on the shared calendar.** Google Calendar keeps
   reminders **separately for each user**: the `reminders` I write on an event only notify me. So the
   app does not put reminders on events. Instead:
-  - Every event is written with `"reminders": { "useDefault": true }`.
+  - Every event of an open entry is written with `"reminders": { "useDefault": true }`. A **done or
+    cancelled** entry's events (its own and its extra dates') get no reminders at all
+    (`{ "useDefault": false, "overrides": [] }`), and get them back when it is reopened (#43).
   - Each user's calendar-list entry for the shared calendar gets these default notifications, set by
     that user's own device with `calendarList.patch`:
 
@@ -38,7 +40,9 @@
   - Each device checks its own user's `defaultReminders` on start and resets them if someone changed
     them.
 - **Title:** `[Coupon] Amazon 10€`. The category prefix keeps entries readable in Google Calendar,
-  and the app strips it for display.
+  and the app strips it for display. A done or cancelled entry shows `[Done]` / `[Cancelled]` instead
+  (the category stays in `hb.category` and the colour); an uncategorised event, one added by hand,
+  keeps its own title.
 - **Colour:** each category maps to a Google `colorId`.
 - **App fields** go in `extendedProperties.private`:
 
