@@ -4,8 +4,8 @@ import type { Item } from '../../lib/items/model'
 import { toggleCollapsed } from '../../lib/items/collapsed'
 import { ItemRow } from './ItemRow'
 
-/** One category: a header that collapses it (with the open count), its "+", and its entries. */
 /**
+ * One category: a header that collapses it (with the open count), its "+", and its entries.
  * `foldable` is false while searching: the section is shown open and its header is plain text, so
  * a tap can't change the remembered folding unseen.
  */
