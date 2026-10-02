@@ -66,7 +66,8 @@ syncState/{uid}                      { syncToken, lastSyncAt }   ← one per per
 categories/{slug}                    { slug, label, colorId, sortOrder }   ← an icon comes with the board UI
 items/{eventId}                      {
   title, category, dueDate: "YYYY-MM-DD", rrule?: string,
-  status, amount?, currency?, code?, url?, notes?, noticeDays?,
+  status, amount?, currency?, code?, url?, notes?, noticeDays?, startDate?: "YYYY-MM-DD",
+  extraDates?: { id, label, date: "YYYY-MM-DD" }[],   // more dates (#34); app only for now, no event
   etags?: { [uid]: string },         // last known Google etag, per user (an event's etag can differ
                                      //   between users because reminders are per user)
   sync: "synced" | "pending" | "error",

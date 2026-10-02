@@ -20,7 +20,9 @@ shell owns the bar, the drawer and "Sign out"; the app passes in its links.
   - If `localStorage` is unavailable (private mode, blocked storage), it falls back to in-memory
     state, which means everything is expanded.
   - Slugs of deleted categories are pruned on load.
-- Items are sorted by `dueDate` ascending, with ties broken by title.
+- Items are sorted by their next date: a passed due date first (the entry is overdue), otherwise the
+  first of the due date and the extra dates from today on, or the last once all have passed; with ties broken by title. The row shows that date, and "+
+  more" when the entry has other dates.
 - Each card shows the title, the relative due date ("tomorrow, 17:00", "in 5 days", "overdue by 2
   days") plus the absolute date, the amount, and the code with a copy button.
 - Urgency colours: **overdue from 17:00 on the due date** is red, within 7 days is amber, anything
@@ -40,7 +42,9 @@ shell owns the bar, the drawer and "Sign out"; the app passes in its links.
 
 **Add / edit sheet**
 
-- Fields: title, category (chips), **due date (date only, always 17:00)**, an optional start date
+- Fields: title, category (chips), **due date (date only, always 17:00)**, more dates (optional,
+  each with a label such as "Cancel by" or "Valid from" and a date; for now they live in the app
+  only, without reminders: #34), an optional start date
   (not after the due date; the row shows "since …" or, while still ahead, "from …"), status (open / done /
   cancelled; when editing only, a new entry is open), repeat (none / monthly /
   yearly / custom), amount, code, link, notes, notice period.

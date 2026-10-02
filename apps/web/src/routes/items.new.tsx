@@ -3,6 +3,7 @@ import { ItemForm } from '@household-brain/calendar/components/items/ItemForm'
 import { type ItemDraft, emptyDraft } from '@household-brain/calendar/lib/items/model'
 import { requestSyncAccess } from '@household-brain/calendar/lib/items/outbox'
 import { addItem } from '@household-brain/calendar/lib/items/store'
+import type { EntryDate } from '@household-brain/calendar/lib/items/dates'
 import { useCategories } from '@household-brain/calendar/lib/items/use-items'
 import { reportWriteFailure } from '@household-brain/calendar/lib/items/write-failures'
 
@@ -17,10 +18,10 @@ function NewItem() {
   const categories = useCategories()
   const navigate = useNavigate()
   const known = categories.some(entry => entry.slug === category) ? category : ''
-  const save = (draft: ItemDraft) => {
+  const save = (draft: ItemDraft, { dates }: { dates: EntryDate[] }) => {
     // Order matters: ask Google first, inside the click; save without waiting for the server.
     requestSyncAccess()
-    addItem(draft).written.catch(reportWriteFailure)
+    addItem(draft, dates).written.catch(reportWriteFailure)
     return navigate({ to: '/' })
   }
   return (
