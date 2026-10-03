@@ -33,6 +33,8 @@
     ],
     "typescript/consistent-type-assertions": ["error", { "assertionStyle": "never" }], // narrow with type guards instead of casting (#68)
     "import/no-relative-parent-imports": "error", // a package imports its own modules by its name, `@household-brain/calendar/lib/…` (#77)
+    // React Compiler memoises at build time (#69, #84): memoising by hand is banned.
+    "eslint/no-restricted-imports": ["error", { "paths": [{ "name": "react", "importNames": ["useMemo", "useCallback", "memo"], "message": "React Compiler memoises at build time (#69): don't memoise by hand." }] }],
     "react/react-in-jsx-scope": "off", // the automatic JSX runtime needs no React import
     "react/function-component-definition": ["error", { "namedComponents": "arrow-function", "unnamedComponents": "arrow-function" }], // components are arrow functions too (#67)
     "@stylistic/indent": [

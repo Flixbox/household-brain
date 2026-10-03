@@ -15,15 +15,16 @@ const menu = (
   </>
 )
 
-export const Route = createRootRoute({
-  component: () => (
-    <AppShell menu={menu}>
-      <OutboxRunner />
-      <div className="space-y-6">
-        <SyncBar />
-        <Outlet />
-        <DoneToast />
-      </div>
-    </AppShell>
-  ),
-})
+// Named, so React Compiler recognises it as a component.
+const RootLayout = () => (
+  <AppShell menu={menu}>
+    <OutboxRunner />
+    <div className="space-y-6">
+      <SyncBar />
+      <Outlet />
+      <DoneToast />
+    </div>
+  </AppShell>
+)
+
+export const Route = createRootRoute({ component: RootLayout })

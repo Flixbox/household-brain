@@ -333,6 +333,13 @@ adapted to this repository:
   `@household-brain/calendar/lib/items/model`. Siblings in the same folder stay `./x`. oxlint enforces
   it (`import/no-relative-parent-imports`). Only what the package's `exports` cover can be imported
   this way (`lib/*.ts`, `components/*.tsx`), so shared non-component code lives in `lib/`.
+- **React Compiler memoises at build time** (#69, through `@rolldown/plugin-babel` in
+  `apps/web/vite.config.ts`, so the packages too): don't write `useMemo`, `useCallback` or `memo` (oxlint's
+  `no-restricted-imports` refuses them). Code has to follow the Rules of React (no mutating props or state, no reading refs while
+  rendering), or the compiler skips it or its memoisation changes what renders. That includes
+  values from outside React read during render: the compiler takes them as unchanging, so read
+  them through a store (`useStore($user)`, not `auth.currentUser`). Components need a name
+  (`const RootLayout = () => …`); an anonymous one isn't compiled.
 - **No barrel files.** No `index.ts` that re-exports a package's modules: barrels pull every module
   into whatever imports one of them, which defeats tree shaking and code splitting. Packages
   expose their modules by path through `exports` patterns in `package.json` (e.g.

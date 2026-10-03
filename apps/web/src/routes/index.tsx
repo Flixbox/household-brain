@@ -2,10 +2,11 @@ import { Link, createFileRoute } from '@tanstack/react-router'
 import { ItemList } from '@household-brain/calendar/components/items/ItemList'
 import { useHousehold } from '@household-brain/calendar/lib/calendar/use-household'
 import { useCategories, useItems } from '@household-brain/calendar/lib/items/use-items'
-import { auth } from '@household-brain/firebase/firebase'
+import { useStore } from '@nanostores/react'
+import { $user } from '@household-brain/firebase/user'
 
 const Home = () => {
-  const user = auth.currentUser
+  const user = useStore($user)
   const household = useHousehold()
   const items = useItems()
   const categories = useCategories()
