@@ -3,7 +3,7 @@ import { useStore } from '@nanostores/react'
 import { db } from '@household-brain/firebase/firebase'
 import { docStore } from '@household-brain/firebase/live'
 import type { HouseholdConfig } from './setup'
-import { householdFrom } from '../documents'
+import { householdFrom } from '@household-brain/calendar/lib/documents'
 
 export type HouseholdState =
   | { state: 'loading' }

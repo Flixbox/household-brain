@@ -1,6 +1,6 @@
 import { useCategories, useItems } from './use-items'
 import type { Item } from './model'
-import type { Category } from '../categories'
+import type { Category } from '@household-brain/calendar/lib/categories'
 
 export type Entry =
   | { state: 'loading' }

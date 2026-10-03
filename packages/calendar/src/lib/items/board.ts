@@ -1,4 +1,4 @@
-import type { Category } from '../categories'
+import type { Category } from '@household-brain/calendar/lib/categories'
 import type { Item } from './model'
 import { matchesSearch } from './search'
 import { nextDate } from './dates'

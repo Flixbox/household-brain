@@ -1,5 +1,5 @@
 import { auth } from '@household-brain/firebase/firebase'
-import { MEMBER_SCOPES, calendarToken, hasCalendarToken, loadGis } from '../google-token'
+import { MEMBER_SCOPES, calendarToken, hasCalendarToken, loadGis } from '@household-brain/calendar/lib/google-token'
 import type { Item } from './model'
 import { type PushContext, pushItem } from './push'
 import { pullChanges } from './puller'

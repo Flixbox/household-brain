@@ -1,7 +1,7 @@
 import type { Temporal } from 'temporal-polyfill'
-import type { Item } from '../../lib/items/model'
-import { type Urgency, rowDue } from '../../lib/items/due'
-import type { EntryDate } from '../../lib/items/dates'
+import type { Item } from '@household-brain/calendar/lib/items/model'
+import { type Urgency, rowDue } from '@household-brain/calendar/lib/items/due'
+import type { EntryDate } from '@household-brain/calendar/lib/items/dates'
 
 const URGENCY_TEXT: Record<Urgency, string> = {
   later: 'text-stone-500',

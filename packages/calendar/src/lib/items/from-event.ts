@@ -1,4 +1,4 @@
-import type { Category } from '../categories'
+import type { Category } from '@household-brain/calendar/lib/categories'
 import { type CalendarEvent, DUE_TIME, END_TIME, type EventContext, STATUS_TAGS, remindersOf, remindersPatch, sameReminders, summaryOf } from './event'
 import { remindersFromText } from './reminders'
 import type { ItemDraft } from './model'

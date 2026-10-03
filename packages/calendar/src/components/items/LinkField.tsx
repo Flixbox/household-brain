@@ -1,5 +1,5 @@
-import { LINK_PATTERN, openableLink } from '../../lib/items/link'
-import { textField } from '../settings/styles'
+import { LINK_PATTERN, openableLink } from '@household-brain/calendar/lib/items/link'
+import { textField } from '@household-brain/calendar/lib/styles'
 import { Field } from './Field'
 
 /** The link field, with a button that opens the link in a new tab once it is a web address (#65). */

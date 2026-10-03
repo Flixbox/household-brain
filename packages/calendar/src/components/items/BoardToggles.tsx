@@ -1,5 +1,5 @@
 import { useStore } from '@nanostores/react'
-import { $byDate, toggleByDate } from '../../lib/items/by-date'
+import { $byDate, toggleByDate } from '@household-brain/calendar/lib/items/by-date'
 import { CompletedToggle } from './CompletedToggle'
 import { ToggleChip } from './ToggleChip'
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_CATEGORIES } from '../categories'
-import { type CalendarApi, CalendarApiError } from '../calendar/api'
+import { DEFAULT_CATEGORIES } from '@household-brain/calendar/lib/categories'
+import { type CalendarApi, CalendarApiError } from '@household-brain/calendar/lib/calendar/api'
 import type { CalendarEvent } from './event'
 import type { Item } from './model'
 import { pushItem } from './push'

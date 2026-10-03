@@ -1,7 +1,7 @@
 import { useStore } from '@nanostores/react'
 import { type MouseEvent, type ReactNode, useEffect, useRef } from 'react'
-import { $menuOpen, closeMenu } from '../lib/menu'
-import { signOutOfApp } from '../lib/session'
+import { $menuOpen, closeMenu } from '@household-brain/shell/lib/menu'
+import { signOutOfApp } from '@household-brain/shell/lib/session'
 
 const item = 'block w-full rounded-lg px-3 py-2 text-left font-medium hover:bg-stone-100 dark:hover:bg-stone-800'
 

@@ -1,4 +1,4 @@
-import type { TaskStatus } from '../../lib/use-task'
+import type { TaskStatus } from '@household-brain/calendar/lib/use-task'
 
 const tone = {
   busy: 'text-stone-500',

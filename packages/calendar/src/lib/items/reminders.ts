@@ -1,4 +1,4 @@
-import { DEFAULT_REMINDERS } from '../calendar/setup'
+import { DEFAULT_REMINDERS } from '@household-brain/calendar/lib/calendar/setup'
 
 /**
  * An entry's own reminders (#35), kept as text so it travels like the other fields:

@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import type { EntryDate } from '../../lib/items/dates'
-import { holdUpdatesValue } from '../../lib/update-hold'
+import type { EntryDate } from '@household-brain/calendar/lib/items/dates'
+import { holdUpdatesValue } from '@household-brain/calendar/lib/update-hold'
 import { useEntryDates } from './use-entry-dates'
-import { normaliseLink } from '../../lib/items/link'
-import { useRemindersAllowed, useUndatedAllowed } from '../../lib/items/use-undated'
-import { type EditableField, type FormState, type ItemDraft, changedFields, editField, followUntouched, openForm } from '../../lib/items/model'
+import { normaliseLink } from '@household-brain/calendar/lib/items/link'
+import { useRemindersAllowed, useUndatedAllowed } from '@household-brain/calendar/lib/items/use-undated'
+import { type EditableField, type FormState, type ItemDraft, changedFields, editField, followUntouched, openForm } from '@household-brain/calendar/lib/items/model'
 
 /**
  * The form's fields: what it shows, the newest version it has seen, and a setter per field. When

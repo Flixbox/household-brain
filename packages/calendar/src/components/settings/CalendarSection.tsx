@@ -1,8 +1,8 @@
-import { connectToHousehold, setUpHousehold } from '../../lib/calendar/connect'
-import type { HouseholdState } from '../../lib/calendar/use-household'
-import { useTask } from '../../lib/use-task'
+import { connectToHousehold, setUpHousehold } from '@household-brain/calendar/lib/calendar/connect'
+import type { HouseholdState } from '@household-brain/calendar/lib/calendar/use-household'
+import { useTask } from '@household-brain/calendar/lib/use-task'
 import { StatusLine } from './StatusLine'
-import { primaryButton } from './styles'
+import { primaryButton } from '@household-brain/calendar/lib/styles'
 
 export const CalendarSection = ({ household }: { household: HouseholdState }) => {
   const { busy, run, status } = useTask()

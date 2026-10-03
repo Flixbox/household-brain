@@ -1,11 +1,11 @@
 import { useNavigate } from '@tanstack/react-router'
 import { useEffect, useMemo } from 'react'
-import type { Category } from '../../lib/categories'
-import { type Item, type ItemDraft, draftOf } from '../../lib/items/model'
-import { refreshNow, requestSyncAccess } from '../../lib/items/outbox'
-import { editItem, removeItem, setExtraDates } from '../../lib/items/store'
-import { type EntryDate, sameDates } from '../../lib/items/dates'
-import { reportWriteFailure } from '../../lib/items/write-failures'
+import type { Category } from '@household-brain/calendar/lib/categories'
+import { type Item, type ItemDraft, draftOf } from '@household-brain/calendar/lib/items/model'
+import { refreshNow, requestSyncAccess } from '@household-brain/calendar/lib/items/outbox'
+import { editItem, removeItem, setExtraDates } from '@household-brain/calendar/lib/items/store'
+import { type EntryDate, sameDates } from '@household-brain/calendar/lib/items/dates'
+import { reportWriteFailure } from '@household-brain/calendar/lib/items/write-failures'
 import { ItemForm } from './ItemForm'
 
 /** Edit and delete one entry. */

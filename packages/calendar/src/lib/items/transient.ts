@@ -1,4 +1,4 @@
-import { CalendarApiError } from '../calendar/api'
+import { CalendarApiError } from '@household-brain/calendar/lib/calendar/api'
 
 /** No Calendar token is cached; getting one needs a click ("Sync now"). */
 export class NeedsAccessError extends Error {

@@ -1,12 +1,12 @@
 import { collection, orderBy, query } from 'firebase/firestore'
 import { useStore } from '@nanostores/react'
 import { useMemo } from 'react'
-import { type Category, visibleCategories } from '../categories'
+import { type Category, visibleCategories } from '@household-brain/calendar/lib/categories'
 import { db } from '@household-brain/firebase/firebase'
 import { dataOf, queryStore } from '@household-brain/firebase/live'
 import type { Item } from './model'
 import { itemsCollection } from './store'
-import { categoryFrom, itemFrom } from '../documents'
+import { categoryFrom, itemFrom } from '@household-brain/calendar/lib/documents'
 
 /** All entries, kept live (from the offline cache first, then the server); one listener for every reader. */
 const $items = queryStore(itemsCollection, itemFrom)

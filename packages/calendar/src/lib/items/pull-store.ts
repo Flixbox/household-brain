@@ -7,7 +7,7 @@ import type { PullDecision } from './pull-plan'
 import { newEventId } from './ids'
 import { isDate } from './dates'
 import { itemsCollection } from './store'
-import { itemFrom } from '../documents'
+import { itemFrom } from '@household-brain/calendar/lib/documents'
 
 const itemDoc = (id: string) => doc(db, 'items', id)
 /** A pulled change is a new revision, but not a change by this person: `updatedBy` stays as it was. */

@@ -1,5 +1,5 @@
 import { useStore } from '@nanostores/react'
-import { $lastDone, undoDone } from '../../lib/items/swipe'
+import { $lastDone, undoDone } from '@household-brain/calendar/lib/items/swipe'
 
 /** "Marked … done" after a swipe, with Undo, for a few seconds. */
 export const DoneToast = () => {

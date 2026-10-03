@@ -269,7 +269,9 @@ adapted to this repository:
 - **Example and test domains use the reserved `.test` TLD** (`owner@household-brain.test`), never
   `example.com` or a real-looking host.
 - **oxlint runs every category as an error.** A rule is switched off only in `.oxlintrc.json`, with
-  its reason as a comment, never with an inline disable comment.
+  its reason as a comment, never with an inline disable comment. Before switching a rule on, search
+  the file for it: a rule already listed as `"off"` further down wins (the last duplicate key in
+  JSON counts), and the new entry silently does nothing. Prove a new rule with a file that breaks it.
 - **Every dependency is pinned exactly** (`savePrefix: ''`, enforced by npm-package-json-lint);
   Dependabot bumps them. Node is pinned in `package.json` (`volta.node`), pnpm in `packageManager`.
 - **fallow** (`.fallowrc.jsonc`, part of `pnpm lint`) fails on unused files, exports and
@@ -309,6 +311,11 @@ adapted to this repository:
     `@household-brain/firebase/live`): it listens only while read, shares one listener between all
     readers, and resets when it stops. Not a `useEffect` with `onSnapshot` per component. Listeners
     with special needs (pending-write metadata in the outbox, server-only answers) stay explicit.
+- **No imports from parent folders** (`../`, #77). Inside a package, a module from another folder is
+  imported by the package's own name and path, as everyone else imports it:
+  `@household-brain/calendar/lib/items/model`. Siblings in the same folder stay `./x`. oxlint enforces
+  it (`import/no-relative-parent-imports`). Only what the package's `exports` cover can be imported
+  this way (`lib/*.ts`, `components/*.tsx`), so shared non-component code lives in `lib/`.
 - **No barrel files.** No `index.ts` that re-exports a package's modules: barrels pull every module
   into whatever imports one of them, which defeats tree shaking and code splitting. Packages
   expose their modules by path through `exports` patterns in `package.json` (e.g.

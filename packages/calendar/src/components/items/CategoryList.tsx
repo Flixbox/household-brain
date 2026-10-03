@@ -1,8 +1,8 @@
 import { useStore } from '@nanostores/react'
-import type { Board } from '../../lib/items/board'
-import { $collapsed, collapsedSlugs } from '../../lib/items/collapsed'
+import type { Board } from '@household-brain/calendar/lib/items/board'
+import { $collapsed, collapsedSlugs } from '@household-brain/calendar/lib/items/collapsed'
 import { CategorySection } from './CategorySection'
-import { NO_CATEGORY_COLOR } from '../../lib/category-colors'
+import { NO_CATEGORY_COLOR } from '@household-brain/calendar/lib/category-colors'
 import { ItemRow } from './ItemRow'
 
 /**

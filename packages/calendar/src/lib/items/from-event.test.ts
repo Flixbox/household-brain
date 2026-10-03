@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_CATEGORIES } from '../categories'
+import { DEFAULT_CATEGORIES } from '@household-brain/calendar/lib/categories'
 import type { CalendarEvent } from './event'
 import { draftFrom, normalisationFor, ownRemindersFix } from './from-event'
 

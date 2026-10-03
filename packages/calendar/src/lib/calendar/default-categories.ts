@@ -1,9 +1,9 @@
 import { collection, onSnapshot } from 'firebase/firestore'
 import { db } from '@household-brain/firebase/firebase'
-import { missingDefaults } from '../categories'
+import { missingDefaults } from '@household-brain/calendar/lib/categories'
 import { firestoreHouseholdStore } from './store'
-import { pruneCollapsed } from '../items/collapsed'
-import { categoryFrom } from '../documents'
+import { pruneCollapsed } from '@household-brain/calendar/lib/items/collapsed'
+import { categoryFrom } from '@household-brain/calendar/lib/documents'
 
 const ignore = () => null
 

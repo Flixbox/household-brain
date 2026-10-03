@@ -1,4 +1,4 @@
-import { MAX_REMINDERS, REMINDER_CHOICES, reminderMinutes, remindersValue } from '../../lib/items/reminders'
+import { MAX_REMINDERS, REMINDER_CHOICES, reminderMinutes, remindersValue } from '@household-brain/calendar/lib/items/reminders'
 import { ToggleChip } from './ToggleChip'
 
 /**

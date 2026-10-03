@@ -1,5 +1,5 @@
 import { useStore } from '@nanostores/react'
-import { $menuOpen, openMenu } from '../lib/menu'
+import { $menuOpen, openMenu } from '@household-brain/shell/lib/menu'
 
 /** The bar at the top of every signed-in page: the app's name and the button that opens the menu. */
 export const TopBar = () => {
