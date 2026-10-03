@@ -1,6 +1,7 @@
 {
-  // The settings every project shares (#79). Each tsconfig extends this and adds only its own: the
-  // ambient `types`, `jsx`, `include`, and for the app its build-info files.
+  // The settings every project shares (#79). Every tsconfig that compiles files extends this and adds
+  // only its own: the ambient `types`, `jsx`, `include`, and for the app's two configs their
+  // build-info files. `apps/web/tsconfig.json` only lists references, so it extends nothing.
   "compilerOptions": {
     "target": "es2023",
     "lib": ["ES2023", "DOM"],
