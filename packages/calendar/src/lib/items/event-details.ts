@@ -20,9 +20,10 @@ const CODE = /^code\s*:\s*(?<value>\S+)(?<rest>.*)$/iu
 const AMOUNT = /^amount\s*:\s*(?<value>\S.*)$/iu
 const LINK = /^(?:link|url)\s*:\s*(?<value>\S+)$/iu
 const WEB_ADDRESS = /https?:\/\/[^\s<>"]+/iu
-// The tags Google Calendar's editor writes. Anything else in angle brackets (`<https://…>` pasted from
-// an email) is text, not HTML.
-const HTML_TAG = /<\/?(?:a|b|br|div|em|i|li|ol|p|span|strong|u|ul)\b[^>]*>/iu
+// Whether a description is HTML is told by the tags Google Calendar's editor writes; otherwise angle
+// brackets (`<https://…>` pasted from an email) are text. Once it is HTML, every tag goes (Google also
+// wraps it in `<html-blob>`), as a literal `<` in HTML is escaped.
+const HTML_TAG = /<\/?(?:a|b|br|div|em|html-blob|i|li|ol|p|span|strong|u|ul)\b[^>]*>/iu
 
 // Longest first, so "R$" wins over "$".
 const SYMBOLS: readonly [string, string][] = [['R$', 'BRL'], ['€', 'EUR'], ['£', 'GBP'], ['$', 'USD']]
@@ -39,7 +40,7 @@ const plainText = (description: string): string => {
   return text
     .replaceAll(/<br\s*\/?>|<\/(?:p|div|li)>/giu, '\n')
     .replaceAll(/<a\s[^>]*href=["'](?<href>[^"']*)["'][^>]*>[\s\S]*?<\/a>/giu, '$<href>')
-    .replaceAll(new RegExp(HTML_TAG.source, 'giu'), '')
+    .replaceAll(/<[^>]+>/gu, '')
     .replaceAll('&nbsp;', ' ')
     .replaceAll('&lt;', '<')
     .replaceAll('&gt;', '>')

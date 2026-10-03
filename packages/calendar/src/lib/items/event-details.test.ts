@@ -31,6 +31,7 @@ describe('detailsFrom', () => {
     })
     expect(detailsFrom('Code: A1\r\nAmount: 5 €\r\nNote')).toMatchObject({ amount: '5', code: 'A1', notes: 'Note' })
     expect(detailsFrom("Amount: 10 &euro;<br><a href='https://shop.household-brain.test'>the\nshop</a>")).toMatchObject({ amount: '10', url: 'https://shop.household-brain.test' })
+    expect(detailsFrom('<html-blob>Amount: 10 €<br>Code: X1</html-blob>')).toMatchObject({ amount: '10', code: 'X1', notes: '' })
     // Angle brackets around an address pasted from an email aren't HTML: the address stays.
     expect(detailsFrom('See <https://shop.household-brain.test/deal>')).toMatchObject({ url: 'https://shop.household-brain.test/deal' })
   })
