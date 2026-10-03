@@ -161,3 +161,4 @@ ui-debug.log
 
 # TanStack Router plugin cache
 .tanstack/
+dist-e2e

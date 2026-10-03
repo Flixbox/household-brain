@@ -8,13 +8,44 @@
     "sharedGlobals": [
       "{workspaceRoot}/tsconfig.base.json"
     ],
+    "e2eEnvironment": [
+      "{workspaceRoot}/firebase.json",
+      "{workspaceRoot}/firestore.rules",
+      "{workspaceRoot}/firestore.indexes.json",
+      { "json": "{workspaceRoot}/package.json", "fields": ["volta", "packageManager"] },
+      "{workspaceRoot}/.github/workflows/ci.yml",
+      { "env": "E2E_PROJECT" }
+    ],
     "production": [
       "default",
       "!{projectRoot}/**/*.test.ts",
       "!{projectRoot}/e2e/**/*"
     ]
   },
+  "plugins": [
+    {
+      "plugin": "@nx/playwright/plugin",
+      "include": ["apps/web/playwright.config.ts"],
+      "options": { "targetName": "playwright" }
+    }
+  ],
   "targetDefaults": {
+    "playwright": {
+      "dependsOn": ["build:e2e"],
+      "inputs": [
+        "default",
+        "^production",
+        "^{projectRoot}/tsconfig*.json",
+        { "json": "{workspaceRoot}/tsconfig.json", "fields": ["compilerOptions", "extends", "files", "include"] },
+        "e2eEnvironment",
+        { "externalDependencies": ["@playwright/test", "firebase-tools"] }
+      ]
+    },
+    "build:e2e": {
+      "cache": true,
+      "inputs": ["production", "^production"],
+      "outputs": ["{projectRoot}/dist-e2e"]
+    },
     "build": {
       "dependsOn": [
         "^build"
