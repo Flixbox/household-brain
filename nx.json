@@ -6,7 +6,11 @@
       "sharedGlobals"
     ],
     "sharedGlobals": [
-      "{workspaceRoot}/tsconfig.base.json"
+      "{workspaceRoot}/tsconfig.base.json",
+      "{workspaceRoot}/firebase.json",
+      "{workspaceRoot}/firestore.rules",
+      "{workspaceRoot}/firestore.indexes.json",
+      { "env": "E2E_PROJECT" }
     ],
     "production": [
       "default",
@@ -14,7 +18,19 @@
       "!{projectRoot}/e2e/**/*"
     ]
   },
+  "plugins": [
+    {
+      "plugin": "@nx/playwright/plugin",
+      "include": ["apps/web/playwright.config.ts"],
+      "options": { "targetName": "e2e", "ciTargetName": "e2e-ci" }
+    }
+  ],
   "targetDefaults": {
+    "build:e2e": {
+      "cache": true,
+      "inputs": ["production", "^production"],
+      "outputs": ["{projectRoot}/dist-e2e"]
+    },
     "build": {
       "dependsOn": [
         "^build"

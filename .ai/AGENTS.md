@@ -291,6 +291,13 @@ adapted to this repository:
   `apps/web/tsconfig.json` only lists references); a compiler option all projects share
   goes into the base. It is an Nx input of every project (`sharedGlobals` in `nx.json`), so changing
   it reruns their typecheck and tests instead of serving them from the cache.
+- **The e2e journeys are cached Nx tasks** (#71): `@nx/playwright` infers `e2e-ci`, one task per spec
+  file, and CI runs it per device (`E2E_PROJECT`). A file whose inputs didn't change replays its
+  result and its videos. **Review the inputs whenever the tests come to depend on something new**
+  outside `apps/web` and the packages (a config file, an emulator setting, an env variable): add it
+  to `sharedGlobals` in `nx.json`, or a cached green hides a broken journey. Today that is
+  `tsconfig.base.json`, `firebase.json`, `firestore.rules`, `firestore.indexes.json` and
+  `E2E_PROJECT`; `@playwright/test`'s version comes with the plugin.
 - **Lint and typecheck are Nx targets:** `pnpm lint` is `nx run-many` over the root project's
   `lint:oxlint`, `lint:packages` and `lint:fallow` (only those root scripts are Nx targets, through
   `nx.includedScripts`), `pnpm typecheck` over every project's `typecheck` (the root's own is in

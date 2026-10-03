@@ -2,15 +2,19 @@ import { defineConfig, devices } from '@playwright/test'
 
 // Runs against a production-like build that talks only to the local Firebase emulators.
 // Start it through `pnpm test:emulated`, which boots the emulators first.
+const DEVICES = [
+  { name: 'desktop-chrome', use: { ...devices['Desktop Chrome'] } },
+  { name: 'android-pixel-9', use: { ...devices['Pixel 9'] } },
+  { name: 'iphone-17', use: { ...devices['iPhone 17'] } },
+]
+
 export default defineConfig({
   forbidOnly: Boolean(process.env.CI),
   globalTimeout: 8 * 60_000,
   // Desktop plus the two phones the app is actually used on: Android Chrome and iPhone Safari (WebKit).
-  projects: [
-    { name: 'desktop-chrome', use: { ...devices['Desktop Chrome'] } },
-    { name: 'android-pixel-9', use: { ...devices['Pixel 9'] } },
-    { name: 'iphone-17', use: { ...devices['iPhone 17'] } },
-  ],
+  // CI runs one device per job: `E2E_PROJECT` picks it, and is an Nx input, so a cached result is
+  // only ever replayed for the same device.
+  projects: DEVICES.filter(device => !process.env.E2E_PROJECT || device.name === process.env.E2E_PROJECT),
   // `list` streams progress in CI too, so a hang shows where it is.
   reporter: process.env.CI ? [['list'], ['github'], ['html', { open: 'never' }]] : 'list',
   retries: process.env.CI ? 1 : 0,
@@ -31,7 +35,7 @@ export default defineConfig({
   // script or an `&&` chain: those wrappers swallow the stop signal and Playwright then waits for the
   // server to exit forever.
   webServer: {
-    command: 'vite preview --port 4173 --strictPort',
+    command: 'vite preview --outDir dist-e2e --port 4173 --strictPort',
     gracefulShutdown: { signal: 'SIGTERM', timeout: 5000 },
     // Never attach to some other server on 4173, e.g. a production `pnpm preview`.
     reuseExistingServer: false,
