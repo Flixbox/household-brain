@@ -334,8 +334,8 @@ adapted to this repository:
   it (`import/no-relative-parent-imports`). Only what the package's `exports` cover can be imported
   this way (`lib/*.ts`, `components/*.tsx`), so shared non-component code lives in `lib/`.
 - **React Compiler memoises at build time** (#69, through `@rolldown/plugin-babel` in
-  `apps/web/vite.config.ts`, so the packages too): don't write `useMemo`, `useCallback` or `memo` for
-  speed. Code has to follow the Rules of React (no mutating props or state, no reading refs while
+  `apps/web/vite.config.ts`, so the packages too): don't write `useMemo`, `useCallback` or `memo` (oxlint's
+  `no-restricted-imports` refuses them). Code has to follow the Rules of React (no mutating props or state, no reading refs while
   rendering), or the compiler skips it or its memoisation changes what renders.
 - **No barrel files.** No `index.ts` that re-exports a package's modules: barrels pull every module
   into whatever imports one of them, which defeats tree shaking and code splitting. Packages
