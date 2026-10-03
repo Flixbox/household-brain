@@ -51,11 +51,11 @@ const merged = (entry: Item, draft: ItemDraft): PullDecision => {
 
 const changed = ({ entry, event, categories }: PullInput): PullDecision => {
   const draft = draftFrom(event, categories)
-  // Neither the version (`googleUpdated`) nor this person's etag is stored yet: both are recorded only
-  // once the event is adjusted (or found fine), so a pull interrupted in between, or a patch that
-  // failed, adjusts it again instead of taking the version as already handled.
-  const synced = { dirty: [], pendingOp: null, sync: 'synced', syncError: null }
+  const googleUpdated = event.updated ?? ''
+  const synced = { dirty: [], googleUpdated, pendingOp: null, sync: 'synced', syncError: null }
   if (!entry) {
+    // The etag for this person is recorded only after the event is adjusted (or found fine): until
+    // someone's is, the same version is adjusted again (`decidePull`).
     return { draft, fields: { ...draft, ...synced, etags: {}, id: event.id }, kind: 'create' }
   }
   if (hasLocalEdits(entry)) {
@@ -120,5 +120,7 @@ export const decidePull = (input: PullInput): PullDecision => {
   if (isSettled(entry, event, uid)) {
     return { kind: 'skip' }
   }
-  return version === 'same' && entry ? rememberEtag(event) : changed(input)
+  // An entry nobody has recorded an etag for came from Google and was never adjusted (an interrupted
+  // pull, or a patch that failed): the same version goes the full way again, so it is adjusted.
+  return version === 'same' && entry && Object.keys(entry.etags).length > 0 ? rememberEtag(event) : changed(input)
 }

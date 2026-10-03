@@ -30,6 +30,9 @@ describe('detailsFrom', () => {
       amount: '10', code: 'SUMMER25', currency: '', notes: 'Only online & not in stores', url: 'https://shop.household-brain.test/deal',
     })
     expect(detailsFrom('Code: A1\r\nAmount: 5 €\r\nNote')).toMatchObject({ amount: '5', code: 'A1', notes: 'Note' })
+    expect(detailsFrom("Amount: 10 &euro;<br><a href='https://shop.household-brain.test'>the\nshop</a>")).toMatchObject({ amount: '10', url: 'https://shop.household-brain.test' })
+    // Angle brackets around an address pasted from an email aren't HTML: the address stays.
+    expect(detailsFrom('See <https://shop.household-brain.test/deal>')).toMatchObject({ url: 'https://shop.household-brain.test/deal' })
   })
 
   it('takes a currency only when nothing else is left on the line', () => {
