@@ -1,6 +1,5 @@
 import { collection, orderBy, query } from 'firebase/firestore'
 import { useStore } from '@nanostores/react'
-import { useMemo } from 'react'
 import { type Category, visibleCategories } from '@household-brain/calendar/lib/categories'
 import { db } from '@household-brain/firebase/firebase'
 import { dataOf, queryStore } from '@household-brain/firebase/live'
@@ -21,5 +20,5 @@ export const useItems = (): Item[] | null => dataOf(useStore($items))
 export const useCategories = (): Category[] => {
   const categories = dataOf(useStore($categories))
   const items = useItems()
-  return useMemo(() => visibleCategories(categories ?? [], items ?? []), [categories, items])
+  return visibleCategories(categories ?? [], items ?? [])
 }

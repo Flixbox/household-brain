@@ -1,5 +1,5 @@
 import { useNavigate } from '@tanstack/react-router'
-import { useEffect, useMemo } from 'react'
+import { useEffect } from 'react'
 import type { Category } from '@household-brain/calendar/lib/categories'
 import { type Item, type ItemDraft, draftOf } from '@household-brain/calendar/lib/items/model'
 import { refreshNow, requestSyncAccess } from '@household-brain/calendar/lib/items/outbox'
@@ -15,7 +15,7 @@ export const EditForm = ({ item, categories }: { item: Item, categories: Categor
   useEffect(() => {
     refreshNow().catch(() => null)
   }, [])
-  const current = useMemo(() => draftOf(item), [item])
+  const current = draftOf(item)
   const after = (write: Promise<unknown>) => {
     write.catch(reportWriteFailure)
     return navigate({ to: '/' })
