@@ -22,7 +22,7 @@
     {
       "plugin": "@nx/playwright/plugin",
       "include": ["apps/web/playwright.config.ts"],
-      "options": { "targetName": "e2e", "ciTargetName": "e2e-ci" }
+      "options": { "targetName": "e2e" }
     }
   ],
   "targetDefaults": {

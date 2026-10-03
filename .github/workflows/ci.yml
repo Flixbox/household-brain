@@ -98,15 +98,15 @@ jobs:
         with:
           path: ~/.cache/firebase/emulators
           key: firebase-emulators-${{ hashFiles('pnpm-lock.yaml') }}
-      # The journeys run as Nx tasks, one per spec file, cached: a file whose inputs (the app, the
-      # packages, the Firestore rules and config, this device, Playwright's version; `nx.json`) didn't
-      # change replays its result, videos included. One at a time: they share the emulators and port 4173.
+      # The journeys run as one cached Nx task per device: when nothing they depend on changed (the app,
+      # the packages, the Firestore rules and config, this device, Playwright's version; `nx.json`),
+      # the result is replayed, videos included. (The per-file `e2e-ci` needs Nx Agents, a paid service.)
       - name: Run the tests against the emulators
         timeout-minutes: 8
         env:
           E2E_PROJECT: ${{ matrix.project }}
         run: |
-          tests="pnpm exec nx run @household-brain/web:build:e2e && pnpm exec nx run @household-brain/web:e2e-ci --parallel=1"
+          tests="pnpm exec nx run @household-brain/web:build:e2e && pnpm exec nx run @household-brain/web:e2e"
           if [ "$E2E_PROJECT" = desktop-chrome ]; then tests="pnpm test:rules && $tests"; fi
           pnpm exec firebase emulators:exec --only auth,firestore --project demo-household-brain "$tests"
       - if: failure()
