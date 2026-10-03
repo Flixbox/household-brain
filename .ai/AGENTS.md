@@ -300,7 +300,9 @@ adapted to this repository:
   packages, `e2eEnvironment` in `nx.json` (the Firebase config and rules, Node and pnpm from the root
   `package.json`, `ci.yml`, `E2E_PROJECT`) and the versions of `@playwright/test` and
   `firebase-tools` (the emulators). Tools only the root `package.json` lists are not covered by the
-  app's dependencies: name them there.
+  app's dependencies: name them there. These inputs replace the plugin's own, so they restate its
+  list: compare them with `nx show project @household-brain/web` without the override when
+  `@nx/playwright` is bumped.
 - **Lint and typecheck are Nx targets:** `pnpm lint` is `nx run-many` over the root project's
   `lint:oxlint`, `lint:packages` and `lint:fallow` (only those root scripts are Nx targets, through
   `nx.includedScripts`), `pnpm typecheck` over every project's `typecheck` (the root's own is in

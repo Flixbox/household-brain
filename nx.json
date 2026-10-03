@@ -36,6 +36,7 @@
         "default",
         "^production",
         "^{projectRoot}/tsconfig*.json",
+        { "json": "{workspaceRoot}/tsconfig.json", "fields": ["compilerOptions", "extends", "files", "include"] },
         "e2eEnvironment",
         { "externalDependencies": ["@playwright/test", "firebase-tools"] }
       ]
