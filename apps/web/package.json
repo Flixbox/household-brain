@@ -17,8 +17,10 @@
     "@household-brain/calendar": "workspace:*",
     "@household-brain/firebase": "workspace:*",
     "@household-brain/shell": "workspace:*",
+    "@nanostores/react": "2.0.1",
     "@tanstack/react-router": "1.170.40",
     "firebase": "12.19.0",
+    "nanostores": "1.5.4",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },
