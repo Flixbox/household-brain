@@ -24,6 +24,30 @@ describe('detailsFrom', () => {
     expect(detailsFrom('Details at https://shop.household-brain.test today')).toMatchObject({ notes: 'Details at https://shop.household-brain.test today', url: 'https://shop.household-brain.test' })
   })
 
+  it("reads what Google Calendar's own editor writes: HTML", () => {
+    const html = '<b>Code:</b> SUMMER25<br>Amount: 10 €<br><a href="https://shop.household-brain.test/deal">the deal</a><br>Only online &amp; not in stores'
+    expect(detailsFrom(html)).toEqual({
+      amount: '10', code: 'SUMMER25', currency: '', notes: 'Only online & not in stores', url: 'https://shop.household-brain.test/deal',
+    })
+    expect(detailsFrom('Code: A1\r\nAmount: 5 €\r\nNote')).toMatchObject({ amount: '5', code: 'A1', notes: 'Note' })
+  })
+
+  it('takes a currency only when nothing else is left on the line', () => {
+    for (const unclear of ['10 € NEW', '€10 (VAT incl.)', '100 kr', '20 %', '2x 10 €']) {
+      expect(detailsFrom(`Amount: ${unclear}`)).toMatchObject({ amount: '', notes: `Amount: ${unclear}` })
+    }
+    expect(detailsFrom('Amount: 10')).toMatchObject({ amount: '10', currency: '' })
+    expect(detailsFrom('Amount: 15 usd')).toMatchObject({ amount: '15', currency: 'USD' })
+  })
+
+  it('keeps what follows a code as a note, and a link without its sentence punctuation', () => {
+    expect(detailsFrom('Code: X1 (in stores only)')).toMatchObject({ code: 'X1', notes: '(in stores only)' })
+    expect(detailsFrom('More at https://shop.household-brain.test/deal.')).toMatchObject({ url: 'https://shop.household-brain.test/deal' })
+    expect(detailsFrom('Link: https://shop.household-brain.test/deal\nOnly online')).toEqual({
+      amount: '', code: '', currency: '', notes: 'Only online', url: 'https://shop.household-brain.test/deal',
+    })
+  })
+
   it('takes only the first line of each kind', () => {
     expect(detailsFrom('Code: ONE\nCode: TWO')).toMatchObject({ code: 'ONE', notes: 'Code: TWO' })
   })

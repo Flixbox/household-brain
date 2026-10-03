@@ -51,11 +51,11 @@ const merged = (entry: Item, draft: ItemDraft): PullDecision => {
 
 const changed = ({ entry, event, categories }: PullInput): PullDecision => {
   const draft = draftFrom(event, categories)
-  const googleUpdated = event.updated ?? ''
-  const synced = { dirty: [], googleUpdated, pendingOp: null, sync: 'synced', syncError: null }
+  // Neither the version (`googleUpdated`) nor this person's etag is stored yet: both are recorded only
+  // once the event is adjusted (or found fine), so a pull interrupted in between, or a patch that
+  // failed, adjusts it again instead of taking the version as already handled.
+  const synced = { dirty: [], pendingOp: null, sync: 'synced', syncError: null }
   if (!entry) {
-    // The etag for this person is recorded only after the event is adjusted (or found fine), so a
-    // pull interrupted in between adjusts it again instead of taking it as already handled.
     return { draft, fields: { ...draft, ...synced, etags: {}, id: event.id }, kind: 'create' }
   }
   if (hasLocalEdits(entry)) {

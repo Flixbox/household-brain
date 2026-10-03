@@ -28,8 +28,10 @@ describe('decidePull', () => {
   })
 
   it('creates an entry for an event made in Google Calendar', () => {
-    const decision = decide({ entry: null })
+    const decision = decide({ entry: null, event: { ...event, updated: '2026-10-01T10:00:05.000Z' } })
     expect(decision).toMatchObject({ fields: { 'code': 'NEW', 'etags': {}, 'id': 'evt1', 'sync': 'synced', 'title': 'Amazon (from Google)' }, kind: 'create' })
+    // The version comes only once the event is adjusted, so a failed adjustment is tried again.
+    expect((decision as { fields: object }).fields).not.toHaveProperty('googleUpdated')
   })
 
   it('takes Google\'s version of an entry without local edits', () => {
