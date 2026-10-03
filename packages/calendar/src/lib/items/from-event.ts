@@ -1,6 +1,7 @@
 import type { Category } from '@household-brain/calendar/lib/categories'
 import { type CalendarEvent, DUE_TIME, END_TIME, type EventContext, STATUS_TAGS, remindersOf, remindersPatch, sameReminders, summaryOf } from './event'
 import { remindersFromText } from './reminders'
+import { detailsFrom } from './event-details'
 import type { ItemDraft } from './model'
 
 const PREFIX = /^\[(?<label>[^\]]+)\]\s*(?<rest>.*)$/u
@@ -41,22 +42,38 @@ export const dueDateOf = (event: CalendarEvent): string =>
 /** An ISO 4217 code another currency is stored as; euros, and anything else, read as ''. */
 const currencyOf = (code: string | undefined) => (code && code !== 'EUR' && /^[A-Z]{3}$/u.test(code) ? code : '')
 
+/**
+ * An event made outside the app that the app is about to take in (a category prefix, but no category
+ * of its own yet): its details come from its description (#83), and `categoryFix` writes them to it.
+ */
+const isAdopting = (event: CalendarEvent, categories: readonly Category[]) =>
+  !event.extendedProperties?.private?.['hb.category'] && Boolean(prefixCategory(event, categories).category)
+
+/** Code, amount, currency, link and notes: from the event's own properties, or for one being taken in, its description. */
+const detailFields = (event: CalendarEvent, categories: readonly Category[]) => {
+  const properties = event.extendedProperties?.private ?? {}
+  const details = isAdopting(event, categories) ? detailsFrom(event.description ?? '') : null
+  return {
+    amount: properties['hb.amount'] ?? details?.amount ?? '',
+    code: properties['hb.code'] ?? details?.code ?? '',
+    currency: currencyOf(properties['hb.currency'] ?? details?.currency),
+    notes: details?.notes ?? event.description ?? '',
+    url: properties['hb.url'] ?? details?.url ?? '',
+  }
+}
+
 /** The entry fields an event carries. */
 export const draftFrom = (event: CalendarEvent, categories: readonly Category[]): ItemDraft => {
   const properties = event.extendedProperties?.private ?? {}
   const status = properties['hb.status']
   return {
     ...categoryAndTitle(event, categories),
-    amount: properties['hb.amount'] ?? '',
-    code: properties['hb.code'] ?? '',
-    currency: currencyOf(properties['hb.currency']),
+    ...detailFields(event, categories),
     dueDate: dueDateOf(event),
-    notes: event.description ?? '',
     reminders: remindersFromText(properties['hb.reminders']),
     // Only a `YYYY-MM-DD` date; anything else another client wrote reads as no start date.
     startDate: /^\d{4}-\d{2}-\d{2}$/u.test(properties['hb.start'] ?? '') ? properties['hb.start'] ?? '' : '',
     status: status === 'done' || status === 'cancelled' ? status : 'open',
-    url: properties['hb.url'] ?? '',
   }
 }
 
@@ -73,13 +90,24 @@ const timeFix = (event: CalendarEvent, draft: ItemDraft, timeZone: string): Cale
       start: { date: null, dateTime: `${draft.dueDate}T${DUE_TIME}`, timeZone },
     }
 
+/** The details taken from the description, as the event's own properties, so later pulls read them back. */
+const detailProperties = (draft: ItemDraft): Record<string, string> => Object.fromEntries([
+  ['hb.amount', draft.amount],
+  ['hb.code', draft.code],
+  ['hb.currency', draft.currency],
+  ['hb.url', draft.url],
+].filter(([, value]) => value !== ''))
+
 const categoryFix = (event: CalendarEvent, draft: ItemDraft, categories: readonly Category[]): CalendarEvent => {
   if (event.extendedProperties?.private?.['hb.category']) {
     return {}
   }
+  const properties = { ...event.extendedProperties?.private, ...detailProperties(draft), 'hb.category': draft.category, 'hb.v': '1' }
   return {
     colorId: categories.find(entry => entry.slug === draft.category)?.colorId ?? '8',
-    extendedProperties: { private: { ...event.extendedProperties?.private, 'hb.category': draft.category, 'hb.v': '1' } },
+    // The details now live in their own fields: the description keeps only the rest (#83).
+    ...(event.description ?? '') === draft.notes ? {} : { description: draft.notes },
+    extendedProperties: { private: properties },
     summary: summaryOf(draft, categories),
   }
 }

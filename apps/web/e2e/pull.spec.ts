@@ -22,7 +22,9 @@ const pullUntil = (page: Page, check: () => Promise<number>, expected: number) =
 test('events made in Google Calendar: taken in and shaped, left alone when put in by hand, strays removed', async ({ page }) => {
   const { google } = await mockGoogle(page)
   // All day, with its own reminders: both need clearing explicitly, or Google rejects the patch.
+  // As the Gemini app writes it (#83): the details in labelled lines of the description.
   google.create({
+    description: 'Code: GYM10\nAmount: 25 €\nMembers only',
     end: { date: '2026-12-02' },
     id: 'madeingoogle1',
     reminders: { overrides: [{ method: 'popup', minutes: 10 }], useDefault: false },
@@ -52,9 +54,12 @@ test('events made in Google Calendar: taken in and shaped, left alone when put i
     // The first pull does the most work (shaping this event, the ones put in by hand, the stray).
     await expect(gym).toContainText('2026-12-01', { timeout: 15_000 })
 
-    // The event was brought into shape: due 17:00, default reminders, category recorded.
+    // The event was brought into shape: due 17:00, default reminders, category recorded, and the
+    // description's code and amount moved into the entry's fields (#83).
+    await expect(gym).toContainText('GYM10')
     await expect.poll(() => gymEvent()).toMatchObject({
-      extendedProperties: { private: { 'hb.category': 'membership' } },
+      description: 'Members only',
+      extendedProperties: { private: { 'hb.amount': '25', 'hb.category': 'membership', 'hb.code': 'GYM10' } },
       reminders: { overrides: [], useDefault: true },
       start: { dateTime: '2026-12-01T17:00:00', timeZone: 'Europe/Berlin' },
       summary: '[Membership] Gym',

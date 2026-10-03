@@ -27,6 +27,20 @@ describe('draftFrom', () => {
     expect(inCurrency('real')).toBe('')
   })
 
+  it('takes the details of an event made outside the app from its description, once (#83)', () => {
+    const made = { description: 'Code: SUMMER25\nAmount: 10 €\nOnly online', start: { date: '2026-12-01' }, summary: '[Coupon] Cinema' }
+    expect(draftFrom(made, DEFAULT_CATEGORIES)).toMatchObject({ amount: '10', category: 'coupon', code: 'SUMMER25', notes: 'Only online', title: 'Cinema' })
+    // Written to the event when it is taken in, so the next pull reads the same fields back.
+    expect(normalisationFor(made, draftFrom(made, DEFAULT_CATEGORIES), context)).toMatchObject({
+      description: 'Only online',
+      extendedProperties: { private: { 'hb.amount': '10', 'hb.category': 'coupon', 'hb.code': 'SUMMER25', 'hb.v': '1' } },
+    })
+    // An event put in by hand without a category keeps its description as it is.
+    expect(draftFrom({ ...made, summary: 'Cinema' }, DEFAULT_CATEGORIES).notes).toBe(made.description)
+    // The app's own events read their fields from their properties, never from the description.
+    expect(draftFrom(appEvent, DEFAULT_CATEGORIES).notes).toBe(appEvent.description)
+  })
+
   it("reads a done or cancelled entry's title without its status tag", () => {
     const done = { ...appEvent, extendedProperties: { private: { ...appEvent.extendedProperties?.private, 'hb.status': 'done' } }, summary: '[Done] Amazon' }
     expect(draftFrom(done, DEFAULT_CATEGORIES)).toMatchObject({ category: 'coupon', status: 'done', title: 'Amazon' })

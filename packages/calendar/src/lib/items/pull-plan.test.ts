@@ -28,8 +28,11 @@ describe('decidePull', () => {
   })
 
   it('creates an entry for an event made in Google Calendar', () => {
-    const decision = decide({ entry: null })
+    const decision = decide({ entry: null, event: { ...event, updated: '2026-10-01T10:00:05.000Z' } })
     expect(decision).toMatchObject({ fields: { 'code': 'NEW', 'etags': {}, 'id': 'evt1', 'sync': 'synced', 'title': 'Amazon (from Google)' }, kind: 'create' })
+    // Until someone's etag is recorded, the same version is adjusted again: a failed patch is retried.
+    const created = { ...entry, etags: {}, googleUpdated: '2026-10-01T10:00:05.000Z' }
+    expect(decide({ entry: created, event: { ...event, updated: '2026-10-01T10:00:05.000Z' } })).toMatchObject({ kind: 'update', normalise: true })
   })
 
   it('takes Google\'s version of an entry without local edits', () => {
