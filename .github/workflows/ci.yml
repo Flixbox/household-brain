@@ -76,6 +76,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # The container runs as root on a checkout owned by the runner's user: without this, every git
+      # call Nx makes fails with "dubious ownership".
+      - name: Trust the checkout
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: Playwright image matches @playwright/test
         run: |
           wanted=$(node -p "require('./package.json').devDependencies['@playwright/test']")
@@ -98,15 +102,15 @@ jobs:
         with:
           path: ~/.cache/firebase/emulators
           key: firebase-emulators-${{ hashFiles('pnpm-lock.yaml') }}
-      # The journeys run as one cached Nx task per device: when nothing they depend on changed (the app,
-      # the packages, the Firestore rules and config, this device, Playwright's version; `nx.json`),
-      # the result is replayed, videos included. (The per-file `e2e-ci` needs Nx Agents, a paid service.)
+      # The journeys run as one cached Nx task per device (`playwright`, after the cached `build:e2e`):
+      # when nothing they depend on changed (`e2eEnvironment` and the inputs in `nx.json`), the result
+      # is replayed, videos included. (The plugin's per-file `e2e-ci` needs Nx Agents, a paid service.)
       - name: Run the tests against the emulators
         timeout-minutes: 8
         env:
           E2E_PROJECT: ${{ matrix.project }}
         run: |
-          tests="pnpm exec nx run @household-brain/web:build:e2e && pnpm exec nx run @household-brain/web:e2e"
+          tests="pnpm exec nx run @household-brain/web:playwright"
           if [ "$E2E_PROJECT" = desktop-chrome ]; then tests="pnpm test:rules && $tests"; fi
           pnpm exec firebase emulators:exec --only auth,firestore --project demo-household-brain "$tests"
       - if: failure()

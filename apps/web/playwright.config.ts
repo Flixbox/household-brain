@@ -35,8 +35,7 @@ export default defineConfig({
   // script or an `&&` chain: those wrappers swallow the stop signal and Playwright then waits for the
   // server to exit forever.
   webServer: {
-    // `--mode e2e`: Nx loads `.env.e2e` into the `e2e` target, and a production-mode preview refuses
-    // the emulator setting (vite.config.ts).
+    // The e2e build's own mode and folder (`build:e2e`).
     command: 'vite preview --mode e2e --outDir dist-e2e --port 4173 --strictPort',
     gracefulShutdown: { signal: 'SIGTERM', timeout: 5000 },
     // Never attach to some other server on 4173, e.g. a production `pnpm preview`.

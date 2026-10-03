@@ -291,13 +291,16 @@ adapted to this repository:
   `apps/web/tsconfig.json` only lists references); a compiler option all projects share
   goes into the base. It is an Nx input of every project (`sharedGlobals` in `nx.json`), so changing
   it reruns their typecheck and tests instead of serving them from the cache.
-- **The e2e journeys are a cached Nx task** (#71): `@nx/playwright` infers `e2e`, and CI runs it per
-  device (`E2E_PROJECT`). When none of its inputs changed, the result and its videos are replayed.
-  (The plugin's per-file `e2e-ci` refuses to run without Nx Agents, a paid service.) **Review the inputs whenever the tests come to depend on something new**
-  outside `apps/web` and the packages (a config file, an emulator setting, an env variable): add it
-  to `sharedGlobals` in `nx.json`, or a cached green hides a broken journey. Today that is
-  `tsconfig.base.json`, `firebase.json`, `firestore.rules`, `firestore.indexes.json` and
-  `E2E_PROJECT`; `@playwright/test`'s version comes with the plugin.
+- **The e2e journeys are a cached Nx task** (#71): `@nx/playwright` infers it as `playwright` (not
+  `e2e`: Nx would load `apps/web/.env.e2e` into a target of that name), and CI runs it per device
+  (`E2E_PROJECT`), after the cached `build:e2e`. When none of its inputs changed, the result and its
+  videos are replayed. (The plugin's per-file `e2e-ci` refuses to run without Nx Agents, a paid
+  service.) **Review its inputs whenever the tests come to depend on something new** outside
+  `apps/web` and the packages, or a cached green hides a broken journey. They are the app, the
+  packages, `e2eEnvironment` in `nx.json` (the Firebase config and rules, Node and pnpm from the root
+  `package.json`, `ci.yml`, `E2E_PROJECT`) and the versions of `@playwright/test` and
+  `firebase-tools` (the emulators). Tools only the root `package.json` lists are not covered by the
+  app's dependencies: name them there.
 - **Lint and typecheck are Nx targets:** `pnpm lint` is `nx run-many` over the root project's
   `lint:oxlint`, `lint:packages` and `lint:fallow` (only those root scripts are Nx targets, through
   `nx.includedScripts`), `pnpm typecheck` over every project's `typecheck` (the root's own is in
