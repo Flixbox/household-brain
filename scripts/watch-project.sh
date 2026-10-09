@@ -53,6 +53,11 @@ issues_seen=$state_dir/issues  # the first 80 characters of each issue line alre
 tracked=$state_dir/tracked     # pull requests followed until their deploy or closing is reported
 main_head=$state_dir/main      # the newest commit on main already reported
 touch "$reported" "$tracked"
+# One watcher per state directory: two would race on its files and report events twice.
+if command -v flock >/dev/null; then
+  exec 9>"$state_dir/lock"
+  flock -n 9 || { echo "another watcher already uses $state_dir" >&2; exit 75; }
+fi
 started=$(date +%s)
 pr=
 
@@ -69,8 +74,8 @@ report() { # report <key> <message...>: print and exit unless this key was repor
 }
 
 open_prs() { # one line per open pull request: its review state, CI and auto-merge
-  "$GH" pr list --repo "$REPO" --state open --json number,title,reviewDecision,autoMergeRequest,statusCheckRollup \
-    --jq '"Open PRs:", (.[] | "  #\(.number) \(.title[0:60]): \(if .reviewDecision == "APPROVED" then "approved" elif .reviewDecision == "CHANGES_REQUESTED" then "changes requested" else "awaiting approval" end), auto-merge \(if .autoMergeRequest then "on" else "off" end), CI \([.statusCheckRollup[]? | .conclusion // .state // "pending"] | if any(. == "FAILURE") then "failed" elif all(. == "SUCCESS" or . == "SKIPPED" or . == "NEUTRAL") then "green" else "running" end)")' \
+  "$GH" pr list --repo "$REPO" --state open --limit 100 --json number,title,reviewDecision,autoMergeRequest,statusCheckRollup \
+    --jq '"Open PRs:", (.[] | "  #\(.number) \(.title[0:60]): \(if .reviewDecision == "APPROVED" then "approved" elif .reviewDecision == "CHANGES_REQUESTED" then "changes requested" else "awaiting approval" end), auto-merge \(if .autoMergeRequest then "on" else "off" end), CI \([.statusCheckRollup[]? | .conclusion // .state // "pending"] | if any(. == "FAILURE" or . == "ERROR" or . == "TIMED_OUT" or . == "CANCELLED" or . == "STARTUP_FAILURE" or . == "ACTION_REQUIRED") then "failed" elif all(. == "SUCCESS" or . == "SKIPPED" or . == "NEUTRAL") then "green" else "running" end)")' \
     || echo "Open PRs: (listing failed)"
 }
 
@@ -190,10 +195,8 @@ check_pr() {
       report "pr-$pr closed" "CLOSED without merging"
       ;;
     OPEN)
-      if ! grep -qxF "$pr" "$tracked"; then
-        echo "$pr" >>"$tracked"
-        report "pr-$pr opened" "NEW_PR: $title"
-      fi
+      grep -qxF "$pr" "$tracked" || echo "$pr" >>"$tracked"
+      report "pr-$pr opened" "NEW_PR: $title"
       [[ $mergeable == CONFLICTING ]] && report "pr-$pr conflict $head" "CONFLICT at ${head:0:7}: rebase on main"
       [[ $decision == APPROVED ]] && report "pr-$pr approved" "APPROVED by the owner. Once it is well reviewed, enable auto-merge: agent-gh pr merge $pr --auto --squash"
       check_run "$head" pr
@@ -205,10 +208,15 @@ check_pr() {
   esac
 }
 
-untrack() { grep -vxF "$pr" "$tracked" >"$tracked.new"; mv "$tracked.new" "$tracked"; }
+untrack() {
+  local rest
+  rest=$(mktemp "$state_dir/tracked.XXXXXX") || return
+  grep -vxF "$pr" "$tracked" >"$rest"
+  mv "$rest" "$tracked"
+}
 
 watched_prs() { # open pull requests, the ones followed until their deploy, and recently merged ones
-  "$GH" pr list --repo "$REPO" --state open --json number --jq '.[].number' &&
+  "$GH" pr list --repo "$REPO" --state open --limit 100 --json number --jq '.[].number' &&
   "$GH" pr list --repo "$REPO" --state merged --limit 20 --json number,mergedAt \
     --jq '.[] | select((.mergedAt | fromdate) > (now - '"$MERGED_HOURS"' * 3600)) | .number' &&
   cat "$tracked"
