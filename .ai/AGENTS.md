@@ -146,6 +146,8 @@ adapted to this repository:
    - It watches `main` too, also between PRs: every new commit (`MAIN_ADVANCED`), failing or
      hanging runs (`MAIN_FAILED`, `MAIN_SLOW`), and new commits an open PR lacks (`MAIN_MOVED`).
    - A PR it has seen open stays watched until its deploy or its closing is reported.
+   - A PR with changes requested (one the owner parked) only reports its CI and comments, not
+     conflicts or `main` moving on.
    - **Every CI result** (a PR's, a deploy's or `main`'s, passed or failed) ends with the list of open
      PRs: approved or awaiting approval, auto-merge on or off, CI state. Act on every approved PR in
      it whose auto-merge is still off, not only on the one the event names.

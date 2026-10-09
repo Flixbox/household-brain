@@ -197,6 +197,12 @@ check_pr() {
     OPEN)
       grep -qxF "$pr" "$tracked" || echo "$pr" >>"$tracked"
       report "pr-$pr opened" "NEW_PR: $title"
+      # Changes requested (e.g. a PR the owner parked): only CI and comments are news, not its age.
+      if [[ $decision == CHANGES_REQUESTED ]]; then
+        check_run "$head" pr
+        check_activity
+        return
+      fi
       [[ $mergeable == CONFLICTING ]] && report "pr-$pr conflict $head" "CONFLICT at ${head:0:7}: rebase on main"
       [[ $decision == APPROVED ]] && report "pr-$pr approved" "APPROVED by the owner. Once it is well reviewed, enable auto-merge: agent-gh pr merge $pr --auto --squash"
       check_run "$head" pr
