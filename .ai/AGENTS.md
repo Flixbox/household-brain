@@ -143,8 +143,9 @@ adapted to this repository:
      it continues with the next one.
    - It runs from a copy, because bash reads a script while running it.
    - It stays armed through the merge and reports the deploy. Don't poll by hand alongside it.
-   - It watches `main` too: failing or hanging runs (`MAIN_FAILED`, `MAIN_SLOW`) and new commits the
-     PR lacks (`MAIN_MOVED`), also between PRs.
+   - It watches `main` too, also between PRs: every new commit (`MAIN_ADVANCED`), failing or
+     hanging runs (`MAIN_FAILED`, `MAIN_SLOW`), and new commits an open PR lacks (`MAIN_MOVED`).
+   - A PR it has seen open stays watched until its deploy or its closing is reported.
    - A plain approval is reported as `APPROVED` only. One with text also comes as `ACTIVITY`, so a
      request written into the approval gets answered before auto-merge.
    - The bot's own comments and replies in review threads are skipped; its reviews (the reviewer agent posts as
@@ -164,6 +165,7 @@ adapted to this repository:
 | `DEPLOYED` | A minute later, check the live app in the browser (section 5): mandatory, but never blocking. Report, and start the next PR. |
 | `DEPLOY_FAILED` | Fix it in a follow-up PR (never push to `main`). |
 | `MAIN_FAILED` / `MAIN_SLOW` | `main` is broken or hanging, whichever PR caused it. That comes first: fix it in a follow-up PR, or re-run a flaky job, before continuing. |
+| `MAIN_ADVANCED` | `main` got a new commit, whoever merged it. Know what landed: if it was your own PR, its deploy follows; otherwise check whether it touches your work. |
 | `MAIN_MOVED` | `main` moved under the PR (another merge). Rebase on `main`, run the checks, push once, so what gets merged is what was tested. |
 | `NEW_ISSUE` / `ISSUE_COMMENT` | Read it; take the work in turn (tech debt first), answer the owner's comment. |
 
