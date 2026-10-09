@@ -61,6 +61,7 @@ describe('draftFrom', () => {
     // An unknown tag stays part of the title.
     expect(draftFrom({ start: { date: '2026-12-01' }, summary: '[Coupon] [Party] Cake' }, DEFAULT_CATEGORIES).title).toBe('[Party] Cake')
     expect(draftFrom({ start: { date: '2026-12-01' }, summary: '[Coupon] [Party]  [Deal] Cake' }, DEFAULT_CATEGORIES).title).toBe('[Party]  Cake')
+    expect(draftFrom({ start: { date: '2026-12-01' }, summary: '[Coupon] [Deal]' }, DEFAULT_CATEGORIES).title).toBe('[Deal]')
     // An app entry with only an unknown tag keeps its title exactly, so its event isn't renamed.
     const unknown = { ...appEvent, summary: '[Coupon] [Draft]Foo' }
     expect(draftFrom(unknown, DEFAULT_CATEGORIES).title).toBe('[Draft]Foo')

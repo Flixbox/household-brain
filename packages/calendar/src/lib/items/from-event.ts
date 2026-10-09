@@ -28,6 +28,12 @@ const withoutTags = (title: string, categories: readonly Category[]): string => 
   return categoryOfTag(groups.label ?? '', categories) ? rest : `${groups.tag ?? ''}${rest}`
 }
 
+/** The title after its category tag, without further known tags; one of nothing but those keeps them. */
+const titleOf = (tagless: string, categories: readonly Category[]) => {
+  const stripped = withoutTags(tagless, categories)
+  return stripped.trim() === '' ? tagless : stripped
+}
+
 /**
  * The category and title of an event: from `hb.category`, else from a `[Label]` title prefix. A
  * leading `[…]` is only treated as a prefix when it names a category (its label or one of its words),
@@ -42,7 +48,7 @@ const categoryAndTitle = (event: CalendarEvent, categories: readonly Category[])
   const status = event.extendedProperties?.private?.['hb.status']
   const tagged = stored && (status === 'done' || status === 'cancelled') ? STATUS_PREFIX.exec(event.summary ?? '')?.groups?.rest ?? null : null
   const tagless = tagged ?? (category ? rest : null)
-  const title = tagless === null ? event.summary ?? '' : withoutTags(tagless, categories)
+  const title = tagless === null ? event.summary ?? '' : titleOf(tagless, categories)
   return { category: stored ?? category?.slug ?? 'uncategorised', tagless, title }
 }
 
