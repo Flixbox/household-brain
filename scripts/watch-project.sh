@@ -74,8 +74,8 @@ report() { # report <key> <message...>: print and exit unless this key was repor
 }
 
 open_prs() { # one line per open pull request: its review state, CI and auto-merge
-  "$GH" pr list --repo "$REPO" --state open --limit 100 --json number,title,reviewDecision,autoMergeRequest,statusCheckRollup \
-    --jq '"Open PRs:", (.[] | "  #\(.number) \(.title[0:60]): \(if .reviewDecision == "APPROVED" then "approved" elif .reviewDecision == "CHANGES_REQUESTED" then "changes requested" else "awaiting approval" end), auto-merge \(if .autoMergeRequest then "on" else "off" end), CI \([.statusCheckRollup[]? | .conclusion // .state // "pending"] | if any(. == "FAILURE" or . == "ERROR" or . == "TIMED_OUT" or . == "CANCELLED" or . == "STARTUP_FAILURE" or . == "ACTION_REQUIRED") then "failed" elif all(. == "SUCCESS" or . == "SKIPPED" or . == "NEUTRAL") then "green" else "running" end)")' \
+  "$GH" pr list --repo "$REPO" --state open --limit 100 --json number,title,reviewDecision,autoMergeRequest,labels,statusCheckRollup \
+    --jq '"Open PRs:", (.[] | "  #\(.number) \(.title[0:60]): \(if any(.labels[]; .name == "parked") then "parked, " else "" end)\(if .reviewDecision == "APPROVED" then "approved" elif .reviewDecision == "CHANGES_REQUESTED" then "changes requested" else "awaiting approval" end), auto-merge \(if .autoMergeRequest then "on" else "off" end), CI \([.statusCheckRollup[]? | .conclusion // .state // "pending"] | if any(. == "FAILURE" or . == "ERROR" or . == "TIMED_OUT" or . == "CANCELLED" or . == "STARTUP_FAILURE" or . == "ACTION_REQUIRED") then "failed" elif all(. == "SUCCESS" or . == "SKIPPED" or . == "NEUTRAL") then "green" else "running" end)")' \
     || echo "Open PRs: (listing failed)"
 }
 
@@ -179,14 +179,14 @@ check_moved() { # main has commits the PR's branch doesn't
 }
 
 check_pr() {
-  local line state mergeable head merge_sha decision auto title
+  local line state mergeable head merge_sha decision auto parked title
   line=$("$GH" pr view "$pr" --repo "$REPO" \
-    --json state,mergeable,headRefOid,mergeCommit,reviewDecision,autoMergeRequest,title,author \
-    --jq '"\(.state) \(.mergeable) \(.headRefOid) \(.mergeCommit.oid // "-") \(if (.reviewDecision // "") == "" then "-" else .reviewDecision end) \(if .autoMergeRequest then "on" else "off" end) \(.title) (by \(.author.login))"') \
+    --json state,mergeable,headRefOid,mergeCommit,reviewDecision,autoMergeRequest,labels,title,author \
+    --jq '"\(.state) \(.mergeable) \(.headRefOid) \(.mergeCommit.oid // "-") \(if (.reviewDecision // "") == "" then "-" else .reviewDecision end) \(if .autoMergeRequest then "on" else "off" end) \(if any(.labels[]; .name == "parked") then "parked" else "-" end) \(.title) (by \(.author.login))"') \
     || return
   # Every field before the title is one word: an empty one would shift the rest (GitHub answers ""
   # for the review decision of a PR without reviews).
-  read -r state mergeable head merge_sha decision auto title <<<"$line"
+  read -r state mergeable head merge_sha decision auto parked title <<<"$line"
   case $state in
     MERGED)
       # A failed deploy stays watched: a re-run of it may still go live.
@@ -199,8 +199,8 @@ check_pr() {
     OPEN)
       grep -qxF "$pr" "$tracked" || echo "$pr" >>"$tracked"
       report "pr-$pr opened" "NEW_PR: $title"
-      # Changes requested (e.g. a PR the owner parked): only CI and comments are news, not its age.
-      if [[ $decision == CHANGES_REQUESTED ]]; then
+      # A PR labelled `parked` is left open on purpose: only its CI and comments are news.
+      if [[ $parked == parked ]]; then
         check_run "$head" pr
         check_activity
         return
