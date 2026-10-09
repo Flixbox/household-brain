@@ -117,8 +117,17 @@ test('events made in Google Calendar: taken in and shaped, left alone when put i
     await expect(popcorn).toContainText('[Deal] Popcorn')
     // Its sync token saved by that version, without the reading rules: the next pull reads the whole
     // calendar again. (An incremental one would skip the event: its etag is the one recorded.)
-    const { syncToken } = (await readDocument(`syncState/${uid}`) ?? {}) as { syncToken?: { stringValue: string } }
-    await seedDocument(`syncState/${uid}`, { schema: 4, syncToken: syncToken?.stringValue ?? '' })
+    // Once the earlier pulls are done writing it, or a late one would put the rules version back.
+    const tokenNow = async () => ((await readDocument(`syncState/${uid}`) ?? {}) as { syncToken?: { stringValue: string } }).syncToken?.stringValue ?? ''
+    await expect.poll(async () => {
+      const before = await tokenNow()
+      await new Promise(resolve => {
+        setTimeout(resolve, 1000)
+      })
+      return before !== '' && before === await tokenNow()
+    }, { timeout: 15_000 }).toBe(true)
+    const syncToken = await tokenNow()
+    await seedDocument(`syncState/${uid}`, { schema: 4, syncToken })
     await pullUntil(page, () => page.getByRole('region', { name: 'Coupon' }).getByRole('link', { name: /^Popcorn/u }).count(), 1)
     await expect.poll(() => google.live().find(event => event.id === 'oldrules1')?.summary).toBe('[Coupon] Popcorn')
     await expect.poll(async () => (await readDocument(`syncState/${uid}`))?.readingRules).toEqual({ integerValue: '1' })

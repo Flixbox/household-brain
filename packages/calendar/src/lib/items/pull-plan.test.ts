@@ -90,6 +90,8 @@ describe('decidePull', () => {
     // One that reads the same is left as it is, and so is one with edits waiting to be sent.
     expect(recheck({ entry: { ...held, title: 'Amazon' }, event: { ...tagged, summary: '[Coupon] Amazon' } })).toEqual({ kind: 'skip' })
     expect(recheck({ entry: { ...held, dirty: ['title'], pendingOp: 'upsert', sync: 'pending' }, event: tagged })).not.toMatchObject({ normalise: true })
+    // Nor is one whose deletion waits to be sent: replacing it would bring it back.
+    expect(recheck({ entry: { ...held, pendingOp: 'delete', sync: 'pending' }, event: tagged })).toEqual({ kind: 'skip' })
   })
 
   it('leaves repeating events alone until repeating entries exist', () => {

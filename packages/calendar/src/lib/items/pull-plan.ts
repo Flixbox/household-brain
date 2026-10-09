@@ -96,10 +96,11 @@ const isUnscheduledDeletion = (entry: Item | null, event: CalendarEvent) =>
 /**
  * Read again under newer rules (#97), an event the entry already holds can say something else now,
  * e.g. a tag that names a category: then Google's version goes the full way, so the entry and the
- * event follow. Not while the entry has edits waiting to be sent.
+ * event follow. Not while anything waits to be sent for the entry: its edits, or its deletion, which
+ * replacing it would undo.
  */
 const readsDifferently = ({ entry, event, categories, recheck }: PullInput) =>
-  Boolean(recheck && entry && !hasLocalEdits(entry) && changedFields(draftOf(entry), draftFrom(event, categories)).length > 0)
+  Boolean(recheck && entry && entry.pendingOp === null && changedFields(draftOf(entry), draftFrom(event, categories)).length > 0)
 
 /** Our own write coming back, or an entry whose deletion is about to be pushed. */
 const isSettled = (entry: Item | null, event: CalendarEvent, uid: string) =>
