@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Watches the whole project until something needs attention, then prints it and exits:
 #
+#   PR #<n>: NEW_PR                  a pull request opened (by anyone, Dependabot included)
 #   PR #<n>: CI_PASSED / CI_FAILED   CI finished for the PR's current head commit
 #   PR #<n>: CI_SLOW                 a CI run (PR or deploy) has been going for more than the limit
 #   PR #<n>: CONFLICT                the PR conflicts with its base branch: rebase it
@@ -173,12 +174,12 @@ check_moved() { # main has commits the PR's branch doesn't
 }
 
 check_pr() {
-  local line state mergeable head merge_sha decision auto
+  local line state mergeable head merge_sha decision auto title
   line=$("$GH" pr view "$pr" --repo "$REPO" \
-    --json state,mergeable,headRefOid,mergeCommit,reviewDecision,autoMergeRequest \
-    --jq '"\(.state) \(.mergeable) \(.headRefOid) \(.mergeCommit.oid // "-") \(.reviewDecision // "-") \(if .autoMergeRequest then "on" else "off" end)"') \
+    --json state,mergeable,headRefOid,mergeCommit,reviewDecision,autoMergeRequest,title,author \
+    --jq '"\(.state) \(.mergeable) \(.headRefOid) \(.mergeCommit.oid // "-") \(.reviewDecision // "-") \(if .autoMergeRequest then "on" else "off" end) \(.title) (by \(.author.login))"') \
     || return
-  read -r state mergeable head merge_sha decision auto <<<"$line"
+  read -r state mergeable head merge_sha decision auto title <<<"$line"
   case $state in
     MERGED)
       # A failed deploy stays watched: a re-run of it may still go live.
@@ -189,7 +190,10 @@ check_pr() {
       report "pr-$pr closed" "CLOSED without merging"
       ;;
     OPEN)
-      grep -qxF "$pr" "$tracked" || echo "$pr" >>"$tracked"
+      if ! grep -qxF "$pr" "$tracked"; then
+        echo "$pr" >>"$tracked"
+        report "pr-$pr opened" "NEW_PR: $title"
+      fi
       [[ $mergeable == CONFLICTING ]] && report "pr-$pr conflict $head" "CONFLICT at ${head:0:7}: rebase on main"
       [[ $decision == APPROVED ]] && report "pr-$pr approved" "APPROVED by the owner. Once it is well reviewed, enable auto-merge: agent-gh pr merge $pr --auto --squash"
       check_run "$head" pr

@@ -158,6 +158,7 @@ adapted to this repository:
 
 | Event | What to do |
 | --- | --- |
+| `NEW_PR` | A pull request appeared (Dependabot's too). Review it like any other: one reviewer pass, and for a dependency bump check what CI can't see, such as a build whose output silently changed. |
 | `CI_PASSED` | Report it and start the watcher again. |
 | `APPROVED` | The owner approved. If the PR is well reviewed (section 5), enable auto-merge now: `agent-gh pr merge <n> --auto --squash`. Don't wait for anything else. |
 | `READY_TO_MERGE` | Approved and green, but auto-merge is off: enable it, unless review findings are still open (then fix them first, within the four-round cap). |
