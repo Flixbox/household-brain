@@ -79,6 +79,19 @@ describe('decidePull', () => {
     expect(decision).toMatchObject({ fields: {}, kind: 'update', normalise: false, ownCopy: true })
   })
 
+  it('reads an unchanged event again after the reading rules changed, and only when it now reads differently (#97)', () => {
+    // Taken in before "[Deal]" named a category: the entry kept the tag in its title.
+    const tagged = { ...event, etag: '"g1"', summary: '[Coupon] [Deal] Amazon' }
+    const held = { ...entry, code: 'NEW', dueDate: '2026-11-03', title: '[Deal] Amazon' }
+    const recheck = (overrides: { entry: Item, event: CalendarEvent }) =>
+      decidePull({ categories: DEFAULT_CATEGORIES, entry: overrides.entry, event: overrides.event, recheck: true, uid: 'owner' })
+    expect(decide({ entry: held, event: tagged })).toEqual({ kind: 'skip' })
+    expect(recheck({ entry: held, event: tagged })).toMatchObject({ fields: { title: 'Amazon' }, kind: 'update', normalise: true })
+    // One that reads the same is left as it is, and so is one with edits waiting to be sent.
+    expect(recheck({ entry: { ...held, title: 'Amazon' }, event: { ...tagged, summary: '[Coupon] Amazon' } })).toEqual({ kind: 'skip' })
+    expect(recheck({ entry: { ...held, dirty: ['title'], pendingOp: 'upsert', sync: 'pending' }, event: tagged })).not.toMatchObject({ normalise: true })
+  })
+
   it('leaves repeating events alone until repeating entries exist', () => {
     expect(decide({ entry: null, event: { ...event, recurrence: ['RRULE:FREQ=YEARLY'] } })).toEqual({ kind: 'skip' })
     expect(decide({ entry: null, event: { ...event, recurringEventId: 'series1' } })).toEqual({ kind: 'skip' })

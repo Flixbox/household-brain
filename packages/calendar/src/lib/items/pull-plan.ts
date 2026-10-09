@@ -1,7 +1,7 @@
 import type { Category } from '@household-brain/calendar/lib/categories'
 import type { CalendarEvent } from './event'
 import { draftFrom, isRecurring } from './from-event'
-import { EDITABLE_FIELDS, type Item, type ItemDraft, draftOf } from './model'
+import { EDITABLE_FIELDS, type Item, type ItemDraft, changedFields, draftOf } from './model'
 import { isDate } from './dates'
 
 /** What to do with one event from Google Calendar. */
@@ -24,6 +24,8 @@ export interface PullInput {
   event: CalendarEvent
   uid: string
   categories: readonly Category[]
+  /** A full listing after the reading rules changed (#97): unchanged events are read again. */
+  recheck?: boolean
 }
 
 const hasLocalEdits = (entry: Item) => entry.sync !== 'synced' && entry.pendingOp === 'upsert'
@@ -91,6 +93,14 @@ const versionOf = (entry: Item | null, event: CalendarEvent): 'older' | 'same' |
 const isUnscheduledDeletion = (entry: Item | null, event: CalendarEvent) =>
   event.status === 'cancelled' && entry !== null && !isDate(entry.dueDate) && !hasLocalEdits(entry)
 
+/**
+ * Read again under newer rules (#97), an event the entry already holds can say something else now,
+ * e.g. a tag that names a category: then Google's version goes the full way, so the entry and the
+ * event follow. Not while the entry has edits waiting to be sent.
+ */
+const readsDifferently = ({ entry, event, categories, recheck }: PullInput) =>
+  Boolean(recheck && entry && !hasLocalEdits(entry) && changedFields(draftOf(entry), draftFrom(event, categories)).length > 0)
+
 /** Our own write coming back, or an entry whose deletion is about to be pushed. */
 const isSettled = (entry: Item | null, event: CalendarEvent, uid: string) =>
   entry !== null && (entry.etags[uid] === event.etag || entry.pendingOp === 'delete')
@@ -99,6 +109,8 @@ const isSettled = (entry: Item | null, event: CalendarEvent, uid: string) =>
  * Decides how one changed event from Google Calendar lands in Firestore:
  * - repeating events, and versions older than the entry's: skip;
  * - the version the entry already holds: only remember its etag for this person;
+ * - in a re-check after the rules changed, an entry without local edits that the event now reads
+ *   differently for: Google's version replaces it, and the event is brought into shape;
  * - our own write coming back (same etag as recorded for this person): skip;
  * - unknown: a new, synced entry;
  * - an entry with unsent local edits: Google's values for every field not edited locally;
@@ -117,10 +129,10 @@ export const decidePull = (input: PullInput): PullDecision => {
   if (cancelled) {
     return deleted(input)
   }
-  if (isSettled(entry, event, uid)) {
+  if (isSettled(entry, event, uid) && !readsDifferently(input)) {
     return { kind: 'skip' }
   }
   // An entry nobody has recorded an etag for came from Google and was never adjusted (an interrupted
   // pull, or a patch that failed): the same version goes the full way again, so it is adjusted.
-  return version === 'same' && entry && Object.keys(entry.etags).length > 0 ? rememberEtag(event) : changed(input)
+  return version === 'same' && entry && Object.keys(entry.etags).length > 0 && !readsDifferently(input) ? rememberEtag(event) : changed(input)
 }

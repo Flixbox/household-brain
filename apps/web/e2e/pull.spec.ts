@@ -99,6 +99,31 @@ test('events made in Google Calendar: taken in and shaped, left alone when put i
     })
   })
 
+  await test.step('after an update changes how events are read, entries taken in before are read again once (#97)', async () => {
+    // As an app version from before "[Deal]" named a category left them: the tag in the title, the
+    // event settled, and a sync token newer than the event.
+    const old = google.create({
+      end: { dateTime: '2026-12-20T17:15:00', timeZone: 'Europe/Berlin' },
+      extendedProperties: { private: { 'hb.category': 'coupon', 'hb.v': '1' } },
+      id: 'oldrules1',
+      reminders: { useDefault: true },
+      start: { dateTime: '2026-12-20T17:00:00', timeZone: 'Europe/Berlin' },
+      summary: '[Coupon] [Deal] Popcorn',
+    })
+    await seedDocument('items/oldrules1', {
+      category: 'coupon', dueDate: '2026-12-20', etags: { [uid]: String(old?.etag) }, googleUpdated: String(old?.updated), status: 'open', sync: 'synced', title: '[Deal] Popcorn',
+    })
+    const popcorn = page.getByRole('region', { name: 'Coupon' }).getByRole('link', { name: /Popcorn/u })
+    await expect(popcorn).toContainText('[Deal] Popcorn')
+    // Its sync token saved by that version, without the reading rules: the next pull reads the whole
+    // calendar again. (An incremental one would skip the event: its etag is the one recorded.)
+    const { syncToken } = (await readDocument(`syncState/${uid}`) ?? {}) as { syncToken?: { stringValue: string } }
+    await seedDocument(`syncState/${uid}`, { schema: 4, syncToken: syncToken?.stringValue ?? '' })
+    await pullUntil(page, () => page.getByRole('region', { name: 'Coupon' }).getByRole('link', { name: /^Popcorn/u }).count(), 1)
+    await expect.poll(() => google.live().find(event => event.id === 'oldrules1')?.summary).toBe('[Coupon] Popcorn')
+    await expect.poll(async () => (await readDocument(`syncState/${uid}`))?.readingRules).toEqual({ integerValue: '1' })
+  })
+
   await test.step("an extra date's event in Google never becomes an entry, and a stray one is removed", async () => {
     await expect.poll(() => readDocument(`items/${strayId}`)).toBeNull()
     await expect(page.getByRole('link', { name: /Something|Stray/u })).toHaveCount(0)
