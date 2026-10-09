@@ -5,6 +5,9 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # No release younger than two days, as for packages (#94).
+    cooldown:
+      default-days: 2
     groups:
       actions:
         patterns: ['*']
@@ -13,6 +16,10 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # pnpm refuses versions younger than 48 hours (minimumReleaseAge in pnpm-workspace.yaml, #94), so
+    # proposing them earlier would only give a failing PR.
+    cooldown:
+      default-days: 2
     ignore:
       # @types/node must match the Node major pinned in package.json (volta.node); bump both together.
       - dependency-name: '@types/node'
