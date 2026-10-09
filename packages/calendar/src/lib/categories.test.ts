@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_CATEGORIES, RETIRED_DEFAULTS, categoryOfTag, missingDefaults, visibleCategories } from './categories'
+import { DEFAULT_CATEGORIES, RETIRED_DEFAULTS, categoryOfTag, missingDefaults, offeredCategory, visibleCategories } from './categories'
 
 describe('missingDefaults', () => {
   it('returns the defaults a set-up household is missing', () => {
@@ -50,5 +50,17 @@ describe('categoryOfTag', () => {
 
   it('only knows words for categories that exist', () => {
     expect(categoryOfTag('deal', DEFAULT_CATEGORIES.filter(category => category.slug !== 'coupon'))).toBeNull()
+  })
+})
+
+describe('offeredCategory', () => {
+  it("keeps an offered category, and a new entry's empty one", () => {
+    expect(offeredCategory('coupon', DEFAULT_CATEGORIES)).toBe('coupon')
+    expect(offeredCategory('', DEFAULT_CATEGORIES)).toBe('')
+  })
+
+  it('offers Paperwork for an entry in none of them, else the first category (#92)', () => {
+    expect(offeredCategory('uncategorised', DEFAULT_CATEGORIES)).toBe('paperwork')
+    expect(offeredCategory('uncategorised', DEFAULT_CATEGORIES.filter(category => category.slug !== 'paperwork'))).toBe('coupon')
   })
 })

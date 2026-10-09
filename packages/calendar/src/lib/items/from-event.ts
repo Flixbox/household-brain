@@ -12,10 +12,20 @@ const prefixCategory = (event: CalendarEvent, categories: readonly Category[]) =
   return { category: categoryOfTag(label, categories), rest }
 }
 
-/** A title without the further tags that name a category: "[Deal] Shop" after "[Coupon]" is "Shop". */
+const LEADING_TAG = /^(?<tag>\[(?<label>[^\]]+)\]\s*)(?<rest>.*)$/u
+
+/**
+ * A title without the leading tags that name a category: "[Deal] Shop" after "[Coupon]" is "Shop".
+ * Unknown tags stay as they were written, also between recognised ones ("[Party] [Deal] Cake" is
+ * "[Party] Cake").
+ */
 const withoutTags = (title: string, categories: readonly Category[]): string => {
-  const groups = PREFIX.exec(title)?.groups
-  return groups && categoryOfTag(groups.label ?? '', categories) ? withoutTags(groups.rest ?? '', categories) : title
+  const groups = LEADING_TAG.exec(title)?.groups
+  if (!groups) {
+    return title
+  }
+  const rest = withoutTags(groups.rest ?? '', categories)
+  return categoryOfTag(groups.label ?? '', categories) ? rest : `${groups.tag ?? ''}${rest}`
 }
 
 /**

@@ -14,15 +14,12 @@ import { type EditableField, type FormState, type ItemDraft, changedFields, edit
  * edited that already has none may stay so.
  * `remindersShown`: the entry's own reminders are offered once every app handles them, and always
  * for an entry that already has some.
- * `fallbackCategory`: the category to start with when the entry's own isn't offered, '' for none.
  * `dates`: the extra dates (`useEntryDates`). `holdUpdates`: whether a new app version must wait, once
  * anything was edited. `saved`: what Save sends, with the title and date labels trimmed and a bare
  * domain as a full address.
  */
-export const useEntryForm = (initial: ItemDraft, { editing, fallbackCategory, initialDates }: { editing: boolean, fallbackCategory: string, initialDates: EntryDate[] }) => {
-  // An entry in no offered category (an event added by hand) starts out in the fallback, as an edit,
-  // so Save applies what the dropdown shows (#92).
-  const [form, setForm] = useState<FormState>(() => (fallbackCategory ? editField(openForm(initial), 'category', fallbackCategory) : openForm(initial)))
+export const useEntryForm = (initial: ItemDraft, { editing, initialDates }: { editing: boolean, initialDates: EntryDate[] }) => {
+  const [form, setForm] = useState<FormState>(() => openForm(initial))
   const [seen, setSeen] = useState(initial)
   if (changedFields(seen, initial).length > 0) {
     setSeen(initial)

@@ -45,8 +45,19 @@ export const categoryOfTag = <Entry extends Pick<Category, 'slug' | 'label'>>(ta
     ?? categories.find(category => CATEGORY_WORDS[category.slug]?.includes(word)) ?? null
 }
 
-/** The category an entry without a known one is offered in the form (#92). */
-export const FALLBACK_CATEGORY = 'paperwork'
+const FALLBACK_CATEGORY = 'paperwork'
+
+/**
+ * The category the form shows and saves: the entry's own when it is offered; for one that isn't (an
+ * uncategorised entry) Paperwork, else the first (#92). Without it the dropdown showed its first
+ * option while Save kept the old category. '' (a new entry without one) stays, so the form asks.
+ */
+export const offeredCategory = (category: string, categories: readonly Pick<Category, 'slug'>[]): string => {
+  if (category === '' || categories.some(entry => entry.slug === category)) {
+    return category
+  }
+  return categories.find(entry => entry.slug === FALLBACK_CATEGORY)?.slug ?? categories[0]?.slug ?? category
+}
 
 /**
  * Former defaults, hidden while no entry uses them (`visibleCategories`). They are never deleted:

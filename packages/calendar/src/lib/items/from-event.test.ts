@@ -60,6 +60,11 @@ describe('draftFrom', () => {
     expect(draftFrom({ start: { date: '2026-12-01' }, summary: '[Paperwork] [Deadline] Return shoes' }, DEFAULT_CATEGORIES)).toMatchObject({ category: 'paperwork', title: 'Return shoes' })
     // An unknown tag stays part of the title.
     expect(draftFrom({ start: { date: '2026-12-01' }, summary: '[Coupon] [Party] Cake' }, DEFAULT_CATEGORIES).title).toBe('[Party] Cake')
+    expect(draftFrom({ start: { date: '2026-12-01' }, summary: '[Coupon] [Party]  [Deal] Cake' }, DEFAULT_CATEGORIES).title).toBe('[Party]  Cake')
+    // An app entry with only an unknown tag keeps its title exactly, so its event isn't renamed.
+    const unknown = { ...appEvent, summary: '[Coupon] [Draft]Foo' }
+    expect(draftFrom(unknown, DEFAULT_CATEGORIES).title).toBe('[Draft]Foo')
+    expect(normalisationFor(unknown, draftFrom(unknown, DEFAULT_CATEGORIES), context)).toBeNull()
     // The event is renamed when taken in, and so is one the app already has that still carries a tag.
     const tagged = { ...appEvent, summary: '[Coupon] [Deal] Amazon' }
     expect(normalisationFor(tagged, draftFrom(tagged, DEFAULT_CATEGORIES), context)).toEqual({ summary: '[Coupon] Amazon' })

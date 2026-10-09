@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from 'react'
-import { type Category, FALLBACK_CATEGORY } from '@household-brain/calendar/lib/categories'
+import { type Category, offeredCategory } from '@household-brain/calendar/lib/categories'
 import type { ItemDraft } from '@household-brain/calendar/lib/items/model'
 import { useEntryForm } from './use-entry-form'
 import { primaryButton, textField } from '@household-brain/calendar/lib/styles'
@@ -28,18 +28,6 @@ interface Props {
 const NO_DATES: EntryDate[] = []
 
 /**
- * The category to preselect when the entry's own is none of those offered (an uncategorised one):
- * Paperwork, else the first. Without it the dropdown would show its first option while Save kept the
- * old category (#92). '' for a new entry without one: it asks to choose.
- */
-const fallbackFor = (category: string, categories: readonly Category[]): string => {
-  if (category === '' || categories.some(entry => entry.slug === category)) {
-    return ''
-  }
-  return categories.find(entry => entry.slug === FALLBACK_CATEGORY)?.slug ?? categories[0]?.slug ?? ''
-}
-
-/**
  * The add/edit form. The due date is a date only: every entry is due at 17:00. It is optional once
  * every person's app handles that: an entry without one (a balance that never expires) has no Google
  * Calendar event. When `initial`
@@ -48,8 +36,9 @@ const fallbackFor = (category: string, categories: readonly Category[]): string 
  * code doesn't reload the page and lose the entry.
  */
 export const ItemForm = ({ initial, initialDates = NO_DATES, categories, onSave, withStatus = false }: Props) => {
-  const fallbackCategory = fallbackFor(initial.category, categories)
-  const { dateRequired, dates: { change: setDates, dates }, draft, holdUpdates, remindersShown, saved, set } = useEntryForm(initial, { editing: withStatus, fallbackCategory, initialDates })
+  const { dateRequired, dates: { change: setDates, dates }, draft, holdUpdates, remindersShown, saved, set } = useEntryForm(initial, { editing: withStatus, initialDates })
+  // Not an edit until saved: a category that arrives meanwhile (another device) still replaces it.
+  const shownCategory = offeredCategory(draft.category, categories)
   const [saving, setSaving] = useState(false)
   const submit = (event: FormEvent) => {
     event.preventDefault()
@@ -58,13 +47,13 @@ export const ItemForm = ({ initial, initialDates = NO_DATES, categories, onSave,
     }
     setSaving(true)
     const { draft: finished, ...rest } = saved
-    return onSave(finished, rest)
+    return onSave({ ...finished, category: offeredCategory(finished.category, categories) }, rest)
   }
   return (
     <form className="grid gap-4" onSubmit={submit} data-hold-updates={holdUpdates}>
       <Field label="Title" required><input required pattern=".*\S.*" title="Enter a title" className={textField} value={draft.title} onChange={set('title')} /></Field>
       <Field label="Category" required>
-        <select required className={textField} value={draft.category} onChange={set('category')}>
+        <select required className={textField} value={shownCategory} onChange={set('category')}>
           <option value="" disabled>Choose…</option>
           {categories.map(category => <option key={category.slug} value={category.slug}>{category.label}</option>)}
         </select>
