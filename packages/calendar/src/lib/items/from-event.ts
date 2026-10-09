@@ -1,4 +1,4 @@
-import type { Category } from '@household-brain/calendar/lib/categories'
+import { type Category, categoryOfTag } from '@household-brain/calendar/lib/categories'
 import { type CalendarEvent, DUE_TIME, END_TIME, type EventContext, STATUS_TAGS, remindersOf, remindersPatch, sameReminders, summaryOf } from './event'
 import { remindersFromText } from './reminders'
 import { detailsFrom } from './event-details'
@@ -9,23 +9,47 @@ const STATUS_PREFIX = new RegExp(`^\\[(?:${Object.values(STATUS_TAGS).join('|')}
 
 const prefixCategory = (event: CalendarEvent, categories: readonly Category[]) => {
   const { label = '', rest = '' } = PREFIX.exec(event.summary ?? '')?.groups ?? {}
-  const category = categories.find(entry => label !== '' && entry.label.toLowerCase() === label.trim().toLowerCase())
-  return { category, rest }
+  return { category: categoryOfTag(label, categories), rest }
+}
+
+const LEADING_TAG = /^(?<tag>\[(?<label>[^\]]+)\]\s*)(?<rest>.*)$/u
+
+/**
+ * A title without the leading tags that name a category: "[Deal] Shop" after "[Coupon]" is "Shop".
+ * Unknown tags stay as they were written, also between recognised ones ("[Party] [Deal] Cake" is
+ * "[Party] Cake").
+ */
+const withoutTags = (title: string, categories: readonly Category[]): string => {
+  const groups = LEADING_TAG.exec(title)?.groups
+  if (!groups) {
+    return title
+  }
+  const rest = withoutTags(groups.rest ?? '', categories)
+  return categoryOfTag(groups.label ?? '', categories) ? rest : `${groups.tag ?? ''}${rest}`
+}
+
+/** The title after its category tag, without further known tags; one of nothing but those keeps them. */
+const titleOf = (tagless: string, categories: readonly Category[]) => {
+  const stripped = withoutTags(tagless, categories)
+  return stripped.trim() === '' ? tagless : stripped
 }
 
 /**
  * The category and title of an event: from `hb.category`, else from a `[Label]` title prefix. A
- * leading `[…]` is only treated as a prefix when it names a category, so "[Draft] Foo" stays whole.
+ * leading `[…]` is only treated as a prefix when it names a category (its label or one of its words),
+ * so "[Draft] Foo" stays whole. Further tags that name one go too (`[Coupon] [Deal] …`); unknown
+ * ones stay part of the title.
  */
-const categoryAndTitle = (event: CalendarEvent, categories: readonly Category[]): { category: string, title: string } => {
+const categoryAndTitle = (event: CalendarEvent, categories: readonly Category[]): { category: string, title: string, tagless: string | null } => {
   const { category, rest } = prefixCategory(event, categories)
   const stored = event.extendedProperties?.private?.['hb.category']
   // A done or cancelled entry's event carries `[Done]` / `[Cancelled]` instead of its category; only
   // then is it a tag (an open entry may well be called "[Done] …").
   const status = event.extendedProperties?.private?.['hb.status']
   const tagged = stored && (status === 'done' || status === 'cancelled') ? STATUS_PREFIX.exec(event.summary ?? '')?.groups?.rest ?? null : null
-  const title = tagged ?? (category ? rest : event.summary ?? '')
-  return { category: stored ?? category?.slug ?? 'uncategorised', title }
+  const tagless = tagged ?? (category ? rest : null)
+  const title = tagless === null ? event.summary ?? '' : titleOf(tagless, categories)
+  return { category: stored ?? category?.slug ?? 'uncategorised', tagless, title }
 }
 
 /** An event someone put into the calendar by hand, without the app's category or a category prefix. */
@@ -66,8 +90,10 @@ const detailFields = (event: CalendarEvent, categories: readonly Category[]) => 
 export const draftFrom = (event: CalendarEvent, categories: readonly Category[]): ItemDraft => {
   const properties = event.extendedProperties?.private ?? {}
   const status = properties['hb.status']
+  const { category, title } = categoryAndTitle(event, categories)
   return {
-    ...categoryAndTitle(event, categories),
+    category,
+    title,
     ...detailFields(event, categories),
     dueDate: dueDateOf(event),
     reminders: remindersFromText(properties['hb.reminders']),
@@ -100,7 +126,9 @@ const detailProperties = (draft: ItemDraft): Record<string, string> => Object.fr
 
 const categoryFix = (event: CalendarEvent, draft: ItemDraft, categories: readonly Category[]): CalendarEvent => {
   if (event.extendedProperties?.private?.['hb.category']) {
-    return {}
+    // A further tag that names a category (`[Coupon] [Deal] …`) goes from the event's title too.
+    const { tagless, title } = categoryAndTitle(event, categories)
+    return tagless !== null && tagless !== title ? { summary: summaryOf(draft, categories) } : {}
   }
   const properties = { ...event.extendedProperties?.private, ...detailProperties(draft), 'hb.category': draft.category, 'hb.v': '1' }
   return {

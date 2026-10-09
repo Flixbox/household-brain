@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from 'react'
-import type { Category } from '@household-brain/calendar/lib/categories'
+import { type Category, offeredCategory } from '@household-brain/calendar/lib/categories'
 import type { ItemDraft } from '@household-brain/calendar/lib/items/model'
 import { useEntryForm } from './use-entry-form'
 import { primaryButton, textField } from '@household-brain/calendar/lib/styles'
@@ -37,6 +37,8 @@ const NO_DATES: EntryDate[] = []
  */
 export const ItemForm = ({ initial, initialDates = NO_DATES, categories, onSave, withStatus = false }: Props) => {
   const { dateRequired, dates: { change: setDates, dates }, draft, holdUpdates, remindersShown, saved, set } = useEntryForm(initial, { editing: withStatus, initialDates })
+  // Not an edit until saved: a category that arrives meanwhile (another device) still replaces it.
+  const shownCategory = offeredCategory(draft.category, categories)
   const [saving, setSaving] = useState(false)
   const submit = (event: FormEvent) => {
     event.preventDefault()
@@ -45,13 +47,13 @@ export const ItemForm = ({ initial, initialDates = NO_DATES, categories, onSave,
     }
     setSaving(true)
     const { draft: finished, ...rest } = saved
-    return onSave(finished, rest)
+    return onSave({ ...finished, category: offeredCategory(finished.category, categories) }, rest)
   }
   return (
     <form className="grid gap-4" onSubmit={submit} data-hold-updates={holdUpdates}>
       <Field label="Title" required><input required pattern=".*\S.*" title="Enter a title" className={textField} value={draft.title} onChange={set('title')} /></Field>
       <Field label="Category" required>
-        <select required className={textField} value={draft.category} onChange={set('category')}>
+        <select required className={textField} value={shownCategory} onChange={set('category')}>
           <option value="" disabled>Choose…</option>
           {categories.map(category => <option key={category.slug} value={category.slug}>{category.label}</option>)}
         </select>

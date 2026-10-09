@@ -31,6 +31,9 @@ test('events made in Google Calendar: taken in and shaped, left alone when put i
     start: { date: '2026-12-01' },
     summary: '[Membership] Gym',
   })
+  // The Gemini app tags freely: a word of the category's list counts as its label (#92).
+  google.create({ end: { date: '2026-12-04' }, id: 'geminideal1', start: { date: '2026-12-03' }, summary: '[Deal] [Coupon] Cinema 2 for 1' })
+  await seedDocument('categories/paperwork', { colorId: '1', label: 'Paperwork', slug: 'paperwork', sortOrder: 7 })
   const birthday = google.create({ end: { date: '2026-12-11' }, id: 'birthday1', reminders: { useDefault: false }, start: { date: '2026-12-10' }, summary: 'Grandma' })
   google.create({ end: { date: '2020-05-02' }, id: 'series1', recurrence: ['RRULE:FREQ=YEARLY'], start: { date: '2020-05-01' }, summary: '[Coupon] Yearly' })
   const strayId = 'abcdefghijklmnopqrstuv0123d01234567'
@@ -66,6 +69,10 @@ test('events made in Google Calendar: taken in and shaped, left alone when put i
     })
     expect(gymEvent()?.start).not.toHaveProperty('date')
 
+    // A tag from the word list sorts it in, and every recognised tag leaves the title (#92).
+    await expect(page.getByRole('region', { name: 'Coupon' }).getByRole('link', { name: /Cinema 2 for 1/u })).toBeVisible()
+    await expect.poll(() => google.live().find(event => event.id === 'geminideal1')?.summary).toBe('[Coupon] Cinema 2 for 1')
+
     google.edit('madeingoogle1', { summary: '[Membership] Gym (renewed)' })
     await pullUntil(page, () => page.getByRole('link', { name: /Gym \(renewed\)/u }).count(), 1)
 
@@ -73,20 +80,23 @@ test('events made in Google Calendar: taken in and shaped, left alone when put i
     await pullUntil(page, () => page.getByRole('link', { name: /Gym/u }).count(), 0)
   })
 
-  await test.step('events put in by hand show as uncategorised and are left alone; repeating events are ignored', async () => {
+  await test.step('events put in by hand show as uncategorised and are left alone until edited; repeating events are ignored', async () => {
     await expect(page.getByRole('region', { name: 'Uncategorised' }).getByRole('link', { name: /Grandma/u })).toContainText('2026-12-10')
     await expect(page.getByRole('link', { name: /Yearly/u })).toHaveCount(0)
     expect(google.live().find(event => event.id === 'birthday1')).toEqual(birthday)
 
-    // Moving it in the app turns it into a timed event on the new date, and still adds no category.
+    // Editing it in the app offers Paperwork, and saving applies what the form shows (#92): the
+    // event is moved to 17:00 on the new date and gets the category.
     await page.getByRole('link', { name: /Grandma/u }).click()
+    await expect(page.getByLabel('Category')).toHaveValue('paperwork')
     await page.getByLabel('Due date (17:00)').fill('2026-12-12')
     await page.getByRole('button', { name: 'Save' }).click()
+    await expect(page.getByRole('region', { name: 'Paperwork' }).getByRole('link', { name: /Grandma/u })).toContainText('2026-12-12')
     await expect.poll(() => google.live().find(event => event.id === 'birthday1')).toMatchObject({
+      extendedProperties: { private: { 'hb.category': 'paperwork' } },
       start: { dateTime: '2026-12-12T17:00:00', timeZone: 'Europe/Berlin' },
-      summary: 'Grandma',
+      summary: '[Paperwork] Grandma',
     })
-    expect(google.live().find(event => event.id === 'birthday1')).not.toHaveProperty('extendedProperties')
   })
 
   await test.step("an extra date's event in Google never becomes an entry, and a stray one is removed", async () => {
