@@ -16,7 +16,7 @@
     "@household-brain/firebase": "workspace:*",
     "@nanostores/react": "2.0.1",
     "firebase": "12.19.0",
-    "nanostores": "1.5.4",
+    "nanostores": "1.5.5",
     "react": "19.3.0"
   },
   "devDependencies": {
