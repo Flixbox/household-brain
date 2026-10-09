@@ -86,6 +86,14 @@ const detailFields = (event: CalendarEvent, categories: readonly Category[]) => 
   }
 }
 
+/**
+ * The version of the rules `draftFrom` and `normalisationFor` read and shape events by. Raise it
+ * whenever they change what they make of an event that is already in the app, e.g. a new tag they
+ * recognise (#92): each person's next pull then reads the whole calendar again once, so entries
+ * taken in under the old rules are brought up to the new ones (#97).
+ */
+export const READING_RULES = 1
+
 /** The entry fields an event carries. */
 export const draftFrom = (event: CalendarEvent, categories: readonly Category[]): ItemDraft => {
   const properties = event.extendedProperties?.private ?? {}

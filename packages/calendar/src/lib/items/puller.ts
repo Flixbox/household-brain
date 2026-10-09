@@ -1,6 +1,6 @@
 import { CalendarApiError, type EventCursor, type EventPage } from '@household-brain/calendar/lib/calendar/api'
 import type { CalendarEvent } from './event'
-import { normalisationFor, ownRemindersFix } from './from-event'
+import { READING_RULES, normalisationFor, ownRemindersFix } from './from-event'
 import { type PullDecision, decidePull } from './pull-plan'
 import { applyDateChange, applyPulled, dropStray, forgetDateEvents, markSchema, readEntryFromCache, readEntryFromServer, readSyncToken, recordEtag, removeVanished, saveSyncToken, serverNow } from './pull-store'
 import { APP_SCHEMA, entryOfEvent, isOrphanDate } from './date-events'
@@ -99,10 +99,10 @@ const removeDatesOfDeleted = async (context: PushContext, event: CalendarEvent):
  * deleted in Google, the entry's date events go too; a failure there is reported, but the entry is
  * still removed (an incremental listing won't bring the deletion again).
  */
-const applyEntryEvent = async (context: PushContext, event: CalendarEvent): Promise<string | null> => {
+const applyEntryEvent = async (context: PushContext, event: CalendarEvent, recheck: boolean): Promise<string | null> => {
   const { categories, uid } = context
   const removed = await removeDatesOfDeleted(context, event)
-  const decision = await applyPulled(event, entry => decidePull({ categories, entry, event, uid }))
+  const decision = await applyPulled(event, entry => decidePull({ categories, entry, event, recheck, uid }))
   // Edited here between the read and the transaction, so the entry stays: its date events are rewritten.
   if (removed !== null && decision.kind !== 'delete') {
     await forgetDateEvents(event.id ?? '')
@@ -163,12 +163,13 @@ const listAll = async (context: PushContext, cursor: EventCursor, events: Calend
     : { events: all, ...page.nextSyncToken ? { nextSyncToken: page.nextSyncToken } : {} }
 }
 
-const pullPages = async (context: PushContext, syncToken: string | null): Promise<string[]> => {
+/** `recheck`: a full listing because the reading rules changed (#97); every event is read again. */
+const pullPages = async (context: PushContext, syncToken: string | null, recheck: boolean): Promise<string[]> => {
   const listedSince = syncToken ? null : await serverNow(context.uid)
   const { events, nextSyncToken } = await listAll(context, syncToken ? { syncToken } : {})
   // Entries first, in Google's order (later changes to the same entry must land last), then the
   // extra dates' events, so each is judged against its entry as this listing left it.
-  const problems = await applyInOrder(events.filter(event => !entryOfEvent(event)), event => applyEntryEvent(context, event))
+  const problems = await applyInOrder(events.filter(event => !entryOfEvent(event)), event => applyEntryEvent(context, event, recheck))
   if (listedSince) {
     await removeVanished(new Set(events.map(event => event.id ?? '')), listedSince, async entry => {
       const problem = await removeDateEvents(context, entry)
@@ -179,9 +180,18 @@ const pullPages = async (context: PushContext, syncToken: string | null): Promis
   }
   const dateProblems = await applyInOrder(events.filter(event => entryOfEvent(event)), event => applyDateEvent(context, event, entryOfEvent(event) ?? ''))
   if (nextSyncToken && nextSyncToken !== syncToken) {
-    await saveSyncToken(context.uid, nextSyncToken)
+    await saveSyncToken(context.uid, nextSyncToken, READING_RULES)
   }
   return [...problems, ...dateProblems]
+}
+
+/**
+ * The sync token to pull with. One saved under older reading rules is set aside, so the whole
+ * calendar is read again once (`recheck`); without any token, the first listing reads it all anyway.
+ */
+const tokenFor = async (uid: string) => {
+  const saved = await readSyncToken(uid, READING_RULES)
+  return saved.current ? { recheck: false, syncToken: saved.syncToken } : { recheck: saved.syncToken !== null, syncToken: null }
 }
 
 /** People whose schema marker this app already wrote since it started. */
@@ -194,13 +204,13 @@ export const pullChanges = async (context: PushContext): Promise<string[]> => {
     marked.add(context.uid)
     markSchema(context.uid, APP_SCHEMA).catch(() => marked.delete(context.uid))
   }
-  const syncToken = await readSyncToken(context.uid)
+  const { syncToken, recheck } = await tokenFor(context.uid)
   try {
-    return await pullPages(context, syncToken)
+    return await pullPages(context, syncToken, recheck)
   } catch (error) {
     if (!syncToken || !isStatus(error, 410)) {
       throw error
     }
-    return pullPages(context, null)
+    return pullPages(context, null, recheck)
   }
 }

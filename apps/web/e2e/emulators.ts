@@ -28,11 +28,20 @@ export const allowlist = async (uid: string) => {
  * A PATCH, so it replaces a document that is still there (e.g. written late by a previous test's
  * page) instead of failing with "already exists".
  */
-export const seedDocument = async (path: string, fields: Record<string, string | number>) => {
+type Seeded = string | number | Record<string, string>
+
+const valueOf = (value: Seeded): object => {
+  if (typeof value === 'number') {
+    return { integerValue: String(value) }
+  }
+  return typeof value === 'string' ? { stringValue: value } : { mapValue: { fields: Object.fromEntries(Object.entries(value).map(([key, inner]) => [key, valueOf(inner)])) } }
+}
+
+export const seedDocument = async (path: string, fields: Record<string, Seeded>) => {
   const response = await fetch(
     `${FIRESTORE}/v1/projects/${PROJECT}/databases/(default)/documents/${path.split('/').map(encodeURIComponent).join('/')}`,
     {
-      body: JSON.stringify({ fields: Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, typeof value === 'number' ? { integerValue: String(value) } : { stringValue: value }])) }),
+      body: JSON.stringify({ fields: Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, valueOf(value)])) }),
       headers: { 'Authorization': 'Bearer owner', 'Content-Type': 'application/json' },
       method: 'PATCH',
     },

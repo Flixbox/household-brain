@@ -74,11 +74,15 @@ export const removeVanished = async (eventIds: ReadonlySet<string>, listedSince:
   })))
 }
 
-/** Each person's Google sync token: Google issues them per user. */
-export const readSyncToken = async (uid: string): Promise<string | null> => {
+/**
+ * Each person's Google sync token (Google issues them per user), and whether it was saved under the
+ * current reading rules; one from older rules (or without any) asks for a full listing (#97).
+ */
+export const readSyncToken = async (uid: string, rules: number): Promise<{ syncToken: string | null, current: boolean }> => {
   const snapshot = await getDoc(syncStateDoc(uid))
   const token: unknown = snapshot.get('syncToken')
-  return typeof token === 'string' ? token : null
+  const saved: unknown = snapshot.get('readingRules')
+  return { current: typeof saved === 'number' && saved >= rules, syncToken: typeof token === 'string' ? token : null }
 }
 
 /** The server's clock, not this device's: written to syncState/{uid} and read back. */
@@ -91,8 +95,8 @@ export const serverNow = async (uid: string): Promise<Timestamp> => {
   return startedAt
 }
 
-export const saveSyncToken = (uid: string, syncToken: string): Promise<void> =>
-  setDoc(syncStateDoc(uid), { syncToken }, { merge: true })
+export const saveSyncToken = (uid: string, syncToken: string, readingRules: number): Promise<void> =>
+  setDoc(syncStateDoc(uid), { readingRules, syncToken }, { merge: true })
 
 /**
  * An extra date's event (one with `hb.entry`) never becomes an entry. An older app version that
