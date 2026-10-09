@@ -55,6 +55,19 @@ describe('draftFrom', () => {
     expect(draft).toMatchObject({ category: 'membership', dueDate: '2026-12-01', status: 'open', title: 'Gym' })
   })
 
+  it('takes the category from a word the Gemini app tags with, and drops further tags that name one (#92)', () => {
+    expect(draftFrom({ start: { date: '2026-12-01' }, summary: '[Deal] Shop 10 €' }, DEFAULT_CATEGORIES)).toMatchObject({ category: 'coupon', title: 'Shop 10 €' })
+    expect(draftFrom({ start: { date: '2026-12-01' }, summary: '[Paperwork] [Deadline] Return shoes' }, DEFAULT_CATEGORIES)).toMatchObject({ category: 'paperwork', title: 'Return shoes' })
+    // An unknown tag stays part of the title.
+    expect(draftFrom({ start: { date: '2026-12-01' }, summary: '[Coupon] [Party] Cake' }, DEFAULT_CATEGORIES).title).toBe('[Party] Cake')
+    // The event is renamed when taken in, and so is one the app already has that still carries a tag.
+    const tagged = { ...appEvent, summary: '[Coupon] [Deal] Amazon' }
+    expect(normalisationFor(tagged, draftFrom(tagged, DEFAULT_CATEGORIES), context)).toEqual({ summary: '[Coupon] Amazon' })
+    const done = { ...tagged, extendedProperties: { private: { ...appEvent.extendedProperties?.private, 'hb.status': 'done' } }, reminders: { overrides: [], useDefault: false }, summary: '[Done] [Deal] Amazon' }
+    expect(draftFrom(done, DEFAULT_CATEGORIES).title).toBe('Amazon')
+    expect(normalisationFor(done, draftFrom(done, DEFAULT_CATEGORIES), context)).toEqual({ summary: '[Done] Amazon' })
+  })
+
   it('keeps a bracketed title that is not a category, even on an app entry', () => {
     expect(draftFrom({ ...appEvent, summary: '[Draft] Foo' }, DEFAULT_CATEGORIES).title).toBe('[Draft] Foo')
   })

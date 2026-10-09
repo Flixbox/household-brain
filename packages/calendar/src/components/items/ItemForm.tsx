@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from 'react'
-import type { Category } from '@household-brain/calendar/lib/categories'
+import { type Category, FALLBACK_CATEGORY } from '@household-brain/calendar/lib/categories'
 import type { ItemDraft } from '@household-brain/calendar/lib/items/model'
 import { useEntryForm } from './use-entry-form'
 import { primaryButton, textField } from '@household-brain/calendar/lib/styles'
@@ -28,6 +28,18 @@ interface Props {
 const NO_DATES: EntryDate[] = []
 
 /**
+ * The category to preselect when the entry's own is none of those offered (an uncategorised one):
+ * Paperwork, else the first. Without it the dropdown would show its first option while Save kept the
+ * old category (#92). '' for a new entry without one: it asks to choose.
+ */
+const fallbackFor = (category: string, categories: readonly Category[]): string => {
+  if (category === '' || categories.some(entry => entry.slug === category)) {
+    return ''
+  }
+  return categories.find(entry => entry.slug === FALLBACK_CATEGORY)?.slug ?? categories[0]?.slug ?? ''
+}
+
+/**
  * The add/edit form. The due date is a date only: every entry is due at 17:00. It is optional once
  * every person's app handles that: an entry without one (a balance that never expires) has no Google
  * Calendar event. When `initial`
@@ -36,7 +48,8 @@ const NO_DATES: EntryDate[] = []
  * code doesn't reload the page and lose the entry.
  */
 export const ItemForm = ({ initial, initialDates = NO_DATES, categories, onSave, withStatus = false }: Props) => {
-  const { dateRequired, dates: { change: setDates, dates }, draft, holdUpdates, remindersShown, saved, set } = useEntryForm(initial, { editing: withStatus, initialDates })
+  const fallbackCategory = fallbackFor(initial.category, categories)
+  const { dateRequired, dates: { change: setDates, dates }, draft, holdUpdates, remindersShown, saved, set } = useEntryForm(initial, { editing: withStatus, fallbackCategory, initialDates })
   const [saving, setSaving] = useState(false)
   const submit = (event: FormEvent) => {
     event.preventDefault()

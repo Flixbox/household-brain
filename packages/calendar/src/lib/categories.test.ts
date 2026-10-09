@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_CATEGORIES, RETIRED_DEFAULTS, missingDefaults, visibleCategories } from './categories'
+import { DEFAULT_CATEGORIES, RETIRED_DEFAULTS, categoryOfTag, missingDefaults, visibleCategories } from './categories'
 
 describe('missingDefaults', () => {
   it('returns the defaults a set-up household is missing', () => {
@@ -31,5 +31,24 @@ describe('visibleCategories', () => {
 
   it('keeps a retired default while an entry uses it', () => {
     expect(visibleCategories(categories, [{ category: 'document' }])).toEqual(categories)
+  })
+})
+
+describe('categoryOfTag', () => {
+  it('finds a category by its label or one of its words, ignoring case and spaces (#92)', () => {
+    expect(categoryOfTag('coupon', DEFAULT_CATEGORIES)?.slug).toBe('coupon')
+    expect(categoryOfTag(' DEAL ', DEFAULT_CATEGORIES)?.slug).toBe('coupon')
+    expect(categoryOfTag('Rücksendung', DEFAULT_CATEGORIES)?.slug).toBe('paperwork')
+    expect(categoryOfTag('Party', DEFAULT_CATEGORIES)).toBeNull()
+    expect(categoryOfTag('', DEFAULT_CATEGORIES)).toBeNull()
+  })
+
+  it('prefers a label over a word, so a category the household named "Deal" wins', () => {
+    const own = [...DEFAULT_CATEGORIES, { colorId: '4', label: 'Deal', slug: 'deal', sortOrder: 9 }]
+    expect(categoryOfTag('deal', own)?.slug).toBe('deal')
+  })
+
+  it('only knows words for categories that exist', () => {
+    expect(categoryOfTag('deal', DEFAULT_CATEGORIES.filter(category => category.slug !== 'coupon'))).toBeNull()
   })
 })
