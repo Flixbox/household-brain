@@ -11,3 +11,9 @@ allowBuilds:
   nx: false
   protobufjs: false
   re2: false
+
+# A version must be at least 48 hours old (#94): a freshly published one has had no time for anyone
+# to notice it is compromised. pnpm enforces this on every install, also with --frozen-lockfile, so
+# CI fails on a lockfile that pins a younger version. Re-run it once the version is old enough. An
+# urgent exception (a security fix) goes into minimumReleaseAgeExclude, with the reason.
+minimumReleaseAge: 2880
