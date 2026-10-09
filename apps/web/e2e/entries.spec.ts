@@ -132,6 +132,7 @@ test('entries: categories and the form, added, edited, deleted, and a double-tap
     await expect(credit).toContainText(/25,00\s€/u)
     await expect(credit).toContainText('no expiry')
     // Its price sits right under the title, as every entry's does, not on the right (#87).
+    await credit.scrollIntoViewIfNeeded()
     await expect(credit.getByText('Gift card credit', { exact: true }).locator('xpath=following-sibling::span[1]')).toHaveText(/25,00\s€/u)
     await expect(page.getByText('not yet in Google Calendar')).toHaveCount(0)
     const creditEvent = () => google.live().find(event => String(event.summary).includes('Gift card credit'))
