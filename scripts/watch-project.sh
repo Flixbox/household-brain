@@ -93,45 +93,46 @@ check_activity() {
 }
 
 check_run() { # check_run <sha> <label>: report a finished or slow CI run of that commit
-  local sha=$1 label=$2 line run status conclusion created age jobs
+  local sha=$1 label=$2 line run attempt status conclusion created age jobs
   # startedAt is the current attempt's start, so a re-run is timed from when it actually began.
   line=$("$GH" run list --repo "$REPO" --workflow "$WORKFLOW" --commit "$sha" \
-    --json databaseId,startedAt,status,conclusion \
-    --jq '.[0] // empty | "\(.databaseId) \(.startedAt) \(.status) \(if (.conclusion // "") == "" then "-" else .conclusion end)"') || return
-  read -r run created status conclusion <<<"$line"
+    --json databaseId,attempt,startedAt,status,conclusion \
+    --jq '.[0] // empty | "\(.databaseId) \(.attempt) \(.startedAt) \(.status) \(if (.conclusion // "") == "" then "-" else .conclusion end)"') || return
+  read -r run attempt created status conclusion <<<"$line"
   [[ -z ${conclusion:-} ]] && return
   jobs=$("$GH" run view "$run" --repo "$REPO" --json jobs --jq '.jobs[] | "  \(.name): \(.status) \(.conclusion // "")"')
-  # report() returns when the event was already reported, so every branch ends in `return`.
+  # report() returns when the event was already reported, so every branch ends in `return`. Failures
+  # are keyed by attempt too, so a re-run that fails again is reported again.
   if [[ $status == completed ]]; then
     if [[ $label == deploy && $conclusion == success ]]; then
       report "pr-$pr deployed $sha" "DEPLOYED: live (run $run)" "$jobs"
     elif [[ $label == deploy ]]; then
-      report "pr-$pr deploy-failed $sha" "DEPLOY_FAILED: run $run on main ended $conclusion: open a follow-up PR" "$jobs"
+      report "pr-$pr deploy-failed $sha $attempt" "DEPLOY_FAILED: run $run on main ended $conclusion: open a follow-up PR" "$jobs"
     elif [[ $conclusion == success ]]; then
       report "pr-$pr ci-passed $sha" "CI_PASSED for ${sha:0:7} (run $run)" "$jobs"
     elif [[ $conclusion != cancelled ]]; then # cancelled: superseded by a newer push
-      report "pr-$pr ci-failed $sha" "CI_FAILED for ${sha:0:7} (run $run): $conclusion. gh run view $run --repo $REPO --log-failed" "$jobs"
+      report "pr-$pr ci-failed $sha $attempt" "CI_FAILED for ${sha:0:7} (run $run): $conclusion. gh run view $run --repo $REPO --log-failed" "$jobs"
     fi
     return
   fi
   age=$(( $(date +%s) - $(date -d "$created" +%s) ))
-  (( age > limit )) && report "pr-$pr ci-slow $run" "CI_SLOW: run $run ($label, ${sha:0:7}) still $status after $(( age / 60 )) min. Cancel it and read the logs." "$jobs"
+  (( age > limit )) && report "pr-$pr ci-slow $run $attempt" "CI_SLOW: run $run ($label, ${sha:0:7}) still $status after $(( age / 60 )) min. Cancel it and read the logs." "$jobs"
 }
 
 check_main() { # the newest CI run on main, whichever PR it came from
-  local line run created status conclusion age
+  local line run attempt created status conclusion age
   line=$("$GH" run list --repo "$REPO" --workflow "$WORKFLOW" --branch main --event push --limit 1 \
-    --json databaseId,startedAt,status,conclusion \
-    --jq '.[0] // empty | "\(.databaseId) \(.startedAt) \(.status) \(if (.conclusion // "") == "" then "-" else .conclusion end)"') || return
-  read -r run created status conclusion <<<"$line"
+    --json databaseId,attempt,startedAt,status,conclusion \
+    --jq '.[0] // empty | "\(.databaseId) \(.attempt) \(.startedAt) \(.status) \(if (.conclusion // "") == "" then "-" else .conclusion end)"') || return
+  read -r run attempt created status conclusion <<<"$line"
   [[ -z ${conclusion:-} ]] && return
   if [[ $status == completed ]]; then
     [[ $conclusion == success || $conclusion == cancelled ]] && return
-    report "main-failed $run" "MAIN_FAILED: CI run $run on main ended $conclusion. Fix main first (follow-up PR). gh run view $run --repo $REPO --log-failed"
+    report "main-failed $run $attempt" "MAIN_FAILED: CI run $run on main ended $conclusion. Fix main first (follow-up PR). gh run view $run --repo $REPO --log-failed"
     return
   fi
   age=$(( $(date +%s) - $(date -d "$created" +%s) ))
-  (( age > limit )) && report "main-slow $run" "MAIN_SLOW: CI run $run on main still $status after $(( age / 60 )) min. Cancel it and read the logs."
+  (( age > limit )) && report "main-slow $run $attempt" "MAIN_SLOW: CI run $run on main still $status after $(( age / 60 )) min. Cancel it and read the logs."
 }
 
 check_main_head() { # a new commit on main, so it never moves on unnoticed
@@ -167,7 +168,8 @@ check_pr() {
   read -r state mergeable head merge_sha decision auto <<<"$line"
   case $state in
     MERGED)
-      if grep -qE "^pr-$pr (deployed|deploy-failed) " "$reported"; then untrack; else check_run "$merge_sha" deploy; fi
+      # A failed deploy stays watched: a re-run of it may still go live.
+      if grep -q "^pr-$pr deployed " "$reported"; then untrack; else check_run "$merge_sha" deploy; fi
       ;;
     CLOSED)
       untrack
