@@ -11,9 +11,13 @@
 #   PR #<n>: DEPLOYED / DEPLOY_FAILED  merged, and the deploy run on main finished
 #   PR #<n>: CLOSED                  closed without merging
 #   MAIN_ADVANCED                    main got a new commit (a merge, whoever made it)
-#   MAIN_FAILED / MAIN_SLOW          the newest CI run on main failed or hangs, whichever PR caused it
+#   MAIN_PASSED / MAIN_FAILED        the newest CI run on main passed, or failed whichever PR caused it
+#   MAIN_SLOW                        the newest CI run on main hangs
 #   NEW_ISSUE / ISSUE_COMMENT        a new issue (not the agent's own), or the owner commented on one
 #   IDLE                             nothing happened for max-hours
+#
+# Every CI result (a PR's, a deploy's or main's) ends with the list of open PRs: approved or
+# awaiting approval, auto-merge on or off, CI state. Approvals are also reported as they come.
 #
 #   scripts/watch-project.sh [ci-limit-minutes=20] [max-hours=12]
 #
@@ -58,7 +62,15 @@ report() { # report <key> <message...>: print and exit unless this key was repor
   echo "$key" >>"$reported"
   [[ -n $pr ]] && set -- "PR #$pr: $1" "${@:2}"
   printf '%s\n' "$@"
+  # Every CI result comes with where each open PR stands, so no approval goes unnoticed.
+  [[ $key =~ (ci-passed|ci-failed|deployed|deploy-failed|main-passed|main-failed) ]] && open_prs
   exit 0
+}
+
+open_prs() { # one line per open pull request: its review state, CI and auto-merge
+  "$GH" pr list --repo "$REPO" --state open --json number,title,reviewDecision,autoMergeRequest,statusCheckRollup \
+    --jq '"Open PRs:", (.[] | "  #\(.number) \(.title[0:60]): \(if .reviewDecision == "APPROVED" then "approved" elif .reviewDecision == "CHANGES_REQUESTED" then "changes requested" else "awaiting approval" end), auto-merge \(if .autoMergeRequest then "on" else "off" end), CI \([.statusCheckRollup[]? | .conclusion // .state // "pending"] | if any(. == "FAILURE") then "failed" elif all(. == "SUCCESS" or . == "SKIPPED" or . == "NEUTRAL") then "green" else "running" end)")' \
+    || echo "Open PRs: (listing failed)"
 }
 
 # One line per item of the current PR: "<kind> <id> <author> <text>". Nx Cloud's status comment on
@@ -127,7 +139,8 @@ check_main() { # the newest CI run on main, whichever PR it came from
   read -r run attempt created status conclusion <<<"$line"
   [[ -z ${conclusion:-} ]] && return
   if [[ $status == completed ]]; then
-    [[ $conclusion == success || $conclusion == cancelled ]] && return
+    [[ $conclusion == cancelled ]] && return
+    [[ $conclusion == success ]] && { report "main-passed $run $attempt" "MAIN_PASSED: CI run $run on main passed"; return; }
     report "main-failed $run $attempt" "MAIN_FAILED: CI run $run on main ended $conclusion. Fix main first (follow-up PR). gh run view $run --repo $REPO --log-failed"
     return
   fi
