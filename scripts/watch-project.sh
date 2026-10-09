@@ -182,8 +182,10 @@ check_pr() {
   local line state mergeable head merge_sha decision auto title
   line=$("$GH" pr view "$pr" --repo "$REPO" \
     --json state,mergeable,headRefOid,mergeCommit,reviewDecision,autoMergeRequest,title,author \
-    --jq '"\(.state) \(.mergeable) \(.headRefOid) \(.mergeCommit.oid // "-") \(.reviewDecision // "-") \(if .autoMergeRequest then "on" else "off" end) \(.title) (by \(.author.login))"') \
+    --jq '"\(.state) \(.mergeable) \(.headRefOid) \(.mergeCommit.oid // "-") \(if (.reviewDecision // "") == "" then "-" else .reviewDecision end) \(if .autoMergeRequest then "on" else "off" end) \(.title) (by \(.author.login))"') \
     || return
+  # Every field before the title is one word: an empty one would shift the rest (GitHub answers ""
+  # for the review decision of a PR without reviews).
   read -r state mergeable head merge_sha decision auto title <<<"$line"
   case $state in
     MERGED)
