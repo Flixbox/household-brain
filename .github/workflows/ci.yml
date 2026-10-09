@@ -70,7 +70,7 @@ jobs:
     container:
       image: mcr.microsoft.com/playwright:v1.64.0-noble@sha256:06a9939e57531807f8d5fd76ce44b53165ffb7d7501d87ab10e285c20b1e971f
     env:
-      PLAYWRIGHT_IMAGE_VERSION: 1.63.0
+      PLAYWRIGHT_IMAGE_VERSION: 1.64.0
       NX_CLOUD_ACCESS_TOKEN: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.NX_CLOUD_ACCESS_TOKEN || secrets.NX_CLOUD_READ_TOKEN }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
