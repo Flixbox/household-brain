@@ -15,21 +15,19 @@ interface Props {
   next: EntryDate | null
   /** " + more" when the entry has other dates. */
   more: string
-  /** Its price, shown here instead when it has no date. */
-  price: string | null
   since: string | null
   now: Temporal.ZonedDateTime
 }
 
 /**
  * A row's right-hand column: when it is due (relative, coloured by urgency, and the date). An entry
- * with no dates, such as a gift card credit that never expires, shows its amount and "no expiry".
+ * with no dates, such as a gift card credit that never expires, says "no expiry"; its price stays
+ * under the title like every other entry's (#87).
  */
-export const DueColumn = ({ item, next, more, price, since, now }: Props) => {
+export const DueColumn = ({ item, next, more, since, now }: Props) => {
   if (!next) {
     return (
       <span className="flex flex-col items-end text-sm">
-        {price && <span className="max-w-36 text-right text-base font-semibold tabular-nums">{price}</span>}
         <span className="text-xs text-stone-500">{item.status === 'open' ? 'no expiry' : item.status}</span>
       </span>
     )
