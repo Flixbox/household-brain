@@ -4,7 +4,7 @@ import { type GoogleTask, type TasksApi, createTasksApi } from '@household-brain
 import { addImportedItem } from './store'
 import { eventIdForTask } from './ids'
 import { importedTask } from './task-import'
-import { logError, logEvent } from '@household-brain/entries/lib/logs'
+import { logErrorOnce, logEvent, logRecovered } from '@household-brain/entries/lib/logs'
 import { entryLogMessage } from '@household-brain/entries/lib/logs-messages'
 
 /**
@@ -57,8 +57,5 @@ export const importTasks = async (): Promise<void> => {
   }
   // Tasks are an optional way in: a failure (the API switched off, no network) is tried again
   // next pull and must not fail the calendar pull before it.
-  await importOpenTasks(tasksApi).catch(() => {
-    logError('Google Tasks import failed')
-    return null
-  })
+  await importOpenTasks(tasksApi).then(() => logRecovered('tasks-import'), () => logErrorOnce('tasks-import', 'Google Tasks import failed'))
 }

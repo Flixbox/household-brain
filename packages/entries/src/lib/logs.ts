@@ -31,6 +31,23 @@ export const logEvent = (message: string, itemId?: string): void => writeLog('ev
 
 export const logError = (message: string, itemId?: string): void => writeLog('error', message, itemId)
 
+const failing = new Set<string>()
+
+/**
+ * An error that keeps happening (Google down, an API switched off) is logged once, when it starts,
+ * not on every retry; once `logRecovered` says it works again, the next failure is logged anew.
+ */
+export const logErrorOnce = (key: string, message: string): void => {
+  if (!failing.has(key)) {
+    failing.add(key)
+    logError(message)
+  }
+}
+
+export const logRecovered = (key: string): void => {
+  failing.delete(key)
+}
+
 /** An entry Google Calendar added, changed or removed, as a pull took it in. */
 export const logGoogleChange = (action: string, title: string, itemId: string): void =>
   logEvent(`${entryLogMessage(action, title)} from Google Calendar`, itemId)

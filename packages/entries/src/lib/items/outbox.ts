@@ -121,6 +121,8 @@ const pullNow = (context: PushContext): Promise<void> => {
         pullProblem = problems.length > 0 ? problems.join(' · ') : null
         if (problems.length > 0) {
           logPullProblem('problem')
+        } else {
+          resetPullProblems()
         }
       }
     }, (error: unknown) => {
