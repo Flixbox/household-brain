@@ -43,6 +43,7 @@ test('entries: categories and the form, added, edited, deleted, and a double-tap
     await page.getByLabel('Amount').fill('10')
     // How often it is due shows after the price in the list (#86).
     await page.getByLabel('Every').selectOption('monthly')
+    await page.getByLabel('Every').blur()
     // A bare domain is fine; it is stored as a full address.
     const linkField = page.getByRole('textbox', { exact: true, name: 'Link' })
     const openLink = page.getByRole('link', { name: 'Open the link in a new tab' })
