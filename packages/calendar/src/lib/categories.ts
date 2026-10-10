@@ -17,6 +17,8 @@ export const DEFAULT_CATEGORIES: readonly Category[] = [
   { colorId: '1', label: 'Paperwork', slug: 'paperwork', sortOrder: 7 },
   // Credit that never expires, e.g. on a gift card: its entries usually have no date at all (#33).
   { colorId: '10', label: 'Balance', slug: 'balance', sortOrder: 8 },
+  // Holdings such as ETFs, funds and shares (#119).
+  { colorId: '4', label: 'Investment', slug: 'investment', sortOrder: 9 },
 ]
 
 /**
@@ -29,6 +31,7 @@ export const CATEGORY_WORDS: Readonly<Record<string, readonly string[]>> = {
   contract: ['vertrag', 'kündigung', 'cancellation', 'notice'],
   coupon: ['deal', 'discount', 'voucher', 'offer', 'promo', 'promotion', 'sale', 'cashback', 'bonus', 'freebie', 'rabatt', 'gutschein', 'angebot', 'aktion', 'gratis'],
   insurance: ['versicherung'],
+  investment: ['etf', 'fund', 'stock', 'share', 'shares', 'aktie', 'aktien', 'fonds', 'wertpapier'],
   membership: ['subscription', 'abo', 'abonnement', 'mitgliedschaft'],
   paperwork: ['deadline', 'return', 'refund', 'document', 'documents', 'tax', 'bill', 'invoice', 'form', 'frist', 'rücksendung', 'retoure', 'erstattung', 'dokument', 'steuer', 'steuern', 'rechnung', 'antrag'],
   transit: ['transport', 'transit', 'ticket', 'deutschlandticket', 'öpnv'],

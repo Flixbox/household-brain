@@ -130,7 +130,7 @@ test('events made in Google Calendar: taken in and shaped, left alone when put i
     await seedDocument(`syncState/${uid}`, { schema: 4, syncToken })
     await pullUntil(page, () => page.getByRole('region', { name: 'Coupon' }).getByRole('link', { name: /^Popcorn/u }).count(), 1)
     await expect.poll(() => google.live().find(event => event.id === 'oldrules1')?.summary).toBe('[Coupon] Popcorn')
-    await expect.poll(async () => (await readDocument(`syncState/${uid}`))?.readingRules).toEqual({ integerValue: '1' })
+    await expect.poll(async () => (await readDocument(`syncState/${uid}`))?.readingRules).toEqual({ integerValue: '2' })
   })
 
   await test.step("an extra date's event in Google never becomes an entry, and a stray one is removed", async () => {

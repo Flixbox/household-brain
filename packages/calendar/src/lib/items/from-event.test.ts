@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_CATEGORIES } from '@household-brain/calendar/lib/categories'
 import type { CalendarEvent } from './event'
-import { draftFrom, normalisationFor, ownRemindersFix } from './from-event'
+import { READING_RULES, draftFrom, normalisationFor, ownRemindersFix, rulesReadWith } from './from-event'
 
 const context = { categories: DEFAULT_CATEGORIES, timeZone: 'Europe/Berlin' }
 const appEvent: CalendarEvent = {
@@ -148,5 +148,12 @@ describe('normalisationFor', () => {
   it('ignores a start date that is not a date', () => {
     const odd = { ...appEvent, extendedProperties: { private: { ...appEvent.extendedProperties?.private, 'hb.start': 'next spring' } } }
     expect(draftFrom(odd, DEFAULT_CATEGORIES).startDate).toBe('')
+  })
+})
+
+describe('rulesReadWith', () => {
+  it('counts a listing as read under the current rules only once every default category exists', () => {
+    expect(rulesReadWith(DEFAULT_CATEGORIES)).toBe(READING_RULES)
+    expect(rulesReadWith(DEFAULT_CATEGORIES.filter(category => category.slug !== 'investment'))).toBe(READING_RULES - 1)
   })
 })

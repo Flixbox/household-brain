@@ -406,6 +406,12 @@ adapted to this repository:
   is tight on compute per request, but scheduled (cron) runs are much less restrictive. When a
   feature needs one, file an issue saying what it is needed for, instead of adding a backend.
 
+- **The Gemini Gem "Household Brain v2" follows `packages/calendar/src/lib/gemini-gem.md`** (#119), the only
+  copy of its instructions. A unit test fails when they don't list exactly the app's category slugs
+  and price intervals, so changing either means changing the instructions in the same PR. After such
+  a PR is merged, paste the new text into the Gem (Gemini, signed in as the owner → Gems → Household
+  Brain v2 → Instructions → Save), and say in the PR that it was done.
+
 ### Repository and accounts
 
 - **`main` only accepts merges from pull requests with green CI**, and force-push is blocked.
