@@ -97,8 +97,12 @@ ids() { awk 'NF >= 2 { print $1, $2 }' | sort -u; }
 check_activity() {
   local seen=$state_dir/pr-$pr-seen now new
   now=$(activity) || return
-  # Comments that existed before the PR was first watched are not news.
-  [[ -e $seen ]] || { ids <<<"$now" >"$seen"; return; }
+  # On the watcher's very first round, the comments already there are old news. A PR that appears
+  # later is new, and so is everything on it, also what came between its NEW_PR and this look (#122).
+  if [[ ! -e $seen ]]; then
+    [[ -e $state_dir/initialized ]] || { ids <<<"$now" >"$seen"; return; }
+    : >"$seen"
+  fi
   new=$(comm -13 <(sort -u "$seen") <(ids <<<"$now"))
   [[ -z $new ]] && return
   echo "$new" >>"$seen"
@@ -300,6 +304,8 @@ while true; do
     for pr in $(sort -un <<<"$prs"); do
       check_pr
     done
+    # From here on, a PR seen for the first time is a new one, not one from before the watcher.
+    touch "$state_dir/initialized"
   fi
   (( $(date +%s) - started > hours * 3600 )) && { echo "IDLE: nothing happened for $hours h"; exit 0; }
   sleep 60
