@@ -88,6 +88,8 @@ describe('patchFor', () => {
     // How often the price is due, likewise only when set (#86).
     expect(eventFor(item, context).extendedProperties?.private).not.toHaveProperty('hb.interval')
     expect(patchFor({ ...item, interval: 'monthly' }, ['interval'], context)).toEqual({ extendedProperties: { private: { 'hb.interval': 'monthly', 'hb.v': '1' } } })
+    // Back to a one-off price, the patch clears it ('' reads back as none).
+    expect(patchFor(item, ['interval'], context)).toEqual({ extendedProperties: { private: { 'hb.interval': '', 'hb.v': '1' } } })
     expect(patchFor(item, ['currency'], context)).toEqual({ extendedProperties: { private: { 'hb.currency': '', 'hb.v': '1' } } })
   })
 })
