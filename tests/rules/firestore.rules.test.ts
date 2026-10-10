@@ -63,6 +63,7 @@ describe('data collections', () => {
   it('refuse unknown fields and oversized text, but keep fields an older version left behind', async () => {
     await assertFails(setDoc(doc(as('alice'), 'items/coupon-2'), { owner: 'mallory', title: 'x' }))
     await assertFails(setDoc(doc(as('alice'), 'items/coupon-2'), { title: 'x'.repeat(50_001) }))
+    await assertFails(setDoc(doc(as('alice'), 'items/coupon-2'), { url: `https://shop.test/${'x'.repeat(50_000)}` }))
     await assertFails(updateDoc(doc(as('alice'), 'items/coupon-1'), { notes: 'x'.repeat(500_001) }))
     await assertFails(setDoc(doc(as('alice'), 'items/coupon-2'), { id: 'coupon-3', title: 'x' }))
     await assertFails(setDoc(doc(as('alice'), 'categories/bills'), { colorId: '1', label: 'Bills', slug: 'other', sortOrder: 1 }))
