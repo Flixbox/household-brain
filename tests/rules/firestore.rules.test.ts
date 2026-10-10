@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebase/rules-unit-testing'
-import { collection, collectionGroup, deleteDoc, doc, getDoc, getDocs, setDoc, updateDoc } from 'firebase/firestore'
+import { collection, collectionGroup, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore'
 import { afterAll, beforeEach, describe, it } from 'vitest'
 
 const env = await initializeTestEnvironment({
@@ -20,6 +20,13 @@ beforeEach(async () => {
 
 const as = (uid: string) => env.authenticatedContext(uid).firestore()
 
+/** Every field the app writes when it adds an entry (`addItem`). */
+const appEntry = {
+  amount: '10', category: 'coupon', code: '', currency: '', dirty: ['title'], dueDate: '2026-12-01', etags: {}, extraDates: [],
+  interval: '', notes: '', pendingOp: 'upsert', reminders: '', rev: 'r1', startDate: '', status: 'open', sync: 'pending',
+  syncError: null, title: 'Coupon', updatedAt: serverTimestamp(), updatedBy: 'alice', url: '',
+}
+
 describe('data collections', () => {
   it('are closed to signed-out visitors', async () => {
     await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), 'items/coupon-1')))
@@ -32,7 +39,8 @@ describe('data collections', () => {
 
   it('are open to allowlisted accounts', async () => {
     await assertSucceeds(getDoc(doc(as('alice'), 'items/coupon-1')))
-    await assertSucceeds(setDoc(doc(as('alice'), 'items/coupon-2'), { id: 'coupon-2', title: 'x' }))
+    await assertSucceeds(setDoc(doc(as('alice'), 'items/coupon-2'), { ...appEntry, id: 'coupon-2' }))
+    await assertSucceeds(updateDoc(doc(as('alice'), 'items/coupon-2'), { dirty: ['url'], notes: 'n'.repeat(400_000), url: 'https://shop.test' }))
     await assertSucceeds(updateDoc(doc(as('alice'), 'items/coupon-1'), { 'etags.alice': 'e1', 'status': 'done' }))
     await assertSucceeds(deleteDoc(doc(as('alice'), 'items/coupon-1')))
     await assertSucceeds(getDocs(collection(as('alice'), 'categories')))
@@ -54,7 +62,8 @@ describe('data collections', () => {
 
   it('refuse unknown fields and oversized text, but keep fields an older version left behind', async () => {
     await assertFails(setDoc(doc(as('alice'), 'items/coupon-2'), { owner: 'mallory', title: 'x' }))
-    await assertFails(setDoc(doc(as('alice'), 'items/coupon-2'), { title: 'x'.repeat(10_001) }))
+    await assertFails(setDoc(doc(as('alice'), 'items/coupon-2'), { title: 'x'.repeat(50_001) }))
+    await assertFails(updateDoc(doc(as('alice'), 'items/coupon-1'), { notes: 'x'.repeat(500_001) }))
     await assertFails(setDoc(doc(as('alice'), 'items/coupon-2'), { id: 'coupon-3', title: 'x' }))
     await assertFails(setDoc(doc(as('alice'), 'categories/bills'), { colorId: '1', label: 'Bills', slug: 'other', sortOrder: 1 }))
     await assertSucceeds(setDoc(doc(as('alice'), 'categories/bills'), { colorId: '1', label: 'Bills', slug: 'bills', sortOrder: 1 }))
@@ -66,10 +75,11 @@ describe('data collections', () => {
 describe('meta/config', () => {
   const config = (calendarId: string) => ({ calendarId, ownerUid: 'alice', timeZone: 'Europe/Berlin' })
 
-  it('is set once and then keeps its calendar', async () => {
+  it('is set once and then stays as it is', async () => {
     await assertSucceeds(setDoc(doc(as('alice'), 'meta/config'), config('household@group.calendar.test')))
-    await assertSucceeds(setDoc(doc(as('alice'), 'meta/config'), { ...config('household@group.calendar.test'), timeZone: 'UTC' }))
     await assertFails(setDoc(doc(as('alice'), 'meta/config'), config('mallory@group.calendar.test')))
+    await assertFails(updateDoc(doc(as('alice'), 'meta/config'), { ownerUid: 'mallory' }))
+    await assertFails(updateDoc(doc(as('alice'), 'meta/config'), { timeZone: 'UTC' }))
     await assertFails(deleteDoc(doc(as('alice'), 'meta/config')))
     await assertFails(setDoc(doc(as('alice'), 'meta/other'), config('x')))
   })
@@ -87,8 +97,11 @@ describe('syncState', () => {
   }))
 
   it('lets each person write only their own, and everyone read all', async () => {
-    await assertSucceeds(setDoc(doc(as('alice'), 'syncState/alice'), { schema: 4 }, { merge: true }))
+    await assertSucceeds(setDoc(doc(as('alice'), 'syncState/alice'), { listingStartedAt: serverTimestamp() }, { merge: true }))
+    await assertSucceeds(setDoc(doc(as('alice'), 'syncState/alice'), { readingRules: 2, syncToken: 's1' }, { merge: true }))
+    await assertSucceeds(setDoc(doc(as('bob'), 'syncState/bob'), { schema: 5 }, { merge: true }))
     await assertSucceeds(getDocs(collection(as('alice'), 'syncState')))
+    await assertSucceeds(getDocs(collection(as('bob'), 'syncState')))
     await assertFails(setDoc(doc(as('alice'), 'syncState/bob'), { syncToken: 'x' }, { merge: true }))
     await assertFails(deleteDoc(doc(as('alice'), 'syncState/bob')))
     await assertFails(setDoc(doc(as('alice'), 'syncState/alice'), { other: 1 }, { merge: true }))

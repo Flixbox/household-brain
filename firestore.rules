@@ -31,11 +31,12 @@ service cloud.firestore {
         && touched().hasOnly([
           'amount', 'category', 'code', 'currency', 'dateEvents', 'dirty', 'dueDate', 'etags',
           'extraDates', 'googleUpdated', 'id', 'interval', 'notes', 'pendingOp', 'reminders', 'rev',
-          'startDate', 'status', 'sync', 'syncError', 'title', 'updatedAt', 'updatedBy',
+          'startDate', 'status', 'sync', 'syncError', 'title', 'updatedAt', 'updatedBy', 'url',
         ])
-        && isText(request.resource.data, 'title', 10000)
-        && isText(request.resource.data, 'notes', 200000)
-        && isText(request.resource.data, 'url', 10000)
+        // Far above what a person types or Google holds, and together well under a document's size limit.
+        && isText(request.resource.data, 'title', 50000)
+        && isText(request.resource.data, 'notes', 500000)
+        && isText(request.resource.data, 'url', 50000)
         && (!('id' in request.resource.data) || request.resource.data.id == id);
     }
 
@@ -47,16 +48,15 @@ service cloud.firestore {
         && isText(request.resource.data, 'label', 200);
     }
 
-    // The household's calendar. Once set, it can't be pointed at another calendar from the app,
-    // so a hijacked session can't redirect the sync.
+    // The household's calendar, owner and time zone. Setup writes it once; after that the app can't
+    // change it, so a hijacked session can't redirect the sync or make itself the owner. Only a
+    // config still lacking its calendar (an interrupted setup) can be completed.
     match /meta/config {
       allow read: if allowed();
       allow create, update: if allowed()
         && touched().hasOnly(['calendarId', 'ownerUid', 'timeZone'])
         && request.resource.data.calendarId is string
-        && (resource == null
-          || resource.data.get('calendarId', '') == ''
-          || request.resource.data.calendarId == resource.data.calendarId);
+        && (resource == null || resource.data.get('calendarId', '') == '');
     }
 
     // Each person's sync progress: everyone in the household reads them all, only its owner writes one.
