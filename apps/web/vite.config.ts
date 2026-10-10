@@ -41,7 +41,9 @@ export default defineConfig(({ mode }) => {
         workbox: {
           // Only the install dialog shows the screenshots: not worth storing offline.
           globIgnores: ['screenshots/**'],
-          globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}'],
+          // No `webmanifest`: the plugin adds its manifest itself, and a second entry with another
+          // revision made Workbox refuse the whole precache list, so no new version installed (#136).
+          globPatterns: ['**/*.{js,css,html,svg,png,ico}'],
           // Firebase Auth's sign-in handler must always come from the network.
           navigateFallbackDenylist: [/^\/__\//u],
         },
