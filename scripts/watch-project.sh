@@ -265,23 +265,27 @@ check_issues() {
 
 # Issues closed or reopened since the last round, by whoever did it.
 check_issue_states() {
-  local now closed reopened
-  now=$("$GH" api "repos/$REPO/issues?state=open&per_page=100" --jq '.[] | select(.pull_request == null) | .number' | sort) || return
+  local now closed reopened events n
+  # A failed listing ends the round here; an empty one is real (no open issues).
+  now=$("$GH" api --paginate "repos/$REPO/issues?state=open&per_page=100" --jq '.[] | select(.pull_request == null) | .number' | sort) || return
   # The issues open on the first run are the starting point, not news.
   [[ -e $open_issues ]] || { echo "$now" >"$open_issues"; return; }
   closed=$(comm -23 "$open_issues" <(echo "$now"))
-  reopened=$(comm -13 "$open_issues" <(echo "$now") | while read -r n; do
-    [[ -n $n ]] && "$GH" api "repos/$REPO/issues/$n" --jq 'select(.closed_at != null or (.state_reason // "") == "reopened") | .number'
-  done)
+  reopened=$(comm -13 "$open_issues" <(echo "$now"))
+  # Every line first, then the state: a lookup that fails leaves the state as it was, so the
+  # next round tries again instead of losing the event.
+  events=$(
+    for n in $closed; do
+      "$GH" api "repos/$REPO/issues/$n" --jq '"ISSUE_CLOSED #\(.number) \(.title) (\(.state_reason // "closed"), by \(.closed_by.login // "?"))"' || exit 1
+    done
+    # A brand-new issue is NEW_ISSUE's; only one that was closed before is reopened.
+    for n in $reopened; do
+      "$GH" api "repos/$REPO/issues/$n" --jq 'select(.closed_at != null or (.state_reason // "") == "reopened") | "ISSUE_REOPENED #\(.number) \(.title)"' || exit 1
+    done
+  ) || return
   echo "$now" >"$open_issues"
-  [[ -z $closed && -z $reopened ]] && return
-  local n
-  for n in $closed; do
-    "$GH" api "repos/$REPO/issues/$n" --jq '"ISSUE_CLOSED #\(.number) \(.title) (\(.state_reason // "closed"), by \(.closed_by.login // "?"))"'
-  done
-  for n in $reopened; do
-    "$GH" api "repos/$REPO/issues/$n" --jq '"ISSUE_REOPENED #\(.number) \(.title)"'
-  done
+  [[ -z $events ]] && return
+  echo "$events"
   exit 0
 }
 
