@@ -15,6 +15,7 @@
 #   MAIN_PASSED / MAIN_FAILED        the newest CI run on main passed, or failed whichever PR caused it
 #   MAIN_SLOW                        the newest CI run on main hangs
 #   NEW_ISSUE / ISSUE_COMMENT        a new issue (not the agent's own), or the owner commented on one
+#   ISSUE_CLOSED / ISSUE_REOPENED    an issue was closed (by anyone) or reopened
 #   IDLE                             nothing happened for max-hours
 #
 # Every CI result (a PR's, a deploy's or main's) ends with the list of open PRs: approved or
@@ -52,6 +53,7 @@ reported=$state_dir/reported   # one line per event already reported
 issues_seen=$state_dir/issues  # the first 80 characters of each issue line already reported
 tracked=$state_dir/tracked     # pull requests followed until their deploy or closing is reported
 main_head=$state_dir/main      # the newest commit on main already reported
+open_issues=$state_dir/open-issues  # the open issues seen last round, by number
 touch "$reported" "$tracked"
 # One watcher per state directory: two would race on its files and report events twice.
 if command -v flock >/dev/null; then
@@ -261,11 +263,34 @@ check_issues() {
   exit 0
 }
 
+# Issues closed or reopened since the last round, by whoever did it.
+check_issue_states() {
+  local now closed reopened
+  now=$("$GH" api "repos/$REPO/issues?state=open&per_page=100" --jq '.[] | select(.pull_request == null) | .number' | sort) || return
+  # The issues open on the first run are the starting point, not news.
+  [[ -e $open_issues ]] || { echo "$now" >"$open_issues"; return; }
+  closed=$(comm -23 "$open_issues" <(echo "$now"))
+  reopened=$(comm -13 "$open_issues" <(echo "$now") | while read -r n; do
+    [[ -n $n ]] && "$GH" api "repos/$REPO/issues/$n" --jq 'select(.closed_at != null or (.state_reason // "") == "reopened") | .number'
+  done)
+  echo "$now" >"$open_issues"
+  [[ -z $closed && -z $reopened ]] && return
+  local n
+  for n in $closed; do
+    "$GH" api "repos/$REPO/issues/$n" --jq '"ISSUE_CLOSED #\(.number) \(.title) (\(.state_reason // "closed"), by \(.closed_by.login // "?"))"'
+  done
+  for n in $reopened; do
+    "$GH" api "repos/$REPO/issues/$n" --jq '"ISSUE_REOPENED #\(.number) \(.title)"'
+  done
+  exit 0
+}
+
 while true; do
   pr=
   check_main
   check_main_head
   check_issues
+  check_issue_states
   # A round with a failed listing is skipped rather than run with pull requests missing.
   if prs=$(watched_prs); then
     for pr in $(sort -un <<<"$prs"); do

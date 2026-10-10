@@ -139,7 +139,7 @@ adapted to this repository:
    ```
 
    - One watcher for the whole project: every open PR, merged ones until their deploy, `main`'s CI,
-     new issues and the owner's comments on issues. Each event comes prefixed with its PR
+     new issues, the owner's comments on issues, and issues closed or reopened. Each event comes prefixed with its PR
      (`PR #12: CI_PASSED …`).
    - It follows each PR's **current** head commit, so a push needs no restart.
    - It remembers what it already reported, so after handling an event you simply start it again and
@@ -179,6 +179,7 @@ adapted to this repository:
 | `MAIN_ADVANCED` | `main` got a new commit, whoever merged it. Know what landed: if it was your own PR, its deploy follows; otherwise check whether it touches your work. |
 | `MAIN_MOVED` | `main` moved under the PR (another merge). Rebase on `main`, run the checks, push once, so what gets merged is what was tested. |
 | `NEW_ISSUE` / `ISSUE_COMMENT` | Read it; take the work in turn (tech debt first), answer the owner's comment. |
+| `ISSUE_CLOSED` / `ISSUE_REOPENED` | An issue was closed (by whom, and why) or reopened. Drop or resume any work on it; a closed one the owner decided on may need nothing else. |
 
 ### 4. Comments and review
 
