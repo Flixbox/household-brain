@@ -206,10 +206,14 @@ check_pr() {
   read -r state mergeable head merge_sha decision auto parked title <<<"$line"
   case $state in
     MERGED)
+      # Comments still count after the merge: one written right after an approval can land after the
+      # round that reported the approval, and the PR is merged by the next one (#129).
+      check_activity
       # A failed deploy stays watched: a re-run of it may still go live.
       if grep -q "^pr-$pr deployed " "$reported"; then untrack; else check_run "$merge_sha" deploy; fi
       ;;
     CLOSED)
+      check_activity
       untrack
       report "pr-$pr closed" "CLOSED without merging"
       ;;
