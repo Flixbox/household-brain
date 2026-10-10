@@ -22,8 +22,16 @@ export default defineConfig(({ mode }) => {
           background_color: '#fbf7f1',
           description: 'Everything in our household that is due on a date, by category.',
           display: 'standalone',
+          // The app's identity, so it no longer depends on start_url (#29).
+          id: '/',
           lang: 'en',
           name: 'Household Brain',
+          // For the richer install dialog (#29): one wide (desktop) and one narrow (phone) screenshot,
+          // taken from the e2e build with made-up demo entries, never the household's own.
+          screenshots: [
+            { form_factor: 'wide', label: 'Entries by category', sizes: '1280x800', src: '/screenshots/wide.png', type: 'image/png' },
+            { label: 'Entries by category', sizes: '412x915', src: '/screenshots/narrow.png', type: 'image/png' },
+          ],
           short_name: 'Household',
           start_url: '/',
           theme_color: '#f57c00',
@@ -31,6 +39,8 @@ export default defineConfig(({ mode }) => {
         pwaAssets: { config: true },
         registerType: 'prompt',
         workbox: {
+          // Only the install dialog shows the screenshots: not worth storing offline.
+          globIgnores: ['screenshots/**'],
           globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}'],
           // Firebase Auth's sign-in handler must always come from the network.
           navigateFallbackDenylist: [/^\/__\//u],
