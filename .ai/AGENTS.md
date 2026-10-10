@@ -292,7 +292,7 @@ adapted to this repository:
   ("within the minimumReleaseAge cutoff"); wait and re-run. Dependabot waits as long (`cooldown`).
   An urgent exception goes into `minimumReleaseAgeExclude` with its reason. **GitHub Actions too**
   (#102): `scripts/check-action-age.sh` runs first in CI and fails on a pinned action release younger
-  than 48 hours; Dependabot's `cooldown` counts loosely, so it can still propose one. Wait and re-run. Node is pinned in `package.json` (`volta.node`), pnpm in `packageManager`.
+  than 48 hours; Dependabot's `cooldown` counts loosely and proposed one at about 43 hours (#101). Wait and re-run. Node is pinned in `package.json` (`volta.node`), pnpm in `packageManager`.
 - **fallow** (`.fallowrc.jsonc`, part of `pnpm lint`) fails on unused files, exports and
   dependencies, on duplication, and on imports across the package boundaries: `apps/web` may use
   every package; `shell` and `calendar` only `firebase`; nothing imports `apps/web` (its e2e tests
