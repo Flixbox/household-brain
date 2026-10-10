@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { resetEmulators, seedDocument } from './emulators'
 import { mockGoogle } from './google-mocks'
-import { openMenu, signInAllowlisted, signInAs } from './session'
+import { openMenu, signInAllowlisted, signInAs, signOutWith } from './session'
 
 const CALENDAR = 'household@group.calendar.google.test'
 
@@ -157,7 +157,7 @@ test('finding entries: all by date, then searching', async ({ page }) => {
     // The next person on this device doesn't open a board filtered by someone else's search.
     await search.fill('gym')
     await openMenu(page)
-    await page.getByRole('dialog', { name: 'Menu' }).getByRole('button', { name: 'Sign out' }).click()
+    await signOutWith(page, page.getByRole('dialog', { name: 'Menu' }).getByRole('button', { name: 'Sign out' }))
     await signInAs(page, 'owner@household-brain.test')
     await expect(page.getByRole('searchbox', { name: 'Search entries' })).toHaveValue('')
   })

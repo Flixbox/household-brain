@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { resetEmulators } from './emulators'
 import { mockGoogle } from './google-mocks'
-import { openMenu, signInAllowlisted } from './session'
+import { openMenu, signInAllowlisted, signOutWith } from './session'
 
 const TWO_REMINDERS = [{ method: 'popup', minutes: 2880 }, { method: 'popup', minutes: 1440 }]
 const CALENDAR = 'household@group.calendar.google.test'
@@ -39,7 +39,7 @@ test('setting up: the owner creates the household calendar, then a second person
     await page.getByRole('link', { name: 'Back' }).click()
     await expect(page.getByText("The household calendar isn't set up yet.")).toHaveCount(0)
     await openMenu(page)
-    await page.getByRole('dialog', { name: 'Menu' }).getByRole('button', { name: 'Sign out' }).click()
+    await signOutWith(page, page.getByRole('dialog', { name: 'Menu' }).getByRole('button', { name: 'Sign out' }))
   })
 
   await test.step('a second person connects the shared calendar and gets their own reminders', async () => {

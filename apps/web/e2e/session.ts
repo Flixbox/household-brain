@@ -1,4 +1,4 @@
-import { type Page, expect } from '@playwright/test'
+import { type Locator, type Page, expect } from '@playwright/test'
 import { allowlist } from './emulators'
 
 declare global {
@@ -9,6 +9,15 @@ declare global {
 
 /** Opens the app menu (the drawer behind the top bar's button). */
 export const openMenu = (page: Page) => page.getByRole('button', { exact: true, name: 'Menu' }).click()
+
+/**
+ * Clicks a "Sign out" button and waits until the app has deleted its offline data and reloaded
+ * (#114), so the next step doesn't run into the reload.
+ */
+export const signOutWith = async (page: Page, button: Locator) => {
+  await Promise.all([page.waitForEvent('load'), button.click()])
+  await expect(page.getByRole('button', { name: 'Sign in with Google' })).toBeVisible()
+}
 
 /** Signs in through the emulator-only hook, without the Google popup. */
 export const signInAs = (page: Page, email: string) => page.evaluate(address => window.e2eSignIn(address), email)
