@@ -53,7 +53,10 @@ jobs:
       # Workbox refuses a precache list with the same URL twice, and then no new version installs (#136).
       - name: Service worker precaches each file once
         run: |
-          duplicates=$(grep -o 'url:"[^"]*"' apps/web/dist/sw.js | sort | uniq -d)
+          urls=$(grep -o 'url:"[^"]*"' apps/web/dist/sw.js || true)
+          # No match at all means the format changed and this check would prove nothing.
+          [ -n "$urls" ] || { echo '::error::No precache entries found in apps/web/dist/sw.js'; exit 1; }
+          duplicates=$(sort <<<"$urls" | uniq -d)
           if [ -n "$duplicates" ]; then
             echo "::error::apps/web/dist/sw.js precaches these more than once: $duplicates"; exit 1
           fi
