@@ -11,15 +11,15 @@
     "zones": [
       { "name": "app", "patterns": ["apps/web/**"] },
       { "name": "shell", "patterns": ["packages/shell/src/**"] },
-      { "name": "calendar", "patterns": ["packages/calendar/src/**"] },
+      { "name": "entries", "patterns": ["packages/entries/src/**"] },
       { "name": "firebase", "patterns": ["packages/firebase/src/**"] }
     ],
     "rules": [
       // apps/web connects the features to the shell; nothing imports from it.
-      { "from": "app", "allow": ["shell", "calendar", "firebase"] },
+      { "from": "app", "allow": ["shell", "entries", "firebase"] },
       // The shell knows no features, and features never import from it for wiring.
       { "from": "shell", "allow": ["firebase"] },
-      { "from": "calendar", "allow": ["firebase"] },
+      { "from": "entries", "allow": ["firebase"] },
       { "from": "firebase", "allow": [] }
     ]
   }

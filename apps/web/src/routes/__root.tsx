@@ -1,7 +1,7 @@
 import { Link, Outlet, createRootRoute } from '@tanstack/react-router'
-import { OutboxRunner } from '@household-brain/calendar/components/OutboxRunner'
-import { SyncBar } from '@household-brain/calendar/components/SyncBar'
-import { DoneToast } from '@household-brain/calendar/components/items/DoneToast'
+import { OutboxRunner } from '@household-brain/entries/components/OutboxRunner'
+import { SyncBar } from '@household-brain/entries/components/SyncBar'
+import { DoneToast } from '@household-brain/entries/components/items/DoneToast'
 import { AppShell } from '@household-brain/shell/components/AppShell'
 import { closeMenu } from '@household-brain/shell/lib/menu'
 

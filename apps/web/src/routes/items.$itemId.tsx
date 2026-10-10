@@ -1,6 +1,6 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { EditForm } from '@household-brain/calendar/components/items/EditForm'
-import { useEntry } from '@household-brain/calendar/lib/items/use-entry'
+import { EditForm } from '@household-brain/entries/components/items/EditForm'
+import { useEntry } from '@household-brain/entries/lib/items/use-entry'
 
 const EditItem = () => {
   const entry = useEntry(Route.useParams().itemId)

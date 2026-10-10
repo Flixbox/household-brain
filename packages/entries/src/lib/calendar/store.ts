@@ -1,0 +1,23 @@
+import { collection, doc, getDoc, getDocs, limit, query, setDoc, writeBatch } from 'firebase/firestore'
+import { db } from '@household-brain/firebase/firebase'
+import type { HouseholdStore } from './setup'
+import { householdFrom } from '@household-brain/entries/lib/documents'
+
+const configDoc = doc(db, 'meta', 'config')
+
+/** The household settings in Firestore: `meta/config` and the `categories` collection. */
+export const firestoreHouseholdStore: HouseholdStore = {
+  config: async () => {
+    const snapshot = await getDoc(configDoc)
+    return snapshot.exists() ? householdFrom(snapshot.data()) : null
+  },
+  hasCategories: async () => !(await getDocs(query(collection(db, 'categories'), limit(1)))).empty,
+  saveCategories: async categories => {
+    const batch = writeBatch(db)
+    for (const category of categories) {
+      batch.set(doc(db, 'categories', category.slug), category)
+    }
+    await batch.commit()
+  },
+  saveConfig: config => setDoc(configDoc, config),
+}

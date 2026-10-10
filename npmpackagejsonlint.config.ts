@@ -12,7 +12,7 @@ export const rules = {
   'no-git-devDependencies': 'error',
   'no-repeated-dependencies': 'error',
   // Our own packages are linked with `workspace:*`; everything from npm is pinned exactly.
-  'prefer-absolute-version-dependencies': ['error', { exceptions: ['@household-brain/calendar', '@household-brain/firebase', '@household-brain/shell'] }],
+  'prefer-absolute-version-dependencies': ['error', { exceptions: ['@household-brain/entries', '@household-brain/firebase', '@household-brain/shell'] }],
   'prefer-absolute-version-devDependencies': 'error',
   'prefer-alphabetical-dependencies': 'error',
   'prefer-alphabetical-devDependencies': 'error',

@@ -301,7 +301,7 @@ adapted to this repository:
   than 48 hours; Dependabot's `cooldown` counts loosely and let a younger one through (#101). Wait and re-run. Node is pinned in `package.json` (`volta.node`), pnpm in `packageManager`.
 - **fallow** (`.fallowrc.jsonc`, part of `pnpm lint`) fails on unused files, exports and
   dependencies, on duplication, and on imports across the package boundaries: `apps/web` may use
-  every package; `shell` and `calendar` only `firebase`; nothing imports `apps/web` (its e2e tests
+  every package; `shell` and `entries` only `firebase`; nothing imports `apps/web` (its e2e tests
   and config included).
 - **The e2e build must never reach production:** the emulator wiring and the `window.e2eSignIn` hook
   are behind an inline `import.meta.env.VITE_USE_EMULATORS` comparison, `vite.config.ts` refuses a
@@ -355,7 +355,7 @@ adapted to this repository:
     with special needs (pending-write metadata in the outbox, server-only answers) stay explicit.
 - **No imports from parent folders** (`../`, #77). Inside a package, a module from another folder is
   imported by the package's own name and path, as everyone else imports it:
-  `@household-brain/calendar/lib/items/model`. Siblings in the same folder stay `./x`. oxlint enforces
+  `@household-brain/entries/lib/items/model`. Siblings in the same folder stay `./x`. oxlint enforces
   it (`import/no-relative-parent-imports`). Only what the package's `exports` cover can be imported
   this way (`lib/*.ts`, `components/*.tsx`), so shared non-component code lives in `lib/`.
 - **React Compiler memoises at build time** (#69, through `@rolldown/plugin-babel` in
@@ -368,7 +368,7 @@ adapted to this repository:
 - **No barrel files.** No `index.ts` that re-exports a package's modules: barrels pull every module
   into whatever imports one of them, which defeats tree shaking and code splitting. Packages
   expose their modules by path through `exports` patterns in `package.json` (e.g.
-  `@household-brain/calendar/components/items/ItemList`), and code imports from the module that
+  `@household-brain/entries/components/items/ItemList`), and code imports from the module that
   defines what it needs.
 - Run tasks through Nx at the root: `pnpm typecheck`, `pnpm test` (`nx run-many`), `pnpm build`
   (`nx run @household-brain/web:build`). Nx caches results, so unchanged projects are skipped.
@@ -408,7 +408,7 @@ adapted to this repository:
   is tight on compute per request, but scheduled (cron) runs are much less restrictive. When a
   feature needs one, file an issue saying what it is needed for, instead of adding a backend.
 
-- **The Gemini Gem "Household Brain v2" follows `packages/calendar/src/lib/gemini-gem.md`** (#119), the only
+- **The Gemini Gem "Household Brain v2" follows `packages/entries/src/lib/gemini-gem.md`** (#119), the only
   copy of its instructions. A unit test fails when they don't list exactly the app's category slugs
   and price intervals, so changing either means changing the instructions in the same PR. After such
   a PR is merged, paste the new text into the Gem (Gemini, signed in as the owner → Gems → Household
