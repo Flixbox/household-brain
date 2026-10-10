@@ -177,7 +177,8 @@ jobs:
           name: web-dist
           path: apps/web/dist/
           if-no-files-found: error
-          retention-days: 1
+          # Long enough for a deploy that waits behind another one, or for an approval.
+          retention-days: 7
 
   deploy:
     name: Deploy to Firebase
