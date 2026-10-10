@@ -218,9 +218,9 @@ importers:
 
   apps/web:
     dependencies:
-      '@household-brain/calendar':
+      '@household-brain/entries':
         specifier: workspace:*
-        version: link:../../packages/calendar
+        version: link:../../packages/entries
       '@household-brain/firebase':
         specifier: workspace:*
         version: link:../../packages/firebase
@@ -277,7 +277,7 @@ importers:
         specifier: 7.4.1
         version: 7.4.1
 
-  packages/calendar:
+  packages/entries:
     dependencies:
       '@household-brain/firebase':
         specifier: workspace:*

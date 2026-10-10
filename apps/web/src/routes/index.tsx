@@ -1,7 +1,7 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { ItemList } from '@household-brain/calendar/components/items/ItemList'
-import { useHousehold } from '@household-brain/calendar/lib/calendar/use-household'
-import { useCategories, useItems } from '@household-brain/calendar/lib/items/use-items'
+import { ItemList } from '@household-brain/entries/components/items/ItemList'
+import { useHousehold } from '@household-brain/entries/lib/calendar/use-household'
+import { useCategories, useItems } from '@household-brain/entries/lib/items/use-items'
 import { useStore } from '@nanostores/react'
 import { $user } from '@household-brain/firebase/user'
 

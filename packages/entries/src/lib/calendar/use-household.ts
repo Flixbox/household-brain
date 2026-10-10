@@ -1,0 +1,23 @@
+import { doc } from 'firebase/firestore'
+import { useStore } from '@nanostores/react'
+import { db } from '@household-brain/firebase/firebase'
+import { docStore } from '@household-brain/firebase/live'
+import type { HouseholdConfig } from './setup'
+import { householdFrom } from '@household-brain/entries/lib/documents'
+
+export type HouseholdState =
+  | { state: 'loading' }
+  | { state: 'missing' }
+  | { state: 'ready', config: HouseholdConfig }
+
+/** The household calendar settings (`meta/config`), live. */
+const $household = docStore(doc(db, 'meta', 'config'), householdFrom)
+
+/** The household calendar settings; loading until known (a failed listener keeps it loading, as before). */
+export const useHousehold = (): HouseholdState => {
+  const live = useStore($household)
+  if (live.state !== 'ready') {
+    return { state: 'loading' }
+  }
+  return live.data ? { config: live.data, state: 'ready' } : { state: 'missing' }
+}

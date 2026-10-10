@@ -1,11 +1,11 @@
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
-import { ItemForm } from '@household-brain/calendar/components/items/ItemForm'
-import { type ItemDraft, emptyDraft } from '@household-brain/calendar/lib/items/model'
-import { requestSyncAccess } from '@household-brain/calendar/lib/items/outbox'
-import { addItem } from '@household-brain/calendar/lib/items/store'
-import type { EntryDate } from '@household-brain/calendar/lib/items/dates'
-import { useCategories } from '@household-brain/calendar/lib/items/use-items'
-import { reportWriteFailure } from '@household-brain/calendar/lib/items/write-failures'
+import { ItemForm } from '@household-brain/entries/components/items/ItemForm'
+import { type ItemDraft, emptyDraft } from '@household-brain/entries/lib/items/model'
+import { requestSyncAccess } from '@household-brain/entries/lib/items/outbox'
+import { addItem } from '@household-brain/entries/lib/items/store'
+import type { EntryDate } from '@household-brain/entries/lib/items/dates'
+import { useCategories } from '@household-brain/entries/lib/items/use-items'
+import { reportWriteFailure } from '@household-brain/entries/lib/items/write-failures'
 
 const NewItem = () => {
   const { category } = Route.useSearch()

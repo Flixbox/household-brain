@@ -1,9 +1,9 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useEffect } from 'react'
-import { CalendarSection } from '@household-brain/calendar/components/settings/CalendarSection'
-import { ShareSection } from '@household-brain/calendar/components/settings/ShareSection'
-import { useHousehold } from '@household-brain/calendar/lib/calendar/use-household'
-import { loadGis } from '@household-brain/calendar/lib/google-token'
+import { CalendarSection } from '@household-brain/entries/components/settings/CalendarSection'
+import { ShareSection } from '@household-brain/entries/components/settings/ShareSection'
+import { useHousehold } from '@household-brain/entries/lib/calendar/use-household'
+import { loadGis } from '@household-brain/entries/lib/google-token'
 import { auth } from '@household-brain/firebase/firebase'
 
 const Settings = () => {
