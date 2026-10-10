@@ -402,6 +402,10 @@ adapted to this repository:
   Authentication → Users, not from a screenshot), and switch sign-up off again. While it is off,
   nobody can sign in for the *first* time, the owner included after deleting their account.
 
+- **No server so far; if one is ever needed, look at a free Cloudflare Worker first.** Its free tier
+  is tight on compute per request, but scheduled (cron) runs are much less restrictive. When a
+  feature needs one, file an issue saying what it is needed for, instead of adding a backend.
+
 ### Repository and accounts
 
 - **`main` only accepts merges from pull requests with green CI**, and force-push is blocked.

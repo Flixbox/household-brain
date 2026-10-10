@@ -6,14 +6,65 @@ service cloud.firestore {
         && exists(/databases/$(db)/documents/allowlist/$(request.auth.uid));
     }
 
+    // The fields a write may touch: all of a new document's, only the changed ones of an update,
+    // so a field an older app version left behind doesn't block later edits.
+    function touched() {
+      return resource == null
+        ? request.resource.data.keys()
+        : request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    function isText(data, field, maxSize) {
+      return !(field in data) || (data[field] is string && data[field].size() <= maxSize);
+    }
+
     // Read-only from the app: allowlist entries are managed only in the Firebase console.
     match /allowlist/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;
     }
 
-    // Everything else, but never the allowlist (rules are OR'd, so the catch-all must exclude it).
-    match /{collection}/{document=**} {
-      allow read, write: if collection != 'allowlist' && allowed();
+    // Only the collections the app uses, and no subcollections. Anything else stays closed,
+    // collection-group queries included.
+    match /items/{id} {
+      allow read, delete: if allowed();
+      allow create, update: if allowed()
+        && touched().hasOnly([
+          'amount', 'category', 'code', 'currency', 'dateEvents', 'dirty', 'dueDate', 'etags',
+          'extraDates', 'googleUpdated', 'id', 'interval', 'notes', 'pendingOp', 'reminders', 'rev',
+          'startDate', 'status', 'sync', 'syncError', 'title', 'updatedAt', 'updatedBy', 'url',
+        ])
+        // Far above what a person types or Google holds, and together well under a document's size limit.
+        && isText(request.resource.data, 'title', 50000)
+        && isText(request.resource.data, 'notes', 500000)
+        && isText(request.resource.data, 'url', 50000)
+        && (!('id' in request.resource.data) || request.resource.data.id == id);
+    }
+
+    match /categories/{slug} {
+      allow read: if allowed();
+      allow create, update: if allowed()
+        && touched().hasOnly(['colorId', 'label', 'slug', 'sortOrder'])
+        && request.resource.data.slug == slug
+        && isText(request.resource.data, 'label', 200);
+    }
+
+    // The household's calendar, owner and time zone. Setup writes it once; after that the app can't
+    // change it, so a hijacked session can't redirect the sync or make itself the owner. Only a
+    // config still lacking its calendar (an interrupted setup) can be completed.
+    match /meta/config {
+      allow read: if allowed();
+      allow create, update: if allowed()
+        && touched().hasOnly(['calendarId', 'ownerUid', 'timeZone'])
+        && request.resource.data.calendarId is string
+        && (resource == null || resource.data.get('calendarId', '') == '');
+    }
+
+    // Each person's sync progress: everyone in the household reads them all, only its owner writes one.
+    match /syncState/{uid} {
+      allow read: if allowed();
+      allow create, update: if allowed()
+        && request.auth.uid == uid
+        && touched().hasOnly(['listingStartedAt', 'readingRules', 'schema', 'syncToken']);
     }
   }
 }
