@@ -1,4 +1,4 @@
-import { type Category, categoryOfTag } from '@household-brain/calendar/lib/categories'
+import { type Category, categoryOfTag, missingDefaults } from '@household-brain/calendar/lib/categories'
 import { type CalendarEvent, DUE_TIME, END_TIME, type EventContext, STATUS_TAGS, remindersOf, remindersPatch, sameReminders, summaryOf } from './event'
 import { remindersFromText } from './reminders'
 import { detailsFrom } from './event-details'
@@ -95,6 +95,15 @@ const detailFields = (event: CalendarEvent, categories: readonly Category[]) => 
  * taken in under the old rules are brought up to the new ones (#97).
  */
 export const READING_RULES = 2
+
+/**
+ * The reading rules a full listing counts as read under. The rules recognise every default
+ * category's tags, so a listing done while the household still lacks a default (one added with these
+ * rules, not yet written by `missingDefaults`) counts as read under the older rules: the next pull
+ * reads everything again, once that category is there.
+ */
+export const rulesReadWith = (categories: readonly Pick<Category, 'slug'>[]): number =>
+  (missingDefaults(categories).length === 0 ? READING_RULES : READING_RULES - 1)
 
 /** The entry fields an event carries. */
 export const draftFrom = (event: CalendarEvent, categories: readonly Category[]): ItemDraft => {

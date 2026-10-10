@@ -31,7 +31,7 @@ export const CATEGORY_WORDS: Readonly<Record<string, readonly string[]>> = {
   contract: ['vertrag', 'kündigung', 'cancellation', 'notice'],
   coupon: ['deal', 'discount', 'voucher', 'offer', 'promo', 'promotion', 'sale', 'cashback', 'bonus', 'freebie', 'rabatt', 'gutschein', 'angebot', 'aktion', 'gratis'],
   insurance: ['versicherung'],
-  investment: ['etf', 'fund', 'stock', 'share', 'shares', 'depot', 'aktie', 'aktien', 'fonds', 'wertpapier'],
+  investment: ['etf', 'fund', 'stock', 'share', 'shares', 'aktie', 'aktien', 'fonds', 'wertpapier'],
   membership: ['subscription', 'abo', 'abonnement', 'mitgliedschaft'],
   paperwork: ['deadline', 'return', 'refund', 'document', 'documents', 'tax', 'bill', 'invoice', 'form', 'frist', 'rücksendung', 'retoure', 'erstattung', 'dokument', 'steuer', 'steuern', 'rechnung', 'antrag'],
   transit: ['transport', 'transit', 'ticket', 'deutschlandticket', 'öpnv'],

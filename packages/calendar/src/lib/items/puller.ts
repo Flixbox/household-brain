@@ -1,6 +1,6 @@
 import { CalendarApiError, type EventCursor, type EventPage } from '@household-brain/calendar/lib/calendar/api'
 import type { CalendarEvent } from './event'
-import { READING_RULES, normalisationFor, ownRemindersFix } from './from-event'
+import { READING_RULES, normalisationFor, ownRemindersFix, rulesReadWith } from './from-event'
 import { type PullDecision, decidePull } from './pull-plan'
 import { applyDateChange, applyPulled, dropStray, forgetDateEvents, markSchema, readEntryFromCache, readEntryFromServer, readSyncToken, recordEtag, removeVanished, saveSyncToken, serverNow } from './pull-store'
 import { APP_SCHEMA, entryOfEvent, isOrphanDate } from './date-events'
@@ -180,7 +180,7 @@ const pullPages = async (context: PushContext, syncToken: string | null, recheck
   }
   const dateProblems = await applyInOrder(events.filter(event => entryOfEvent(event)), event => applyDateEvent(context, event, entryOfEvent(event) ?? ''))
   if (nextSyncToken && nextSyncToken !== syncToken) {
-    await saveSyncToken(context.uid, nextSyncToken, READING_RULES)
+    await saveSyncToken(context.uid, nextSyncToken, rulesReadWith(context.categories))
   }
   return [...problems, ...dateProblems]
 }
