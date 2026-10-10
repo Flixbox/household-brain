@@ -30,7 +30,7 @@ export default defineConfig(({ mode }) => {
           // taken from the e2e build with made-up demo entries, never the household's own.
           screenshots: [
             { form_factor: 'wide', label: 'Entries by category', sizes: '1280x800', src: '/screenshots/wide.png', type: 'image/png' },
-            { label: 'Entries by category', sizes: '412x915', src: '/screenshots/narrow.png', type: 'image/png' },
+            { form_factor: 'narrow', label: 'Entries by category', sizes: '412x915', src: '/screenshots/narrow.png', type: 'image/png' },
           ],
           short_name: 'Household',
           start_url: '/',
