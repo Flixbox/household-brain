@@ -23,10 +23,10 @@
     "emulators": "firebase emulators:start --only auth,firestore --project demo-household-brain"
   },
   "dependencies": {
-    "firebase": "12.19.0"
+    "firebase": "13.0.0"
   },
   "devDependencies": {
-    "@firebase/rules-unit-testing": "5.0.2",
+    "@firebase/rules-unit-testing": "6.0.0",
     "@nx/playwright": "23.3.0",
     "@playwright/test": "1.64.0",
     "@stylistic/eslint-plugin": "5.10.0",

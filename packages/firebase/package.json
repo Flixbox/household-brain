@@ -12,7 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "firebase": "12.19.0",
+    "firebase": "13.0.0",
     "nanostores": "1.5.5"
   }
 }
