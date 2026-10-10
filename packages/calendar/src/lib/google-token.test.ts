@@ -1,7 +1,7 @@
 import { cleanTestStorage, getTestStorage, useTestStorageEngine } from '@nanostores/persistent'
 import { Temporal } from 'temporal-polyfill'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { $calendarToken, MEMBER_SCOPES, OWNER_SCOPES, acceptToken, forgetCalendarToken, hasCalendarToken, revokeCalendarToken } from './google-token'
+import { $calendarToken, MEMBER_SCOPES, OWNER_SCOPES, TASKS_SCOPE, acceptToken, forgetCalendarToken, hasCalendarToken, revokeCalendarToken } from './google-token'
 
 // oxlint-disable-next-line react-hooks/rules-of-hooks -- nanostores' switch to fake storage, not a React hook
 useTestStorageEngine()
@@ -24,6 +24,12 @@ describe('acceptToken', () => {
 
   it('rejects an error response', () => {
     expect(() => acceptToken(response('', { error: 'access_denied' }), MEMBER_SCOPES, ME)).toThrow('access_denied')
+  })
+
+  it('keeps the Tasks permission separate from the background Calendar scopes', () => {
+    const scopes = [...MEMBER_SCOPES, TASKS_SCOPE]
+    expect(MEMBER_SCOPES).not.toContain(TASKS_SCOPE)
+    expect(acceptToken(response(scopes.join(' ')), scopes, ME).scopes).toContain(TASKS_SCOPE)
   })
 })
 

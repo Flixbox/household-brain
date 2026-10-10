@@ -19,10 +19,10 @@ const stamp = () => ({ rev: newEventId(), updatedAt: serverTimestamp(), updatedB
 // already in the local cache and shown everywhere.
 
 /** Saves a new entry, marked for pushing. Returns its id at once and the server write separately. */
-export const addItem = (draft: ItemDraft, extraDates: EntryDate[] = []): { id: string, written: Promise<void> } => {
+export const addItem = (draft: ItemDraft, extraDates: EntryDate[] = [], taskId?: string): { id: string, written: Promise<void> } => {
   const id = newEventId()
   const written = setDoc(itemDoc(id), {
-    ...draft, ...stamp(), dirty: [...EDITABLE_FIELDS], etags: {}, extraDates, id, pendingOp: 'upsert', sync: 'pending', syncError: null,
+    ...draft, ...stamp(), ...taskId ? { taskId } : {}, dirty: [...EDITABLE_FIELDS], etags: {}, extraDates, id, pendingOp: 'upsert', sync: 'pending', syncError: null,
   })
   return { id, written }
 }

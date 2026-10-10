@@ -17,8 +17,8 @@ describe('itemFrom', () => {
 
   it('passes the optional fields through, and reads the less common states', () => {
     const updatedAt = { nanoseconds: 0, seconds: 1 }
-    const item = itemFrom('e', { googleUpdated: '2026-10-01T10:00:05.000Z', pendingOp: 'delete', syncError: 'refused', updatedAt, updatedBy: 'u1' })
-    expect(item).toMatchObject({ googleUpdated: '2026-10-01T10:00:05.000Z', pendingOp: 'delete', syncError: 'refused', updatedAt, updatedBy: 'u1' })
+    const item = itemFrom('e', { googleUpdated: '2026-10-01T10:00:05.000Z', pendingOp: 'delete', syncError: 'refused', taskId: 'task-1', updatedAt, updatedBy: 'u1' })
+    expect(item).toMatchObject({ googleUpdated: '2026-10-01T10:00:05.000Z', pendingOp: 'delete', syncError: 'refused', taskId: 'task-1', updatedAt, updatedBy: 'u1' })
     // A server timestamp not yet written reads as null, and stays so.
     expect(itemFrom('e', { updatedAt: null }).updatedAt).toBeNull()
     expect(itemFrom('e', { dateEvents: { abc: { error: 7, shape: 's' } } }).dateEvents).toEqual({ abc: { shape: 's' } })

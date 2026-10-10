@@ -1,18 +1,22 @@
-// Google Calendar access tokens from Google Identity Services (GIS), separate from the Firebase
-// sign-in. A token lasts about an hour and is kept in localStorage through a persistent store, so a
-// reload doesn't lose it; there is no refresh token anywhere. The trade-off: injected script could
-// read a calendar-only token that expires within the hour. A token belongs to the account it was
-// asked for (the signed-in person's email as the hint) and is never used for another person.
-// Scopes: `calendar.events` (not the narrower `calendar.app.created`, which may not cover a calendar
-// another account owns) and `calendar.calendarlist` for everyone; the owner also grants
-// `calendar.app.created` once, to create the household calendar. Sharing it would need
-// `calendar.acls`, so it is done by hand instead (README).
+// Google access tokens from Google Identity Services (GIS), separate from the Firebase sign-in. A
+// token lasts about an hour and is kept in localStorage through a persistent store, so a reload
+// doesn't lose it; there is no refresh token anywhere. The trade-off: injected script could read a
+// token that expires within the hour. A token belongs to the account it was asked for (the signed-in
+// person's email as the hint) and is never used for another person.
+// Background sync continues to require only Calendar scopes, so cached tokens from before Tasks was
+// added remain usable. The Settings connection gesture asks for the separate Tasks scope as well;
+// background work checks for it and never opens a consent window itself. The Calendar scopes are
+// `calendar.events` (not the narrower `calendar.app.created`, which may not cover a calendar another
+// account owns) and `calendar.calendarlist` for everyone; the owner also grants `calendar.app.created`
+// once, to create the household calendar. Sharing it would need `calendar.acls`, so it is done by
+// hand instead (README).
 import { persistentJSON } from '@nanostores/persistent'
 import { Temporal } from 'temporal-polyfill'
 import { holdUpdatesWhile } from './update-hold'
 
 const GIS_SCRIPT = 'https://accounts.google.com/gsi/client'
 const CALENDAR = 'https://www.googleapis.com/auth/calendar'
+export const TASKS_SCOPE = 'https://www.googleapis.com/auth/tasks'
 
 /** What every household member grants: edit events, and manage their own calendar list. */
 export const MEMBER_SCOPES = [`${CALENDAR}.events`, `${CALENDAR}.calendarlist`] as const
@@ -129,12 +133,12 @@ const popupProblem = (error: { type: string, message?: string }): string => {
 /** Checks a GIS token response; exported for tests. */
 export const acceptToken = (response: TokenResponse, scopes: readonly string[], account: string): Token => {
   if (response.error) {
-    throw new Error(`Google refused Calendar access: ${response.error}`)
+    throw new Error(`Google refused access: ${response.error}`)
   }
   const granted = new Set(response.scope.split(' '))
   const missing = scopes.filter(scope => !granted.has(scope))
   if (missing.length > 0) {
-    throw new Error(`Calendar access is incomplete. Please allow every permission (missing: ${missing.join(', ')})`)
+    throw new Error(`Google access is incomplete. Please allow every permission (missing: ${missing.join(', ')})`)
   }
   return {
     account,
@@ -169,6 +173,12 @@ export const calendarToken = async (scopes: readonly string[], account: string |
 /** Whether a usable token for `account` covering `scopes` is cached, so work can run without asking Google. */
 export const hasCalendarToken = (scopes: readonly string[], account: string | null | undefined): boolean =>
   usable($calendarToken.get(), scopes, account)
+
+/** Returns a usable cached token without ever asking Google for one. */
+export const cachedCalendarToken = (scopes: readonly string[], account: string | null | undefined): string | null => {
+  const token = $calendarToken.get()
+  return usable(token, scopes, account) ? token.value : null
+}
 
 /** Forgets the cached token, e.g. on sign-out or when Google rejects it. */
 export const forgetCalendarToken = () => {

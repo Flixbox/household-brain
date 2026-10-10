@@ -6,6 +6,12 @@ interface CalendarRequest {
   body: unknown
 }
 
+interface TasksRequest {
+  method: string
+  path: string
+  body: unknown
+}
+
 const CORS = {
   'access-control-allow-headers': 'authorization, content-type, if-match',
   'access-control-allow-methods': 'GET, POST, PATCH, DELETE',
@@ -35,7 +41,12 @@ export const mockGoogle = async (page: Page, calendarId = 'household@group.calen
   const requests: CalendarRequest[] = []
   const calendarList = new Map<string, Record<string, unknown>>()
   const events = new Map<string, Record<string, unknown>>()
+  const taskLists = new Map<string, Record<string, unknown>>([
+    ['household-brain', { id: 'household-brain', title: 'Household Brain' }],
+  ])
+  const tasks = new Map<string, Map<string, Record<string, unknown>>>()
   const listing = { refused: false, status: 503 }
+  const taskRequests: TasksRequest[] = []
   let version = 0
   const stored = (id: string, event: object) => {
     version += 1
@@ -78,6 +89,46 @@ export const mockGoogle = async (page: Page, calendarId = 'household@group.calen
       await reply(route, 501, { error: { message: `Not mocked: ${request.method()} ${path}` } })
     }
   })
+  await page.route('https://tasks.googleapis.com/tasks/v1/**', async route => {
+    const request = route.request()
+    if (request.method() === 'OPTIONS') {
+      await route.fulfill({ headers: CORS, status: 204 })
+      return
+    }
+    const path = decodeURIComponent(new URL(request.url()).pathname.replace('/tasks/v1', ''))
+    const body: unknown = request.postData() ? request.postDataJSON() : null
+    taskRequests.push({ body, method: request.method(), path })
+    if (request.method() === 'GET' && path === '/users/@me/lists') {
+      await reply(route, 200, { items: [...taskLists.values()] })
+      return
+    }
+    const match = /^\/lists\/(?<listId>[^/]+)\/tasks(?:\/(?<taskId>[^/]+))?$/u.exec(path)?.groups
+    if (!match) {
+      await reply(route, 501, { error: { message: `Not mocked: ${request.method()} ${path}` } })
+      return
+    }
+    const listId = match.listId ?? ''
+    const list = tasks.get(listId) ?? new Map<string, Record<string, unknown>>()
+    tasks.set(listId, list)
+    if (request.method() === 'GET') {
+      const open = [...list.values()].filter(task => task.status !== 'completed')
+      await reply(route, 200, { items: open })
+      return
+    }
+    if (request.method() === 'PATCH') {
+      const taskId = match.taskId ?? ''
+      const task = list.get(taskId)
+      if (!task) {
+        await reply(route, 404, { error: { message: 'Not Found' } })
+        return
+      }
+      const completed = { ...task, ...body as object, status: 'completed' }
+      list.set(taskId, completed)
+      await reply(route, 200, completed)
+      return
+    }
+    await reply(route, 501, { error: { message: `Not mocked: ${request.method()} ${path}` } })
+  })
   /** Changes made directly in Google Calendar, as another device or person would. */
   const google = {
     create: (event: Record<string, unknown> & { id: string }) => stored(event.id, event),
@@ -93,8 +144,22 @@ export const mockGoogle = async (page: Page, calendarId = 'household@group.calen
       listing.refused = refused
       listing.status = status
     },
+    /** Google Tasks, for the import (#118): tasks added as the Gemini app would. */
+    tasks: {
+      create: (listId: string, task: Record<string, unknown> & { id: string }) => {
+        if (!taskLists.has(listId)) {
+          taskLists.set(listId, { id: listId, title: listId })
+        }
+        const list = tasks.get(listId) ?? new Map<string, Record<string, unknown>>()
+        tasks.set(listId, list)
+        const storedTask = { ...task, status: task.status ?? 'needsAction' }
+        list.set(task.id, storedTask)
+        return storedTask
+      },
+      live: () => [...tasks.values()].flatMap(list => Array.from(list.values())),
+    },
   }
-  return { events, google, requests }
+  return { events, google, requests, taskRequests }
 }
 
 interface EventCall {
