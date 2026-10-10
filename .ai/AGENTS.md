@@ -148,7 +148,9 @@ adapted to this repository:
    - It stays armed through the merge and reports the deploy. Don't poll by hand alongside it.
    - It watches `main` too, also between PRs: every new commit (`MAIN_ADVANCED`), failing or
      hanging runs (`MAIN_FAILED`, `MAIN_SLOW`), and new commits an open PR lacks (`MAIN_MOVED`).
-   - A PR it has seen open stays watched until its deploy or its closing is reported.
+   - A PR it has seen open stays watched until its deploy or its closing is reported, comments
+     included: on a PR it already follows, one written just before a merge is still reported after
+     it (#129).
    - A PR labelled **`parked`** (left open on purpose) only reports its CI and comments, not
      conflicts, approvals or `main` moving on. To park a PR, add the label; remove it to bring the
      PR back.
