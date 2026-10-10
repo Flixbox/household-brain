@@ -87,14 +87,14 @@ test('events made in Google Calendar: taken in and shaped, left alone when put i
 
     google.tasks.create('another-list', {
       id: 'task-json',
-      notes: JSON.stringify({ amount: '10.00', category: 'coupon', currency: 'EUR', dueDate: '2026-12-31', notes: 'Weekdays', title: 'Cinema 2 for 1' }),
+      notes: JSON.stringify({ amount: '10.00', category: 'coupon', currency: 'EUR', dueDate: '2026-12-31', notes: 'Weekdays', title: 'Bowling night' }),
       title: 'Task title',
     })
     google.tasks.create('household-brain', { id: 'task-plain', notes: 'Remember the receipt', title: 'Unstructured note' })
     await page.goto('/')
-    await pullUntil(page, () => page.getByRole('link', { name: /Cinema 2 for 1/u }).count(), 1)
+    await pullUntil(page, () => page.getByRole('link', { name: /Bowling night/u }).count(), 1)
 
-    await expect(page.getByRole('region', { name: 'Coupon' }).getByRole('link', { name: /Cinema 2 for 1/u })).toContainText('2026-12-31')
+    await expect(page.getByRole('region', { name: 'Coupon' }).getByRole('link', { name: /Bowling night/u })).toContainText('2026-12-31')
     await expect.poll(() => google.tasks.live().find(task => task.id === 'task-json')?.status).toBe('completed')
     expect(google.tasks.live().find(task => task.id === 'task-plain')?.status).toBe('needsAction')
     await expect(page.getByRole('link', { name: /Unstructured note/u })).toHaveCount(0)
