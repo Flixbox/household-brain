@@ -39,6 +39,7 @@ describe('categoryOfTag', () => {
     expect(categoryOfTag('coupon', DEFAULT_CATEGORIES)?.slug).toBe('coupon')
     expect(categoryOfTag(' DEAL ', DEFAULT_CATEGORIES)?.slug).toBe('coupon')
     expect(categoryOfTag('Rücksendung', DEFAULT_CATEGORIES)?.slug).toBe('paperwork')
+    expect(categoryOfTag('ETF', DEFAULT_CATEGORIES)?.slug).toBe('investment')
     expect(categoryOfTag('Party', DEFAULT_CATEGORIES)).toBeNull()
     expect(categoryOfTag('', DEFAULT_CATEGORIES)).toBeNull()
   })

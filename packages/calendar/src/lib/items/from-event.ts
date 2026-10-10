@@ -94,7 +94,7 @@ const detailFields = (event: CalendarEvent, categories: readonly Category[]) => 
  * recognise (#92): each person's next pull then reads the whole calendar again once, so entries
  * taken in under the old rules are brought up to the new ones (#97).
  */
-export const READING_RULES = 1
+export const READING_RULES = 2
 
 /** The entry fields an event carries. */
 export const draftFrom = (event: CalendarEvent, categories: readonly Category[]): ItemDraft => {
