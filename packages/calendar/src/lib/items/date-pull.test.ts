@@ -7,8 +7,7 @@ import type { Item } from './model'
 const context = { categories: DEFAULT_CATEGORIES, timeZone: 'Europe/Berlin' }
 const cancelBy = { date: '2099-11-30', id: '01234567', label: 'Cancel by' }
 const draft: Item = {
-  amount: '', category: 'membership', code: '', currency: '', dirty: [], dueDate: '2099-12-14', etags: {}, extraDates: [cancelBy], id: 'abcdefghijklmnopqrstuv0123', notes: 'Shared',
-  pendingOp: null, reminders: '', rev: 'r1', startDate: '', status: 'open', sync: 'synced', syncError: null, title: 'Streaming', url: '',
+  amount: '', category: 'membership', code: '', currency: '', dirty: [], dueDate: '2099-12-14', etags: {}, extraDates: [cancelBy], id: 'abcdefghijklmnopqrstuv0123', interval: '', notes: 'Shared', pendingOp: null, reminders: '', rev: 'r1', startDate: '', status: 'open', sync: 'synced', syncError: null, title: 'Streaming', url: '',
 }
 const written = dateEventFor(draft, cancelBy, context)
 const item: Item = { ...draft, dateEvents: { [cancelBy.id]: { shape: shapeOf(written) } } }

@@ -68,7 +68,7 @@ export const ItemForm = ({ initial, initialDates = NO_DATES, categories, onSave,
       {remindersShown && <RemindersField value={draft.reminders} onChange={set('reminders')} />}
       {withStatus && <StatusField value={draft.status} onChange={set('status')} />}
       <Field label="Code"><input className={textField} value={draft.code} onChange={set('code')} /></Field>
-      <AmountField amount={draft.amount} currency={draft.currency} onAmount={set('amount')} onCurrency={set('currency')} />
+      <AmountField amount={draft.amount} currency={draft.currency} interval={draft.interval} onAmount={set('amount')} onCurrency={set('currency')} onInterval={set('interval')} />
       <LinkField value={draft.url} onChange={set('url')} />
       <Field label="Notes"><textarea rows={3} className={textField} value={draft.notes} onChange={set('notes')} /></Field>
       <button type="submit" className={primaryButton} disabled={saving}>Save</button>

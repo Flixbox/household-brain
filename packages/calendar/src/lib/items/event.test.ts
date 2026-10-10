@@ -15,6 +15,7 @@ const item: Item = {
   dueDate: '2026-11-03',
   etags: {},
   id: 'abc123def456',
+  interval: '',
   notes: 'Only online',
   pendingOp: null,
   reminders: '',
@@ -84,6 +85,9 @@ describe('patchFor', () => {
     expect(eventFor(item, context).extendedProperties?.private).not.toHaveProperty('hb.currency')
     expect(eventFor({ ...item, currency: 'BRL' }, context).extendedProperties?.private).toMatchObject({ 'hb.currency': 'BRL' })
     expect(patchFor({ ...item, currency: 'BRL' }, ['currency'], context)).toEqual({ extendedProperties: { private: { 'hb.currency': 'BRL', 'hb.v': '1' } } })
+    // How often the price is due, likewise only when set (#86).
+    expect(eventFor(item, context).extendedProperties?.private).not.toHaveProperty('hb.interval')
+    expect(patchFor({ ...item, interval: 'monthly' }, ['interval'], context)).toEqual({ extendedProperties: { private: { 'hb.interval': 'monthly', 'hb.v': '1' } } })
     expect(patchFor(item, ['currency'], context)).toEqual({ extendedProperties: { private: { 'hb.currency': '', 'hb.v': '1' } } })
   })
 })

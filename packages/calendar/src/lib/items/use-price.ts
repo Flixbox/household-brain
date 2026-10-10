@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useStore } from '@nanostores/react'
 import { persistentJSON } from '@nanostores/persistent'
 import { type EuroRates, isForeign, ratesOf } from './currency'
+import { withInterval } from './interval'
 import { amountLabel } from './amount'
 import type { Item } from './model'
 
@@ -37,8 +38,11 @@ export const refreshEuroRates = async (today: string) => {
   }
 }
 
-/** An entry's amount for display, fetching today's euro rates first when it is in another currency. */
-export const usePrice = ({ amount, currency }: Pick<Item, 'amount' | 'currency'>, today: string): string | null => {
+/**
+ * An entry's amount for display, with how often it is due ("15,00 € / month"), fetching today's
+ * euro rates first when it is in another currency.
+ */
+export const usePrice = ({ amount, currency, interval }: Pick<Item, 'amount' | 'currency' | 'interval'>, today: string): string | null => {
   const foreign = isForeign(currency)
   useEffect(() => {
     if (foreign) {
@@ -51,5 +55,6 @@ export const usePrice = ({ amount, currency }: Pick<Item, 'amount' | 'currency'>
       }
     }
   }, [foreign, today])
-  return amountLabel(amount, currency, useStore($euroRates))
+  const price = amountLabel(amount, currency, useStore($euroRates))
+  return price && withInterval(price, interval)
 }

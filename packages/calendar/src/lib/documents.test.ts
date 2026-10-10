@@ -4,7 +4,7 @@ import { categoryFrom, householdFrom, itemFrom } from './documents'
 describe('itemFrom', () => {
   it('reads a complete entry as it is', () => {
     const data = {
-      amount: '10', category: 'coupon', code: 'SUMMER25', currency: '', dirty: ['code'], dueDate: '2026-11-03', etags: { owner: '"1"' }, id: 'evt1',
+      amount: '10', category: 'coupon', code: 'SUMMER25', currency: '', dirty: ['code'], dueDate: '2026-11-03', etags: { owner: '"1"' }, id: 'evt1', interval: 'monthly',
       notes: '', pendingOp: 'upsert', reminders: '', rev: 'r1', startDate: '', status: 'open', sync: 'pending', syncError: null, title: 'Amazon', url: '',
     }
     expect(itemFrom('evt1', data)).toEqual(data)
@@ -27,7 +27,7 @@ describe('itemFrom', () => {
   it('fills in what an older or stray document lacks, and leaves optional fields out', () => {
     const item = itemFrom('doc-id', { dirty: ['code', 'nonsense'], etags: { owner: 1 }, status: 'archived', sync: 'unknown', title: 'Gym' })
     expect(item).toEqual({
-      amount: '', category: '', code: '', currency: '', dirty: ['code'], dueDate: '', etags: {}, id: 'doc-id', notes: '', pendingOp: null,
+      amount: '', category: '', code: '', currency: '', dirty: ['code'], dueDate: '', etags: {}, id: 'doc-id', interval: '', notes: '', pendingOp: null,
       reminders: '', rev: '', startDate: '', status: 'open', sync: 'pending', syncError: null, title: 'Gym', url: '',
     })
     expect(item).not.toHaveProperty('extraDates')
