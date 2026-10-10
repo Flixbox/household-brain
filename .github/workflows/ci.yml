@@ -50,6 +50,13 @@ jobs:
           if grep -rlE 'e2eSignIn|127\.0\.0\.1:(9099|8080)' apps/web/dist/; then
             echo '::error::The production build contains emulator code'; exit 1
           fi
+      # Workbox refuses a precache list with the same URL twice, and then no new version installs (#136).
+      - name: Service worker precaches each file once
+        run: |
+          duplicates=$(grep -o 'url:"[^"]*"' apps/web/dist/sw.js | sort | uniq -d)
+          if [ -n "$duplicates" ]; then
+            echo "::error::apps/web/dist/sw.js precaches these more than once: $duplicates"; exit 1
+          fi
       - name: Scan history for secrets (gitleaks)
         run: |
           docker run --rm -u "$(id -u):$(id -g)" -v "$PWD:/repo" -w /repo \
