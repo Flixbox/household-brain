@@ -31,6 +31,10 @@ jobs:
         with:
           fetch-depth: 0 # gitleaks scans the whole history
           persist-credentials: false
+      - name: No GitHub Action release younger than 48 hours
+        run: bash scripts/check-action-age.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: package.json # reads volta.node

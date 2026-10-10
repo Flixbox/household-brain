@@ -247,8 +247,9 @@ adapted to this repository:
 - **The e2e job runs in Microsoft's Playwright image**, which already has the browsers and their system
   packages. Installing them per run was slow and once hung. The image version must
   equal `@playwright/test`: when Dependabot bumps the package, CI's first e2e step fails with a
-  message, and `container.image` in `ci.yml` needs the matching tag and digest
-  (`docker pull mcr.microsoft.com/playwright:vX.Y.Z-noble`, then `docker inspect` for the digest).
+  message, and `ci.yml` needs the matching version in two places: `container.image` (tag and digest:
+  `docker manifest inspect`, or the registry's `docker-content-digest` header) and
+  `PLAYWRIGHT_IMAGE_VERSION` next to it, which that first step compares.
 
 ### Shell
 
@@ -289,7 +290,9 @@ adapted to this repository:
   Dependabot bumps them. **No version younger than 48 hours** (#94): `minimumReleaseAge` in `pnpm-workspace.yaml`,
   which pnpm checks on every install, `--frozen-lockfile` included, so CI fails on such a lockfile
   ("within the minimumReleaseAge cutoff"); wait and re-run. Dependabot waits as long (`cooldown`).
-  An urgent exception goes into `minimumReleaseAgeExclude` with its reason. Node is pinned in `package.json` (`volta.node`), pnpm in `packageManager`.
+  An urgent exception goes into `minimumReleaseAgeExclude` with its reason. **GitHub Actions too**
+  (#102): `scripts/check-action-age.sh` runs first in CI and fails on a pinned action release younger
+  than 48 hours; Dependabot's `cooldown` counts loosely and let a younger one through (#101). Wait and re-run. Node is pinned in `package.json` (`volta.node`), pnpm in `packageManager`.
 - **fallow** (`.fallowrc.jsonc`, part of `pnpm lint`) fails on unused files, exports and
   dependencies, on duplication, and on imports across the package boundaries: `apps/web` may use
   every package; `shell` and `calendar` only `firebase`; nothing imports `apps/web` (its e2e tests
