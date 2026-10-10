@@ -9,4 +9,11 @@ export const newEventId = (fillRandom: (bytes: Uint8Array<ArrayBuffer>) => unkno
   return [...bytes].map(byte => ALPHABET[byte % ALPHABET.length]).join('')
 }
 
+/**
+ * The entry (and event) id for an imported Google Task (#118): the same for the same task on every
+ * device, so two pulls importing it at once create one entry. Hex digits are base32hex too.
+ */
+export const eventIdForTask = (taskId: string): string =>
+  `t${[...new TextEncoder().encode(taskId)].map(byte => byte.toString(16).padStart(2, '0')).join('')}`
+
 export const isEventId = (id: string) => /^[0-9a-v]{5,1024}$/u.test(id)

@@ -19,13 +19,28 @@ const stamp = () => ({ rev: newEventId(), updatedAt: serverTimestamp(), updatedB
 // already in the local cache and shown everywhere.
 
 /** Saves a new entry, marked for pushing. Returns its id at once and the server write separately. */
-export const addItem = (draft: ItemDraft, extraDates: EntryDate[] = [], taskId?: string): { id: string, written: Promise<void> } => {
+const newEntry = (id: string, draft: ItemDraft, extraDates: EntryDate[]) => ({
+  ...draft, ...stamp(), dirty: [...EDITABLE_FIELDS], etags: {}, extraDates, id, pendingOp: 'upsert', sync: 'pending', syncError: null,
+})
+
+export const addItem = (draft: ItemDraft, extraDates: EntryDate[] = []): { id: string, written: Promise<void> } => {
   const id = newEventId()
-  const written = setDoc(itemDoc(id), {
-    ...draft, ...stamp(), ...taskId ? { taskId } : {}, dirty: [...EDITABLE_FIELDS], etags: {}, extraDates, id, pendingOp: 'upsert', sync: 'pending', syncError: null,
-  })
+  const written = setDoc(itemDoc(id), newEntry(id, draft, extraDates))
   return { id, written }
 }
+
+/**
+ * Saves the entry a Google Task becomes (#118), unless it already exists: its id comes from the task,
+ * so a second device importing the same task meanwhile adds nothing. A transaction needs the server,
+ * so offline it fails at once instead of waiting.
+ */
+export const addImportedItem = (id: string, draft: ItemDraft, taskId: string): Promise<void> =>
+  runTransaction(db, async transaction => {
+    const ref = itemDoc(id)
+    if (!(await transaction.get(ref)).exists()) {
+      transaction.set(ref, { ...newEntry(id, draft, []), taskId })
+    }
+  })
 
 /**
  * Saves an edit. Only fields that differ from what the form opened with are written and pushed, so

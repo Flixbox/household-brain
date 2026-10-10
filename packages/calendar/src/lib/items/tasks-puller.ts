@@ -1,28 +1,19 @@
-import { getDocs } from 'firebase/firestore'
 import { auth } from '@household-brain/firebase/firebase'
-import { itemFrom } from '@household-brain/calendar/lib/documents'
 import { MEMBER_SCOPES, TASKS_SCOPE, cachedCalendarToken, forgetCalendarToken, hasCalendarToken } from '@household-brain/calendar/lib/google-token'
 import { type GoogleTask, type TasksApi, createTasksApi } from '@household-brain/calendar/lib/tasks/api'
-import { addItem, itemsCollection } from './store'
+import { addImportedItem } from './store'
+import { eventIdForTask } from './ids'
 import { importedTask } from './task-import'
 
-/** Task ids entries already came from: such a task is only ticked off, never imported twice. */
-const importedTaskIds = async (): Promise<Set<string>> => {
-  const { docs } = await getDocs(itemsCollection)
-  return new Set(docs.flatMap(entry => itemFrom(entry.id, entry.data()).taskId ?? []))
-}
-
 /**
- * One task: a new entry when its notes hold the Gem's JSON (#118), then ticked off. The entry
- * carries the task id first, so an interruption before the tick never imports it twice.
+ * One task: an entry when its notes hold the Gem's JSON (#118), then ticked off. The entry is saved
+ * first, under an id that comes from the task, so an interruption before the tick never imports it
+ * twice: the next pull finds the entry and only ticks the task off.
  */
-const takeTask = async (api: TasksApi, { listId, task }: { listId: string, task: GoogleTask }, known: Set<string>): Promise<void> => {
-  const imported = known.has(task.id) ? null : importedTask(task)
+const takeTask = async (api: TasksApi, listId: string, task: GoogleTask): Promise<void> => {
+  const imported = importedTask(task)
   if (imported) {
-    await addItem(imported.draft, [], imported.taskId).written
-    known.add(imported.taskId)
-  }
-  if (known.has(task.id)) {
+    await addImportedItem(eventIdForTask(task.id), imported.draft, task.id)
     await api.completeTask(listId, task.id)
   }
 }
@@ -36,9 +27,8 @@ const inOrder = <Entry>(entries: readonly Entry[], take: (entry: Entry) => Promi
 
 /** Every list, not just one: the Gemini app doesn't always use the list it was told to. */
 const importOpenTasks = async (api: TasksApi): Promise<void> => {
-  const known = await importedTaskIds()
   await inOrder(await api.listTaskLists(), async list =>
-    inOrder((await api.listOpenTasks(list.id)).filter(task => task.id !== ''), task => takeTask(api, { listId: list.id, task }, known)))
+    inOrder((await api.listOpenTasks(list.id)).filter(task => task.id !== ''), task => takeTask(api, list.id, task)))
 }
 
 const tasksScopes = [...MEMBER_SCOPES, TASKS_SCOPE] as const

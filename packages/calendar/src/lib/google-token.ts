@@ -153,14 +153,15 @@ export const acceptToken = (response: TokenResponse, scopes: readonly string[], 
  * too narrow, or about to expire. Call it from a click handler the first time: Google may need to
  * show its consent popup.
  */
-export const calendarToken = async (scopes: readonly string[], account: string | null | undefined): Promise<string> => {
+export const calendarToken = async (scopes: readonly string[], account: string | null | undefined, alsoAsk: readonly string[] = []): Promise<string> => {
   const current = $calendarToken.get()
-  if (usable(current, scopes, account)) {
+  if (usable(current, [...scopes, ...alsoAsk], account)) {
     return current.value
   }
   // One request at a time: parallel callers share it instead of opening several Google windows.
   // The Google window can hide the app on a phone; no new version may load meanwhile.
-  pending ??= holdUpdatesWhile(loadGis().then(() => requestToken(scopes, account)))
+  // `alsoAsk` is asked for but optional: a person who declines it still gets a token for `scopes`.
+  pending ??= holdUpdatesWhile(loadGis().then(() => requestToken([...scopes, ...alsoAsk], account)))
     .then(response => acceptToken(response, scopes, account ?? ''))
     .finally(() => {
       pending = null

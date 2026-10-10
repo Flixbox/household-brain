@@ -1,3 +1,4 @@
+import { eventIdForTask, isEventId } from './ids'
 import { describe, expect, it } from 'vitest'
 import { importedTask, parseTaskNotes } from './task-import'
 
@@ -43,5 +44,13 @@ describe('importedTask', () => {
     })?.draft).toEqual({
       amount: '', category: 'paperwork', code: '', currency: '', dueDate: '', interval: '', notes: '', reminders: '', startDate: '', status: 'open', title: 'Task fallback', url: '',
     })
+  })
+})
+
+describe('eventIdForTask', () => {
+  it('gives the same task the same valid event id, and different tasks different ones', () => {
+    expect(eventIdForTask('MTIzNDU2Nzg5')).toBe(eventIdForTask('MTIzNDU2Nzg5'))
+    expect(eventIdForTask('MTIzNDU2Nzg5')).not.toBe(eventIdForTask('MTIzNDU2Nzg6'))
+    expect(isEventId(eventIdForTask('MTIzNDU2Nzg5'))).toBe(true)
   })
 })
