@@ -10,7 +10,7 @@ import type { PushOutcome } from './push'
 import { type PushRecord, errorFor, recordFor } from './record'
 import { itemFrom } from '@household-brain/entries/lib/documents'
 import { logError, logEvent } from '@household-brain/entries/lib/logs'
-import { entryLogMessage, errorLogMessage } from '@household-brain/entries/lib/logs-messages'
+import { changedDetail, entryLogMessage, errorLogMessage } from '@household-brain/entries/lib/logs-messages'
 
 export const itemsCollection = collection(db, 'items')
 const itemDoc = (id: string) => doc(db, 'items', id)
@@ -60,7 +60,7 @@ const saveEdit = ({ draft, id, message, opened }: { draft: ItemDraft, id: string
   const written = updateDoc(itemDoc(id), {
     ...values, ...stamp(), dirty: arrayUnion(...changed), pendingOp: 'upsert', sync: 'pending', syncError: null,
   })
-  logEvent(message, id)
+  logEvent(message, id, changedDetail(changed))
   return written
 }
 
@@ -127,7 +127,7 @@ export const recordPush = (item: Item, outcome: PushOutcome, { uid, categories }
 
 export const recordPushError = (item: Item, message: string) => apply(item, latest => errorFor(latest, item, message)).then(recorded => {
   if (recorded) {
-    logError(errorLogMessage('Google refused', item.title), item.id)
+    logError(errorLogMessage('Google refused', item.title), item.id, message)
   }
   return recorded
 })

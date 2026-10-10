@@ -32,6 +32,8 @@ export interface Log {
   kind: typeof LOG_KINDS[number]
   message: string
   itemId?: string
+  /** What the row shows when opened: the fields that changed, or what Google answered. */
+  detail?: string
 }
 
 const oneOf = <Choice extends string>(choices: readonly Choice[], value: unknown): Choice | undefined => choices.find(choice => choice === value)
@@ -92,6 +94,7 @@ export const logFrom = (id: string, data: DocumentData): Log => ({
   kind: oneOf(LOG_KINDS, data.kind) ?? 'event',
   message: text(data.message),
   ...typeof data.itemId === 'string' ? { itemId: data.itemId } : {},
+  ...typeof data.detail === 'string' && data.detail !== '' ? { detail: data.detail } : {},
 })
 
 /** A `categories/{slug}` document. */

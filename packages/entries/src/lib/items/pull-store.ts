@@ -77,7 +77,7 @@ export const removeVanished = async (eventIds: ReadonlySet<string>, listedSince:
       return false
     })
     if (removed) {
-      logGoogleChange('Removed', itemFrom(entry.id, entry.data()).title, entry.id)
+      logGoogleChange('Removed', itemFrom(entry.id, entry.data()).title, { itemId: entry.id })
     }
   }))
 }

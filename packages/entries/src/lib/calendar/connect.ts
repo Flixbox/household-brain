@@ -25,7 +25,7 @@ export const setUpHousehold = async (): Promise<string> => {
     logEvent('Connected Google Calendar')
     return 'The Household Brain calendar is ready, and your notifications are set to 2 days and 1 day before.'
   } catch (error) {
-    logError('Google Calendar connection failed')
+    logError('Google Calendar connection failed', '', error instanceof Error ? error.message : String(error))
     throw error
   }
 }
@@ -40,7 +40,7 @@ export const connectToHousehold = async (config: HouseholdConfig): Promise<strin
       ? 'Connected: the calendar is in your Google Calendar, with notifications 2 days and 1 day before.'
       : 'Already connected, with notifications 2 days and 1 day before.'
   } catch (error) {
-    logError('Google Calendar connection failed')
+    logError('Google Calendar connection failed', '', error instanceof Error ? error.message : String(error))
     throw error
   }
 }

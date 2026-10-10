@@ -57,5 +57,6 @@ export const importTasks = async (): Promise<void> => {
   }
   // Tasks are an optional way in: a failure (the API switched off, no network) is tried again
   // next pull and must not fail the calendar pull before it.
-  await importOpenTasks(tasksApi).then(() => logRecovered('tasks-import'), () => logErrorOnce('tasks-import', 'Google Tasks import failed'))
+  await importOpenTasks(tasksApi).then(() => logRecovered('tasks-import'), (error: unknown) =>
+    logErrorOnce('tasks-import', 'Google Tasks import failed', error instanceof Error ? error.message : String(error)))
 }

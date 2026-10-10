@@ -120,7 +120,7 @@ const pullNow = (context: PushContext): Promise<void> => {
       if (started === generation) {
         pullProblem = problems.length > 0 ? problems.join(' · ') : null
         if (problems.length > 0) {
-          logPullProblem('problem')
+          logPullProblem('problem', problems.join('\n'))
         } else {
           resetPullProblems()
         }
@@ -128,7 +128,7 @@ const pullNow = (context: PushContext): Promise<void> => {
     }, (error: unknown) => {
       if (started === generation) {
         pullProblem = isTransient(error) ? pullProblem : describe(error)
-        logPullProblem('failure')
+        logPullProblem('failure', describe(error))
       }
     })
     .finally(() => {

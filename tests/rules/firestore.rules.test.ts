@@ -81,6 +81,8 @@ describe('logs', () => {
 
   it('allows a member to create and read a valid log', async () => {
     await assertSucceeds(setDoc(doc(as('alice'), 'logs/one'), appLog()))
+    await assertSucceeds(setDoc(doc(as('alice'), 'logs/detailed'), appLog({ detail: 'Changed: title, due date' })))
+    await assertFails(setDoc(doc(as('alice'), 'logs/too-long'), appLog({ detail: 'x'.repeat(4001) })))
     await assertSucceeds(getDocs(collection(as('alice'), 'logs')))
   })
 

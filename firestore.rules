@@ -52,12 +52,13 @@ service cloud.firestore {
     match /logs/{id} {
       allow read: if allowed();
       allow create: if allowed()
-        && request.resource.data.keys().hasOnly(['at', 'by', 'kind', 'message', 'itemId'])
+        && request.resource.data.keys().hasOnly(['at', 'by', 'detail', 'kind', 'message', 'itemId'])
         && request.resource.data.by == request.auth.uid
         && request.resource.data.kind in ['error', 'event']
         && request.resource.data.message is string
         && request.resource.data.message.size() <= 2000
         && isText(request.resource.data, 'itemId', 200)
+        && isText(request.resource.data, 'detail', 4000)
         && request.resource.data.at == request.time;
       allow update: if false;
       allow delete: if allowed()

@@ -14,7 +14,8 @@ import { logErrorOnce, logGoogleChange, logRecovered } from '@household-brain/en
 
 const pullLogMessages = { failure: 'Google Calendar pull failed', problem: 'Google Calendar pull had a problem' } as const
 
-export const logPullProblem = (kind: keyof typeof pullLogMessages): void => logErrorOnce(`pull-${kind}`, pullLogMessages[kind])
+export const logPullProblem = (kind: keyof typeof pullLogMessages, detail: string): void =>
+  logErrorOnce(`pull-${kind}`, pullLogMessages[kind], detail)
 
 /** A clean pull (or a new session): the next problem is news again. */
 export const resetPullProblems = (): void => {
@@ -53,7 +54,8 @@ const logEntryDecision = (event: CalendarEvent, decision: PullDecision, before: 
     return
   }
   loggedChanges.add(key)
-  logGoogleChange(actionFor(decision.kind), decision.kind === 'delete' ? before : decision.draft.title, event.id)
+  const title = decision.kind === 'delete' ? before : decision.draft.title
+  logGoogleChange(actionFor(decision.kind), title, { changed: decision.kind === 'update' ? Object.keys(decision.fields) : [], itemId: event.id })
 }
 
 const normalise = async (context: PushContext, event: CalendarEvent, patch: CalendarEvent): Promise<string | null> => {
@@ -107,7 +109,7 @@ const applyDateEvent = async (context: PushContext, event: CalendarEvent, entryI
     // Moved or deleted in Google: the entry follows; edited otherwise: it is put back (#34).
     const eventContext = { categories: context.categories, timeZone: context.config.timeZone }
     if (await applyDateChange(entryId, dateId, entry => dateEventChange({ dateId, event, item: entry }, eventContext)) && owner) {
-      logGoogleChange('Changed', owner.title, entryId)
+      logGoogleChange('Changed', owner.title, { itemId: entryId })
     }
     return null
   }
