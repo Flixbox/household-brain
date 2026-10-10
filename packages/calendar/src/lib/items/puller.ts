@@ -9,6 +9,7 @@ import { dateEventChange } from './date-pull'
 import type { Item, ItemDraft } from './model'
 import type { PushContext } from './push'
 import { isTransient } from './transient'
+import { importTasks } from './tasks-puller'
 
 /**
  * Pulls what changed in Google Calendar since the last pull: each changed event
@@ -197,13 +198,8 @@ const tokenFor = async (uid: string) => {
 /** People whose schema marker this app already wrote since it started. */
 const marked = new Set<string>()
 
-export const pullChanges = async (context: PushContext): Promise<string[]> => {
-  // Best effort and not awaited: offline it would wait for the server, and a failure mustn't stop
-  // the pull. Tried again next session (or next pull) if it fails.
-  if (!marked.has(context.uid)) {
-    marked.add(context.uid)
-    markSchema(context.uid, APP_SCHEMA).catch(() => marked.delete(context.uid))
-  }
+/** The calendar part of a pull; a sync token Google no longer accepts (410) means one full listing. */
+const pullCalendar = async (context: PushContext): Promise<string[]> => {
   const { syncToken, recheck } = await tokenFor(context.uid)
   try {
     return await pullPages(context, syncToken, recheck)
@@ -213,4 +209,16 @@ export const pullChanges = async (context: PushContext): Promise<string[]> => {
     }
     return pullPages(context, null, recheck)
   }
+}
+
+export const pullChanges = async (context: PushContext): Promise<string[]> => {
+  // Best effort and not awaited: offline it would wait for the server, and a failure mustn't stop
+  // the pull. Tried again next session (or next pull) if it fails.
+  if (!marked.has(context.uid)) {
+    marked.add(context.uid)
+    markSchema(context.uid, APP_SCHEMA).catch(() => marked.delete(context.uid))
+  }
+  const problems = await pullCalendar(context)
+  await importTasks()
+  return problems
 }

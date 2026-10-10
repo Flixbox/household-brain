@@ -31,11 +31,12 @@ service cloud.firestore {
         && touched().hasOnly([
           'amount', 'category', 'code', 'currency', 'dateEvents', 'dirty', 'dueDate', 'etags',
           'extraDates', 'googleUpdated', 'id', 'interval', 'notes', 'pendingOp', 'reminders', 'rev',
-          'startDate', 'status', 'sync', 'syncError', 'title', 'updatedAt', 'updatedBy', 'url',
+          'startDate', 'status', 'sync', 'syncError', 'taskId', 'title', 'updatedAt', 'updatedBy', 'url',
         ])
         // Far above what a person types or Google holds, and together well under a document's size limit.
         && isText(request.resource.data, 'title', 50000)
         && isText(request.resource.data, 'notes', 500000)
+        && isText(request.resource.data, 'taskId', 500)
         && isText(request.resource.data, 'url', 50000)
         && (!('id' in request.resource.data) || request.resource.data.id == id);
     }

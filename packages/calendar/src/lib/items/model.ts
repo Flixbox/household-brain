@@ -53,6 +53,8 @@ export interface Item {
   updatedAt?: unknown
   /** Uid of the person who made the last local change. */
   updatedBy?: string
+  /** The Google Task that created this entry, when it came through the Tasks inbox. */
+  taskId?: string
 }
 
 export const EDITABLE_FIELDS = ['title', 'category', 'dueDate', 'startDate', 'status', 'code', 'amount', 'currency', 'interval', 'url', 'notes', 'reminders'] as const

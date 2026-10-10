@@ -80,6 +80,26 @@ test('events made in Google Calendar: taken in and shaped, left alone when put i
     await pullUntil(page, () => page.getByRole('link', { name: /Gym/u }).count(), 0)
   })
 
+  await test.step('a connected Google Tasks inbox imports JSON tasks and leaves plain notes open', async () => {
+    await page.goto('/settings')
+    await page.getByRole('button', { name: 'Connect my Google Calendar' }).click()
+    await expect(page.getByRole('status').filter({ hasText: 'Connected' })).toBeVisible()
+
+    google.tasks.create('another-list', {
+      id: 'task-json',
+      notes: JSON.stringify({ amount: '10.00', category: 'coupon', currency: 'EUR', dueDate: '2026-12-31', notes: 'Weekdays', title: 'Bowling night' }),
+      title: 'Task title',
+    })
+    google.tasks.create('household-brain', { id: 'task-plain', notes: 'Remember the receipt', title: 'Unstructured note' })
+    await page.goto('/')
+    await pullUntil(page, () => page.getByRole('link', { name: /Bowling night/u }).count(), 1)
+
+    await expect(page.getByRole('region', { name: 'Coupon' }).getByRole('link', { name: /Bowling night/u })).toContainText('2026-12-31')
+    await expect.poll(() => google.tasks.live().find(task => task.id === 'task-json')?.status).toBe('completed')
+    expect(google.tasks.live().find(task => task.id === 'task-plain')?.status).toBe('needsAction')
+    await expect(page.getByRole('link', { name: /Unstructured note/u })).toHaveCount(0)
+  })
+
   await test.step('events put in by hand show as uncategorised and are left alone until edited; repeating events are ignored', async () => {
     await expect(page.getByRole('region', { name: 'Uncategorised' }).getByRole('link', { name: /Grandma/u })).toContainText('2026-12-10')
     await expect(page.getByRole('link', { name: /Yearly/u })).toHaveCount(0)

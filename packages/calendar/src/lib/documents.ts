@@ -44,6 +44,7 @@ const optionalFields = (data: DocumentData): Partial<Item> => ({
   ...Array.isArray(data.extraDates) ? { extraDates: data.extraDates.flatMap(entryDateOf) } : {},
   ...isRecord(data.dateEvents) ? { dateEvents: dateEventsOf(data.dateEvents) } : {},
   ...typeof data.googleUpdated === 'string' ? { googleUpdated: data.googleUpdated } : {},
+  ...typeof data.taskId === 'string' ? { taskId: data.taskId } : {},
   ...'updatedAt' in data ? { updatedAt: data.updatedAt } : {},
   ...typeof data.updatedBy === 'string' ? { updatedBy: data.updatedBy } : {},
 })

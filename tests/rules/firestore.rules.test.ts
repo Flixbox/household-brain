@@ -24,7 +24,7 @@ const as = (uid: string) => env.authenticatedContext(uid).firestore()
 const appEntry = {
   amount: '10', category: 'coupon', code: '', currency: '', dirty: ['title'], dueDate: '2026-12-01', etags: {}, extraDates: [],
   interval: '', notes: '', pendingOp: 'upsert', reminders: '', rev: 'r1', startDate: '', status: 'open', sync: 'pending',
-  syncError: null, title: 'Coupon', updatedAt: serverTimestamp(), updatedBy: 'alice', url: '',
+  syncError: null, taskId: 'task-1', title: 'Coupon', updatedAt: serverTimestamp(), updatedBy: 'alice', url: '',
 }
 
 describe('data collections', () => {
@@ -40,6 +40,7 @@ describe('data collections', () => {
   it('are open to allowlisted accounts', async () => {
     await assertSucceeds(getDoc(doc(as('alice'), 'items/coupon-1')))
     await assertSucceeds(setDoc(doc(as('alice'), 'items/coupon-2'), { ...appEntry, id: 'coupon-2' }))
+    await assertSucceeds(updateDoc(doc(as('alice'), 'items/coupon-2'), { taskId: 'task-2' }))
     await assertSucceeds(updateDoc(doc(as('alice'), 'items/coupon-2'), { dirty: ['url'], notes: 'n'.repeat(400_000), url: 'https://shop.test' }))
     await assertSucceeds(updateDoc(doc(as('alice'), 'items/coupon-1'), { 'etags.alice': 'e1', 'status': 'done' }))
     await assertSucceeds(deleteDoc(doc(as('alice'), 'items/coupon-1')))

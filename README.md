@@ -54,7 +54,8 @@ CI (`.github/workflows/ci.yml`) runs checks, the e2e suite and, on `main`, the d
 The Firebase project is a Google Cloud project; everything below happens in it.
 
 **Google Cloud**
-- Enable the **Google Calendar API**.
+- Enable the **Google Calendar API** and the **Google Tasks API** (the Tasks inbox, #118; without
+  it the app skips the import and keeps syncing the calendar).
 - OAuth consent screen: External, with the app name and a support email. Publish it to **In
   production** (Testing mode asks for consent again every week). An unverified app is fine for
   personal use: click through the warning once.
