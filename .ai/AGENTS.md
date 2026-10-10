@@ -393,6 +393,11 @@ adapted to this repository:
   `import.meta.env` through a helper function stops Vite from folding it, so the dead code ships.
 - **Firebase Hosting matches header `source` against the request path, not the rewrite target.** A
   `no-cache` rule on `/index.html` does not cover `/` or SPA routes, so it needs `**`.
+- **The Content Security Policy is enforced** (`firebase.json` headers, #113) and names each host the
+  app talks to. Calling a new outside service (another Google API, a new rates source) means adding
+  its origin to `connect-src` in the same PR, or the browser blocks it in production. The e2e
+  journeys run on `vite preview`, which sends no such header, so CI can't catch a missing host:
+  check the live app's console after the deploy.
 - **Watch the allowlist entry with `onSnapshot`, don't read it once.** A one-shot server read raced
   sign-out (stale "allowed") and locked the app out offline.
 
