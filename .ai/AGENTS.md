@@ -170,7 +170,7 @@ adapted to this repository:
 | `CONFLICT` | Rebase on `main`, run the checks, push once, reply on the PR. |
 | `ACTIVITY` | Answer every comment (section 4), including those of a pending review. |
 | `DEPLOYED` | A minute later, check the live app in the browser (section 5): mandatory, but never blocking. Report, and start the next PR. |
-| `DEPLOY_FAILED` | Fix it in a follow-up PR (never push to `main`). |
+| `DEPLOY_FAILED` | Fix it in a follow-up PR (never push to `main`). A deploy that a newer merge cancelled isn't a failure: the watcher follows the newer run, which deploys both. |
 | `MAIN_FAILED` / `MAIN_SLOW` | `main` is broken or hanging, whichever PR caused it. That comes first: fix it in a follow-up PR, or re-run a flaky job, before continuing. |
 | `MAIN_PASSED` | `main`'s newest run passed. Nothing to fix; read the open-PR list that comes with it. |
 | `MAIN_ADVANCED` | `main` got a new commit, whoever merged it. Know what landed: if it was your own PR, its deploy follows; otherwise check whether it touches your work. |
