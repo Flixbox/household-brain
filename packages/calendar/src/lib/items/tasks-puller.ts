@@ -12,8 +12,9 @@ import { importedTask } from './task-import'
  */
 const takeTask = async (api: TasksApi, listId: string, task: GoogleTask): Promise<void> => {
   const imported = importedTask(task)
-  if (imported) {
-    await addImportedItem(eventIdForTask(task.id), imported.draft, task.id)
+  const id = eventIdForTask(task.id)
+  if (imported && id) {
+    await addImportedItem(id, imported.draft, task.id)
     await api.completeTask(listId, task.id)
   }
 }

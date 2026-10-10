@@ -51,6 +51,7 @@ describe('eventIdForTask', () => {
   it('gives the same task the same valid event id, and different tasks different ones', () => {
     expect(eventIdForTask('MTIzNDU2Nzg5')).toBe(eventIdForTask('MTIzNDU2Nzg5'))
     expect(eventIdForTask('MTIzNDU2Nzg5')).not.toBe(eventIdForTask('MTIzNDU2Nzg6'))
-    expect(isEventId(eventIdForTask('MTIzNDU2Nzg5'))).toBe(true)
+    expect(isEventId(eventIdForTask('MTIzNDU2Nzg5') ?? '')).toBe(true)
+    expect(eventIdForTask('x'.repeat(512))).toBeNull()
   })
 })
