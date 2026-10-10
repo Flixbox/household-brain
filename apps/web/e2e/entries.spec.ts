@@ -41,6 +41,9 @@ test('entries: categories and the form, added, edited, deleted, and a double-tap
     await page.getByLabel('Due date (17:00)').fill('2026-11-03')
     await page.getByLabel('Code').fill('SUMMER25')
     await page.getByLabel('Amount').fill('10')
+    // How often it is due shows after the price in the list (#86).
+    await page.getByLabel('Every').selectOption('monthly')
+    await page.getByLabel('Every').blur()
     // A bare domain is fine; it is stored as a full address.
     const linkField = page.getByRole('textbox', { exact: true, name: 'Link' })
     const openLink = page.getByRole('link', { name: 'Open the link in a new tab' })
@@ -51,13 +54,13 @@ test('entries: categories and the form, added, edited, deleted, and a double-tap
     await expect(openLink).toHaveAttribute('target', '_blank')
     await expect(openLink).toHaveAttribute('rel', 'noopener noreferrer')
     await page.getByRole('button', { name: 'Save' }).click()
-    // The price and the code show in the list, in that order under the title.
-    await expect(coupons.getByRole('link', { name: /Amazon/u })).toContainText(/Amazon\s*10,00\s€\s*SUMMER25/u)
+    // The price with its interval, and the code show in the list, in that order under the title.
+    await expect(coupons.getByRole('link', { name: /Amazon/u })).toContainText(/Amazon\s*10,00\s€ \/ month\s*SUMMER25/u)
     await expect(coupons.getByRole('link', { name: /Amazon/u })).toContainText('2026-11-03')
     await synced()
     expect(google.live()).toEqual([expect.objectContaining({
       end: { dateTime: '2026-11-03T17:15:00', timeZone: 'Europe/Berlin' },
-      extendedProperties: { private: expect.objectContaining({ 'hb.amount': '10', 'hb.category': 'coupon', 'hb.code': 'SUMMER25', 'hb.url': 'https://shop.household-brain.test' }) },
+      extendedProperties: { private: expect.objectContaining({ 'hb.amount': '10', 'hb.category': 'coupon', 'hb.code': 'SUMMER25', 'hb.interval': 'monthly', 'hb.url': 'https://shop.household-brain.test' }) },
       reminders: { useDefault: true },
       start: { dateTime: '2026-11-03T17:00:00', timeZone: 'Europe/Berlin' },
       summary: '[Coupon] Amazon',

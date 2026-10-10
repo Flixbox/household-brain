@@ -2,6 +2,7 @@ import { type Category, categoryOfTag } from '@household-brain/calendar/lib/cate
 import { type CalendarEvent, DUE_TIME, END_TIME, type EventContext, STATUS_TAGS, remindersOf, remindersPatch, sameReminders, summaryOf } from './event'
 import { remindersFromText } from './reminders'
 import { detailsFrom } from './event-details'
+import { intervalFrom } from './interval'
 import type { ItemDraft } from './model'
 
 const PREFIX = /^\[(?<label>[^\]]+)\]\s*(?<rest>.*)$/u
@@ -81,6 +82,7 @@ const detailFields = (event: CalendarEvent, categories: readonly Category[]) => 
     amount: properties['hb.amount'] ?? details?.amount ?? '',
     code: properties['hb.code'] ?? details?.code ?? '',
     currency: currencyOf(properties['hb.currency'] ?? details?.currency),
+    interval: intervalFrom(properties['hb.interval']),
     notes: details?.notes ?? event.description ?? '',
     url: properties['hb.url'] ?? details?.url ?? '',
   }

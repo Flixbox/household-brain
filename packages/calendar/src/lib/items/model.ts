@@ -20,6 +20,8 @@ export interface Item {
   amount: string
   /** The amount's currency: an ISO 4217 code such as `BRL`, or '' for euros. Absent on older entries. */
   currency: string
+  /** How often the amount is due (`interval.ts`): '' for a one-off price. Absent on older entries. */
+  interval: string
   url: string
   notes: string
   /** The entry's own reminders as text (`reminders.ts`): '' for the household default. Absent on older entries. */
@@ -53,7 +55,7 @@ export interface Item {
   updatedBy?: string
 }
 
-export const EDITABLE_FIELDS = ['title', 'category', 'dueDate', 'startDate', 'status', 'code', 'amount', 'currency', 'url', 'notes', 'reminders'] as const
+export const EDITABLE_FIELDS = ['title', 'category', 'dueDate', 'startDate', 'status', 'code', 'amount', 'currency', 'interval', 'url', 'notes', 'reminders'] as const
 export type EditableField = typeof EDITABLE_FIELDS[number]
 export type ItemDraft = Pick<Item, EditableField>
 
@@ -63,6 +65,7 @@ export const emptyDraft = (category = ''): ItemDraft => ({
   code: '',
   currency: '',
   dueDate: '',
+  interval: '',
   notes: '',
   reminders: '',
   startDate: '',
@@ -78,6 +81,7 @@ export const draftOf = (item: Item): ItemDraft => ({
   code: item.code,
   currency: item.currency,
   dueDate: item.dueDate,
+  interval: item.interval,
   notes: item.notes,
   reminders: item.reminders,
   startDate: item.startDate,

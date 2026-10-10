@@ -98,6 +98,8 @@ export const privateProperties = (item: Item): Record<string, string> => ({
   // a patch of the entry's own event clears it; its extra dates' events keep the old value, which
   // nothing reads back (the entry's own event is the one a pull reads the currency from).
   ...isForeign(item.currency) ? { 'hb.currency': item.currency } : {},
+  // Like the currency: only when the entry has one, so other events stay as they were (#86).
+  ...item.interval ? { 'hb.interval': item.interval } : {},
   'hb.start': item.startDate ?? '',
   'hb.status': item.status,
   'hb.url': item.url,
@@ -135,6 +137,7 @@ const GROUP_OF: Record<EditableField, (keyof typeof groups)[]> = {
   code: [],
   currency: [],
   dueDate: ['date'],
+  interval: [],
   notes: ['notes'],
   reminders: ['reminders'],
   startDate: [],
@@ -149,6 +152,7 @@ const PROPERTY_OF: Partial<Record<EditableField, string>> = {
   category: 'hb.category',
   code: 'hb.code',
   currency: 'hb.currency',
+  interval: 'hb.interval',
   reminders: 'hb.reminders',
   startDate: 'hb.start',
   status: 'hb.status',

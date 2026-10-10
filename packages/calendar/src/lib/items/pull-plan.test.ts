@@ -15,8 +15,7 @@ const event: CalendarEvent = {
 }
 
 const entry: Item = {
-  amount: '', category: 'coupon', code: 'OLD', currency: '', dirty: [], dueDate: '2026-11-01', etags: { owner: '"g1"' }, id: 'evt1', notes: '',
-  pendingOp: null, reminders: '', rev: 'r1', startDate: '', status: 'open', sync: 'synced', syncError: null, title: 'Amazon', url: '',
+  amount: '', category: 'coupon', code: 'OLD', currency: '', dirty: [], dueDate: '2026-11-01', etags: { owner: '"g1"' }, id: 'evt1', interval: '', notes: '', pendingOp: null, reminders: '', rev: 'r1', startDate: '', status: 'open', sync: 'synced', syncError: null, title: 'Amazon', url: '',
 }
 
 const decide = (overrides: { entry?: Item | null, event?: CalendarEvent }) =>

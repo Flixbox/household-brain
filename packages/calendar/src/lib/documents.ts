@@ -3,6 +3,7 @@ import type { Category } from './categories'
 import { type HouseholdConfig, TIME_ZONE } from './calendar/setup'
 import type { EntryDate } from './items/dates'
 import { type DateEventRecord, EDITABLE_FIELDS, type EditableField, type Item } from './items/model'
+import { intervalFrom } from './items/interval'
 
 /**
  * Firestore documents read into the app's types (#68). Field by field, with a fallback for anything
@@ -57,6 +58,7 @@ export const itemFrom = (id: string, data: DocumentData): Item => ({
   dueDate: text(data.dueDate),
   etags: textMap(data.etags),
   id,
+  interval: intervalFrom(data.interval),
   notes: text(data.notes),
   pendingOp: oneOf(OPS, data.pendingOp) ?? null,
   reminders: text(data.reminders),

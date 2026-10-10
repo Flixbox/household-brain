@@ -8,8 +8,7 @@ import { pushItem } from './push'
 const config = { calendarId: 'cal-1', ownerUid: 'owner', timeZone: 'Europe/Berlin' }
 
 const base: Item = {
-  amount: '', category: 'coupon', code: '', currency: '', dirty: [], dueDate: '2026-11-03', etags: {}, id: 'evt1', notes: '',
-  pendingOp: 'upsert', reminders: '', rev: 'r1', startDate: '', status: 'open', sync: 'pending', syncError: null, title: 'Amazon', url: '',
+  amount: '', category: 'coupon', code: '', currency: '', dirty: [], dueDate: '2026-11-03', etags: {}, id: 'evt1', interval: '', notes: '', pendingOp: 'upsert', reminders: '', rev: 'r1', startDate: '', status: 'open', sync: 'pending', syncError: null, title: 'Amazon', url: '',
 }
 
 const fakeApi = (behaviour: Partial<Record<'insert' | 'patch' | 'delete' | 'get', number[]>> = {}) => {

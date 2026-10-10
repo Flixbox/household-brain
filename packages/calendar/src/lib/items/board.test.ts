@@ -12,6 +12,7 @@ const entry = (overrides: Partial<Item>): Item => ({
   dueDate: '2026-11-03',
   etags: {},
   id: overrides.title ?? 'id',
+  interval: '',
   notes: '',
   pendingOp: null,
   reminders: '',

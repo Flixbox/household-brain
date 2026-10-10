@@ -103,6 +103,9 @@ comments. Only wait in the foreground for something whose result you need for th
     journeys together in its spec rather than splitting them up for size.
   - Inside a journey, find what a step checks by its own title or id (`google.live().find(...)`),
     not by position: earlier steps leave their entries and events behind.
+  - **Blur a `<select>` after `selectOption` on WebKit** (the iPhone project). A select that keeps
+    focus sometimes swallowed later link clicks, so a following step timed out on a page that never
+    opened (#110); it passed on retry, which hid it as "flaky".
 - **Batch your changes.** Every push cancels the running CI for that branch, so five quick pushes mean
   five cancelled runs and no result.
 - **Check exit codes without pipes**, or with `${PIPESTATUS[0]}`. See the shell lesson below.

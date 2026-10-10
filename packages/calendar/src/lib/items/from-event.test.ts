@@ -16,8 +16,14 @@ const appEvent: CalendarEvent = {
 describe('draftFrom', () => {
   it('reads an event the app wrote', () => {
     expect(draftFrom(appEvent, DEFAULT_CATEGORIES)).toEqual({
-      amount: '10', category: 'coupon', code: 'X1', currency: '', dueDate: '2026-11-03', notes: 'Only online', reminders: '', startDate: '2026-10-01', status: 'open', title: 'Amazon', url: '',
+      amount: '10', category: 'coupon', code: 'X1', currency: '', dueDate: '2026-11-03', interval: '', notes: 'Only online', reminders: '', startDate: '2026-10-01', status: 'open', title: 'Amazon', url: '',
     })
+  })
+
+  it('reads how often the price is due, and nothing it doesn\'t know (#86)', () => {
+    const every = (value: string) => draftFrom({ ...appEvent, extendedProperties: { private: { ...appEvent.extendedProperties?.private, 'hb.interval': value } } }, DEFAULT_CATEGORIES).interval
+    expect(every('monthly')).toBe('monthly')
+    expect(every('fortnightly')).toBe('')
   })
 
   it('reads another currency, and euros or anything malformed as none', () => {
