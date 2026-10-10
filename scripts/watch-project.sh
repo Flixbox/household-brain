@@ -123,10 +123,16 @@ check_run() { # check_run <sha> <label>: report a finished or slow CI run of tha
   # are keyed by attempt too, so a re-run that fails again is reported again.
   if [[ $status == completed ]]; then
     if [[ $label == deploy && $conclusion == cancelled ]]; then
-      # A newer merge cancelled this deploy, and the newer run deploys this commit too: follow that one.
+      # The deploy job keeps at most one deploy waiting: a newer merge replaces (cancels) an older one
+      # still waiting, and the newer run deploys this commit too. Follow that one; without a newer
+      # run, the cancellation is reported like a failure.
       local newest
       newest=$("$GH" run list --repo "$REPO" --workflow "$WORKFLOW" --branch main --event push --limit 1 --json headSha --jq '.[0].headSha // empty') || return
-      [[ -n $newest && $newest != "$sha" ]] && check_run "$newest" deploy
+      if [[ -n $newest && $newest != "$sha" ]]; then
+        check_run "$newest" deploy
+      else
+        report "pr-$pr deploy-failed $sha $attempt" "DEPLOY_FAILED: run $run on main was cancelled, and no newer run replaces it: re-run it" "$jobs"
+      fi
     elif [[ $label == deploy && $conclusion == success ]]; then
       report "pr-$pr deployed $sha" "DEPLOYED: live (run $run)" "$jobs"
     elif [[ $label == deploy ]]; then
