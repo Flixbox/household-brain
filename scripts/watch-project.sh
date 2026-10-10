@@ -96,7 +96,7 @@ ids() { awk 'NF >= 2 { print $1, $2 }' | sort -u; }
 
 check_activity() {
   local seen=$state_dir/pr-$pr-seen now new
-  now=$(activity) || { round_complete=false; return; }
+  now=$(activity) || { round_complete=false; return 1; }
   # On the watcher's very first round, the comments already there are old news. A PR that appears
   # later is new, and so is everything on it, also what came between its NEW_PR and this look (#122).
   if [[ ! -e $seen ]]; then
@@ -207,13 +207,15 @@ check_pr() {
   case $state in
     MERGED)
       # Comments still count after the merge: one written right after an approval can land after the
-      # round that reported the approval, and the PR is merged by the next one (#129).
-      check_activity
+      # round that reported the approval, and the PR is merged by the next one (#129). Only for a PR
+      # still followed: a recent merge seen for the first time would replay old comments.
+      # A failed look is tried again next round, before the PR can be dropped.
+      if grep -qxF "$pr" "$tracked"; then check_activity || return; fi
       # A failed deploy stays watched: a re-run of it may still go live.
       if grep -q "^pr-$pr deployed " "$reported"; then untrack; else check_run "$merge_sha" deploy; fi
       ;;
     CLOSED)
-      check_activity
+      if grep -qxF "$pr" "$tracked"; then check_activity || return; fi
       untrack
       report "pr-$pr closed" "CLOSED without merging"
       ;;
