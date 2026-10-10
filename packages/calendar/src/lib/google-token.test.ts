@@ -1,7 +1,7 @@
 import { cleanTestStorage, getTestStorage, useTestStorageEngine } from '@nanostores/persistent'
 import { Temporal } from 'temporal-polyfill'
-import { afterEach, describe, expect, it } from 'vitest'
-import { $calendarToken, MEMBER_SCOPES, OWNER_SCOPES, acceptToken, forgetCalendarToken, hasCalendarToken } from './google-token'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { $calendarToken, MEMBER_SCOPES, OWNER_SCOPES, acceptToken, forgetCalendarToken, hasCalendarToken, revokeCalendarToken } from './google-token'
 
 // oxlint-disable-next-line react-hooks/rules-of-hooks -- nanostores' switch to fake storage, not a React hook
 useTestStorageEngine()
@@ -57,5 +57,33 @@ describe('the stored token', () => {
     forgetCalendarToken()
     expect(getTestStorage()['hb:calendar-token']).toBe('null')
     expect(hasCalendarToken(MEMBER_SCOPES, ME)).toBe(false)
+  })
+})
+
+describe('revokeCalendarToken (#117)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('forgets the token and revokes it at Google, in the body and not the URL', () => {
+    const fetch = vi.fn(() => Promise.resolve(new Response(null)))
+    vi.stubGlobal('fetch', fetch)
+    $calendarToken.set({ account: ME, scopes: [...MEMBER_SCOPES], usableUntil: now() + 60_000, value: 'secret-token' })
+    revokeCalendarToken()
+    expect($calendarToken.get()).toBeNull()
+    expect(fetch).toHaveBeenCalledTimes(1)
+    const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('https://oauth2.googleapis.com/revoke')
+    expect(url).not.toContain('secret-token')
+    expect(String(init.body)).toBe('token=secret-token')
+    expect(init).toMatchObject({ keepalive: true, method: 'POST' })
+  })
+
+  it('asks Google nothing when there is no token', () => {
+    const fetch = vi.fn(() => Promise.resolve(new Response(null)))
+    vi.stubGlobal('fetch', fetch)
+    forgetCalendarToken()
+    revokeCalendarToken()
+    expect(fetch).not.toHaveBeenCalled()
   })
 })

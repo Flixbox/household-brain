@@ -174,3 +174,19 @@ export const hasCalendarToken = (scopes: readonly string[], account: string | nu
 export const forgetCalendarToken = () => {
   $calendarToken.set(null)
 }
+
+const REVOKE_URL = 'https://oauth2.googleapis.com/revoke'
+
+/**
+ * On sign-out (#117): forgets the token and revokes it at Google, so a copy taken from this device
+ * stops working at once instead of within the hour. Google withdraws the app's grant for that account
+ * with it, so the person's other devices ask for Calendar access again on their next sync. The token
+ * goes in the body, never the URL; `keepalive` lets the request finish while sign-out reloads the page.
+ */
+export const revokeCalendarToken = () => {
+  const token = $calendarToken.get()
+  forgetCalendarToken()
+  if (token) {
+    fetch(REVOKE_URL, { body: new URLSearchParams({ token: token.value }), keepalive: true, method: 'POST' }).catch(() => null)
+  }
+}
