@@ -96,7 +96,7 @@ ids() { awk 'NF >= 2 { print $1, $2 }' | sort -u; }
 
 check_activity() {
   local seen=$state_dir/pr-$pr-seen now new
-  now=$(activity) || return
+  now=$(activity) || { round_complete=false; return; }
   # On the watcher's very first round, the comments already there are old news. A PR that appears
   # later is new, and so is everything on it, also what came between its NEW_PR and this look (#122).
   if [[ ! -e $seen ]]; then
@@ -200,7 +200,7 @@ check_pr() {
   line=$("$GH" pr view "$pr" --repo "$REPO" \
     --json state,mergeable,headRefOid,mergeCommit,reviewDecision,autoMergeRequest,labels,title,author \
     --jq '"\(.state) \(.mergeable) \(.headRefOid) \(.mergeCommit.oid // "-") \(if (.reviewDecision // "") == "" then "-" else .reviewDecision end) \(if .autoMergeRequest then "on" else "off" end) \(if any(.labels[]; .name == "parked") then "parked" else "-" end) \(.title) (by \(.author.login))"') \
-    || return
+    || { round_complete=false; return; }
   # Every field before the title is one word: an empty one would shift the rest (GitHub answers ""
   # for the review decision of a PR without reviews).
   read -r state mergeable head merge_sha decision auto parked title <<<"$line"
@@ -301,11 +301,13 @@ while true; do
   check_issue_states
   # A round with a failed listing is skipped rather than run with pull requests missing.
   if prs=$(watched_prs); then
+    round_complete=true
     for pr in $(sort -un <<<"$prs"); do
       check_pr
     done
-    # From here on, a PR seen for the first time is a new one, not one from before the watcher.
-    touch "$state_dir/initialized"
+    # From here on, a PR seen for the first time is a new one, not one from before the watcher. Only
+    # after a round in which every PR answered: one that failed must still get its comments recorded.
+    [[ $round_complete == true ]] && touch "$state_dir/initialized"
   fi
   (( $(date +%s) - started > hours * 3600 )) && { echo "IDLE: nothing happened for $hours h"; exit 0; }
   sleep 60
