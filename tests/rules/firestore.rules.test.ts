@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebase/rules-unit-testing'
-import { collection, collectionGroup, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore'
+import { Timestamp, collection, collectionGroup, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore'
 import { afterAll, beforeEach, describe, it } from 'vitest'
 
 const env = await initializeTestEnvironment({
@@ -71,6 +71,45 @@ describe('data collections', () => {
     await assertSucceeds(setDoc(doc(as('alice'), 'categories/bills'), { colorId: '1', label: 'Bills', slug: 'bills', sortOrder: 1 }))
     await env.withSecurityRulesDisabled(context => setDoc(doc(context.firestore(), 'items/legacy'), { createdAt: 1, title: 'Old' }))
     await assertSucceeds(updateDoc(doc(as('alice'), 'items/legacy'), { title: 'Renamed' }))
+  })
+})
+
+describe('logs', () => {
+  const appLog = (changes: Record<string, unknown> = {}) => ({
+    at: serverTimestamp(), by: 'alice', itemId: 'coupon-1', kind: 'event', message: 'Added "Coupon"', ...changes,
+  })
+
+  it('allows a member to create and read a valid log', async () => {
+    await assertSucceeds(setDoc(doc(as('alice'), 'logs/one'), appLog()))
+    await assertSucceeds(setDoc(doc(as('alice'), 'logs/detailed'), appLog({ detail: 'Changed: title, due date' })))
+    await assertFails(setDoc(doc(as('alice'), 'logs/too-long'), appLog({ detail: 'x'.repeat(4001) })))
+    await assertSucceeds(getDocs(collection(as('alice'), 'logs')))
+  })
+
+  it('rejects a log attributed to someone else', async () => {
+    await assertFails(setDoc(doc(as('alice'), 'logs/wrong-by'), appLog({ by: 'bob' })))
+  })
+
+  it('rejects an unknown kind', async () => {
+    await assertFails(setDoc(doc(as('alice'), 'logs/wrong-kind'), appLog({ kind: 'notice' })))
+  })
+
+  it('rejects extra fields', async () => {
+    await assertFails(setDoc(doc(as('alice'), 'logs/extra'), appLog({ extra: true })))
+  })
+
+  it('rejects every update', async () => {
+    await assertSucceeds(setDoc(doc(as('alice'), 'logs/immutable'), appLog()))
+    await assertFails(updateDoc(doc(as('alice'), 'logs/immutable'), { message: 'Changed' }))
+  })
+
+  it('allows deletion only after the retention period', async () => {
+    await env.withSecurityRulesDisabled(async context => {
+      await setDoc(doc(context.firestore(), 'logs/old'), { ...appLog(), at: Timestamp.fromMillis(1) })
+      await setDoc(doc(context.firestore(), 'logs/recent'), { ...appLog(), at: Timestamp.fromMillis(2_000_000_000_000) })
+    })
+    await assertSucceeds(deleteDoc(doc(as('alice'), 'logs/old')))
+    await assertFails(deleteDoc(doc(as('alice'), 'logs/recent')))
   })
 })
 

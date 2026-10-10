@@ -40,6 +40,7 @@ describe('errorFor', () => {
     expect(errorFor(pushed, pushed, 'boom')).toEqual({ fields: { sync: 'error', syncError: 'boom' }, kind: 'update' })
     expect(errorFor({ ...pushed, rev: 'r2' }, pushed, 'boom')).toEqual({ kind: 'nothing' })
     expect(errorFor(null, pushed, 'boom')).toEqual({ kind: 'nothing' })
+    expect(errorFor({ ...pushed, sync: 'error', syncError: 'boom' }, pushed, 'boom')).toEqual({ kind: 'nothing' })
   })
 })
 

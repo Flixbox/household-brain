@@ -2,14 +2,13 @@ import { auth } from '@household-brain/firebase/firebase'
 import { MEMBER_SCOPES, calendarToken, hasCalendarToken, loadGis } from '@household-brain/entries/lib/google-token'
 import type { Item } from './model'
 import { type PushContext, pushItem } from './push'
-import { pullChanges } from './puller'
+import { logPullProblem, pullChanges, resetPullProblems } from './puller'
 import { recordPush, recordPushError } from './store'
 import { outboxApi } from './outbox-api'
 import { isTransient } from './transient'
 import { $outbox } from './outbox-state'
 import { watchOutboxTriggers } from './outbox-triggers'
 import { forgetDateWork, nextDateWork, runDateWork } from './date-outbox'
-
 /**
  * The outbox: pushes pending entries to Google Calendar one at a time while a Calendar token is
  * available. Asking Google for a token needs a click, so the outbox never asks itself: without a
@@ -120,10 +119,16 @@ const pullNow = (context: PushContext): Promise<void> => {
     .then(problems => {
       if (started === generation) {
         pullProblem = problems.length > 0 ? problems.join(' · ') : null
+        if (problems.length > 0) {
+          logPullProblem('problem', problems.join('\n'))
+        } else {
+          resetPullProblems()
+        }
       }
     }, (error: unknown) => {
       if (started === generation) {
         pullProblem = isTransient(error) ? pullProblem : describe(error)
+        logPullProblem('failure', describe(error))
       }
     })
     .finally(() => {
@@ -247,6 +252,7 @@ const reset = () => {
   recorded.clear()
   forgetDateWork()
   unconfirmed = new Set()
+  resetPullProblems()
   publish()
 }
 

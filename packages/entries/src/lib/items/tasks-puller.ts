@@ -4,6 +4,8 @@ import { type GoogleTask, type TasksApi, createTasksApi } from '@household-brain
 import { addImportedItem } from './store'
 import { eventIdForTask } from './ids'
 import { importedTask } from './task-import'
+import { logErrorOnce, logEvent, logRecovered } from '@household-brain/entries/lib/logs'
+import { entryLogMessage } from '@household-brain/entries/lib/logs-messages'
 
 /**
  * One task: an entry when its notes hold the Gem's JSON (#118), then ticked off. The entry is saved
@@ -14,7 +16,10 @@ const takeTask = async (api: TasksApi, listId: string, task: GoogleTask): Promis
   const imported = importedTask(task)
   const id = eventIdForTask(task.id)
   if (imported && id) {
-    await addImportedItem(id, imported.draft, task.id)
+    const added = await addImportedItem(id, imported.draft, task.id)
+    if (added) {
+      logEvent(entryLogMessage('Imported', imported.draft.title), id)
+    }
     await api.completeTask(listId, task.id)
   }
 }
@@ -52,5 +57,6 @@ export const importTasks = async (): Promise<void> => {
   }
   // Tasks are an optional way in: a failure (the API switched off, no network) is tried again
   // next pull and must not fail the calendar pull before it.
-  await importOpenTasks(tasksApi).catch(() => null)
+  await importOpenTasks(tasksApi).then(() => logRecovered('tasks-import'), (error: unknown) =>
+    logErrorOnce('tasks-import', 'Google Tasks import failed', error instanceof Error ? error.message : String(error)))
 }

@@ -8,6 +8,7 @@ import { newEventId } from './ids'
 import { isDate } from './dates'
 import { itemsCollection } from './store'
 import { itemFrom } from '@household-brain/entries/lib/documents'
+import { logGoogleChange } from '@household-brain/entries/lib/logs'
 
 const itemDoc = (id: string) => doc(db, 'items', id)
 /** A pulled change is a new revision, but not a change by this person: `updatedBy` stays as it was. */
@@ -63,15 +64,22 @@ export const removeVanished = async (eventIds: ReadonlySet<string>, listedSince:
   // Their date events go first. A transient failure stops here, so the entries stay for the next full
   // listing; a refusal is reported by `beforeDelete` and the entries still go.
   await Promise.all(vanished.map(entry => beforeDelete(itemFrom(entry.id, entry.data()))))
-  await Promise.all(vanished.map(entry => runTransaction(db, async transaction => {
-    const latest = await transaction.get(entry.ref)
-    if (untouched(latest)) {
-      transaction.delete(entry.ref)
-    } else if (latest.exists()) {
-      // Kept after all (changed meanwhile): its date events, already deleted, are written again.
-      transaction.update(entry.ref, staleLedger(itemFrom(latest.id, latest.data())))
+  await Promise.all(vanished.map(async entry => {
+    const removed = await runTransaction(db, async transaction => {
+      const latest = await transaction.get(entry.ref)
+      if (untouched(latest)) {
+        transaction.delete(entry.ref)
+        return true
+      } else if (latest.exists()) {
+        // Kept after all (changed meanwhile): its date events, already deleted, are written again.
+        transaction.update(entry.ref, staleLedger(itemFrom(latest.id, latest.data())))
+      }
+      return false
+    })
+    if (removed) {
+      logGoogleChange('Removed', itemFrom(entry.id, entry.data()).title, { itemId: entry.id })
     }
-  })))
+  }))
 }
 
 /**
@@ -123,18 +131,20 @@ export const readEntryFromServer = async (id: string): Promise<Item | null> => {
  * the entry, so a new revision), and for anything else the ledger forgets the event, so the outbox
  * writes it back.
  */
-export const applyDateChange = (entryId: string, dateId: string, decide: (entry: Item) => DateEventChange): Promise<void> =>
+export const applyDateChange = (entryId: string, dateId: string, decide: (entry: Item) => DateEventChange): Promise<boolean> =>
   runTransaction(db, async transaction => {
     const ref = itemDoc(entryId)
     const snapshot = await transaction.get(ref)
     if (!snapshot.exists()) {
-      return
+      return false
     }
     const entry = itemFrom(snapshot.id, snapshot.data())
     const fields = dateChangeFields(entry, dateId, decide(entry))
     if (fields) {
       transaction.update(ref, fields)
+      return true
     }
+    return false
   })
 
 const dateChangeFields = (entry: Item, dateId: string, change: DateEventChange): Record<string, unknown> | null => {

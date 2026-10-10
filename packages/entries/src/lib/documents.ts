@@ -1,4 +1,4 @@
-import type { DocumentData } from 'firebase/firestore'
+import { type DocumentData, Timestamp } from 'firebase/firestore'
 import type { Category } from './categories'
 import { type HouseholdConfig, TIME_ZONE } from './calendar/setup'
 import type { EntryDate } from './items/dates'
@@ -23,6 +23,18 @@ const isEditableField = (value: unknown): value is EditableField => EDITABLE_FIE
 const STATUSES = ['open', 'done', 'cancelled'] as const
 const SYNCS = ['pending', 'synced', 'error'] as const
 const OPS = ['upsert', 'delete'] as const
+const LOG_KINDS = ['error', 'event'] as const
+
+export interface Log {
+  id: string
+  at: Timestamp | null
+  by: string
+  kind: typeof LOG_KINDS[number]
+  message: string
+  itemId?: string
+  /** What the row shows when opened: the fields that changed, or what Google answered. */
+  detail?: string
+}
 
 const oneOf = <Choice extends string>(choices: readonly Choice[], value: unknown): Choice | undefined => choices.find(choice => choice === value)
 
@@ -72,6 +84,17 @@ export const itemFrom = (id: string, data: DocumentData): Item => ({
   title: text(data.title),
   url: text(data.url),
   ...optionalFields(data),
+})
+
+/** A `logs/{id}` document. */
+export const logFrom = (id: string, data: DocumentData): Log => ({
+  at: data.at instanceof Timestamp ? data.at : null,
+  by: text(data.by),
+  id,
+  kind: oneOf(LOG_KINDS, data.kind) ?? 'event',
+  message: text(data.message),
+  ...typeof data.itemId === 'string' ? { itemId: data.itemId } : {},
+  ...typeof data.detail === 'string' && data.detail !== '' ? { detail: data.detail } : {},
 })
 
 /** A `categories/{slug}` document. */

@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as EventsRouteImport } from './routes/events'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ItemsItemIdRouteImport } from './routes/items.$itemId'
 import { Route as ItemsNewRouteImport } from './routes/items.new'
@@ -17,6 +18,11 @@ import { Route as ItemsNewRouteImport } from './routes/items.new'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EventsRoute = EventsRouteImport.update({
+  id: '/events',
+  path: '/events',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -37,12 +43,14 @@ const ItemsNewRoute = ItemsNewRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/events': typeof EventsRoute
   '/settings': typeof SettingsRoute
   '/items/$itemId': typeof ItemsItemIdRoute
   '/items/new': typeof ItemsNewRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/events': typeof EventsRoute
   '/settings': typeof SettingsRoute
   '/items/$itemId': typeof ItemsItemIdRoute
   '/items/new': typeof ItemsNewRoute
@@ -50,20 +58,23 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/events': typeof EventsRoute
   '/settings': typeof SettingsRoute
   '/items/$itemId': typeof ItemsItemIdRoute
   '/items/new': typeof ItemsNewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/settings' | '/items/$itemId' | '/items/new'
+  fullPaths: '/' | '/events' | '/settings' | '/items/$itemId' | '/items/new'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/settings' | '/items/$itemId' | '/items/new'
-  id: '__root__' | '/' | '/settings' | '/items/$itemId' | '/items/new'
+  to: '/' | '/events' | '/settings' | '/items/$itemId' | '/items/new'
+  id:
+    '__root__' | '/' | '/events' | '/settings' | '/items/$itemId' | '/items/new'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  EventsRoute: typeof EventsRoute
   SettingsRoute: typeof SettingsRoute
   ItemsItemIdRoute: typeof ItemsItemIdRoute
   ItemsNewRoute: typeof ItemsNewRoute
@@ -76,6 +87,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/events': {
+      id: '/events'
+      path: '/events'
+      fullPath: '/events'
+      preLoaderRoute: typeof EventsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -104,6 +122,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  EventsRoute: EventsRoute,
   SettingsRoute: SettingsRoute,
   ItemsItemIdRoute: ItemsItemIdRoute,
   ItemsNewRoute: ItemsNewRoute,

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { categoryFrom, householdFrom, itemFrom } from './documents'
+import { Timestamp } from 'firebase/firestore'
+import { categoryFrom, householdFrom, itemFrom, logFrom } from './documents'
 
 describe('itemFrom', () => {
   it('reads a complete entry as it is', () => {
@@ -50,5 +51,17 @@ describe('categoryFrom and householdFrom', () => {
     expect(householdFrom({ calendarId: 'cal-1', ownerUid: 'u1', timeZone: 'Europe/Berlin' })).toEqual({ calendarId: 'cal-1', ownerUid: 'u1', timeZone: 'Europe/Berlin' })
     expect(householdFrom({ ownerUid: 'u1' })).toBeNull()
     expect(householdFrom({ calendarId: 'cal-1' })).toEqual({ calendarId: 'cal-1', ownerUid: '', timeZone: 'Europe/Berlin' })
+  })
+})
+
+describe('logFrom', () => {
+  it('reads a complete log and ignores malformed optional fields', () => {
+    const at = Timestamp.fromMillis(1_791_234_567_000)
+    expect(logFrom('log-1', { at, by: 'alice', itemId: 'item-1', kind: 'error', message: 'Google refused "Cinema"' })).toEqual({
+      at, by: 'alice', id: 'log-1', itemId: 'item-1', kind: 'error', message: 'Google refused "Cinema"',
+    })
+    expect(logFrom('log-2', { at: 'pending', by: 4, itemId: 7, kind: 'unknown', message: 8 })).toEqual({
+      at: null, by: '', id: 'log-2', kind: 'event', message: '',
+    })
   })
 })
