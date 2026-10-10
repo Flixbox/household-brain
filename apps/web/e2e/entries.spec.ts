@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { resetEmulators, seedDocument } from './emulators'
 import { mockGoogle } from './google-mocks'
-import { signInAllowlisted } from './session'
+import { openMenu, signInAllowlisted } from './session'
 
 const CALENDAR = 'household@group.calendar.google.test'
 
@@ -96,6 +96,17 @@ test('entries: categories and the form, added, edited, deleted, and a double-tap
     await page.getByRole('button', { name: 'Delete entry' }).click()
     await expect(coupons.getByRole('link', { name: /Amazon/u })).toHaveCount(0)
     await expect.poll(() => google.live().length).toBe(0)
+
+    await test.step('the history lists the entry being added, edited and deleted', async () => {
+      await openMenu(page)
+      await page.getByRole('link', { name: 'Logs' }).click()
+      await expect(page.getByRole('heading', { name: 'Logs' })).toBeVisible()
+      await expect(page.getByText('Added "Amazon"', { exact: true })).toBeVisible()
+      await expect(page.getByText('Edited "Amazon"', { exact: true })).toHaveCount(2)
+      await expect(page.getByText('Deleted "Amazon"', { exact: true })).toBeVisible()
+      await openMenu(page)
+      await page.getByRole('link', { name: 'Entries' }).click()
+    })
   })
 
   await test.step('a double-tapped Save creates one entry, and deleting it while it syncs removes the event too', async () => {

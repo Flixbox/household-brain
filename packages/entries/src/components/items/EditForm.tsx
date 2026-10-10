@@ -31,7 +31,7 @@ export const EditForm = ({ item, categories }: { item: Item, categories: Categor
   }
   const remove = () => {
     requestSyncAccess()
-    return after(removeItem(item.id))
+    return after(removeItem(item))
   }
   return (
     <>

@@ -1,6 +1,7 @@
 import { CalendarApiError, type EventCursor, type EventPage } from '@household-brain/entries/lib/calendar/api'
+import type { Category } from '@household-brain/entries/lib/categories'
 import type { CalendarEvent } from './event'
-import { READING_RULES, normalisationFor, ownRemindersFix, rulesReadWith } from './from-event'
+import { READING_RULES, draftFrom, normalisationFor, ownRemindersFix, rulesReadWith } from './from-event'
 import { type PullDecision, decidePull } from './pull-plan'
 import { applyDateChange, applyPulled, dropStray, forgetDateEvents, markSchema, readEntryFromCache, readEntryFromServer, readSyncToken, recordEtag, removeVanished, saveSyncToken, serverNow } from './pull-store'
 import { APP_SCHEMA, entryOfEvent, isOrphanDate } from './date-events'
@@ -10,6 +11,19 @@ import type { Item, ItemDraft } from './model'
 import type { PushContext } from './push'
 import { isTransient } from './transient'
 import { importTasks } from './tasks-puller'
+import { logError, logGoogleChange } from '@household-brain/entries/lib/logs'
+
+const pullLogMessages = { failure: 'Google Calendar pull failed', problem: 'Google Calendar pull had a problem' } as const
+const loggedPullProblems = new Set<keyof typeof pullLogMessages>()
+
+export const logPullProblem = (kind: keyof typeof pullLogMessages): void => {
+  if (!loggedPullProblems.has(kind)) {
+    loggedPullProblems.add(kind)
+    logError(pullLogMessages[kind])
+  }
+}
+
+export const resetPullProblems = (): void => loggedPullProblems.clear()
 
 /**
  * Pulls what changed in Google Calendar since the last pull: each changed event
@@ -24,6 +38,20 @@ import { importTasks } from './tasks-puller'
 
 const isStatus = (error: unknown, status: number) => error instanceof CalendarApiError && error.status === status
 const describe = (error: unknown) => (error instanceof Error ? error.message : String(error))
+const actionFor = (kind: PullDecision['kind']): string => {
+  if (kind === 'create') {
+    return 'Added'
+  }
+  return kind === 'delete' ? 'Removed' : 'Changed'
+}
+
+const logEntryDecision = (event: CalendarEvent, decision: PullDecision, categories: readonly Category[]): void => {
+  if (!event.id || decision.kind === 'skip' || (decision.kind === 'update' && !decision.normalise && Object.keys(decision.fields).length === 0)) {
+    return
+  }
+  const title = decision.kind === 'delete' ? draftFrom(event, categories).title : decision.draft.title
+  logGoogleChange(actionFor(decision.kind), title, event.id)
+}
 
 const normalise = async (context: PushContext, event: CalendarEvent, patch: CalendarEvent): Promise<string | null> => {
   const target = { calendarId: context.config.calendarId, eventId: event.id ?? '' }
@@ -71,10 +99,13 @@ const applyDateEvent = async (context: PushContext, event: CalendarEvent, entryI
   const eventId = event.id ?? ''
   const dateId = eventId.slice(entryId.length + 1)
   await dropStray(eventId)
-  if (!isOrphanDate(await ownerOf(entryId, dateId), dateId)) {
+  const owner = await ownerOf(entryId, dateId)
+  if (!isOrphanDate(owner, dateId)) {
     // Moved or deleted in Google: the entry follows; edited otherwise: it is put back (#34).
     const eventContext = { categories: context.categories, timeZone: context.config.timeZone }
-    await applyDateChange(entryId, dateId, entry => dateEventChange({ dateId, event, item: entry }, eventContext))
+    if (await applyDateChange(entryId, dateId, entry => dateEventChange({ dateId, event, item: entry }, eventContext)) && owner) {
+      logGoogleChange('Changed', owner.title, entryId)
+    }
     return null
   }
   return event.status === 'cancelled'
@@ -104,6 +135,7 @@ const applyEntryEvent = async (context: PushContext, event: CalendarEvent, reche
   const { categories, uid } = context
   const removed = await removeDatesOfDeleted(context, event)
   const decision = await applyPulled(event, entry => decidePull({ categories, entry, event, recheck, uid }))
+  logEntryDecision(event, decision, categories)
   // Edited here between the read and the transaction, so the entry stays: its date events are rewritten.
   if (removed !== null && decision.kind !== 'delete') {
     await forgetDateEvents(event.id ?? '')

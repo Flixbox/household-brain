@@ -57,6 +57,6 @@ export const recordFor = ({ latest, pushed, outcome, uid, remote }: PushResult):
 
 /** A failed push is only recorded if nothing changed meanwhile; a newer change gets its own attempt. */
 export const errorFor = (latest: Item | null, pushed: Item, message: string): PushRecord =>
-  latest?.rev === pushed.rev
+  latest?.rev === pushed.rev && !(latest.sync === 'error' && latest.syncError === message)
     ? { fields: { sync: 'error', syncError: message }, kind: 'update' }
     : { kind: 'nothing' }

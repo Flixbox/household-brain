@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as LogsRouteImport } from './routes/logs'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ItemsItemIdRouteImport } from './routes/items.$itemId'
 import { Route as ItemsNewRouteImport } from './routes/items.new'
@@ -17,6 +18,11 @@ import { Route as ItemsNewRouteImport } from './routes/items.new'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LogsRoute = LogsRouteImport.update({
+  id: '/logs',
+  path: '/logs',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -37,12 +43,14 @@ const ItemsNewRoute = ItemsNewRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/logs': typeof LogsRoute
   '/settings': typeof SettingsRoute
   '/items/$itemId': typeof ItemsItemIdRoute
   '/items/new': typeof ItemsNewRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/logs': typeof LogsRoute
   '/settings': typeof SettingsRoute
   '/items/$itemId': typeof ItemsItemIdRoute
   '/items/new': typeof ItemsNewRoute
@@ -50,20 +58,22 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/logs': typeof LogsRoute
   '/settings': typeof SettingsRoute
   '/items/$itemId': typeof ItemsItemIdRoute
   '/items/new': typeof ItemsNewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/settings' | '/items/$itemId' | '/items/new'
+  fullPaths: '/' | '/logs' | '/settings' | '/items/$itemId' | '/items/new'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/settings' | '/items/$itemId' | '/items/new'
-  id: '__root__' | '/' | '/settings' | '/items/$itemId' | '/items/new'
+  to: '/' | '/logs' | '/settings' | '/items/$itemId' | '/items/new'
+  id: '__root__' | '/' | '/logs' | '/settings' | '/items/$itemId' | '/items/new'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  LogsRoute: typeof LogsRoute
   SettingsRoute: typeof SettingsRoute
   ItemsItemIdRoute: typeof ItemsItemIdRoute
   ItemsNewRoute: typeof ItemsNewRoute
@@ -76,6 +86,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/logs': {
+      id: '/logs'
+      path: '/logs'
+      fullPath: '/logs'
+      preLoaderRoute: typeof LogsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -104,6 +121,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  LogsRoute: LogsRoute,
   SettingsRoute: SettingsRoute,
   ItemsItemIdRoute: ItemsItemIdRoute,
   ItemsNewRoute: ItemsNewRoute,

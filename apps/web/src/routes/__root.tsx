@@ -12,6 +12,7 @@ const menu = (
   <>
     <Link to="/" onClick={closeMenu} className={menuLink}>Entries</Link>
     <Link to="/settings" onClick={closeMenu} className={menuLink}>Settings</Link>
+    <Link to="/logs" onClick={closeMenu} className={menuLink}>Logs</Link>
   </>
 )
 

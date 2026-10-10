@@ -49,6 +49,21 @@ service cloud.firestore {
         && isText(request.resource.data, 'label', 200);
     }
 
+    match /logs/{id} {
+      allow read: if allowed();
+      allow create: if allowed()
+        && request.resource.data.keys().hasOnly(['at', 'by', 'kind', 'message', 'itemId'])
+        && request.resource.data.by == request.auth.uid
+        && request.resource.data.kind in ['error', 'event']
+        && request.resource.data.message is string
+        && request.resource.data.message.size() <= 2000
+        && isText(request.resource.data, 'itemId', 200)
+        && request.resource.data.at == request.time;
+      allow update: if false;
+      allow delete: if allowed()
+        && resource.data.at < request.time - duration.value(90, 'd');
+    }
+
     // The household's calendar, owner and time zone. Setup writes it once; after that the app can't
     // change it, so a hijacked session can't redirect the sync or make itself the owner. Only a
     // config still lacking its calendar (an interrupted setup) can be completed.
