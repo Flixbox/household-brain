@@ -1,3 +1,4 @@
+/* oxlint-disable import/no-nodejs-modules -- a build step: runs on Bun at build time, never in the browser */
 /**
  * Builds the app with Bun's bundler, from index.html:
  *

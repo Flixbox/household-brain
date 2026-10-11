@@ -1,3 +1,4 @@
+/* oxlint-disable import/no-nodejs-modules -- a build step: runs on Bun at build time, never in the browser */
 import { recordOf } from '@household-brain/core/lib/read'
 import { dirname, join } from 'node:path'
 

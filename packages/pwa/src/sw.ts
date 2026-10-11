@@ -1,3 +1,5 @@
+/* oxlint-disable typescript/no-unsafe-assignment, typescript/no-unsafe-call, typescript/no-unsafe-member-access -- the type-aware lint reads tsconfig.json, which leaves the worker out; tsc checks it through tsconfig.sw.json */
+/* oxlint-disable eslint/no-underscore-dangle -- `__SW_MANIFEST` is Serwist's fixed name for the precache list */
 import { type PrecacheEntry, Serwist, type SerwistGlobalConfig } from 'serwist'
 
 declare global {

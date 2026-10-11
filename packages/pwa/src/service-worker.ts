@@ -1,3 +1,4 @@
+/* oxlint-disable import/no-nodejs-modules -- a build step: runs on Bun at build time, never in the browser */
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { injectManifest } from '@serwist/build'
