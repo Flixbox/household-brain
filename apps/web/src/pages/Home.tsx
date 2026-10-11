@@ -1,11 +1,12 @@
-import { Link, createFileRoute } from '@tanstack/react-router'
 import { ItemList } from '@household-brain/entries/components/items/ItemList'
 import { useHousehold } from '@household-brain/entries/lib/calendar/use-household'
 import { useCategories, useItems } from '@household-brain/entries/lib/items/use-items'
 import { useStore } from '@nanostores/react'
 import { $user } from '@household-brain/firebase/user'
+import { Link } from 'wouter'
+import { paths } from '@household-brain/entries/lib/paths'
 
-const Home = () => {
+export const Home = () => {
   const user = useStore($user)
   const household = useHousehold()
   const items = useItems()
@@ -24,7 +25,7 @@ const Home = () => {
         <p className="rounded-lg bg-orange-100 px-4 py-3 text-orange-950 dark:bg-orange-950 dark:text-orange-100">
           The household calendar isn&apos;t set up yet.
           {' '}
-          <Link to="/settings" className="font-semibold underline">Set it up in Settings</Link>
+          <Link href={paths.settings} className="font-semibold underline">Set it up in Settings</Link>
           .
         </p>
       )}
@@ -32,7 +33,3 @@ const Home = () => {
     </section>
   )
 }
-
-export const Route = createFileRoute('/')({
-  component: Home,
-})

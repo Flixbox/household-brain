@@ -265,8 +265,6 @@ adapted to this repository:
 
 ### Shell
 
-- **Quote file paths that contain `$`.** TanStack route files are named like `items.$itemId.tsx`;
-  unquoted in a shell command, `$itemId` expands to nothing and the file becomes `items..tsx`.
 - **A pipe hides the exit code.** `bun run lint | tail` succeeds even when lint fails, and a commit
   chained after it with `&&` went through with a lint error. Check `${PIPESTATUS[0]}`, use
   `set -o pipefail`, or don't pipe a command whose exit code matters.
@@ -351,13 +349,12 @@ adapted to this repository:
   from the repository root, with `bun test` for their logic. The one shell file is
   `packages/tooling/install-bun.sh`: it installs Bun, so it can't be a Bun program. There is no
   `scripts/` folder.
-- **Routes are files in `apps/web/src/routes`** (TanStack Router). `routeTree.gen.ts` is generated,
-  never edited: by the Nx `routes` target, which `build`, `build:e2e` and `typecheck` depend on, and
-  by `tsr watch` during `dev` (#147, #153).
+- **Pages are routed with `wouter`** (#164): `apps/web/src/App.tsx` lists the page addresses, each
+  page is a component in `apps/web/src/pages/`. No generated route tree, no extra build step.
 - **The repo is an Nx workspace** (Bun workspaces): `apps/web` is the app, `packages/*` are
   features and shared code, consumed as TypeScript source (modules exported by path, no build
   step). A new feature, e.g. a shopping list, becomes its own `packages/<name>`,
-  and `apps/web` routes render what it exports. Packages never import from `apps/web`.
+  and `apps/web` pages render what it exports. Packages never import from `apps/web`.
   A new package also goes into the `workspace:*` exceptions in `npmpackagejsonlint.config.ts`
   (exceptions are exact names), and gets its own `package.json` and `tsconfig.json`.
 - **The shell knows no features.** `packages/shell` is the frame (layout, sign-in gate, update
@@ -383,6 +380,10 @@ adapted to this repository:
   values from outside React read during render: the compiler takes them as unchanging, so read
   them through a store (`useStore($user)`, not `auth.currentUser`). Components need a name
   (`const RootLayout = () => …`); an anonymous one isn't compiled.
+- **An effect returns only a cleanup function.** Write `useEffect(() => { doIt() }, [])` with a block
+  unless `doIt` returns the cleanup: React calls whatever an effect returns, and Chrome's `scrollTo`
+  returns a promise, so an expression body blanked the app when a page was left (#165). TypeScript
+  doesn't catch it.
 - **No barrel files.** No `index.ts` that re-exports a package's modules: barrels pull every module
   into whatever imports one of them, which defeats tree shaking and code splitting. Packages
   expose their modules by path through `exports` patterns in `package.json` (e.g.

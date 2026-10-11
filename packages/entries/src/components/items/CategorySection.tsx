@@ -1,4 +1,5 @@
-import { Link } from '@tanstack/react-router'
+import { Link } from 'wouter'
+import { newItemPath } from '@household-brain/entries/lib/paths'
 import type { Category } from '@household-brain/entries/lib/categories'
 import type { Item } from '@household-brain/entries/lib/items/model'
 import { toggleCollapsed } from '@household-brain/entries/lib/items/collapsed'
@@ -40,7 +41,7 @@ export const CategorySection = ({ category, items, collapsed, foldable = true }:
               </span>
             )}
         </h2>
-        <Link to="/items/new" search={{ category: category.slug }} aria-label={`Add ${category.label}`} className="text-xl font-semibold text-orange-700 dark:text-orange-400">+</Link>
+        <Link href={newItemPath(category.slug)} aria-label={`Add ${category.label}`} className="text-xl font-semibold text-orange-700 dark:text-orange-400">+</Link>
       </div>
       <ul id={listId} hidden={collapsed}>
         {items.map(item => <ItemRow key={item.id} item={item} />)}

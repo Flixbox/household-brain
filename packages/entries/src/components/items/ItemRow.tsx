@@ -1,9 +1,9 @@
-import { Link } from '@tanstack/react-router'
+import { Link } from 'wouter'
+import { itemPath } from '@household-brain/entries/lib/paths'
 import { useStore } from '@nanostores/react'
 import type { Item } from '@household-brain/entries/lib/items/model'
 import { startLabel } from '@household-brain/entries/lib/items/due'
 import { $now } from '@household-brain/entries/lib/items/now'
-import { requestSyncAccess } from '@household-brain/entries/lib/items/outbox'
 import { markDone } from '@household-brain/entries/lib/items/swipe'
 import { extraDatesOf, nextDate } from '@household-brain/entries/lib/items/dates'
 import { useSwipeToDone } from './use-swipe'
@@ -23,18 +23,13 @@ export const ItemRow = ({ item, category }: { item: Item, category?: string }) =
   const more = item.status === 'open' && extraDatesOf(item).length > 0 ? ' + more' : ''
   const since = startLabel(item.startDate, now)
   const price = usePrice(item, now.toPlainDate().toString())
-  const { handlers, offset } = useSwipeToDone(() => {
-    // Asks Google for access while the gesture still counts as a click, like Save does.
-    requestSyncAccess()
-    markDone(item)
-  }, item.status === 'open')
+  const { handlers, offset } = useSwipeToDone(() => markDone(item), item.status === 'open')
   return (
     // The green "Done" shows behind the row while it is swiped.
     <li className="relative overflow-hidden rounded-lg">
       {offset < 0 && <span aria-hidden="true" className="absolute inset-y-0 right-0 flex items-center rounded-lg bg-green-700 px-4 text-sm font-semibold text-white">Done</span>}
       <Link
-        to="/items/$itemId"
-        params={{ itemId: item.id }}
+        href={itemPath(item.id)}
         // A native link drag would take over the pointer and stop the swipe.
         draggable={false}
         onClickCapture={handlers.handleClickCapture}

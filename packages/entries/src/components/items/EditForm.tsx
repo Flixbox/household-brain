@@ -1,4 +1,3 @@
-import { useNavigate } from '@tanstack/react-router'
 import { useEffect } from 'react'
 import type { Category } from '@household-brain/entries/lib/categories'
 import { type Item, type ItemDraft, draftOf } from '@household-brain/entries/lib/items/model'
@@ -6,11 +5,13 @@ import { refreshNow, requestSyncAccess } from '@household-brain/entries/lib/item
 import { editItem, removeItem, setExtraDates } from '@household-brain/entries/lib/items/store'
 import { type EntryDate, sameDates } from '@household-brain/entries/lib/items/dates'
 import { reportWriteFailure } from '@household-brain/entries/lib/items/write-failures'
+import { useLocation } from 'wouter'
+import { paths } from '@household-brain/entries/lib/paths'
 import { ItemForm } from './ItemForm'
 
 /** Edit and delete one entry. */
 export const EditForm = ({ item, categories }: { item: Item, categories: Category[] }) => {
-  const navigate = useNavigate()
+  const [, navigate] = useLocation()
   // Fetch Google's latest now; when it arrives, the fields not edited yet follow it (ItemForm).
   useEffect(() => {
     refreshNow().catch(() => null)
@@ -18,7 +19,8 @@ export const EditForm = ({ item, categories }: { item: Item, categories: Categor
   const current = draftOf(item)
   const after = (write: Promise<unknown>) => {
     write.catch(reportWriteFailure)
-    return navigate({ to: '/' })
+    navigate(paths.home)
+    return Promise.resolve()
   }
   // Each handler asks Google first, inside the click, and saves without waiting for the server.
   // Saved: what differs from the newest version the form has seen, i.e. only fields typed in here

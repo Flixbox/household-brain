@@ -5,10 +5,7 @@
   "type": "module",
   "license": "Unlicense",
   "scripts": {
-    "dev": "bun run --parallel dev:routes dev:server",
-    "dev:routes": "tsr watch",
-    "dev:server": "bun --bun vite",
-    "routes": "tsr generate",
+    "dev": "bun --bun vite",
     "build": "tsc -b && bun --bun vite build && pwa-build dist",
     "preview": "bun --bun vite preview",
     "typecheck": "tsc -b",
@@ -22,54 +19,18 @@
     "@household-brain/pwa": "workspace:*",
     "@household-brain/shell": "workspace:*",
     "@nanostores/react": "2.0.1",
-    "@tanstack/react-router": "1.170.41",
     "firebase": "13.0.0",
     "nanostores": "1.5.5",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "wouter": "3.13.0"
   },
   "devDependencies": {
     "@babel/core": "7.29.7",
     "@rolldown/plugin-babel": "0.2.4",
     "@tailwindcss/vite": "4.3.3",
-    "@tanstack/router-cli": "1.167.40",
     "@vitejs/plugin-react": "6.1.2",
     "babel-plugin-react-compiler": "1.0.0",
     "tailwindcss": "4.3.3"
-  },
-  "nx": {
-    "targets": {
-      "routes": {
-        "cache": true,
-        "inputs": [
-          "{projectRoot}/src/routes/**/*",
-          "{projectRoot}/tsr.config.json",
-          {
-            "externalDependencies": [
-              "@tanstack/router-cli"
-            ]
-          }
-        ],
-        "outputs": [
-          "{projectRoot}/src/routeTree.gen.ts"
-        ]
-      },
-      "build": {
-        "dependsOn": [
-          "^build",
-          "routes"
-        ]
-      },
-      "build:e2e": {
-        "dependsOn": [
-          "routes"
-        ]
-      },
-      "typecheck": {
-        "dependsOn": [
-          "routes"
-        ]
-      }
-    }
   }
 }
