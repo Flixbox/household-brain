@@ -28,7 +28,7 @@ that work with the owner's account.
 
 - **Pull requests and comments:** `agent-gh pr create --assignee Flixbox …`, `agent-gh pr comment …`.
   Every pull request is assigned to the owner (`Flixbox`), always.
-- **Project watcher:** `GH=agent-gh /tmp/watch-project.sh`. It still reads comments with the owner's
+- **Project watcher:** `GH=agent-gh bun packages/tooling/src/watch-project.ts`. It still reads comments with the owner's
   login, because only the owner's account can see the owner's pending (unsubmitted) reviews.
 - **What the bot can't do**, on purpose: change repository settings or rulesets, merge past checks,
   or approve. Settings changes the owner asks for are made with the owner's `gh` login. Merging is
@@ -46,17 +46,17 @@ deploy is green. Never stack pull requests or work on two in parallel: the owner
 which rewrites the history a stacked branch is built on, and every open PR is one more thing for
 the owner to track.
 
-**Keep each pull request tight: one topic.** Side findings, refactors and tooling tweaks go into
-their own follow-up PR, never along for the ride.
+**One pull request per coherent change** (owner's rule): one feature, one fix or one refactor, whole.
+Side findings, refactors and tooling tweaks go into their own follow-up PR, never along for the
+ride. This rule outranks the next one: a coherent change is never split just to make PRs smaller.
 
-**Keep each pull request low in complexity** (owner's rule). Prefer the simplest change that does
-the job, an out-of-the-box solution over a hand-built one, and a dependency over in-house machinery.
-Where complexity is unavoidable, encapsulate it in a dependency or a separate package instead of
-spreading it through the app, and split a large change into several small PRs that each stand alone
-(e.g. #146: the router #147 and the PWA #148 each get their own).
+**Keep each pull request low in complexity** (owner's rule), within that change. Prefer the simplest
+solution that does the job, an out-of-the-box one over a hand-built one, and a dependency over
+in-house machinery. Where complexity is unavoidable, encapsulate it in a dependency or a separate
+package instead of spreading it through the app.
 
 **No pull requests that only change docs.** A README or agent-note change (a new rule, a docs issue)
-rides along with the next real feature, refactor or fix PR, the one exception to "one topic", and
+rides along with the next real feature, refactor or fix PR, the one exception to "one coherent change", and
 that PR's description says so and closes the docs issue.
 
 **Abstract only when it pays.** Introduce or extend a shared helper, or file an issue proposing one,
@@ -123,7 +123,7 @@ adapted to this repository:
 - **Record only the e2e build with demo data**, never the live app: it shows the household's real
   entries, and pull requests are public. CI films every e2e test and uploads the videos per device
   (`e2e-videos-<device>`), so the journey step that covers the change is the recording.
-- Turn it into a GIF with `scripts/pr-gif.sh` (`fetch`, then `sheet` to find the seconds, then `gif`),
+- Turn it into a GIF with `bun packages/tooling/src/pr-gif.ts` (`fetch`, then `sheet` to find the seconds, then `gif`),
   from the run of the commit the description talks about. At most 10 MB.
 - Publish it on the `assets` branch (an orphan branch that is never merged) and embed it in the
   description as `![what it shows](https://github.com/Flixbox/household-brain/blob/assets/pr-<n>-<what>.gif?raw=true)`.
@@ -141,7 +141,7 @@ adapted to this repository:
 2. **Keep the project watcher running in the background**, and let its exit wake you:
 
    ```sh
-   cp scripts/watch-project.sh /tmp/watch-project.sh && GH=agent-gh /tmp/watch-project.sh
+   GH=agent-gh bun packages/tooling/src/watch-project.ts
    ```
 
    - One watcher for the whole project: every open PR, merged ones until their deploy, `main`'s CI,
@@ -150,7 +150,8 @@ adapted to this repository:
    - It follows each PR's **current** head commit, so a push needs no restart.
    - It remembers what it already reported, so after handling an event you simply start it again and
      it continues with the next one.
-   - It runs from a copy, because bash reads a script while running it.
+   - Bun reads the whole program before running it, so checking out or editing the tooling under a
+     running watcher is harmless (the bash watcher had to run from a copy).
    - It stays armed through the merge and reports the deploy. Don't poll by hand alongside it.
    - It watches `main` too, also between PRs: every new commit (`MAIN_ADVANCED`), failing or
      hanging runs (`MAIN_FAILED`, `MAIN_SLOW`), and new commits an open PR lacks (`MAIN_MOVED`).
@@ -236,7 +237,7 @@ adapted to this repository:
   silently for 1.5 hours in CI because nothing put a limit on it (GitHub's default is 6 hours).
 - **CI test reporters must stream progress** (`list`), not only write a report at the end. With
   `github` + `html` alone, a hang produced no output at all after "Running 12 tests".
-- **Watch a pipeline with a deadline**: `scripts/watch-project.sh` (see the babysitting guide above).
+- **Watch a pipeline with a deadline**: `packages/tooling/src/watch-project.ts` (see the babysitting guide above).
 - **Each push to a PR branch cancels the running CI** (`concurrency` with `cancel-in-progress`).
   Batch fixes into one push, or no run ever finishes.
 - **Pushing anything under `.github/workflows/` needs the `workflow` scope** on the GitHub token
@@ -247,10 +248,6 @@ adapted to this repository:
   even started. Always filter by workflow (`--workflow ci.yml`).
 - **Right after a push, GitHub can still report the PR's previous head commit.** A watcher using
   `--pr` then watched the cancelled run of the old commit. Watch by the commit you just pushed.
-
-- **Run the watcher from a copy of the script**, e.g. in a scratch directory. Bash reads a script
-  while running it, so editing or checking out `scripts/watch-project.sh` under a running one corrupts
-  it.
 
 - **Stacked PRs conflict after a squash merge.** PR 6 was built on PR 5's branch; squash-merging
   PR 5 rewrote that history and left PR 6 conflicting, unnoticed until the owner pointed it out. One
@@ -302,12 +299,12 @@ adapted to this repository:
   npm-package-json-lint); Dependabot bumps them. **No version younger than 48 hours** (#94):
   `install.minimumReleaseAge` in `bunfig.toml`. Bun checks it only when it resolves a version
   (`bun add`, `bun update`); a version already in `bun.lock` is installed unchecked, also with
-  `--frozen-lockfile`. So `scripts/check-package-age.ts` runs first in CI: it asks the npm registry
+  `--frozen-lockfile`. So `packages/tooling/src/check-package-age.ts` runs first in CI: it asks the npm registry
   when each version a change adds to `bun.lock` was published, and fails on one that is too young;
   wait and re-run. Dependabot waits as long (`cooldown`). An urgent exception goes into
   `install.minimumReleaseAgeExcludes` with its reason; the CI check reads it too. **GitHub Actions too**
-  (#102): `scripts/check-action-age.sh` runs first in CI and fails on a pinned action release younger
-  than 48 hours; Dependabot's `cooldown` counts loosely and let a younger one through (#101). Wait and re-run. Bun is pinned in `packageManager`, and with its checksum in `scripts/install-bun.sh`.
+  (#102): `packages/tooling/src/check-action-age.ts` runs first in CI and fails on a pinned action release younger
+  than 48 hours; Dependabot's `cooldown` counts loosely and let a younger one through (#101). Wait and re-run. Bun is pinned in `packageManager`, and with its checksum in `packages/tooling/install-bun.sh`.
 - **fallow** (`.fallowrc.jsonc`, part of `bun run lint`) fails on unused files, exports and
   dependencies, on duplication, and on imports across the package boundaries: `apps/web` may use
   every package; `shell` and `entries` only `firebase`; nothing imports `apps/web` (its e2e tests
@@ -317,7 +314,7 @@ adapted to this repository:
   production build with it set, and CI fails if `apps/web/dist/` mentions either. The emulators run
   as `demo-household-brain`, which can't reach real Google services.
 - **CI uses only GitHub-owned and `google-github-actions/*` actions**, pinned to full SHAs (a
-  repository setting); Bun is installed by `scripts/install-bun.sh` from its release (version and
+  repository setting); Bun is installed by `packages/tooling/install-bun.sh` from its release (version and
   checksum pinned), not through `oven-sh/setup-bun`, a third-party action.
 - **Never use the `pull_request_target` or `workflow_run` triggers** (both run code with the base
   repository's privileges), and never add self-hosted runners to this public repo.
@@ -346,6 +343,11 @@ adapted to this repository:
 
 ### Toolchain
 
+- **Repository tooling lives in `packages/tooling`** (#142), TypeScript run by Bun: the project
+  watcher, the GIF tool, CI's age checks and Node removal, each run as `bun packages/tooling/src/<tool>.ts`
+  from the repository root, with `bun test` for their logic. The one shell file is
+  `packages/tooling/install-bun.sh`: it installs Bun, so it can't be a Bun program. There is no
+  `scripts/` folder.
 - **The repo is an Nx workspace** (Bun workspaces): `apps/web` is the app, `packages/*` are
   features and shared code, consumed as TypeScript source (modules exported by path, no build
   step). A new feature, e.g. a shopping list, becomes its own `packages/<name>`,
@@ -391,7 +393,7 @@ adapted to this repository:
 - **Bun, and only Bun** (#140): it is the package manager (workspaces, `bun.lock`), the runtime of
   every script, Nx, the Firebase CLI and Playwright, and the unit test runner (`bun test`, imports
   from `bun:test`). There is no Node fallback: `bunfig.toml` sets `run.bun`, so whatever a script
-  starts as `node` runs on Bun, and CI removes the runners' own Node (`scripts/remove-node.sh`), so
+  starts as `node` runs on Bun, and CI removes the runners' own Node (`packages/tooling/src/remove-node.ts`), so
   anything that still reaches for it fails instead of quietly using it. Run tools through `bun run`
   (or `bun --bun <bin>`), never `npx`.
 - **Bun runs no dependency install scripts** except for packages in `trustedDependencies` in

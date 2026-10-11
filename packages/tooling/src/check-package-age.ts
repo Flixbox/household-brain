@@ -4,10 +4,13 @@
  * as it is, also with --frozen-lockfile (#140). So CI asks the npm registry when each version this
  * change adds to bun.lock was published, and fails on one younger than the setting.
  *
- *   bun scripts/check-package-age.ts <base-ref>    compares bun.lock with the one at <base-ref>
+ *   bun packages/tooling/src/check-package-age.ts <base-ref>    compares bun.lock with the one at <base-ref>
+ *
+ * Run from the repository root (it reads bun.lock and bunfig.toml there).
  */
 import { $ } from 'bun'
 import { Temporal } from 'temporal-polyfill'
+import { tooYoung } from './age'
 
 const REGISTRY = 'https://registry.npmjs.org'
 
@@ -46,12 +49,11 @@ const publishedAt = async (spec: string): Promise<Temporal.Instant | null> => {
 
 const bunfig: { install?: { minimumReleaseAge?: number, minimumReleaseAgeExcludes?: string[] } } = Bun.TOML.parse(await Bun.file('bunfig.toml').text())
 const install = bunfig.install ?? {}
-const oldest = Temporal.Now.instant().subtract({ seconds: install.minimumReleaseAge ?? 0 })
 const excluded = new Set(install.minimumReleaseAgeExcludes ?? [])
 
 const [, , base] = process.argv
 if (!base) {
-  throw new Error('Usage: bun scripts/check-package-age.ts <base-ref>')
+  throw new Error('Usage: bun packages/tooling/src/check-package-age.ts <base-ref>')
 }
 const before = await $`git show ${base}:bun.lock`.quiet().nothrow()
 // The change that brought bun.lock (#140) moved pnpm-checked versions over unchanged.
@@ -59,12 +61,12 @@ const known = before.exitCode === 0 ? lockedVersions(before.stdout.toString()) :
 const now = lockedVersions(await Bun.file('bun.lock').text())
 const added = known ? [...now].filter(spec => !known.has(spec) && !excluded.has(nameAndVersion(spec)[0])) : []
 
-const tooYoung = (await Promise.all(added.map(async spec => ({ published: await publishedAt(spec), spec }))))
-  .filter(({ published }) => published === null || Temporal.Instant.compare(published, oldest) > 0)
+const young = (await Promise.all(added.map(async spec => ({ published: await publishedAt(spec), spec }))))
+  .filter(({ published }) => published === null || tooYoung(published, install.minimumReleaseAge ?? 0))
 
 process.stdout.write(`${known ? added.length : 'No'} package versions to check against ${base}${known ? '' : ' (it has no bun.lock)'}\n`)
-if (tooYoung.length > 0) {
-  for (const { spec, published } of tooYoung) {
+if (young.length > 0) {
+  for (const { spec, published } of young) {
     process.stdout.write(`::error::${spec} was published ${published ? published.toString() : 'at an unknown time'}, less than ${install.minimumReleaseAge}s ago (#94). Wait and re-run.\n`)
   }
   process.exit(1)
