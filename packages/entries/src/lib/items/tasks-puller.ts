@@ -25,7 +25,7 @@ const takeTask = async (api: TasksApi, listId: string, task: GoogleTask): Promis
 }
 
 /** In order, one task after the other, as the calendar pull applies events. */
-const inOrder = <Entry>(entries: readonly Entry[], take: (entry: Entry) => Promise<void>): Promise<void> =>
+const inOrder = async <Entry>(entries: readonly Entry[], take: (entry: Entry) => Promise<void>): Promise<void> =>
   entries.reduce<Promise<void>>(async (previous, entry) => {
     await previous
     await take(entry)
@@ -34,14 +34,14 @@ const inOrder = <Entry>(entries: readonly Entry[], take: (entry: Entry) => Promi
 /** Every list, not just one: the Gemini app doesn't always use the list it was told to. */
 const importOpenTasks = async (api: TasksApi): Promise<void> => {
   await inOrder(await api.listTaskLists(), async list =>
-    inOrder((await api.listOpenTasks(list.id)).filter(task => task.id !== ''), task => takeTask(api, list.id, task)))
+    inOrder((await api.listOpenTasks(list.id)).filter(task => task.id !== ''), async task => takeTask(api, list.id, task)))
 }
 
 const tasksScopes = [...MEMBER_SCOPES, TASKS_SCOPE] as const
 const account = () => auth.currentUser?.email
 const tasksApi = createTasksApi({
   forgetToken: forgetCalendarToken,
-  token: () => {
+  token: async () => {
     const token = cachedCalendarToken(tasksScopes, account())
     return token ? Promise.resolve(token) : Promise.reject(new Error('Google Tasks access is no longer available'))
   },

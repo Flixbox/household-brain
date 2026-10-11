@@ -8,7 +8,7 @@
 import { $ } from 'bun'
 
 // Root in the Playwright container, a sudoer on the runners.
-const remove = (path: string) => (process.getuid?.() === 0 ? $`rm -f ${path}` : $`sudo rm -f ${path}`)
+const remove = async (path: string) => (process.getuid?.() === 0 ? $`rm -f ${path}` : $`sudo rm -f ${path}`)
 
 const removeAll = async (): Promise<void> => {
   const node = Bun.which('node')

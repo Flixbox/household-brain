@@ -36,7 +36,7 @@ const releasedAt = async ({ repo, sha, tag }: { repo: string, sha: string, tag: 
   return committed ? Temporal.Instant.from(committed) : null
 }
 
-const workflows = await Promise.all(Array.from(new Glob('.github/workflows/*.{yml,yaml}').scanSync('.')).map(path => Bun.file(path).text()))
+const workflows = await Promise.all(Array.from(new Glob('.github/workflows/*.{yml,yaml}').scanSync('.')).map(async path => Bun.file(path).text()))
 const pins = pinnedActions(workflows.join('\n'))
 // Every workflow pins its actions by commit: finding none means the scan itself broke.
 if (pins.length === 0) {

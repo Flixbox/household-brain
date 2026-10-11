@@ -75,7 +75,7 @@ const normalise = async (context: PushContext, event: CalendarEvent, patch: Cale
 }
 
 /** Before an entry goes here, its extra dates' events go from Google, so their reminders stop. */
-const removeDateEvents = (context: PushContext, entry: Item): Promise<string | null> =>
+const removeDateEvents = async (context: PushContext, entry: Item): Promise<string | null> =>
   deleteDateEvents(context, entry).then(() => null, (error: unknown) => reportUnlessTransient(`Couldn't remove the other dates of "${entry.title}" from Google Calendar`, error))
 
 /** The entry a date event belongs to: the cached copy when it still has the date, else the server's. */
@@ -173,7 +173,7 @@ const settleEntryEvent = async (context: PushContext, event: CalendarEvent, deci
 }
 
 /** Applies events one after another, in Google's order, collecting the problems. */
-const applyInOrder = (events: CalendarEvent[], apply: (event: CalendarEvent) => Promise<string | null>) =>
+const applyInOrder = async (events: CalendarEvent[], apply: (event: CalendarEvent) => Promise<string | null>) =>
   events.reduce<Promise<string[]>>(async (previous, event) => {
     const found = await previous
     const problem = await apply(event)
@@ -200,7 +200,7 @@ const pullPages = async (context: PushContext, syncToken: string | null, recheck
   const { events, nextSyncToken } = await listAll(context, syncToken ? { syncToken } : {})
   // Entries first, in Google's order (later changes to the same entry must land last), then the
   // extra dates' events, so each is judged against its entry as this listing left it.
-  const problems = await applyInOrder(events.filter(event => !entryOfEvent(event)), event => applyEntryEvent(context, event, recheck))
+  const problems = await applyInOrder(events.filter(event => !entryOfEvent(event)), async event => applyEntryEvent(context, event, recheck))
   if (listedSince) {
     await removeVanished(new Set(events.map(event => event.id ?? '')), listedSince, async entry => {
       const problem = await removeDateEvents(context, entry)
@@ -209,7 +209,7 @@ const pullPages = async (context: PushContext, syncToken: string | null, recheck
       }
     })
   }
-  const dateProblems = await applyInOrder(events.filter(event => entryOfEvent(event)), event => applyDateEvent(context, event, entryOfEvent(event) ?? ''))
+  const dateProblems = await applyInOrder(events.filter(event => entryOfEvent(event)), async event => applyDateEvent(context, event, entryOfEvent(event) ?? ''))
   if (nextSyncToken && nextSyncToken !== syncToken) {
     await saveSyncToken(context.uid, nextSyncToken, rulesReadWith(context.categories))
   }

@@ -31,7 +31,7 @@ test('entries: categories and the form, added, edited, deleted, and a double-tap
 
   await test.step('an entry is added, edited and deleted, and each change reaches Google Calendar', async () => {
     const coupons = page.getByRole('region', { name: 'Coupon' })
-    const synced = () => expect(page.getByText('not yet in Google Calendar')).toHaveCount(0)
+    const synced = async () => expect(page.getByText('not yet in Google Calendar')).toHaveCount(0)
 
     // Add, from the category's own "+" so the category is preselected.
     await page.getByRole('link', { name: 'Add Coupon' }).click()
@@ -188,7 +188,7 @@ test('entries: categories and the form, added, edited, deleted, and a double-tap
     await expect.poll(() => creditEvent()?.start).toMatchObject({ dateTime: '2027-01-31T17:00:00' })
 
     // In another currency it shows in that one, with its euro value at the day's rate.
-    await page.route('https://api.frankfurter.dev/**', route => route.fulfill({ json: [{ base: 'EUR', date: '2027-01-01', quote: 'USD', rate: 1.25 }] }))
+    await page.route('https://api.frankfurter.dev/**', async route => route.fulfill({ json: [{ base: 'EUR', date: '2027-01-01', quote: 'USD', rate: 1.25 }] }))
     await credit.click()
     await page.getByLabel('Currency').selectOption('USD')
     await page.getByRole('button', { name: 'Save' }).click()

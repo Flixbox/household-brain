@@ -16,7 +16,7 @@ const pullStamp = () => ({ rev: newEventId(), updatedAt: serverTimestamp() })
 const syncStateDoc = (uid: string) => doc(db, 'syncState', uid)
 
 /** Applies the decision for one pulled event in a transaction, and returns it. */
-export const applyPulled = (event: CalendarEvent, decide: (entry: Item | null) => PullDecision): Promise<PullDecision> =>
+export const applyPulled = async (event: CalendarEvent, decide: (entry: Item | null) => PullDecision): Promise<PullDecision> =>
   runTransaction(db, async transaction => {
     const ref = itemDoc(event.id ?? '')
     const snapshot = await transaction.get(ref)
@@ -34,7 +34,7 @@ export const applyPulled = (event: CalendarEvent, decide: (entry: Item | null) =
   })
 
 /** After the app adjusted an event: its etag and version, so the next pull sees it as our own. */
-export const recordEtag = (id: string, uid: string, event: CalendarEvent): Promise<void> =>
+export const recordEtag = async (id: string, uid: string, event: CalendarEvent): Promise<void> =>
   updateDoc(itemDoc(id), { [`etags.${uid}`]: event.etag ?? '', googleUpdated: event.updated ?? '' })
 
 /**
@@ -63,7 +63,7 @@ export const removeVanished = async (eventIds: ReadonlySet<string>, listedSince:
   const vanished = synced.docs.filter(entry => !eventIds.has(entry.id) && isDate(entry.get('dueDate')) && untouched(entry))
   // Their date events go first. A transient failure stops here, so the entries stay for the next full
   // listing; a refusal is reported by `beforeDelete` and the entries still go.
-  await Promise.all(vanished.map(entry => beforeDelete(itemFrom(entry.id, entry.data()))))
+  await Promise.all(vanished.map(async entry => beforeDelete(itemFrom(entry.id, entry.data()))))
   await Promise.all(vanished.map(async entry => {
     const removed = await runTransaction(db, async transaction => {
       const latest = await transaction.get(entry.ref)
@@ -103,7 +103,7 @@ export const serverNow = async (uid: string): Promise<Timestamp> => {
   return startedAt
 }
 
-export const saveSyncToken = (uid: string, syncToken: string, readingRules: number): Promise<void> =>
+export const saveSyncToken = async (uid: string, syncToken: string, readingRules: number): Promise<void> =>
   setDoc(syncStateDoc(uid), { readingRules, syncToken }, { merge: true })
 
 /**
@@ -111,7 +111,7 @@ export const saveSyncToken = (uid: string, syncToken: string, readingRules: numb
  * didn't know them may have made one from it anyway, under the event's id: that stray is removed,
  * in Firestore only (nothing is pushed).
  */
-export const dropStray = (eventId: string): Promise<void> =>
+export const dropStray = async (eventId: string): Promise<void> =>
   runTransaction(db, async transaction => {
     const ref = itemDoc(eventId)
     if ((await transaction.get(ref)).exists()) {
@@ -131,7 +131,7 @@ export const readEntryFromServer = async (id: string): Promise<Item | null> => {
  * the entry, so a new revision), and for anything else the ledger forgets the event, so the outbox
  * writes it back.
  */
-export const applyDateChange = (entryId: string, dateId: string, decide: (entry: Item) => DateEventChange): Promise<boolean> =>
+export const applyDateChange = async (entryId: string, dateId: string, decide: (entry: Item) => DateEventChange): Promise<boolean> =>
   runTransaction(db, async transaction => {
     const ref = itemDoc(entryId)
     const snapshot = await transaction.get(ref)
@@ -170,7 +170,7 @@ const dateChangeFields = (entry: Item, dateId: string, change: DateEventChange):
  * After an entry's date events were deleted in Google but the entry stayed (edited here meanwhile):
  * they are written again.
  */
-export const forgetDateEvents = (id: string): Promise<void> =>
+export const forgetDateEvents = async (id: string): Promise<void> =>
   runTransaction(db, async transaction => {
     const snapshot = await transaction.get(itemDoc(id))
     const fields = snapshot.exists() ? staleLedger(itemFrom(snapshot.id, snapshot.data())) : {}
@@ -186,5 +186,5 @@ export const readEntryFromCache = async (id: string): Promise<Item | null> => {
 }
 
 /** Tells the other devices what this person's app handles (see APP_SCHEMA). */
-export const markSchema = (uid: string, schema: number): Promise<void> =>
+export const markSchema = async (uid: string, schema: number): Promise<void> =>
   setDoc(syncStateDoc(uid), { schema }, { merge: true })

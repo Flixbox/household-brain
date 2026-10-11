@@ -70,7 +70,7 @@ const sayAndExit = (lines: readonly string[]): never => {
   return process.exit(0)
 }
 
-const inOrder = <Item>(items: readonly Item[], each: (item: Item) => Promise<unknown>): Promise<void> =>
+const inOrder = async <Item>(items: readonly Item[], each: (item: Item) => Promise<unknown>): Promise<void> =>
   items.reduce<Promise<void>>(async (previous, item) => {
     await previous
     await each(item)
@@ -194,7 +194,7 @@ const checkOpen = async (pr: number, state: PrState): Promise<void> => {
   const reviewNews = commentsRead && !state.parked
   await (reviewNews ? checkReview(pr, state) : Promise.resolve())
   await checkRun(pr, state.head, 'pr')
-  await (reviewNews ? checkReady(pr, state).then(() => checkMoved(pr, state.head)) : Promise.resolve())
+  await (reviewNews ? checkReady(pr, state).then(async () => checkMoved(pr, state.head)) : Promise.resolve())
 }
 
 const checkPr = async (pr: number): Promise<void> => {
@@ -234,10 +234,10 @@ const checkIssues = async (): Promise<void> => {
 }
 
 /** Issue lines for what was closed or reopened between `before` and `now`; null when a lookup failed. */
-const issueChanges = (before: string[], now: string[]): Promise<string[] | null> =>
+const issueChanges = async (before: string[], now: string[]): Promise<string[] | null> =>
   Promise.all([
-    ...before.filter(issue => !now.includes(issue)).map(issue => issueLine(Number(issue), 'closed')),
-    ...now.filter(issue => !before.includes(issue)).map(issue => issueLine(Number(issue), 'reopened')),
+    ...before.filter(issue => !now.includes(issue)).map(async issue => issueLine(Number(issue), 'closed')),
+    ...now.filter(issue => !before.includes(issue)).map(async issue => issueLine(Number(issue), 'reopened')),
   ]).then(lines => lines.filter(line => line !== null), () => null)
 
 /** Issues closed or reopened since the last round. A failed lookup leaves the state as it was, so the next round tries again. */
@@ -280,7 +280,7 @@ const checkPrs = async (): Promise<void> => {
 }
 
 const watchRound = async (): Promise<void> => {
-  await inOrder([checkMain, checkMainHead, checkIssues, checkIssueStates, checkPrs], check => check())
+  await inOrder([checkMain, checkMainHead, checkIssues, checkIssueStates, checkPrs], async check => check())
   if (Temporal.Instant.compare(Temporal.Now.instant(), started.add({ hours: Number(maxHours) })) > 0) {
     sayAndExit([`IDLE: nothing happened for ${maxHours} h`])
   }

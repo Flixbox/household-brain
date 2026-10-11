@@ -26,5 +26,5 @@ serwist.addEventListeners()
 // Devices that installed the app before #148 still hold the Workbox caches of vite-plugin-pwa,
 // which Serwist doesn't know to clean up.
 self.addEventListener('activate', event => {
-  event.waitUntil(caches.keys().then(names => Promise.all(names.filter(name => name.startsWith('workbox-')).map(name => caches.delete(name)))))
+  event.waitUntil(caches.keys().then(async names => Promise.all(names.filter(name => name.startsWith('workbox-')).map(async name => caches.delete(name)))))
 })

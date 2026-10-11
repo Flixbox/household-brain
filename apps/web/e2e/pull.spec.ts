@@ -14,7 +14,7 @@ test.beforeEach(async () => {
 })
 
 /** The app pulls when it comes back to the foreground; this simulates that until `check` passes. */
-const pullUntil = (page: Page, check: () => Promise<number>, expected: number) =>
+const pullUntil = async (page: Page, check: () => Promise<number>, expected: number) =>
   expect.poll(async () => {
     await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')))
     return check()
@@ -75,10 +75,10 @@ test('events made in Google Calendar: taken in and shaped, left alone when put i
     await expect.poll(() => google.live().find(event => event.id === 'geminideal1')?.summary).toBe('[Coupon] Cinema 2 for 1')
 
     google.edit('madeingoogle1', { summary: '[Membership] Gym (renewed)' })
-    await pullUntil(page, () => page.getByRole('link', { name: /Gym \(renewed\)/u }).count(), 1)
+    await pullUntil(page, async () => page.getByRole('link', { name: /Gym \(renewed\)/u }).count(), 1)
 
     google.delete('madeingoogle1')
-    await pullUntil(page, () => page.getByRole('link', { name: /Gym/u }).count(), 0)
+    await pullUntil(page, async () => page.getByRole('link', { name: /Gym/u }).count(), 0)
   })
 
   await test.step('a connected Google Tasks inbox imports JSON tasks and leaves plain notes open', async () => {
@@ -93,7 +93,7 @@ test('events made in Google Calendar: taken in and shaped, left alone when put i
     })
     google.tasks.create('household-brain', { id: 'task-plain', notes: 'Remember the receipt', title: 'Unstructured note' })
     await page.goto('/')
-    await pullUntil(page, () => page.getByRole('link', { name: /Bowling night/u }).count(), 1)
+    await pullUntil(page, async () => page.getByRole('link', { name: /Bowling night/u }).count(), 1)
 
     await expect(page.getByRole('region', { name: 'Coupon' }).getByRole('link', { name: /Bowling night/u })).toContainText('2026-12-31')
     await expect.poll(() => google.tasks.live().find(task => task.id === 'task-json')?.status).toBe('completed')
@@ -149,13 +149,13 @@ test('events made in Google Calendar: taken in and shaped, left alone when put i
     }, { timeout: 15_000 }).toBe(true)
     const syncToken = await tokenNow()
     await seedDocument(`syncState/${uid}`, { schema: 4, syncToken })
-    await pullUntil(page, () => page.getByRole('region', { name: 'Coupon' }).getByRole('link', { name: /^Popcorn/u }).count(), 1)
+    await pullUntil(page, async () => page.getByRole('region', { name: 'Coupon' }).getByRole('link', { name: /^Popcorn/u }).count(), 1)
     await expect.poll(() => google.live().find(event => event.id === 'oldrules1')?.summary).toBe('[Coupon] Popcorn')
     await expect.poll(async () => (await readDocument(`syncState/${uid}`))?.readingRules).toEqual({ integerValue: '2' })
   })
 
   await test.step("an extra date's event in Google never becomes an entry, and a stray one is removed", async () => {
-    await expect.poll(() => readDocument(`items/${strayId}`)).toBeNull()
+    await expect.poll(async () => readDocument(`items/${strayId}`)).toBeNull()
     await expect(page.getByRole('link', { name: /Something|Stray/u })).toHaveCount(0)
     // This app version says so, for the devices that will write date events.
     await expect.poll(async () => (await readDocument(`syncState/${uid}`))?.schema).toEqual({ integerValue: '4' })

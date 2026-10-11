@@ -47,7 +47,7 @@ export const mockGoogle = async (page: Page, { calendarId = 'household@group.cal
       },
     })
   }, refuseFirstToken)
-  await page.route('https://accounts.google.com/gsi/client', route => route.fulfill({ body: '', contentType: 'text/javascript' }))
+  await page.route('https://accounts.google.com/gsi/client', async route => route.fulfill({ body: '', contentType: 'text/javascript' }))
 
   const requests: CalendarRequest[] = []
   const calendarList = new Map<string, Record<string, unknown>>()
@@ -64,7 +64,7 @@ export const mockGoogle = async (page: Page, { calendarId = 'household@group.cal
     events.set(id, { ...event, etag: `"v${version}"`, id, updated: updatedAt(version) })
     return events.get(id)
   }
-  const reply = (route: Route, status: number, body: unknown) => (status === 204
+  const reply = async (route: Route, status: number, body: unknown) => (status === 204
     ? route.fulfill({ headers: CORS, status })
     : route.fulfill({ body: JSON.stringify(body), contentType: 'application/json', headers: CORS, status }))
 
@@ -95,7 +95,7 @@ export const mockGoogle = async (page: Page, { calendarId = 'household@group.cal
       calendarList.set(id, { ...calendarList.get(id), ...recordOf(body) })
       await reply(route, 200, calendarList.get(id))
     } else if (path.includes('/events')) {
-      await handleEvent({ body, events, latest: () => version, listing, path, reply: (status, json) => reply(route, status, json), request, stored })
+      await handleEvent({ body, events, latest: () => version, listing, path, reply: async (status, json) => reply(route, status, json), request, stored })
     } else {
       await reply(route, 501, { error: { message: `Not mocked: ${request.method()} ${path}` } })
     }

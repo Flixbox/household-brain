@@ -19,7 +19,7 @@ const DIR = process.env.STATE_DIR ?? `${process.env.XDG_STATE_HOME ?? `${home}/.
 
 const stateFile = (name: string) => `${DIR}/${name}`
 
-export const exists = (name: string): Promise<boolean> => Bun.file(stateFile(name)).exists()
+export const exists = async (name: string): Promise<boolean> => Bun.file(stateFile(name)).exists()
 
 export const readLines = async (name: string): Promise<string[]> =>
   ((await exists(name)) ? (await Bun.file(stateFile(name)).text()).split('\n').filter(Boolean) : [])

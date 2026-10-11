@@ -8,7 +8,7 @@ declare global {
 }
 
 /** Opens the app menu (the drawer behind the top bar's button). */
-export const openMenu = (page: Page) => page.getByRole('button', { exact: true, name: 'Menu' }).click()
+export const openMenu = async (page: Page) => page.getByRole('button', { exact: true, name: 'Menu' }).click()
 
 /**
  * Clicks a "Sign out" button and waits until the app has deleted its offline data and reloaded
@@ -25,7 +25,7 @@ export const signOutWith = async (page: Page, button: Locator) => {
  */
 export const signInAs = async (page: Page, email: string) => {
   await page.waitForFunction(() => typeof window.e2eSignIn === 'function')
-  return page.evaluate(address => window.e2eSignIn(address), email)
+  return page.evaluate(async address => window.e2eSignIn(address), email)
 }
 
 /** Signs in, reads the user id from the no-access screen, allowlists it, and waits until access is granted. */

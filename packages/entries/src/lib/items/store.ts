@@ -38,7 +38,7 @@ export const addItem = (draft: ItemDraft, extraDates: EntryDate[] = []): { id: s
  * so a second device importing the same task meanwhile adds nothing. A transaction needs the server,
  * so offline it fails at once instead of waiting.
  */
-export const addImportedItem = (id: string, draft: ItemDraft, taskId: string): Promise<boolean> =>
+export const addImportedItem = async (id: string, draft: ItemDraft, taskId: string): Promise<boolean> =>
   runTransaction(db, async transaction => {
     const ref = itemDoc(id)
     if (!(await transaction.get(ref)).exists()) {
@@ -52,10 +52,10 @@ export const addImportedItem = (id: string, draft: ItemDraft, taskId: string): P
  * Saves an edit. Only fields that differ from what the form opened with are written and pushed, so
  * a change the other person made meanwhile to another field is kept.
  */
-const saveEdit = ({ draft, id, message, opened }: { draft: ItemDraft, id: string, message: string, opened: ItemDraft }): Promise<void> => {
+const saveEdit = async ({ draft, id, message, opened }: { draft: ItemDraft, id: string, message: string, opened: ItemDraft }): Promise<void> => {
   const changed = changedFields(opened, draft)
   if (changed.length === 0) {
-    return Promise.resolve()
+    return
   }
   const values = Object.fromEntries(changed.map(field => [field, draft[field]]))
   const written = updateDoc(itemDoc(id), {
@@ -77,11 +77,11 @@ const statusAction = (status: Item['status']): string => {
 
 const editAction = (opened: ItemDraft, draft: ItemDraft): string => draft.status === opened.status ? 'Edited' : statusAction(draft.status)
 
-export const editItem = (id: string, opened: ItemDraft, draft: ItemDraft): Promise<void> =>
+export const editItem = async (id: string, opened: ItemDraft, draft: ItemDraft): Promise<void> =>
   saveEdit({ draft, id, message: entryLogMessage(editAction(opened, draft), draft.title), opened })
 
 /** Sets an entry's status (e.g. done after a swipe): only the status is written and pushed. */
-export const setItemStatus = (item: Item, status: Item['status']): Promise<void> => saveEdit({
+export const setItemStatus = async (item: Item, status: Item['status']): Promise<void> => saveEdit({
   draft: { ...draftOf(item), status },
   id: item.id,
   message: entryLogMessage(statusAction(status), item.title),
@@ -92,21 +92,21 @@ export const setItemStatus = (item: Item, status: Item['status']): Promise<void>
  * Saves an entry's extra dates. The outbox then brings their Google events in line (`planDates`),
  * without marking the entry pending: its own event doesn't change.
  */
-export const setExtraDates = (id: string, extraDates: EntryDate[]): Promise<void> =>
+export const setExtraDates = async (id: string, extraDates: EntryDate[]): Promise<void> =>
   updateDoc(itemDoc(id), { ...stamp(), extraDates })
 
 /**
  * Marks an entry for deletion. Always through Google, even for an entry that looks unsynced: its
  * insert may have reached Google without the answer arriving. Deleting a missing event is harmless.
  */
-export const removeItem = (item: Pick<Item, 'id' | 'title'>): Promise<void> => {
+export const removeItem = async (item: Pick<Item, 'id' | 'title'>): Promise<void> => {
   const written = updateDoc(itemDoc(item.id), { ...stamp(), pendingOp: 'delete', sync: 'pending', syncError: null })
   logEvent(entryLogMessage('Deleted', item.title), item.id)
   return written
 }
 
 /** Applies a push record in a transaction; resolves to false when nothing could be recorded. */
-const apply = (item: Item, decide: (latest: Item | null) => PushRecord): Promise<boolean> =>
+const apply = async (item: Item, decide: (latest: Item | null) => PushRecord): Promise<boolean> =>
   runTransaction(db, async transaction => {
     const ref = itemDoc(item.id)
     const snapshot = await transaction.get(ref)
@@ -121,12 +121,12 @@ const apply = (item: Item, decide: (latest: Item | null) => PushRecord): Promise
   })
 
 /** Records a push; Google's event after it is read back as a draft with the household's categories. */
-export const recordPush = (item: Item, outcome: PushOutcome, { uid, categories }: { uid: string, categories: readonly Category[] }) => {
+export const recordPush = async (item: Item, outcome: PushOutcome, { uid, categories }: { uid: string, categories: readonly Category[] }) => {
   const remote = outcome.kind === 'synced' ? draftFrom(outcome.event, categories) : null
   return apply(item, latest => recordFor({ latest, outcome, pushed: item, remote, uid }))
 }
 
-export const recordPushError = (item: Item, error: unknown) => {
+export const recordPushError = async (item: Item, error: unknown) => {
   const message = stringify(error)
   return apply(item, latest => errorFor(latest, item, message)).then(recorded => {
     if (recorded) {
@@ -136,7 +136,7 @@ export const recordPushError = (item: Item, error: unknown) => {
   })
 }
 
-export const retryItem = (item: Item): Promise<void> =>
+export const retryItem = async (item: Item): Promise<void> =>
   updateDoc(itemDoc(item.id), { sync: 'pending', syncError: null })
 
 /**
@@ -144,7 +144,7 @@ export const retryItem = (item: Item): Promise<void> =>
  * it, with the error, so it isn't retried until the entry changes), or nothing after a delete. Skipped
  * when the entry is gone meanwhile.
  */
-export const recordDateOp = (item: Item, op: DateOp, error: string | null = null): Promise<void> =>
+export const recordDateOp = async (item: Item, op: DateOp, error: string | null = null): Promise<void> =>
   runTransaction(db, async transaction => {
     const ref = itemDoc(item.id)
     if (!(await transaction.get(ref)).exists()) {
