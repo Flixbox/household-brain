@@ -4,10 +4,7 @@ import { missingDefaults } from '@household-brain/entries/lib/categories'
 import { firestoreHouseholdStore } from './store'
 import { pruneCollapsed } from '@household-brain/entries/lib/items/collapsed'
 import { categoryFrom } from '@household-brain/entries/lib/documents'
-
-const ignore = (): void => {
-  // The defaults are added on a later start instead.
-}
+import { ignoreFailure } from '@household-brain/core/lib/ignore'
 
 /**
  * Keeps this device in line with the household's categories, acting only on the server's answer
@@ -29,7 +26,9 @@ export const watchDefaultCategories = (): () => void =>
       pruneCollapsed(categories.map(category => category.slug))
     }
     const missing = missingDefaults(categories)
+    // A failed write or a listener error (signed out, access removed) loses nothing: the next start
+    // compares the categories again and adds what is still missing.
     if (missing.length > 0) {
-      firestoreHouseholdStore.saveCategories(missing).catch(ignore)
+      firestoreHouseholdStore.saveCategories(missing).catch(ignoreFailure)
     }
-  }, ignore)
+  }, ignoreFailure)

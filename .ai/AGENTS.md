@@ -219,7 +219,11 @@ adapted to this repository:
   times out, go on with the next PR anyway and fix what broke there (or in a follow-up PR first,
   if the live app is unusable). Say in the report what the check showed. The check:
   1. Open `https://household-brain-sf.web.app` and **reload** it, so the new service worker and build
-     are the ones running. If an "update available" prompt appears, take it.
+     are the ones running. If an "update available" prompt appears, take it. **Make sure the new
+     build is the one running:** compare the `/assets/index-*.js` the page loaded with the one in
+     `curl https://household-brain-sf.web.app/`, and reload until they match; the service worker
+     can serve the previous build for a few reloads. A `fetch` from inside the page doesn't tell:
+     the service worker answers it from its cache.
   2. Check that the page renders, sign-in or the signed-in screen works, and the browser console
      shows no errors.
   3. Exercise what the PR changed, where that is safe on real data. Never create, change or delete
@@ -394,6 +398,10 @@ adapted to this repository:
   doesn't catch it.
 - **Small helpers every package needs live in `packages/core`** (#171), e.g. `stringify()` for any value
   as text: never `String(error)` or `error.message` by hand. A helper moves there once two packages share it.
+- **A failure dropped on purpose goes to `ignoreFailure`** (`@household-brain/core/lib/ignore`, #174),
+  never a bare `() => null`, with a comment saying why nothing is lost. A failure someone should
+  see (data left behind, a feature that silently stops) goes to `reportError` instead. A `catch`
+  that turns a failure into a value (`.catch(() => null)` meaning "not there") is neither and stays.
 - **No barrel files.** No `index.ts` that re-exports a package's modules: barrels pull every module
   into whatever imports one of them, which defeats tree shaking and code splitting. Packages
   expose their modules by path through `exports` patterns in `package.json` (e.g.

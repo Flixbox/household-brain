@@ -6,6 +6,7 @@ import { useOutbox } from '@household-brain/entries/lib/items/use-outbox'
 import { retryItem } from '@household-brain/entries/lib/items/store'
 import { dismissWriteFailures, reportWriteFailure, useWriteFailures } from '@household-brain/entries/lib/items/write-failures'
 import { stringify } from '@household-brain/core/lib/stringify'
+import { ignoreFailure } from '@household-brain/core/lib/ignore'
 
 const bar = 'flex flex-wrap items-center gap-3 rounded-lg px-4 py-3 text-sm'
 // Google's error messages can hold long URLs without spaces; let them wrap anywhere, or they widen the
@@ -17,6 +18,7 @@ export const SyncBar = () => {
   const { failed, missingCalendar, needsAccess, pullProblem, waiting } = useOutbox()
   const writeFailures = useWriteFailures()
   const [problem, setProblem] = useState('')
+  // Shows its own problem, so the click has nothing left to handle.
   const sync = () => syncNow().then(() => { setProblem('') }, (error: unknown) => { setProblem(stringify(error)) })
   return (
     <div className="space-y-2">
@@ -26,7 +28,7 @@ export const SyncBar = () => {
             {waiting > 0 ? `${waiting === 1 ? '1 change' : `${waiting} changes`} not yet in Google Calendar.` : 'Not synced with Google Calendar on this device yet.'}
           </p>
           {missingCalendar && <Link href={paths.settings} className="font-semibold underline">Set up the calendar</Link>}
-          {needsAccess && !missingCalendar && <button type="button" className="font-semibold text-orange-700 dark:text-orange-400" onClick={() => { sync().catch(() => null) }}>Sync now</button>}
+          {needsAccess && !missingCalendar && <button type="button" className="font-semibold text-orange-700 dark:text-orange-400" onClick={() => { sync().catch(ignoreFailure) }}>Sync now</button>}
         </div>
       )}
       {failed.map(item => (

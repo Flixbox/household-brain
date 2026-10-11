@@ -5,6 +5,7 @@ import { dataOf, queryStore } from '@household-brain/firebase/live'
 import { type Log, logFrom } from '@household-brain/entries/lib/documents'
 import { changedDetail, entryLogMessage, logDetail } from '@household-brain/entries/lib/logs-messages'
 import { stringify } from '@household-brain/core/lib/stringify'
+import { ignoreFailure } from '@household-brain/core/lib/ignore'
 
 const LOG_LIMIT = 200
 const LOG_MESSAGE_LIMIT = 2000
@@ -25,7 +26,8 @@ const writeLog = (kind: Log['kind'], { message, itemId, detail }: { message: str
     ...itemId ? { itemId } : {},
     ...detail ? { detail: logDetail(detail) } : {},
   }
-  addDoc(logsCollection, data).catch(() => null)
+  // The history is a convenience: a refused or lost entry must not break the change it describes.
+  addDoc(logsCollection, data).catch(ignoreFailure)
 }
 
 /** `detail` is what the row shows when opened: which fields changed, what Google answered. */
@@ -69,7 +71,7 @@ export const pruneOldLogs = (): void => {
       snapshot.docs.forEach(entry => { batch.delete(entry.ref) })
       return snapshot.empty ? null : batch.commit()
     })
-    .catch(() => null)
+    .catch(ignoreFailure)
 }
 
 export const useLogs = (): Log[] | null => dataOf(useStore($logs))

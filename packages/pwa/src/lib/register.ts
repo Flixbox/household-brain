@@ -1,5 +1,6 @@
 import { atom } from 'nanostores'
 import { Serwist } from '@serwist/window'
+import { ignoreFailure } from '@household-brain/core/lib/ignore'
 
 /** How often an open app asks the server for a new version. */
 const CHECK_EVERY_MS = 60 * 60 * 1000
@@ -16,7 +17,8 @@ let reloadWhenTakenOver = false
 const watchForUpdates = (registration: ServiceWorkerRegistration) => {
   const check = () => {
     if (navigator.onLine) {
-      registration.update().catch(() => null)
+      // Offline or a server hiccup: the next check asks again.
+      registration.update().catch(ignoreFailure)
     }
   }
   setInterval(check, CHECK_EVERY_MS)
@@ -43,7 +45,13 @@ export const startServiceWorker = () => {
     if (registration) {
       watchForUpdates(registration)
     }
-  }).catch(() => null)
+  }).catch((error: unknown) => {
+    // Offline, registering can fail as a matter of course, and the next start registers again. Online,
+    // a failure means the app silently stops working offline, so it shows.
+    if (navigator.onLine) {
+      reportError(error)
+    }
+  })
 }
 
 /** Lets the waiting version take over, then reloads the page into it. */
