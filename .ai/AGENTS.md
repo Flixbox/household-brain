@@ -49,6 +49,12 @@ the owner to track.
 **Keep each pull request tight: one topic.** Side findings, refactors and tooling tweaks go into
 their own follow-up PR, never along for the ride.
 
+**Keep each pull request low in complexity** (owner's rule). Prefer the simplest change that does
+the job, an out-of-the-box solution over a hand-built one, and a dependency over in-house machinery.
+Where complexity is unavoidable, encapsulate it in a dependency or a separate package instead of
+spreading it through the app, and split a large change into several small PRs that each stand alone
+(e.g. #146: the router #147 and the PWA #148 each get their own).
+
 **No pull requests that only change docs.** A README or agent-note change (a new rule, a docs issue)
 rides along with the next real feature, refactor or fix PR, the one exception to "one topic", and
 that PR's description says so and closes the docs issue.
@@ -392,7 +398,8 @@ adapted to this repository:
   `package.json`. It holds only the placeholder `trust-no-install-scripts`, a name no package has:
   an **empty** list does not switch off Bun's built-in list of trusted packages, and Bun then built
   `re2` in CI, whose native module crashed Bun during the deploy (#145). A non-empty list replaces the
-  built-in one. CI fails if a compiled native addon shows up in `node_modules`. Add a package only
+  built-in one (a real package of that name would also have to be among our dependencies to matter).
+CI fails if a compiled native addon shows up in `node_modules`. Add a package only
   when it truly needs its script, with the reason in the PR.
 - **`bun test` types are stricter than Vitest's:** `expect(x).toEqual(y)` wants `y` to fit `x`'s type.
   For a deliberately loose comparison write `expect<unknown>(x)`.

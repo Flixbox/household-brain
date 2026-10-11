@@ -47,10 +47,11 @@ jobs:
         run: bun scripts/check-package-age.ts "$BASE"
         env:
           BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || 'HEAD^' }}
-      # trustedDependencies lets no package run an install script (#145): a compiled addon means one did.
+      # trustedDependencies lets no package run an install script (#145). node-gyp's output means one
+      # did. The other jobs install the same lockfile, so checking it here, on the PR, covers them.
       - name: No dependency install script ran
         run: |
-          addons=$(find node_modules/.bun -path '*/build/Release/*.node' 2>/dev/null || true)
+          addons=$(find node_modules/.bun -path '*/build/Release/*.node')
           if [ -n "$addons" ]; then echo "::error::A dependency install script built: $addons"; exit 1; fi
       - run: bun run lint
       - run: bun run typecheck
