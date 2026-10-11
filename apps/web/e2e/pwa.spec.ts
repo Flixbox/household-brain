@@ -38,10 +38,10 @@ test('the app can be installed and opens offline', async ({ context, page }) => 
   })
 
   await test.step('a page address opens from the stored app while offline', async () => {
-    await expect.poll(() => page.evaluate(async () => (await navigator.serviceWorker.getRegistration())?.active?.state), INSTALL_WAIT).toBe('activated')
+    await expect.poll(async () => page.evaluate(async () => (await navigator.serviceWorker.getRegistration())?.active?.state), INSTALL_WAIT).toBe('activated')
     // The worker takes over pages opened after it is installed.
     await page.reload()
-    await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true)
+    await expect.poll(async () => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true)
     await context.setOffline(true)
     await page.goto('/events')
     // The page itself holds only an empty root element: the sign-in screen at this address means the

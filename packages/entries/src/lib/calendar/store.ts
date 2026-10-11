@@ -19,5 +19,5 @@ export const firestoreHouseholdStore: HouseholdStore = {
     }
     await batch.commit()
   },
-  saveConfig: config => setDoc(configDoc, config),
+  saveConfig: async config => setDoc(configDoc, config),
 }

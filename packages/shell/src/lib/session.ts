@@ -16,7 +16,7 @@ export const onSignOut = (handler: () => void): () => void => {
 const PENDING_WRITES_GRACE_MS = 5000
 
 /** Whether every change this device made has reached the server within `ms`. */
-const sentWithin = (ms: number) => Promise.race([
+const sentWithin = async (ms: number) => Promise.race([
   waitForPendingWrites(db).then(() => true, () => false),
   new Promise<boolean>(resolve => {
     setTimeout(() => { resolve(false) }, ms)

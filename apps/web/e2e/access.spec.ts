@@ -7,8 +7,8 @@ test.beforeEach(async () => {
 })
 
 /** How many documents Firestore keeps in its offline cache (IndexedDB) in this browser. */
-const cachedDocuments = (page: Page) => page.evaluate(async () => {
-  const count = (name: string) => new Promise<number>(resolve => {
+const cachedDocuments = async (page: Page) => page.evaluate(async () => {
+  const count = async (name: string) => new Promise<number>(resolve => {
     const open = indexedDB.open(name)
     open.onsuccess = () => {
       const database = open.result
@@ -75,9 +75,9 @@ test('getting in: signed out, turned away without the allowlist, let in with it,
     await expect(menu).toBeHidden()
     await expect(page.getByRole('button', { exact: true, name: 'Menu' })).toHaveAttribute('aria-expanded', 'false')
     // Signing out deletes the household's data from the device (#114): the cached documents are gone.
-    await expect.poll(() => cachedDocuments(page)).toBeGreaterThan(0)
+    await expect.poll(async () => cachedDocuments(page)).toBeGreaterThan(0)
     await openMenu(page)
     await signOutWith(page, menu.getByRole('button', { name: 'Sign out' }))
-    await expect.poll(() => cachedDocuments(page)).toBe(0)
+    await expect.poll(async () => cachedDocuments(page)).toBe(0)
   })
 })

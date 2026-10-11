@@ -31,7 +31,7 @@ if (process.env.BUN_PUBLIC_USE_EMULATORS === 'true') {
   // End-to-end tests sign in without the Google popup: the Auth emulator accepts an unsigned
   // Google ID token. Only present in emulator builds.
   Object.assign(window, {
-    e2eSignIn: (email: string) => signInWithCredential(auth, GoogleAuthProvider.credential(JSON.stringify({
+    e2eSignIn: async (email: string) => signInWithCredential(auth, GoogleAuthProvider.credential(JSON.stringify({
       email,
       email_verified: true,
       name: email.split('@')[0],

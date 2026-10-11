@@ -66,10 +66,13 @@ const pruneCutoff = (): Timestamp => Timestamp.fromMillis(Temporal.Now.instant()
 /** Removes old history in the background; a denied or offline cleanup is harmless. */
 export const pruneOldLogs = (): void => {
   getDocs(query(logsCollection, where('at', '<', pruneCutoff()), limit(LOG_LIMIT)))
-    .then(snapshot => {
+    .then(async snapshot => {
+      if (snapshot.empty) {
+        return
+      }
       const batch = writeBatch(db)
       snapshot.docs.forEach(entry => { batch.delete(entry.ref) })
-      return snapshot.empty ? null : batch.commit()
+      await batch.commit()
     })
     .catch(ignoreFailure)
 }

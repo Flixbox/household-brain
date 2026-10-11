@@ -10,7 +10,7 @@ const email = () => auth.currentUser?.email
 
 const apiFor = (scopes: readonly string[]) => createCalendarApi({
   forgetToken: forgetCalendarToken,
-  token: () => calendarToken(scopes, email()),
+  token: async () => calendarToken(scopes, email()),
 })
 
 /** Owner: creates the household calendar (once) and connects the owner's own account. */

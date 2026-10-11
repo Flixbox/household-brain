@@ -24,8 +24,8 @@ export const writeAssets = async (dir: string, config: PwaConfig, description: s
     start_url: '/',
     theme_color: config.themeColor,
   })
-  await Promise.all(images.map(image => Bun.write(join(dir, image.name), image.contents)))
-  await Promise.all(files.map(file => Bun.write(join(dir, file.name), file.name.endsWith('.webmanifest') ? withAppIdentity(file.contents, config) : file.contents)))
+  await Promise.all(images.map(async image => Bun.write(join(dir, image.name), image.contents)))
+  await Promise.all(files.map(async file => Bun.write(join(dir, file.name), file.name.endsWith('.webmanifest') ? withAppIdentity(file.contents, config) : file.contents)))
   const page = join(dir, 'index.html')
   const linked = new HTMLRewriter().on('head', { element: head => { head.append(html.join('\n'), { html: true }) } })
   await Bun.write(page, await linked.transform(new Response(Bun.file(page))).text())

@@ -19,7 +19,7 @@ const upsert = async (context: PushContext, event: CalendarEvent): Promise<void>
       throw error
     }
     // Someone else may write it between the read and the patch (412): read and patch once more.
-    await overwrite(context, event).catch((conflict: unknown) => {
+    await overwrite(context, event).catch(async (conflict: unknown) => {
       if (!isStatus(conflict, 412)) {
         throw conflict
       }
@@ -41,12 +41,12 @@ const overwrite = async ({ api, config }: PushContext, event: CalendarEvent): Pr
 }
 
 /** Carries out one planned write; deleting a missing event is harmless. */
-export const pushDateOp = (context: PushContext, item: Item, op: DateOp): Promise<void> =>
+export const pushDateOp = async (context: PushContext, item: Item, op: DateOp): Promise<void> =>
   op.kind === 'upsert'
     ? upsert(context, op.event)
     : context.api.deleteEvent(context.config.calendarId, dateEventId(item.id, op.dateId))
 
 /** Deletes every date event an entry may have in Google, before the entry's own event goes. */
 export const deleteDateEvents = async ({ api, config }: PushContext, item: Item): Promise<void> => {
-  await Promise.all(dateEventIdsOf(item).map(eventId => api.deleteEvent(config.calendarId, eventId)))
+  await Promise.all(dateEventIdsOf(item).map(async eventId => api.deleteEvent(config.calendarId, eventId)))
 }

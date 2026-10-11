@@ -32,7 +32,7 @@ export const CalendarSection = ({ household }: { household: HouseholdState }) =>
             type="button"
             className={primaryButton}
             disabled={busy}
-            onClick={() => { run(() => connectToHousehold(household.config)) }}
+            onClick={() => { run(async () => connectToHousehold(household.config)) }}
           >
             Connect my Google Calendar
           </button>

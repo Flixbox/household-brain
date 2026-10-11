@@ -112,9 +112,9 @@ const readyContext = (): PushContext | null => {
 }
 
 /** Pulls from Google Calendar, at most once per few seconds; parallel callers share one pull. */
-const pullNow = (context: PushContext): Promise<void> => {
+const pullNow = async (context: PushContext): Promise<void> => {
   if (performance.now() - pulledAt < PULL_REUSE_MS) {
-    return Promise.resolve()
+    return
   }
   const started = generation
   pulling ??= pullChanges(context)
@@ -206,27 +206,27 @@ const continueAfterStep = async (): Promise<void> => {
 
 const watch = (): (() => void)[] =>
   watchOutboxTriggers({
-    categories: categories => {
+    categories: async categories => {
       data.categories = categories
       return run()
     },
-    config: config => {
+    config: async config => {
       data.config = config
       data.configLoaded = true
       return run(true)
     },
-    dateGate: () => run(),
-    items: (items, pendingWrites) => {
+    dateGate: async () => run(),
+    items: async (items, pendingWrites) => {
       data.items = items
       unconfirmed = pendingWrites
       return run()
     },
-    online: () => {
+    online: async () => {
       pausedUntil = 0
       return run()
     },
-    pull: () => run(true),
-    tokenChanged: () => run(),
+    pull: async () => run(true),
+    tokenChanged: async () => run(),
   })
 
 /** Forgets retries and pulls: the waiting, the last pull and its problem. */
@@ -271,7 +271,7 @@ export const startOutbox = (): () => void => {
 
 /** Asks Google for Calendar access while a click is still fresh, so pushing starts right away; saving never waits for it. */
 export const requestSyncAccess = (): void => {
-  calendarToken(MEMBER_SCOPES, auth.currentUser?.email).then(() => {
+  calendarToken(MEMBER_SCOPES, auth.currentUser?.email).then(async () => {
     pausedUntil = 0
     return run(true)
     // Consent refused or its window closed: the Sync bar keeps offering the click.
@@ -291,9 +291,9 @@ export const syncNow = async (): Promise<void> => {
  * up with Google; what the pull brings arrives through the entries listener like any other change.
  * Nothing happens offline or without Google access; while a push runs, the pull runs right after it.
  */
-export const refreshNow = (): Promise<void> => {
+export const refreshNow = async (): Promise<void> => {
   if (!navigator.onLine || !hasCalendarToken(MEMBER_SCOPES, auth.currentUser?.email)) {
-    return Promise.resolve()
+    return
   }
   pulledAt = Number.NEGATIVE_INFINITY
   return run(true)

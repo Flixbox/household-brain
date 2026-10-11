@@ -32,7 +32,7 @@ export const AccessGate = ({ children }: { children: ReactNode }) => {
   const { signIn, signInError, signingIn } = useSignIn()
 
   if (access.state === 'allowed') {
-    return children
+    return <>{children}</>
   }
   return (
     // While the Google window is open, no new version may load (`ReloadPrompt`): on a phone the

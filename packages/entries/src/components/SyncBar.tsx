@@ -19,7 +19,7 @@ export const SyncBar = () => {
   const writeFailures = useWriteFailures()
   const [problem, setProblem] = useState('')
   // Shows its own problem, so the click has nothing left to handle.
-  const sync = () => syncNow().then(() => { setProblem('') }, (error: unknown) => { setProblem(stringify(error)) })
+  const sync = async () => syncNow().then(() => { setProblem('') }, (error: unknown) => { setProblem(stringify(error)) })
   return (
     <div className="space-y-2">
       {(waiting > 0 || needsAccess) && (

@@ -81,9 +81,9 @@ let gisLoaded: Promise<void> | null = null
  * clicked, the consent popup opens straight away: a popup opened too long after the click is
  * blocked.
  */
-export const loadGis = (): Promise<void> => {
+export const loadGis = async (): Promise<void> => {
   if (window.google?.accounts.oauth2) {
-    return Promise.resolve()
+    return
   }
   gisLoaded ??= new Promise((resolve, reject) => {
     const script = document.createElement('script')
@@ -99,10 +99,10 @@ export const loadGis = (): Promise<void> => {
 const usable = (token: Token | null, scopes: readonly string[], account: string | null | undefined): token is Token =>
   token !== null && Boolean(account) && token.account === account && now() < token.usableUntil && scopes.every(scope => token.scopes.includes(scope))
 
-const requestToken = (scopes: readonly string[], hint?: string | null): Promise<TokenResponse> => {
+const requestToken = async (scopes: readonly string[], hint?: string | null): Promise<TokenResponse> => {
   const oauth2 = window.google?.accounts.oauth2
   if (!oauth2) {
-    return Promise.reject(new Error('Google sign-in is unavailable'))
+    throw new Error('Google sign-in is unavailable')
   }
   return new Promise((resolve, reject) => {
     oauth2.initTokenClient({
@@ -161,7 +161,7 @@ export const calendarToken = async (scopes: readonly string[], account: string |
   // One request at a time: parallel callers share it instead of opening several Google windows.
   // The Google window can hide the app on a phone; no new version may load meanwhile.
   // `alsoAsk` is asked for but optional: a person who declines it still gets a token for `scopes`.
-  pending ??= holdUpdatesWhile(loadGis().then(() => requestToken([...scopes, ...alsoAsk], account)))
+  pending ??= holdUpdatesWhile(loadGis().then(async () => requestToken([...scopes, ...alsoAsk], account)))
     .then(response => acceptToken(response, scopes, account ?? ''))
     .finally(() => {
       pending = null

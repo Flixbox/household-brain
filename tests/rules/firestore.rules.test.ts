@@ -8,7 +8,7 @@ const env = await initializeTestEnvironment({
   projectId: 'demo-household-brain',
 })
 
-afterAll(() => env.cleanup())
+afterAll(async () => env.cleanup())
 
 beforeEach(async () => {
   await env.clearFirestore()
@@ -69,7 +69,7 @@ describe('data collections', () => {
     await assertFails(setDoc(doc(as('alice'), 'items/coupon-2'), { id: 'coupon-3', title: 'x' }))
     await assertFails(setDoc(doc(as('alice'), 'categories/bills'), { colorId: '1', label: 'Bills', slug: 'other', sortOrder: 1 }))
     await assertSucceeds(setDoc(doc(as('alice'), 'categories/bills'), { colorId: '1', label: 'Bills', slug: 'bills', sortOrder: 1 }))
-    await env.withSecurityRulesDisabled(context => setDoc(doc(context.firestore(), 'items/legacy'), { createdAt: 1, title: 'Old' }))
+    await env.withSecurityRulesDisabled(async context => setDoc(doc(context.firestore(), 'items/legacy'), { createdAt: 1, title: 'Old' }))
     await assertSucceeds(updateDoc(doc(as('alice'), 'items/legacy'), { title: 'Renamed' }))
   })
 })
@@ -126,13 +126,13 @@ describe('meta/config', () => {
   })
 
   it('can be completed when the calendar is still missing', async () => {
-    await env.withSecurityRulesDisabled(context => setDoc(doc(context.firestore(), 'meta/config'), config('')))
+    await env.withSecurityRulesDisabled(async context => setDoc(doc(context.firestore(), 'meta/config'), config('')))
     await assertSucceeds(setDoc(doc(as('alice'), 'meta/config'), config('household@group.calendar.test')))
   })
 })
 
 describe('syncState', () => {
-  beforeEach(() => env.withSecurityRulesDisabled(async context => {
+  beforeEach(async () => env.withSecurityRulesDisabled(async context => {
     await setDoc(doc(context.firestore(), 'allowlist/bob'), { name: 'Bob' })
     await setDoc(doc(context.firestore(), 'syncState/bob'), { schema: 4, syncToken: 'sync-1' })
   }))
