@@ -35,13 +35,13 @@
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "fallow": "3.32.0",
-    "firebase-tools": "15.32.1",
+    "firebase-tools": "15.33.0",
     "npm-package-json-lint": "11.0.0",
     "nx": "23.3.0",
     "oxlint": "1.87.0",
     "temporal-polyfill": "1.0.5",
     "typescript": "7.0.2",
-    "vite": "8.3.3"
+    "vite": "8.3.4"
   },
   "nx": {
     "includedScripts": [
