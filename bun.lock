@@ -105,7 +105,16 @@
     "packages/tooling": {
       "name": "@household-brain/tooling",
       "version": "0.0.0",
+      "bin": {
+        "check-action-age": "./src/check-action-age.ts",
+        "check-package-age": "./src/check-package-age.ts",
+        "e2e-hosting-config": "./src/e2e-hosting-config.ts",
+        "pr-gif": "./src/pr-gif.ts",
+        "remove-node": "./src/remove-node.ts",
+        "watch-project": "./src/watch-project.ts",
+      },
       "dependencies": {
+        "@household-brain/core": "workspace:*",
         "temporal-polyfill": "1.0.5",
       },
     },

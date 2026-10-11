@@ -4,16 +4,13 @@ import { type HouseholdConfig, TIME_ZONE } from './calendar/setup'
 import type { EntryDate } from './items/dates'
 import { type DateEventRecord, EDITABLE_FIELDS, type EditableField, type Item } from './items/model'
 import { intervalFrom } from './items/interval'
+import { isRecord, textOf } from '@household-brain/core/lib/read'
 
 /**
  * Firestore documents read into the app's types (#68). Field by field, with a fallback for anything
  * missing or of the wrong type: older app versions wrote fewer fields, and a stray document must
  * not take a screen down. Optional fields stay absent when the document has none.
  */
-
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
-
-const text = (value: unknown, fallback = '') => (typeof value === 'string' ? value : fallback)
 
 const textMap = (value: unknown): Record<string, string> =>
   (isRecord(value) ? Object.fromEntries(Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === 'string')) : {})
@@ -42,13 +39,13 @@ const entryDateOf = (value: unknown): EntryDate[] => {
   if (!isRecord(value)) {
     return []
   }
-  return [{ date: text(value.date), id: text(value.id), label: text(value.label) }]
+  return [{ date: textOf(value.date), id: textOf(value.id), label: textOf(value.label) }]
 }
 
 const dateEventsOf = (value: Record<string, unknown>): Record<string, DateEventRecord> =>
   Object.fromEntries(Object.entries(value).filter(entry => isRecord(entry[1])).map(([id, record]) => {
     const { shape, error } = isRecord(record) ? record : {}
-    return [id, { shape: text(shape), ...typeof error === 'string' ? { error } : {} }]
+    return [id, { shape: textOf(shape), ...typeof error === 'string' ? { error } : {} }]
   }))
 
 /** The fields only some entries have, left out when the document has none. */
@@ -63,50 +60,50 @@ const optionalFields = (data: DocumentData): Partial<Item> => ({
 
 /** An `items/{id}` document. Its id is the document's own: every write goes to `items/{id}`. */
 export const itemFrom = (id: string, data: DocumentData): Item => ({
-  amount: text(data.amount),
-  category: text(data.category),
-  code: text(data.code),
-  currency: text(data.currency),
+  amount: textOf(data.amount),
+  category: textOf(data.category),
+  code: textOf(data.code),
+  currency: textOf(data.currency),
   dirty: Array.isArray(data.dirty) ? data.dirty.filter(isEditableField) : [],
-  dueDate: text(data.dueDate),
+  dueDate: textOf(data.dueDate),
   etags: textMap(data.etags),
   id,
   interval: intervalFrom(data.interval),
-  notes: text(data.notes),
+  notes: textOf(data.notes),
   pendingOp: oneOf(OPS, data.pendingOp) ?? null,
-  reminders: text(data.reminders),
-  rev: text(data.rev),
-  startDate: text(data.startDate),
+  reminders: textOf(data.reminders),
+  rev: textOf(data.rev),
+  startDate: textOf(data.startDate),
   status: oneOf(STATUSES, data.status) ?? 'open',
   // A document without a known sync state is pushed again rather than taken as being in Google.
   sync: oneOf(SYNCS, data.sync) ?? 'pending',
   syncError: typeof data.syncError === 'string' ? data.syncError : null,
-  title: text(data.title),
-  url: text(data.url),
+  title: textOf(data.title),
+  url: textOf(data.url),
   ...optionalFields(data),
 })
 
 /** A `logs/{id}` document. */
 export const logFrom = (id: string, data: DocumentData): Log => ({
   at: data.at instanceof Timestamp ? data.at : null,
-  by: text(data.by),
+  by: textOf(data.by),
   id,
   kind: oneOf(LOG_KINDS, data.kind) ?? 'event',
-  message: text(data.message),
+  message: textOf(data.message),
   ...typeof data.itemId === 'string' ? { itemId: data.itemId } : {},
   ...typeof data.detail === 'string' && data.detail !== '' ? { detail: data.detail } : {},
 })
 
 /** A `categories/{slug}` document. */
 export const categoryFrom = (id: string, data: DocumentData): Category => ({
-  colorId: text(data.colorId, '8'),
-  label: text(data.label, id),
-  slug: text(data.slug, id),
+  colorId: textOf(data.colorId, '8'),
+  label: textOf(data.label, id),
+  slug: textOf(data.slug, id),
   sortOrder: typeof data.sortOrder === 'number' ? data.sortOrder : Number.MAX_SAFE_INTEGER,
 })
 
 /** The `meta/config` document; null when it lacks the calendar it describes. */
 export const householdFrom = (data: DocumentData): HouseholdConfig | null =>
   (typeof data.calendarId === 'string' && data.calendarId !== ''
-    ? { calendarId: data.calendarId, ownerUid: text(data.ownerUid), timeZone: text(data.timeZone, TIME_ZONE) }
+    ? { calendarId: data.calendarId, ownerUid: textOf(data.ownerUid), timeZone: textOf(data.timeZone, TIME_ZONE) }
     : null)

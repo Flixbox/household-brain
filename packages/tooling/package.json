@@ -17,6 +17,7 @@
     "test": "bun test"
   },
   "dependencies": {
+    "@household-brain/core": "workspace:*",
     "temporal-polyfill": "1.0.5"
   }
 }

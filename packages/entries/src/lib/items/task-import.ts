@@ -5,6 +5,7 @@ import { type ItemDraft, emptyDraft } from './model'
 import { PLAIN_NUMBER } from './amount'
 import { isDate } from './dates'
 import { intervalFrom } from './interval'
+import { isRecord, textOf } from '@household-brain/core/lib/read'
 
 const KNOWN_FIELDS = ['v', 'title', 'category', 'dueDate', 'startDate', 'code', 'amount', 'currency', 'interval', 'url', 'notes'] as const
 type KnownField = typeof KNOWN_FIELDS[number]
@@ -15,8 +16,6 @@ export interface ImportedTask {
   taskId: string
   draft: ItemDraft
 }
-
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
 
 const fieldOf = (key: string): KnownField | null => KNOWN_FIELDS.find(field => field === key) ?? null
 
@@ -70,8 +69,6 @@ export const parseTaskNotes = (notes: string | null | undefined): TaskPayload | 
   return parsed
 }
 
-const text = (value: unknown): string => typeof value === 'string' ? value : ''
-
 const date = (value: unknown): string => {
   if (!isDate(value)) {
     return ''
@@ -85,17 +82,17 @@ const date = (value: unknown): string => {
 }
 
 const category = (value: unknown): string => {
-  const candidate = text(value)
+  const candidate = textOf(value)
   return DEFAULT_CATEGORIES.some(entry => entry.slug === candidate) ? candidate : 'paperwork'
 }
 
 const amount = (value: unknown): string => {
-  const candidate = text(value).trim()
+  const candidate = textOf(value).trim()
   return PLAIN_NUMBER.test(candidate) ? candidate : ''
 }
 
 const currency = (value: unknown): string => {
-  const candidate = text(value).trim().toUpperCase()
+  const candidate = textOf(value).trim().toUpperCase()
   return candidate === 'EUR' || !/^[A-Z]{3}$/u.test(candidate) ? '' : candidate
 }
 
@@ -105,20 +102,20 @@ export const importedTask = (task: GoogleTask): ImportedTask | null => {
   if (!payload || task.id === '') {
     return null
   }
-  const taskTitle = text(task.title)
-  const payloadTitle = text(payload.title)
+  const taskTitle = textOf(task.title)
+  const payloadTitle = textOf(payload.title)
   return {
     draft: {
       ...emptyDraft(category(payload.category)),
       amount: amount(payload.amount),
-      code: text(payload.code),
+      code: textOf(payload.code),
       currency: currency(payload.currency),
       dueDate: date(payload.dueDate),
       interval: intervalFrom(payload.interval),
-      notes: text(payload.notes),
+      notes: textOf(payload.notes),
       startDate: date(payload.startDate),
       title: payloadTitle.trim() === '' ? taskTitle : payloadTitle,
-      url: text(payload.url),
+      url: textOf(payload.url),
     },
     taskId: task.id,
   }
