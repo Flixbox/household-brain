@@ -5,7 +5,7 @@
   "type": "module",
   "license": "Unlicense",
   "scripts": {
-    "dev": "bun dev.ts",
+    "dev": "bun --env-file=.env.production --env-file=.env.production.local dev.ts",
     "build": "tsc -b && bun --env-file=.env.production --env-file=.env.production.local build.ts production dist && pwa-build dist",
     "typecheck": "tsc -b",
     "test": "bun test --pass-with-no-tests src",

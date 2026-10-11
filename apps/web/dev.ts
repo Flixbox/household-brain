@@ -1,11 +1,13 @@
 /**
  * The dev server: `bun dev.ts` (through `bun run dev`). Every page address gets the app, as Firebase
- * Hosting's rewrite does; Tailwind and the `BUN_PUBLIC_*` variables come in through bunfig.toml.
+ * Hosting's rewrite does; Tailwind and the `BUN_PUBLIC_*` variables come in through bunfig.toml,
+ * their values from the env files the production build reads (package.json), so the page talks to
+ * the real project.
  *
  * Bun's hot module reloading can't load import cycles yet (oven-sh/bun#40259; temporal-polyfill has
- * one), so it is off and the page reloads instead: a change under `src` sends `/__reload` listeners
- * (main.tsx) a message, and the reload gets a fresh bundle. Once Bun's fix ships, `hmr: true` and
- * the listener go.
+ * one), so it is off and the page reloads instead: a change to index.html, `src`, `public` or
+ * `packages` sends `/__reload` listeners (main.tsx) a message, and the reload gets a fresh bundle.
+ * Once Bun's fix ships, `hmr: true` and the listener go.
  */
 import { watch } from 'node:fs'
 import app from './index.html'
@@ -25,13 +27,14 @@ const reloadPages = () => {
     }
   }, RELOAD_DELAY_MS)
 }
-for (const folder of ['src', '../../packages']) {
+for (const folder of ['src', 'public', '../../packages']) {
   watch(folder, { recursive: true }, (_event, file) => {
     if (file && !file.includes('node_modules')) {
       reloadPages()
     }
   })
 }
+watch('index.html', reloadPages)
 
 const reloads = () => {
   let own: ReadableStreamDefaultController<string> | null = null
