@@ -351,13 +351,12 @@ adapted to this repository:
   from the repository root, with `bun test` for their logic. The one shell file is
   `packages/tooling/install-bun.sh`: it installs Bun, so it can't be a Bun program. There is no
   `scripts/` folder.
-- **Routes are files in `apps/web/src/routes`** (TanStack Router). `routeTree.gen.ts` is generated,
-  never edited: by the Nx `routes` target, which `build`, `build:e2e` and `typecheck` depend on, and
-  by `tsr watch` during `dev` (#147, #153).
+- **Pages are routed with `wouter`** (#164): `apps/web/src/App.tsx` lists the page addresses, each
+  page is a component in `apps/web/src/pages/`. No generated route tree, no extra build step.
 - **The repo is an Nx workspace** (Bun workspaces): `apps/web` is the app, `packages/*` are
   features and shared code, consumed as TypeScript source (modules exported by path, no build
   step). A new feature, e.g. a shopping list, becomes its own `packages/<name>`,
-  and `apps/web` routes render what it exports. Packages never import from `apps/web`.
+  and `apps/web` pages render what it exports. Packages never import from `apps/web`.
   A new package also goes into the `workspace:*` exceptions in `npmpackagejsonlint.config.ts`
   (exceptions are exact names), and gets its own `package.json` and `tsconfig.json`.
 - **The shell knows no features.** `packages/shell` is the frame (layout, sign-in gate, update

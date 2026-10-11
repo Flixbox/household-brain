@@ -21,7 +21,7 @@
   "rules": {
     "react/rules-of-hooks": "error",
     "eslint/capitalized-comments": ["error", "always", { "ignoreConsecutiveComments": true }], // continuation lines of a comment stay lowercase
-    "react/forbid-component-props": ["error", { "forbid": [{ "propName": "className", "allowedFor": ["Link"] }] }], // router links are styled like anchors
+    "react/forbid-component-props": ["error", { "forbid": [{ "propName": "className", "allowedFor": ["Link"] }] }], // router links (wouter) are styled like anchors
     "import/consistent-type-specifier-style": "off", // fights no-import-type-side-effects; verbatimModuleSyntax already enforces correct type imports
     "eslint/sort-imports": ["error", { "ignoreDeclarationSort": true }], // members stay sorted; module order is left to the author
     "react/only-export-components": [
@@ -171,19 +171,10 @@
   },
   "ignorePatterns": [
     "dist",
-    "apps/web/src/routeTree.gen.ts",
     "playwright-report",
     "test-results"
   ],
   "overrides": [
-    {
-      "files": [
-        "apps/web/src/routes/**"
-      ],
-      "rules": {
-        "react/only-export-components": "off"
-      }
-    },
     {
       "files": [
         "**/*.config.ts",

@@ -1,4 +1,4 @@
-import { Link } from '@tanstack/react-router'
+import { Link } from 'wouter'
 import { useStore } from '@nanostores/react'
 import type { Item } from '@household-brain/entries/lib/items/model'
 import { startLabel } from '@household-brain/entries/lib/items/due'
@@ -33,8 +33,7 @@ export const ItemRow = ({ item, category }: { item: Item, category?: string }) =
     <li className="relative overflow-hidden rounded-lg">
       {offset < 0 && <span aria-hidden="true" className="absolute inset-y-0 right-0 flex items-center rounded-lg bg-green-700 px-4 text-sm font-semibold text-white">Done</span>}
       <Link
-        to="/items/$itemId"
-        params={{ itemId: item.id }}
+        href={`/items/${item.id}`}
         // A native link drag would take over the pointer and stop the swipe.
         draggable={false}
         onClickCapture={handlers.handleClickCapture}

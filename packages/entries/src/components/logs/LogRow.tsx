@@ -1,4 +1,4 @@
-import { Link } from '@tanstack/react-router'
+import { Link } from 'wouter'
 import type { Log } from '@household-brain/entries/lib/documents'
 import type { Item } from '@household-brain/entries/lib/items/model'
 import { logTime } from '@household-brain/entries/lib/logs-messages'
@@ -34,7 +34,7 @@ export const LogRow = ({ log, item, actor }: { log: Log, item: Item | null, acto
           {log.at ? `, ${logTime(log.at)}` : ''}
         </p>
         {item && (
-          <Link to="/items/$itemId" params={{ itemId: item.id }} className="text-orange-700 underline dark:text-orange-400">
+          <Link href={`/items/${item.id}`} className="text-orange-700 underline dark:text-orange-400">
             Open “{item.title}”
           </Link>
         )}

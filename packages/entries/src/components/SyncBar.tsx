@@ -1,4 +1,4 @@
-import { Link } from '@tanstack/react-router'
+import { Link } from 'wouter'
 import { useState } from 'react'
 import { syncNow } from '@household-brain/entries/lib/items/outbox'
 import { useOutbox } from '@household-brain/entries/lib/items/use-outbox'
@@ -24,7 +24,7 @@ export const SyncBar = () => {
           <p role="status" className="flex-1">
             {waiting > 0 ? `${waiting === 1 ? '1 change' : `${waiting} changes`} not yet in Google Calendar.` : 'Not synced with Google Calendar on this device yet.'}
           </p>
-          {missingCalendar && <Link to="/settings" className="font-semibold underline">Set up the calendar</Link>}
+          {missingCalendar && <Link href="/settings" className="font-semibold underline">Set up the calendar</Link>}
           {needsAccess && !missingCalendar && <button type="button" className="font-semibold text-orange-700 dark:text-orange-400" onClick={sync}>Sync now</button>}
         </div>
       )}
