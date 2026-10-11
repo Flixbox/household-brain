@@ -19,7 +19,9 @@ const fakeListener = () => {
 
 beforeEach(() => {
   jest.useFakeTimers()
-  spyOn(globalThis, 'reportError').mockImplementation(() => null)
+  spyOn(globalThis, 'reportError').mockImplementation(() => {
+    // Errors are checked through the spy's calls.
+  })
 })
 
 afterEach(() => {
@@ -34,8 +36,10 @@ describe('liveStore', () => {
     const seen: unknown[] = []
     expect(listener.calls.started).toBe(0)
 
-    const stopFirst = $store.listen(value => seen.push(value))
-    const stopSecond = $store.listen(() => null)
+    const stopFirst = $store.listen(value => { seen.push(value) })
+    const stopSecond = $store.listen(() => {
+      // Only keeps the store listened to.
+    })
     expect(listener.calls.started).toBe(1)
     listener.push('hello')
     expect(seen).toEqual([{ data: 'hello', state: 'ready' }])
@@ -51,7 +55,7 @@ describe('liveStore', () => {
     const listener = fakeListener()
     const $store = liveStore(listener.subscribe)
     const seen: unknown[] = []
-    const stop = $store.listen(value => seen.push(value))
+    const stop = $store.listen(value => { seen.push(value) })
     listener.fail('permission-denied')
     expect(seen).toEqual([{ message: 'permission-denied', state: 'error' }])
     expect(dataOf({ message: 'x', state: 'error' })).toBeNull()
@@ -66,7 +70,9 @@ describe('liveStore', () => {
 
   it('cancels a pending retry when it stops', () => {
     const listener = fakeListener()
-    const stop = liveStore(listener.subscribe).listen(() => null)
+    const stop = liveStore(listener.subscribe).listen(() => {
+      // Only keeps the store listened to.
+    })
     listener.fail('unavailable')
     stop()
     jest.runAllTimers()
@@ -75,7 +81,9 @@ describe('liveStore', () => {
 
   it('stays quiet about a listener refused once nobody reads it (e.g. right after sign-out)', () => {
     const listener = fakeListener()
-    const stop = liveStore(listener.subscribe).listen(() => null)
+    const stop = liveStore(listener.subscribe).listen(() => {
+      // Only keeps the store listened to.
+    })
     stop()
     // Within nanostores' unmount delay the listener still runs; the rules now refuse it.
     listener.fail('permission-denied')

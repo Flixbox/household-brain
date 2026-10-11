@@ -28,7 +28,6 @@
     "typescript/promise-function-async": "off",
     "typescript/require-await": "off",
     "typescript/strict-boolean-expressions": "off",
-    "typescript/strict-void-return": "off",
     "react/rules-of-hooks": "error",
     "eslint/capitalized-comments": ["error", "always", { "ignoreConsecutiveComments": true }], // continuation lines of a comment stay lowercase
     "react/forbid-component-props": ["error", { "forbid": [{ "propName": "className", "allowedFor": ["Link"] }] }], // router links (wouter) are styled like anchors

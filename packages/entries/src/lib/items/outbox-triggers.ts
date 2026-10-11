@@ -26,19 +26,25 @@ interface Triggers {
   tokenChanged: () => unknown
 }
 
-const ignore = () => null
+const ignore = (): void => {
+  // A listener error ends the listener; the outbox wakes on the other triggers.
+}
 
 const watchFirestore = (triggers: Triggers): (() => void)[] =>
   [
-    onSnapshot(query(itemsCollection, orderBy('updatedAt')), { includeMetadataChanges: true }, snapshot => triggers.items(
-      snapshot.docs.map(entry => itemFrom(entry.id, entry.data())),
-      new Set(snapshot.docs.filter(entry => entry.metadata.hasPendingWrites).map(entry => entry.id)),
-    ), ignore),
-    onSnapshot(query(collection(db, 'categories'), orderBy('sortOrder')), snapshot =>
-      triggers.categories(snapshot.docs.map(entry => categoryFrom(entry.id, entry.data()))), ignore),
+    onSnapshot(query(itemsCollection, orderBy('updatedAt')), { includeMetadataChanges: true }, snapshot => {
+      triggers.items(
+        snapshot.docs.map(entry => itemFrom(entry.id, entry.data())),
+        new Set(snapshot.docs.filter(entry => entry.metadata.hasPendingWrites).map(entry => entry.id)),
+      )
+    }, ignore),
+    onSnapshot(query(collection(db, 'categories'), orderBy('sortOrder')), snapshot => {
+      triggers.categories(snapshot.docs.map(entry => categoryFrom(entry.id, entry.data())))
+    }, ignore),
     watchDateGate(triggers.dateGate),
-    onSnapshot(doc(db, 'meta', 'config'), snapshot =>
-      triggers.config(snapshot.exists() ? householdFrom(snapshot.data()) : null), ignore),
+    onSnapshot(doc(db, 'meta', 'config'), snapshot => {
+      triggers.config(snapshot.exists() ? householdFrom(snapshot.data()) : null)
+    }, ignore),
   ]
 
 /**
@@ -47,14 +53,21 @@ const watchFirestore = (triggers: Triggers): (() => void)[] =>
  * visible. Returns the functions that stop each.
  */
 export const watchOutboxTriggers = (triggers: Triggers): (() => void)[] => {
-  const pullIfVisible = () => (document.visibilityState === 'visible' ? triggers.pull() : null)
-  globalThis.addEventListener('online', triggers.online)
+  const pullIfVisible = () => {
+    if (document.visibilityState === 'visible') {
+      triggers.pull()
+    }
+  }
+  const online = () => {
+    triggers.online()
+  }
+  globalThis.addEventListener('online', online)
   document.addEventListener('visibilitychange', pullIfVisible)
   const every = setInterval(pullIfVisible, PULL_EVERY_MS)
   return [
     ...watchFirestore(triggers),
-    $calendarToken.listen(() => triggers.tokenChanged()),
-    () => { globalThis.removeEventListener('online', triggers.online) },
+    $calendarToken.listen(() => { triggers.tokenChanged() }),
+    () => { globalThis.removeEventListener('online', online) },
     () => { document.removeEventListener('visibilitychange', pullIfVisible) },
     () => { clearInterval(every) },
   ]
