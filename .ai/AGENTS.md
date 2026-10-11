@@ -166,6 +166,9 @@ adapted to this repository:
      it whose auto-merge is still off, not only on the one the event names.
    - A plain approval is reported as `APPROVED` only. One with text also comes as `ACTIVITY`, so a
      request written into the approval gets answered before auto-merge.
+   - **A PR's new comments are reported before its approval** (#154): the owner often comments and
+     approves in one go, and an `APPROVED` reported first got auto-merge switched on before the
+     comment was read (#152).
    - The bot's own comments and replies in review threads are skipped; its reviews (the reviewer agent posts as
      the same bot) are not.
 
