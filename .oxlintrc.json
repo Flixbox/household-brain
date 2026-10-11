@@ -24,7 +24,6 @@
     "react/forbid-component-props": ["error", { "forbid": [{ "propName": "className", "allowedFor": ["Link"] }] }], // router links are styled like anchors
     "import/consistent-type-specifier-style": "off", // fights no-import-type-side-effects; verbatimModuleSyntax already enforces correct type imports
     "eslint/sort-imports": ["error", { "ignoreDeclarationSort": true }], // members stay sorted; module order is left to the author
-    "eslint/new-cap": ["error", { "capIsNewExceptions": ["VitePWA"] }],
     "react/only-export-components": [
       "warn",
       {
@@ -189,12 +188,31 @@
       "files": [
         "**/*.config.ts",
         "**/vite.config.ts",
-        "**/playwright.config.ts",
-        "**/pwa-assets.config.ts"
+        "**/playwright.config.ts"
       ],
       "rules": {
         "import/no-default-export": "off",
         "import/no-nodejs-modules": "off"
+      }
+    },
+    {
+      // The PWA build steps run on Bun at build time, never in the browser.
+      "files": [
+        "packages/pwa/src/build.ts",
+        "packages/pwa/src/assets.ts",
+        "packages/pwa/src/service-worker.ts"
+      ],
+      "rules": {
+        "import/no-nodejs-modules": "off"
+      }
+    },
+    {
+      // Serwist's fixed name for the precache list it fills in.
+      "files": [
+        "packages/pwa/src/sw.ts"
+      ],
+      "rules": {
+        "eslint/no-underscore-dangle": ["error", { "allow": ["__SW_MANIFEST"] }]
       }
     },
     {

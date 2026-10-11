@@ -62,10 +62,10 @@ jobs:
           if grep -rlE 'e2eSignIn|127\.0\.0\.1:(9099|8080)' apps/web/dist/; then
             echo '::error::The production build contains emulator code'; exit 1
           fi
-      # Workbox refuses a precache list with the same URL twice, and then no new version installs (#136).
+      # Serwist (like Workbox) refuses a precache list with the same URL twice, and then no new version installs (#136).
       - name: Service worker precaches each file once
         run: |
-          urls=$(grep -o 'url:"[^"]*"' apps/web/dist/sw.js || true)
+          urls=$(grep -o '"url":"[^"]*"' apps/web/dist/sw.js || true)
           # No match at all means the format changed and this check would prove nothing.
           [ -n "$urls" ] || { echo '::error::No precache entries found in apps/web/dist/sw.js'; exit 1; }
           duplicates=$(sort <<<"$urls" | uniq -d)

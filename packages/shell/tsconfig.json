@@ -1,7 +1,7 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "types": ["vite/client", "vite-plugin-pwa/react", "bun"],
+    "types": ["vite/client", "bun"],
     "jsx": "react-jsx"
   },
   "include": ["src", "../firebase/src/env.d.ts"]
