@@ -265,8 +265,6 @@ adapted to this repository:
 
 ### Shell
 
-- **Quote file paths that contain `$`.** TanStack route files are named like `items.$itemId.tsx`;
-  unquoted in a shell command, `$itemId` expands to nothing and the file becomes `items..tsx`.
 - **A pipe hides the exit code.** `bun run lint | tail` succeeds even when lint fails, and a commit
   chained after it with `&&` went through with a lint error. Check `${PIPESTATUS[0]}`, use
   `set -o pipefail`, or don't pipe a command whose exit code matters.

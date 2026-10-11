@@ -156,8 +156,6 @@ firebase-debug.log
 firestore-debug.log
 ui-debug.log
 
-# TanStack Router plugin cache
-.tanstack/
 dist-e2e
 
 # Written by packages/tooling/src/e2e-hosting-config.ts for the end-to-end tests.
