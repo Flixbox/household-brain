@@ -9,6 +9,10 @@
   "jsPlugins": [
     "@stylistic/eslint-plugin"
   ],
+  // Rules that need type information (oxlint-tsgolint, #167), for the CLI, editors and lint:fix alike.
+  "options": {
+    "typeAware": true
+  },
   "categories": {
     "correctness": "error",
     "nursery": "error",
