@@ -186,15 +186,14 @@ const checkOpen = async (pr: number, state: PrState): Promise<void> => {
   }
   await report({ key: `pr-${pr} opened`, lines: [`NEW_PR: ${state.title}`] }, pr)
   // Comments before the approval: an approval often comes with review comments, and reporting it
-  // first meant auto-merge went on before they were read (#152). A failed lookup holds back the
-  // approval too, until the comments could be read.
-  if (!await checkActivity(pr)) {
-    return
-  }
+  // first meant auto-merge went on before they were read (#152). While the comments can't be read,
+  // the approval waits too.
+  const commentsRead = await checkActivity(pr)
   // A PR labelled `parked` is left open on purpose: only its CI and comments are news.
-  await (state.parked ? Promise.resolve() : checkReview(pr, state))
+  const reviewNews = commentsRead && !state.parked
+  await (reviewNews ? checkReview(pr, state) : Promise.resolve())
   await checkRun(pr, state.head, 'pr')
-  await (state.parked ? Promise.resolve() : checkReady(pr, state).then(() => checkMoved(pr, state.head)))
+  await (reviewNews ? checkReady(pr, state).then(() => checkMoved(pr, state.head)) : Promise.resolve())
 }
 
 const checkPr = async (pr: number): Promise<void> => {
