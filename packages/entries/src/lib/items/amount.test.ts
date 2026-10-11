@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { amountLabel } from './amount'
 import { ratesOf } from './currency'
 

@@ -1,5 +1,5 @@
 import { eventIdForTask, isEventId } from './ids'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { importedTask, parseTaskNotes } from './task-import'
 
 describe('parseTaskNotes', () => {

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { Timestamp } from 'firebase/firestore'
 import { categoryFrom, householdFrom, itemFrom, logFrom } from './documents'
 
@@ -8,7 +8,7 @@ describe('itemFrom', () => {
       amount: '10', category: 'coupon', code: 'SUMMER25', currency: '', dirty: ['code'], dueDate: '2026-11-03', etags: { owner: '"1"' }, id: 'evt1', interval: 'monthly',
       notes: '', pendingOp: 'upsert', reminders: '', rev: 'r1', startDate: '', status: 'open', sync: 'pending', syncError: null, title: 'Amazon', url: '',
     }
-    expect(itemFrom('evt1', data)).toEqual(data)
+    expect<unknown>(itemFrom('evt1', data)).toEqual(data)
   })
 
   it("takes the document's own id, whatever the data says", () => {

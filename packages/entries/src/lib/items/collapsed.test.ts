@@ -1,5 +1,5 @@
 import { cleanTestStorage, getTestStorage, useTestStorageEngine } from '@nanostores/persistent'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'bun:test'
 import { $collapsed, collapsedSlugs, pruneCollapsed, toggleCollapsed } from './collapsed'
 
 // oxlint-disable-next-line react-hooks/rules-of-hooks -- nanostores' switch to fake storage, not a React hook

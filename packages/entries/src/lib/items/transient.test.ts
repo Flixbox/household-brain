@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { CalendarApiError } from '@household-brain/entries/lib/calendar/api'
 import { NeedsAccessError, isTransient } from './transient'
 

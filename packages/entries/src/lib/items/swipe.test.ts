@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { SWIPE_DONE_PX, swipedToDone } from './swipe-threshold'
 
 describe('swipedToDone', () => {

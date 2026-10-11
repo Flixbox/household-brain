@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { DEFAULT_CATEGORIES } from '@household-brain/entries/lib/categories'
 import { type CalendarApi, CalendarApiError } from '@household-brain/entries/lib/calendar/api'
 import type { CalendarEvent } from './event'

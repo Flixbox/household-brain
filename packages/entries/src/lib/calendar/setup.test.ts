@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { type Category, DEFAULT_CATEGORIES } from '@household-brain/entries/lib/categories'
 import type { CalendarListEntry, Reminder } from './api'
 import { CALENDAR_NAME, DEFAULT_REMINDERS, type HouseholdConfig, type HouseholdStore, type SetupApi, TIME_ZONE, createHousehold, joinHousehold } from './setup'
@@ -54,7 +54,7 @@ describe('createHousehold', () => {
 
     expect(config).toEqual({ calendarId: 'cal-1', ownerUid: 'owner-uid', timeZone: TIME_ZONE })
     expect(state.config).toEqual(config)
-    expect(state.categories).toEqual(DEFAULT_CATEGORIES)
+    expect(state.categories).toEqual([...DEFAULT_CATEGORIES])
     expect(calls).toEqual([`find ${CALENDAR_NAME}`, `create ${CALENDAR_NAME} Europe/Berlin`, 'get cal-1', 'add cal-1 2880,1440'])
   })
 

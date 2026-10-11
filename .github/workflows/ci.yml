@@ -35,16 +35,22 @@ jobs:
         run: bash scripts/check-action-age.sh
         env:
           GH_TOKEN: ${{ github.token }}
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: package.json # reads volta.node
-      - name: Install pnpm (version from packageManager)
-        run: npm install -g "$(node -p "require('./package.json').packageManager")"
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm lint
-      - run: pnpm typecheck
-      - run: pnpm test
-      - run: pnpm build
+      # Bun only (#140): installed from its pinned release, and the runner's own Node removed so
+      # nothing falls back to it.
+      - run: bash scripts/install-bun.sh
+      - run: bash scripts/remove-node.sh
+      - run: bun install --frozen-lockfile
+      # Bun applies its minimum release age only when it resolves a version, not to one already in
+      # bun.lock, so this checks what the change adds to the lockfile (#94). Install scripts never
+      # ran, so the install before it is harmless.
+      - name: No package version younger than 48 hours
+        run: bun scripts/check-package-age.ts "$BASE"
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || 'HEAD^' }}
+      - run: bun run lint
+      - run: bun run typecheck
+      - run: bun run test
+      - run: bun run build
       - name: Production build has no emulator wiring
         run: |
           if grep -rlE 'e2eSignIn|127\.0\.0\.1:(9099|8080)' apps/web/dist/; then
@@ -96,26 +102,25 @@ jobs:
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: Playwright image matches @playwright/test
         run: |
-          wanted=$(node -p "require('./package.json').devDependencies['@playwright/test']")
+          wanted=$(sed -n 's/.*"@playwright\/test": "\([^"]*\)".*/\1/p' package.json)
           if [ "$wanted" != "$PLAYWRIGHT_IMAGE_VERSION" ]; then
             echo "::error::@playwright/test is $wanted but the CI image is $PLAYWRIGHT_IMAGE_VERSION: update container.image in ci.yml"
             exit 1
           fi
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: package.json # reads volta.node; the image's own Node is older
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: '21' # Firestore emulator
-      - name: Install pnpm (version from packageManager)
-        run: npm install -g "$(node -p "require('./package.json').packageManager")"
-      - run: pnpm install --frozen-lockfile
+      # Bun only (#140): installed from its pinned release, and the runner's own Node removed so
+      # nothing falls back to it.
+      - run: bash scripts/install-bun.sh
+      - run: bash scripts/remove-node.sh
+      - run: bun install --frozen-lockfile
       - name: Cache the Firebase emulator downloads
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/firebase/emulators
-          key: firebase-emulators-${{ hashFiles('pnpm-lock.yaml') }}
+          key: firebase-emulators-${{ hashFiles('bun.lock') }}
       # The journeys run as one cached Nx task per device (`playwright`, after the cached `build:e2e`):
       # when nothing they depend on changed (`e2eEnvironment` and the inputs in `nx.json`), the result
       # is replayed, videos included. (The plugin's per-file `e2e-ci` needs Nx Agents, a paid service.)
@@ -124,9 +129,9 @@ jobs:
         env:
           E2E_PROJECT: ${{ matrix.project }}
         run: |
-          tests="pnpm exec nx run @household-brain/web:playwright"
-          if [ "$E2E_PROJECT" = desktop-chrome ]; then tests="pnpm test:rules && $tests"; fi
-          pnpm exec firebase emulators:exec --only auth,firestore --project demo-household-brain "$tests"
+          tests="bun run nx run @household-brain/web:playwright"
+          if [ "$E2E_PROJECT" = desktop-chrome ]; then tests="bun run test:rules && $tests"; fi
+          bun run firebase emulators:exec --only auth,firestore --project demo-household-brain "$tests"
       - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -168,15 +173,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: package.json
-      - name: Install pnpm (version from packageManager)
-        run: npm install -g "$(node -p "require('./package.json').packageManager")"
-      - run: pnpm install --frozen-lockfile
+      # Bun only (#140): installed from its pinned release, and the runner's own Node removed so
+      # nothing falls back to it.
+      - run: bash scripts/install-bun.sh
+      - run: bash scripts/remove-node.sh
+      - run: bun install --frozen-lockfile
       # Built here from the checked-out commit, never from a cache entry: the remote cache is
       # shared, and production must not depend on what some other run stored in it.
-      - run: pnpm build --skip-nx-cache
+      - run: bun run build --skip-nx-cache
       - name: Production build has no emulator wiring
         run: |
           if grep -rlE 'e2eSignIn|127\.0\.0\.1:(9099|8080)' apps/web/dist/; then
@@ -210,12 +214,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: package.json
-      - name: Install pnpm (version from packageManager)
-        run: npm install -g "$(node -p "require('./package.json').packageManager")"
-      - run: pnpm install --frozen-lockfile
+      # Bun only (#140): installed from its pinned release, and the runner's own Node removed so
+      # nothing falls back to it.
+      - run: bash scripts/install-bun.sh
+      - run: bash scripts/remove-node.sh
+      - run: bun install --frozen-lockfile
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: web-dist
@@ -224,4 +227,4 @@ jobs:
         with:
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.DEPLOY_SA }}
-      - run: pnpm exec firebase deploy --only hosting,firestore:rules,firestore:indexes --non-interactive
+      - run: bun run firebase deploy --only hosting,firestore:rules,firestore:indexes --non-interactive

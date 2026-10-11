@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { createCalendarApi } from './api'
 
 const respond = (...replies: { status: number, body?: unknown }[]) => {
@@ -53,7 +53,7 @@ describe('createCalendarApi', () => {
       { accessRole: 'owner', id: 'b', summary: 'Household Brain (old)' },
     ]
     const { fetchFn, requests } = respond({ body: { items }, status: 200 })
-    expect(await createCalendarApi(tokens('t').access, fetchFn).findOwnedCalendars('Household Brain')).toEqual([items[0]])
+    expect(await createCalendarApi(tokens('t').access, fetchFn).findOwnedCalendars('Household Brain')).toEqual(items.slice(0, 1))
     expect(requests[0]?.url).toContain('/users/me/calendarList?minAccessRole=owner')
   })
 

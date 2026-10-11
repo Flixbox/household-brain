@@ -11,19 +11,15 @@ updates:
     groups:
       actions:
         patterns: ['*']
-  # The npm ecosystem also covers pnpm-lock.yaml.
-  - package-ecosystem: npm
+  # Bun's lockfile (bun.lock) and package.json, every workspace included.
+  - package-ecosystem: bun
     directory: /
     schedule:
       interval: weekly
-    # pnpm refuses versions younger than 48 hours (minimumReleaseAge in pnpm-workspace.yaml, #94), so
+    # Bun refuses versions younger than 48 hours (minimumReleaseAge in bunfig.toml, #94), so
     # proposing them earlier would only give a failing PR.
     cooldown:
       default-days: 2
-    ignore:
-      # @types/node must match the Node major pinned in package.json (volta.node); bump both together.
-      - dependency-name: '@types/node'
-        update-types: [version-update:semver-major]
     groups:
       minor-and-patch:
         update-types: [minor, patch]

@@ -1,0 +1,13 @@
+[install]
+# Every dependency pinned exactly (npmpackagejsonlint.config.ts enforces it in package.json too).
+exact = true
+# A version must be at least 48 hours old (#94): a freshly published one has had no time for anyone
+# to notice it is compromised. Bun checks it on every install, so CI fails on a lockfile that pins a
+# younger version; re-run once it is old enough.
+minimumReleaseAge = 172800
+# Each package sees only its own dependencies, as with pnpm.
+linker = "isolated"
+
+[run]
+# No Node fallback: a script or bin written for `node` (its shebang) runs on Bun instead.
+bun = true

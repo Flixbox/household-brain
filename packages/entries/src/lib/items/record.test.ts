@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import type { Item } from './model'
 import { errorFor, recordFor } from './record'
 

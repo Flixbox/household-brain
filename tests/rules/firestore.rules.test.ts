@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebase/rules-unit-testing'
 import { Timestamp, collection, collectionGroup, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore'
-import { afterAll, beforeEach, describe, it } from 'vitest'
+import { afterAll, beforeEach, describe, it } from 'bun:test'
 
 const env = await initializeTestEnvironment({
   firestore: { rules: readFileSync('firestore.rules', 'utf8') },

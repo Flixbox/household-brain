@@ -4,12 +4,13 @@
   "version": "0.0.0",
   "type": "module",
   "license": "Unlicense",
-  "packageManager": "pnpm@12.6.0",
-  "volta": {
-    "node": "26.10.0"
-  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "packageManager": "bun@1.4.2",
   "scripts": {
-    "dev": "pnpm --filter @household-brain/web dev",
+    "dev": "bun run --filter @household-brain/web dev",
     "build": "nx run @household-brain/web:build",
     "lint": "nx run-many -t lint:oxlint lint:packages lint:fallow",
     "lint:oxlint": "oxlint --max-warnings=0",
@@ -18,8 +19,8 @@
     "lint:fix": "oxlint --fix && npmPkgJsonLint -c npmpackagejsonlint.config.ts --fix . 'apps/*' 'packages/*'",
     "typecheck": "nx run-many -t typecheck",
     "test": "nx run-many -t test",
-    "test:rules": "vitest run --config vitest.rules.config.ts",
-    "test:emulated": "firebase emulators:exec --only auth,firestore --project demo-household-brain \"pnpm test:rules && pnpm --filter @household-brain/web test:e2e\"",
+    "test:rules": "bun test tests/rules",
+    "test:emulated": "firebase emulators:exec --only auth,firestore --project demo-household-brain \"bun run test:rules && bun run --filter @household-brain/web test:e2e\"",
     "emulators": "firebase emulators:start --only auth,firestore --project demo-household-brain"
   },
   "dependencies": {
@@ -30,7 +31,7 @@
     "@nx/playwright": "23.3.0",
     "@playwright/test": "1.64.0",
     "@stylistic/eslint-plugin": "5.10.0",
-    "@types/node": "26.6.4",
+    "@types/bun": "1.4.2",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "fallow": "3.32.0",
@@ -38,9 +39,9 @@
     "npm-package-json-lint": "11.0.0",
     "nx": "23.3.0",
     "oxlint": "1.87.0",
+    "temporal-polyfill": "1.0.5",
     "typescript": "7.0.2",
-    "vite": "8.3.3",
-    "vitest": "5.0.3"
+    "vite": "8.3.3"
   },
   "nx": {
     "includedScripts": [
@@ -53,5 +54,6 @@
         "command": "tsc -p tsconfig.json"
       }
     }
-  }
+  },
+  "trustedDependencies": []
 }

@@ -5,13 +5,13 @@
   "type": "module",
   "license": "Unlicense",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview",
+    "dev": "bun --bun vite",
+    "build": "tsc -b && bun --bun vite build",
+    "preview": "bun --bun vite preview",
     "typecheck": "tsc -b",
-    "test": "vitest run --passWithNoTests",
-    "build:e2e": "vite build --mode e2e --outDir dist-e2e",
-    "test:e2e": "vite build --mode e2e --outDir dist-e2e && playwright test"
+    "test": "bun test --pass-with-no-tests src",
+    "build:e2e": "bun --bun vite build --mode e2e --outDir dist-e2e",
+    "test:e2e": "bun --bun vite build --mode e2e --outDir dist-e2e && bun --bun playwright test"
   },
   "dependencies": {
     "@household-brain/entries": "workspace:*",

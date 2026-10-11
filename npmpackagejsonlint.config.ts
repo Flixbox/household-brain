@@ -1,6 +1,6 @@
 // Lints package.json (npm-package-json-lint). Every dependency must be pinned to an exact version;
-// pnpm-workspace.yaml sets savePrefix '' so `pnpm add` writes exact versions, and Dependabot bumps them.
-// The linter `require()`s this file, which Node loads as an ES module, so it reads the module's
+// bunfig.toml sets install.exact so `bun add` writes exact versions, and Dependabot bumps them.
+// The linter `require()`s this file, which Bun loads as an ES module, so it reads the module's
 // named exports: `rules` must be a named export (a default export would arrive as `{ default }`).
 export const rules = {
   'no-archive-dependencies': 'error',

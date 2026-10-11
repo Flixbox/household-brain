@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { DEFAULT_CATEGORIES } from '@household-brain/entries/lib/categories'
 import { dateEventFor, shapeOf } from './date-events'
 import { dateEventChange } from './date-pull'

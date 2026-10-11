@@ -1,6 +1,6 @@
 import { cleanTestStorage, getTestStorage, useTestStorageEngine } from '@nanostores/persistent'
 import { Temporal } from 'temporal-polyfill'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, mock, spyOn } from 'bun:test'
 import { $calendarToken, MEMBER_SCOPES, OWNER_SCOPES, TASKS_SCOPE, acceptToken, forgetCalendarToken, hasCalendarToken, revokeCalendarToken } from './google-token'
 
 // oxlint-disable-next-line react-hooks/rules-of-hooks -- nanostores' switch to fake storage, not a React hook
@@ -68,12 +68,11 @@ describe('the stored token', () => {
 
 describe('revokeCalendarToken (#117)', () => {
   afterEach(() => {
-    vi.unstubAllGlobals()
+    mock.restore()
   })
 
   it('forgets the token and revokes it at Google, in the body and not the URL', () => {
-    const fetch = vi.fn(() => Promise.resolve(new Response(null)))
-    vi.stubGlobal('fetch', fetch)
+    const fetch = spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null))
     $calendarToken.set({ account: ME, scopes: [...MEMBER_SCOPES], usableUntil: now() + 60_000, value: 'secret-token' })
     revokeCalendarToken()
     expect($calendarToken.get()).toBeNull()
@@ -86,8 +85,7 @@ describe('revokeCalendarToken (#117)', () => {
   })
 
   it('asks Google nothing when there is no token', () => {
-    const fetch = vi.fn(() => Promise.resolve(new Response(null)))
-    vi.stubGlobal('fetch', fetch)
+    const fetch = spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null))
     forgetCalendarToken()
     revokeCalendarToken()
     expect(fetch).not.toHaveBeenCalled()
