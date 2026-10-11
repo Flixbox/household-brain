@@ -1,5 +1,6 @@
 {
   "name": "household-brain-workspace",
+  "description": "Everything in our household that is due on a date, by category.",
   "private": true,
   "version": "0.0.0",
   "type": "module",

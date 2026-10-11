@@ -6,9 +6,9 @@ import type { PwaConfig } from '@household-brain/pwa/lib/config'
  * Generates the icons and the web app manifest from the app's icon (`favicons`) into the build, and
  * links them from its index.html.
  */
-export const writeAssets = async (dir: string, config: PwaConfig) => {
+export const writeAssets = async (dir: string, config: PwaConfig, description: string) => {
   const { files, html, images } = await favicons(config.icon, {
-    appDescription: config.description,
+    appDescription: description,
     appName: config.name,
     appShortName: config.shortName,
     // Not `favicons`' see-through bar, which would put the page under the iPhone's status bar.

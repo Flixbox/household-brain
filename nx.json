@@ -46,7 +46,7 @@
     },
     "build:e2e": {
       "cache": true,
-      "inputs": ["production", "^production"],
+      "inputs": ["production", "^production", { "json": "{workspaceRoot}/package.json", "fields": ["description"] }],
       "outputs": ["{projectRoot}/dist-e2e"]
     },
     "build": {
@@ -55,7 +55,8 @@
       ],
       "inputs": [
         "production",
-        "^production"
+        "^production",
+        { "json": "{workspaceRoot}/package.json", "fields": ["description"] }
       ],
       "outputs": [
         "{projectRoot}/dist"

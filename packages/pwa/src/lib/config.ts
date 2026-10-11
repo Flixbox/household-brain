@@ -10,7 +10,6 @@ export interface PwaScreenshot {
 /** What an app tells the PWA build about itself (`pwa.config.ts` in the app's folder). */
 export interface PwaConfig {
   backgroundColor: string
-  description: string
   /** The app's icon, relative to the app's folder; every icon size is generated from it. */
   icon: string
   lang: string

@@ -6,6 +6,7 @@
 import { resolve } from 'node:path'
 import type { PwaConfig } from '@household-brain/pwa/lib/config'
 import { writeAssets } from './assets'
+import { workspaceDescription } from './description'
 import { writeServiceWorker } from './service-worker'
 
 const [dir] = process.argv.slice(2)
@@ -14,6 +15,6 @@ if (!dir) {
   process.exit(64)
 }
 const { default: config }: { default: PwaConfig } = await import(resolve('pwa.config.ts'))
-await writeAssets(dir, config)
+await writeAssets(dir, config, await workspaceDescription())
 const stored = await writeServiceWorker(dir, config)
 process.stdout.write(`${dir}: icons, manifest and a service worker that stores ${stored} files\n`)

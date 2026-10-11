@@ -421,8 +421,8 @@ CI fails if a compiled native addon shows up in `node_modules`. Add a package on
   whole screen down. Check support before using a recent API; nothing in lint catches it.
 
 - **The installable, offline app comes from `packages/pwa`** (#148): never hand-write icons, a
-  manifest or head links. Change `apps/web/pwa.config.ts` or the SVGs in `apps/web/icons/`; the
-  build's `pwa-build` step generates the rest.
+  manifest or head links. Change `apps/web/pwa.config.ts`, the SVGs in `apps/web/icons/`, or the
+  description in the root `package.json` (#161); the build's `pwa-build` step generates the rest.
 
 - **Compare `import.meta.env.X` inline** when the branch must vanish from production builds. Passing
   `import.meta.env` through a helper function stops Vite from folding it, so the dead code ships.
