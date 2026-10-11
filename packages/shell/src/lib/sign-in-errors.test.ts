@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { signInErrorMessage } from './sign-in-errors'
 
 const authError = (code: string) => Object.assign(new Error(`Firebase: Error (${code}).`), { code })

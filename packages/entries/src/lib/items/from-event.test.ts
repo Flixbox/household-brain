@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { DEFAULT_CATEGORIES } from '@household-brain/entries/lib/categories'
 import type { CalendarEvent } from './event'
 import { READING_RULES, draftFrom, normalisationFor, ownRemindersFix, rulesReadWith } from './from-event'
@@ -44,7 +44,7 @@ describe('draftFrom', () => {
     // An event put in by hand without a category keeps its description as it is.
     expect(draftFrom({ ...made, summary: 'Cinema' }, DEFAULT_CATEGORIES).notes).toBe(made.description)
     // The app's own events read their fields from their properties, never from the description.
-    expect(draftFrom(appEvent, DEFAULT_CATEGORIES).notes).toBe(appEvent.description)
+    expect<unknown>(draftFrom(appEvent, DEFAULT_CATEGORIES).notes).toBe(appEvent.description)
   })
 
   it("reads a done or cancelled entry's title without its status tag", () => {

@@ -1,5 +1,5 @@
 import { Temporal } from 'temporal-polyfill'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { dueStatus, rowDue, startLabel } from './due'
 
 const at = (dateTime: string) => Temporal.PlainDateTime.from(dateTime).toZonedDateTime('Europe/Berlin')
@@ -15,7 +15,7 @@ describe('dueStatus', () => {
     ['2026-11-09', '2026-11-02T12:00', 'in 7 days', 'soon'],
     ['2026-11-10', '2026-11-02T12:00', 'in 8 days', 'later'],
   ])('due %s, at %s: %s (%s)', (...[dueDate, now, label, urgency]) => {
-    expect(dueStatus(dueDate, at(now))).toEqual({ label, urgency })
+    expect<unknown>(dueStatus(dueDate, at(now))).toEqual({ label, urgency })
   })
 
   it('counts calendar days across the switch to winter time', () => {

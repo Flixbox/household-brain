@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { LINK_PATTERN, normaliseLink, openableLink } from './link'
 
 // Compiled the way the browser compiles an input's pattern.

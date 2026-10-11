@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { DEFAULT_CATEGORIES, RETIRED_DEFAULTS, categoryOfTag, missingDefaults, offeredCategory, visibleCategories } from './categories'
 
 describe('missingDefaults', () => {

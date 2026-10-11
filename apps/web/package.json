@@ -9,7 +9,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b",
-    "test": "vitest run --passWithNoTests",
+    "test": "bun test --pass-with-no-tests src",
     "build:e2e": "vite build --mode e2e --outDir dist-e2e",
     "test:e2e": "vite build --mode e2e --outDir dist-e2e && playwright test"
   },

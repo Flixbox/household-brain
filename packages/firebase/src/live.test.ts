@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, jest, mock, spyOn } from 'bun:test'
 import { RETRY_MS, type Subscribe, dataOf, liveStore } from './live'
 
 /** A fake Firestore listener the test drives by hand. */
@@ -18,13 +18,13 @@ const fakeListener = () => {
 }
 
 beforeEach(() => {
-  vi.useFakeTimers()
-  vi.stubGlobal('reportError', vi.fn())
+  jest.useFakeTimers()
+  spyOn(globalThis, 'reportError').mockImplementation(() => null)
 })
 
 afterEach(() => {
-  vi.useRealTimers()
-  vi.unstubAllGlobals()
+  jest.useRealTimers()
+  mock.restore()
 })
 
 describe('liveStore', () => {
@@ -43,7 +43,7 @@ describe('liveStore', () => {
     stopFirst()
     stopSecond()
     // A store stops a moment after its last reader leaves (nanostores).
-    vi.runAllTimers()
+    jest.runAllTimers()
     expect(listener.calls).toEqual({ started: 1, stopped: 1 })
   })
 
@@ -57,7 +57,7 @@ describe('liveStore', () => {
     expect(dataOf({ message: 'x', state: 'error' })).toBeNull()
     expect(globalThis.reportError).toHaveBeenCalledWith(new Error('permission-denied'))
 
-    vi.advanceTimersByTime(RETRY_MS)
+    jest.advanceTimersByTime(RETRY_MS)
     expect(listener.calls.started).toBe(2)
     listener.push('back')
     expect(seen.at(-1)).toEqual({ data: 'back', state: 'ready' })
@@ -69,7 +69,7 @@ describe('liveStore', () => {
     const stop = liveStore(listener.subscribe).listen(() => null)
     listener.fail('unavailable')
     stop()
-    vi.runAllTimers()
+    jest.runAllTimers()
     expect(listener.calls.started).toBe(1)
   })
 
@@ -79,7 +79,7 @@ describe('liveStore', () => {
     stop()
     // Within nanostores' unmount delay the listener still runs; the rules now refuse it.
     listener.fail('permission-denied')
-    vi.runAllTimers()
+    jest.runAllTimers()
     expect(globalThis.reportError).not.toHaveBeenCalled()
     expect(listener.calls.started).toBe(1)
   })

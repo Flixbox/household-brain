@@ -1,7 +1,7 @@
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "types": ["node"]
+    "types": ["bun"]
   },
-  "include": ["vitest.rules.config.ts", "npmpackagejsonlint.config.ts", "tests"]
+  "include": ["npmpackagejsonlint.config.ts", "tests"]
 }

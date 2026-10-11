@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { dateEventId, entryOfEvent, isDateEventId } from './date-events'
 import { isEventId, newEventId } from './ids'
 

@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test'
 
 // Runs against a production-like build that talks only to the local Firebase emulators.
-// Start it through `pnpm test:emulated`, which boots the emulators first.
+// Start it through `bun run test:emulated`, which boots the emulators first.
 const DEVICES = [
   { name: 'desktop-chrome', use: { ...devices['Desktop Chrome'] } },
   { name: 'android-pixel-9', use: { ...devices['Pixel 9'] } },
@@ -31,14 +31,14 @@ export default defineConfig({
     // (`scripts/pr-gif.sh`). Demo data only: the tests never see real entries.
     video: process.env.CI ? 'on' : 'off',
   },
-  // `pnpm test:e2e` builds first. The server command must be `vite preview` itself, not a pnpm
-  // script or an `&&` chain: those wrappers swallow the stop signal and Playwright then waits for the
-  // server to exit forever.
+  // `bun run test:e2e` builds first. The server command must be `vite preview` itself (on Bun), not a
+  // package script or an `&&` chain: those wrappers swallow the stop signal and Playwright then waits
+  // for the server to exit forever.
   webServer: {
     // The e2e build's own mode and folder (`build:e2e`).
-    command: 'vite preview --mode e2e --outDir dist-e2e --port 4173 --strictPort',
+    command: 'bun --bun vite preview --mode e2e --outDir dist-e2e --port 4173 --strictPort',
     gracefulShutdown: { signal: 'SIGTERM', timeout: 5000 },
-    // Never attach to some other server on 4173, e.g. a production `pnpm preview`.
+    // Never attach to some other server on 4173, e.g. a production `bun run preview`.
     reuseExistingServer: false,
     timeout: 120_000,
     url: 'http://localhost:4173',

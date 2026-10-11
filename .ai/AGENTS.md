@@ -91,8 +91,8 @@ comments. Only wait in the foreground for something whose result you need for th
 
 ### 1. Before you push
 
-- **Run the quick checks locally**: `pnpm lint && pnpm typecheck && pnpm test` (seconds). Leave the
-  e2e suite (`pnpm test:emulated`) to CI, which runs it on every push anyway; run it locally only to
+- **Run the quick checks locally**: `bun run lint && bun run typecheck && bun run test` (seconds). Leave the
+  e2e suite (`bun run test:emulated`) to CI, which runs it on every push anyway; run it locally only to
   debug a failure CI found.
 - **Write e2e tests as a few full user journeys, not many small tests.** Every test resets the
   emulators and seeds data in `beforeEach`, then signs in and usually mocks Google, on each of the
@@ -223,7 +223,7 @@ adapted to this repository:
 
 ### CI and monitoring
 
-- **Playwright's `webServer.command` must be the server itself** (`vite preview ...`), never a pnpm
+- **Playwright's `webServer.command` must be the server itself** (`bun --bun vite preview ...`), never a package
   script or an `&&` chain. The wrappers swallowed the stop signal: all tests passed in seconds, then
   Playwright waited forever for the server to exit, and an orphaned `vite preview` kept port 4173.
 - **Every job has a `timeout-minutes`, and Playwright has a `globalTimeout`.** The hang above sat
@@ -261,7 +261,7 @@ adapted to this repository:
 
 - **Quote file paths that contain `$`.** TanStack route files are named like `items.$itemId.tsx`;
   unquoted in a shell command, `$itemId` expands to nothing and the file becomes `items..tsx`.
-- **A pipe hides the exit code.** `pnpm lint | tail` succeeds even when lint fails, and a commit
+- **A pipe hides the exit code.** `bun run lint | tail` succeeds even when lint fails, and a commit
   chained after it with `&&` went through with a lint error. Check `${PIPESTATUS[0]}`, use
   `set -o pipefail`, or don't pipe a command whose exit code matters.
 
@@ -292,14 +292,14 @@ adapted to this repository:
   its reason as a comment, never with an inline disable comment. Before switching a rule on, search
   the file for it: a rule already listed as `"off"` further down wins (the last duplicate key in
   JSON counts), and the new entry silently does nothing. Prove a new rule with a file that breaks it.
-- **Every dependency is pinned exactly** (`savePrefix: ''`, enforced by npm-package-json-lint);
-  Dependabot bumps them. **No version younger than 48 hours** (#94): `minimumReleaseAge` in `pnpm-workspace.yaml`,
-  which pnpm checks on every install, `--frozen-lockfile` included, so CI fails on such a lockfile
-  ("within the minimumReleaseAge cutoff"); wait and re-run. Dependabot waits as long (`cooldown`).
-  An urgent exception goes into `minimumReleaseAgeExclude` with its reason. **GitHub Actions too**
+- **Every dependency is pinned exactly** (`install.exact` in `bunfig.toml`, enforced by
+  npm-package-json-lint); Dependabot bumps them. **No version younger than 48 hours** (#94):
+  `install.minimumReleaseAge` in `bunfig.toml`, which Bun checks on every install, so CI fails on a
+  lockfile that pins a younger version; wait and re-run. Dependabot waits as long (`cooldown`). An
+  urgent exception goes into `install.minimumReleaseAgeExcludes` with its reason. **GitHub Actions too**
   (#102): `scripts/check-action-age.sh` runs first in CI and fails on a pinned action release younger
-  than 48 hours; Dependabot's `cooldown` counts loosely and let a younger one through (#101). Wait and re-run. Node is pinned in `package.json` (`volta.node`), pnpm in `packageManager`.
-- **fallow** (`.fallowrc.jsonc`, part of `pnpm lint`) fails on unused files, exports and
+  than 48 hours; Dependabot's `cooldown` counts loosely and let a younger one through (#101). Wait and re-run. Bun is pinned in `packageManager`, and with its checksum in `scripts/install-bun.sh`.
+- **fallow** (`.fallowrc.jsonc`, part of `bun run lint`) fails on unused files, exports and
   dependencies, on duplication, and on imports across the package boundaries: `apps/web` may use
   every package; `shell` and `entries` only `firebase`; nothing imports `apps/web` (its e2e tests
   and config included).
@@ -308,7 +308,8 @@ adapted to this repository:
   production build with it set, and CI fails if `apps/web/dist/` mentions either. The emulators run
   as `demo-household-brain`, which can't reach real Google services.
 - **CI uses only GitHub-owned and `google-github-actions/*` actions**, pinned to full SHAs (a
-  repository setting); pnpm is installed from `packageManager`, not through a third-party action.
+  repository setting); Bun is installed by `scripts/install-bun.sh` from its release (version and
+  checksum pinned), not through `oven-sh/setup-bun`, a third-party action.
 - **Never use the `pull_request_target` or `workflow_run` triggers** (both run code with the base
   repository's privileges), and never add self-hosted runners to this public repo.
 - **One TypeScript config to change: `tsconfig.base.json`** (#79). Every tsconfig that compiles files
@@ -322,21 +323,21 @@ adapted to this repository:
   videos are replayed. (The plugin's per-file `e2e-ci` refuses to run without Nx Agents, a paid
   service.) **Review its inputs whenever the tests come to depend on something new** outside
   `apps/web` and the packages, or a cached green hides a broken journey. They are the app, the
-  packages, `e2eEnvironment` in `nx.json` (the Firebase config and rules, Node and pnpm from the root
+  packages, `e2eEnvironment` in `nx.json` (the Firebase config and rules, Bun from the root
   `package.json`, `ci.yml`, `E2E_PROJECT`) and the versions of `@playwright/test` and
   `firebase-tools` (the emulators). Tools only the root `package.json` lists are not covered by the
   app's dependencies: name them there. These inputs replace the plugin's own, so they restate its
   list: compare them with `nx show project @household-brain/web` without the override when
   `@nx/playwright` is bumped.
-- **Lint and typecheck are Nx targets:** `pnpm lint` is `nx run-many` over the root project's
+- **Lint and typecheck are Nx targets:** `bun run lint` is `nx run-many` over the root project's
   `lint:oxlint`, `lint:packages` and `lint:fallow` (only those root scripts are Nx targets, through
-  `nx.includedScripts`), `pnpm typecheck` over every project's `typecheck` (the root's own is in
+  `nx.includedScripts`), `bun run typecheck` over every project's `typecheck` (the root's own is in
   `nx.targets`). Whole-repo tools take `{workspaceRoot}/**/*` as input: the root project's default
   inputs exclude files that belong to other projects, which once served a stale green from cache.
 
 ### Toolchain
 
-- **The repo is an Nx workspace** (pnpm workspaces): `apps/web` is the app, `packages/*` are
+- **The repo is an Nx workspace** (Bun workspaces): `apps/web` is the app, `packages/*` are
   features and shared code, consumed as TypeScript source (modules exported by path, no build
   step). A new feature, e.g. a shopping list, becomes its own `packages/<name>`,
   and `apps/web` routes render what it exports. Packages never import from `apps/web`.
@@ -370,16 +371,25 @@ adapted to this repository:
   expose their modules by path through `exports` patterns in `package.json` (e.g.
   `@household-brain/entries/components/items/ItemList`), and code imports from the module that
   defines what it needs.
-- Run tasks through Nx at the root: `pnpm typecheck`, `pnpm test` (`nx run-many`), `pnpm build`
+- Run tasks through Nx at the root: `bun run typecheck`, `bun run test` (`nx run-many`), `bun run build`
   (`nx run @household-brain/web:build`). Nx caches results, so unchanged projects are skipped.
 
 - **oxlint loads `@stylistic/eslint-plugin` through `jsPlugins`.** There is no ESLint here.
   `.oxlintrc.json` is JSONC, so each disabled rule carries its reason as a comment.
-- **npm-package-json-lint only auto-discovers `.js`/`.json` configs.** `pnpm lint` passes
-  `-c npmpackagejsonlint.config.ts`. Node loads that file as an ES module, so `rules` must be a
+- **npm-package-json-lint only auto-discovers `.js`/`.json` configs.** `bun run lint` passes
+  `-c npmpackagejsonlint.config.ts`. Bun loads that file as an ES module, so `rules` must be a
   named export: a default export arrives wrapped as `{ default }` and reads as an empty config.
-- **pnpm denies dependency install scripts.** Decide each package in `allowBuilds` in
-  `pnpm-workspace.yaml`. `savePrefix: ''` keeps new dependencies exactly pinned.
+- **Bun, and only Bun** (#140): it is the package manager (workspaces, `bun.lock`), the runtime of
+  every script, Nx, the Firebase CLI and Playwright, and the unit test runner (`bun test`, imports
+  from `bun:test`). There is no Node fallback: `bunfig.toml` sets `run.bun`, so whatever a script
+  starts as `node` runs on Bun, and CI removes the runners' own Node (`scripts/remove-node.sh`), so
+  anything that still reaches for it fails instead of quietly using it. Run tools through `bun run`
+  (or `bun --bun <bin>`), never `npx`.
+- **Bun runs no dependency install scripts** except for packages in `trustedDependencies` in
+  `package.json`, which is deliberately empty (it also turns off Bun's built-in trusted list). Add a
+  package there only when it truly needs its script, with the reason in the PR.
+- **`bun test` types are stricter than Vitest's:** `expect(x).toEqual(y)` wants `y` to fit `x`'s type.
+  For a deliberately loose comparison write `expect<unknown>(x)`.
 - **The Firestore emulator needs Java 21** (`brew install openjdk@21`); Java 17 fails.
 
 ### App and build

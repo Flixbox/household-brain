@@ -1,19 +1,17 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, mock, spyOn } from 'bun:test'
 import { $euroRates, refreshEuroRates } from './use-price'
 
 const answer = [{ base: 'EUR', date: '2026-10-02', quote: 'BRL', rate: 5 }]
 
 describe('refreshEuroRates', () => {
   afterEach(() => {
-    vi.unstubAllGlobals()
-    vi.restoreAllMocks()
+    mock.restore()
   })
 
   it('fetches once a day, and after a failure again only once the retry time has passed', async () => {
     let clock = 0
-    vi.spyOn(performance, 'now').mockImplementation(() => clock)
-    const fetch = vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValue(new Response(JSON.stringify(answer)))
-    vi.stubGlobal('fetch', fetch)
+    spyOn(performance, 'now').mockImplementation(() => clock)
+    const fetch = spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('offline')).mockResolvedValue(new Response(JSON.stringify(answer)))
 
     await refreshEuroRates('2026-10-02')
     expect($euroRates.get()).toBeNull()

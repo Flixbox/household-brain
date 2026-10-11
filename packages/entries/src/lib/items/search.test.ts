@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { matchesSearch } from './search'
 
 const item = { amount: '9.99', code: 'SUMMER25', notes: 'Only online', title: 'Café Müller', url: 'https://shop.household-brain.test' }

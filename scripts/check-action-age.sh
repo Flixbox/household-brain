@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Fails when a workflow pins a GitHub Action release younger than the minimum age (#102), as
-# pnpm's minimumReleaseAge does for packages (#94): a fresh release has had no time for anyone to
+# Bun's minimumReleaseAge (bunfig.toml) does for packages (#94): a fresh release has had no time for anyone to
 # notice it is compromised. Each `uses: owner/repo@<sha> # vX.Y.Z` is dated by its release, or by
 # its commit when the tag has no release (or there is no version comment). Re-run it once the
 # release is old enough.

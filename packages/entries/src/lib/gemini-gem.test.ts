@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { DEFAULT_CATEGORIES } from './categories'
 import { INTERVALS } from './items/interval'
-import gem from './gemini-gem.md?raw'
+import gem from './gemini-gem.md' with { type: 'text' }
 
 /** The instructions pasted into the Gemini Gem: the fenced block of `gemini-gem.md` (#119). */
 const instructions = gem.match(/```text\n(?<text>[\s\S]*?)```/u)?.groups?.text ?? ''

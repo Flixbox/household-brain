@@ -15,27 +15,27 @@ history live in the GitHub issues.
 ## Quick start
 
 ```sh
-pnpm install
-pnpm dev               # Vite dev server on http://localhost:5173
-pnpm lint              # oxlint, npm-package-json-lint, fallow (Nx, cached); pnpm lint:fix fixes what it can
-pnpm typecheck && pnpm test
-pnpm build             # apps/web/dist
-pnpm test:emulated     # Firebase emulators: rules tests and Playwright e2e (needs Java 21)
-pnpm emulators         # emulators only, to iterate on pnpm test:rules or the e2e tests against them
+bun install
+bun run dev               # Vite dev server on http://localhost:5173
+bun run lint              # oxlint, npm-package-json-lint, fallow (Nx, cached); bun run lint:fix fixes what it can
+bun run typecheck && bun run test
+bun run build             # apps/web/dist
+bun run test:emulated     # Firebase emulators: rules tests and Playwright e2e (needs Java 21)
+bun run emulators         # emulators only, to iterate on bun run test:rules or the e2e tests against them
 ```
 
 **Machine setup (once):**
 
 ```sh
-brew install volta && volta install node@26 pnpm   # Node is pinned in package.json (volta.node), pnpm in packageManager
+curl -fsSL https://bun.sh/install | bash -s bun-v1.4.2   # the version in package.json (packageManager); no Node needed
 brew install openjdk@21                            # the Firestore emulator needs Java 21
-pnpm exec playwright install chromium webkit       # e2e runs desktop Chrome, Pixel 9 and iPhone 17
+bun --bun playwright install chromium webkit        # e2e runs desktop Chrome, Pixel 9 and iPhone 17
 brew install --cask gcloud-cli && gcloud init      # only for the one-time Google Cloud setup below
 ```
 
 ## Layout
 
-An Nx workspace on pnpm workspaces. Packages are consumed as TypeScript source, their modules
+An Nx workspace on Bun workspaces, run entirely on Bun (no Node). Packages are consumed as TypeScript source, their modules
 exported by path (no barrel files); only the app is built.
 
 ```
@@ -96,6 +96,6 @@ The Firebase project is a Google Cloud project; everything below happens in it.
   environment deploys from `main` only; `main` can't be deleted or force-pushed.
 - Ground rules: review a fork PR's diff, `.github/` included, before clicking "Approve and run";
   never use the `pull_request_target` or `workflow_run` triggers; never add self-hosted runners.
-- Manual fallback: `pnpm exec firebase deploy --only hosting,firestore:rules,firestore:indexes`.
+- Manual fallback: `bun run firebase deploy --only hosting,firestore:rules,firestore:indexes`.
 
 Licence: Unlicense.

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { INTERVALS, intervalFrom, withInterval } from './interval'
 
 describe('intervals (#86)', () => {

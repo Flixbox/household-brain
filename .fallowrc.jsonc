@@ -1,5 +1,5 @@
 {
-  // fallow: unused code, duplication and architecture boundaries (#59). Runs in `pnpm lint`.
+  // fallow: unused code, duplication and architecture boundaries (#59). Runs in `bun run lint`.
   // The schema of the installed version: editors complete and check this file against it. fallow
   // reads only JSON(C) or TOML (it is a Rust binary), so there is no typed .ts config.
   "$schema": "./node_modules/fallow/schema.json",

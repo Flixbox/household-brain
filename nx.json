@@ -12,7 +12,7 @@
       "{workspaceRoot}/firebase.json",
       "{workspaceRoot}/firestore.rules",
       "{workspaceRoot}/firestore.indexes.json",
-      { "json": "{workspaceRoot}/package.json", "fields": ["volta", "packageManager"] },
+      { "json": "{workspaceRoot}/package.json", "fields": ["packageManager"] },
       "{workspaceRoot}/.github/workflows/ci.yml",
       { "env": "E2E_PROJECT" }
     ],

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { changedFields, editField, emptyDraft, followUntouched, openForm } from './model'
 
 describe('followUntouched', () => {
