@@ -233,10 +233,10 @@ adapted to this repository:
 
 ### CI and monitoring
 
-- **Playwright's `webServer.command` must be the server itself** (`bun --bun vite preview ...`), never a package
-  script or an `&&` chain. The wrappers swallowed the stop signal: all tests passed in seconds, then
-  Playwright waited forever for the server to exit, and an orphaned `vite preview` kept port 4173.
-- **Every job has a `timeout-minutes`, and Playwright has a `globalTimeout`.** The hang above sat
+- **The e2e tests run against the Firebase Hosting emulator** (#150), which serves the e2e build with
+  production's headers, CSP and rewrites (`firebase.e2e.json`, written by
+  `packages/tooling/src/e2e-hosting-config.ts`). Change those in `firebase.json` only.
+- **Every job has a `timeout-minutes`, and Playwright has a `globalTimeout`.** A hang once sat
   silently for 1.5 hours in CI because nothing put a limit on it (GitHub's default is 6 hours).
 - **CI test reporters must stream progress** (`list`), not only write a report at the end. With
   `github` + `html` alone, a hang produced no output at all after "Running 12 tests".
@@ -431,8 +431,8 @@ CI fails if a compiled native addon shows up in `node_modules`. Add a package on
 - **The Content Security Policy is enforced** (`firebase.json` headers, #113) and names each host the
   app talks to. Calling a new outside service (another Google API, a new rates source) means adding
   its origin to `connect-src` in the same PR, or the browser blocks it in production. The e2e
-  journeys run on `vite preview`, which sends no such header, so CI can't catch a missing host:
-  check the live app's console after the deploy.
+  journeys get the same header (#150), so they catch a missing host for every call they make; still
+  check the live app's console after the deploy for calls they don't.
 - **Watch the allowlist entry with `onSnapshot`, don't read it once.** A one-shot server read raced
   sign-out (stale "allowed") and locked the app out offline.
 

@@ -21,7 +21,7 @@
     "typecheck": "nx run-many -t typecheck",
     "test": "nx run-many -t test",
     "test:rules": "bun test tests/rules",
-    "test:emulated": "firebase emulators:exec --only auth,firestore --project demo-household-brain \"bun run test:rules && bun run --filter @household-brain/web test:e2e\"",
+    "test:emulated": "bun packages/tooling/src/e2e-hosting-config.ts && nx run @household-brain/web:build:e2e && firebase emulators:exec --config firebase.e2e.json --only auth,firestore,hosting --project demo-household-brain \"bun run test:rules && bun run --filter @household-brain/web test:e2e\"",
     "emulators": "firebase emulators:start --only auth,firestore --project demo-household-brain"
   },
   "devDependencies": {

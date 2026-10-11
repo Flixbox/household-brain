@@ -14,6 +14,7 @@
       "{workspaceRoot}/firestore.indexes.json",
       { "json": "{workspaceRoot}/package.json", "fields": ["packageManager"] },
       "{workspaceRoot}/.github/workflows/ci.yml",
+      "{workspaceRoot}/packages/tooling/src/e2e-hosting-config.ts",
       { "env": "E2E_PROJECT" }
     ],
     "production": [
