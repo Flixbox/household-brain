@@ -3,5 +3,5 @@
   "compilerOptions": {
     "types": ["bun"]
   },
-  "include": ["npmpackagejsonlint.config.ts", "tests", "scripts"]
+  "include": ["npmpackagejsonlint.config.ts", "tests"]
 }

@@ -1,0 +1,21 @@
+{
+  "name": "@household-brain/tooling",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "license": "Unlicense",
+  "bin": {
+    "check-action-age": "./src/check-action-age.ts",
+    "check-package-age": "./src/check-package-age.ts",
+    "pr-gif": "./src/pr-gif.ts",
+    "remove-node": "./src/remove-node.ts",
+    "watch-project": "./src/watch-project.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "temporal-polyfill": "1.0.5"
+  }
+}

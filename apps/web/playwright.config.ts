@@ -28,7 +28,7 @@ export default defineConfig({
     serviceWorkers: 'block',
     trace: 'retain-on-failure',
     // Every test is filmed in CI, so a pull request can show the screens it changed as a GIF
-    // (`scripts/pr-gif.sh`). Demo data only: the tests never see real entries.
+    // (`packages/tooling/src/pr-gif.ts`). Demo data only: the tests never see real entries.
     video: process.env.CI ? 'on' : 'off',
   },
   // `bun run test:e2e` builds first. The server command must be `vite preview` itself (on Bun), not a

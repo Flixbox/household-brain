@@ -31,20 +31,20 @@ jobs:
         with:
           fetch-depth: 0 # gitleaks scans the whole history
           persist-credentials: false
-      - name: No GitHub Action release younger than 48 hours
-        run: bash scripts/check-action-age.sh
-        env:
-          GH_TOKEN: ${{ github.token }}
       # Bun only (#140): installed from its pinned release, and the runner's own Node removed so
       # nothing falls back to it.
-      - run: bash scripts/install-bun.sh
-      - run: bash scripts/remove-node.sh
+      - run: bash packages/tooling/install-bun.sh
+      - run: bun packages/tooling/src/remove-node.ts
       - run: bun install --frozen-lockfile
+      - name: No GitHub Action release younger than 48 hours
+        run: bun packages/tooling/src/check-action-age.ts
+        env:
+          GH_TOKEN: ${{ github.token }}
       # Bun applies its minimum release age only when it resolves a version, not to one already in
       # bun.lock, so this checks what the change adds to the lockfile (#94). Install scripts never
       # ran, so the install before it is harmless.
       - name: No package version younger than 48 hours
-        run: bun scripts/check-package-age.ts "$BASE"
+        run: bun packages/tooling/src/check-package-age.ts "$BASE"
         env:
           BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || 'HEAD^' }}
       # trustedDependencies lets no package run an install script (#145). node-gyp's output means one
@@ -119,8 +119,8 @@ jobs:
           java-version: '21' # Firestore emulator
       # Bun only (#140): installed from its pinned release, and the runner's own Node removed so
       # nothing falls back to it.
-      - run: bash scripts/install-bun.sh
-      - run: bash scripts/remove-node.sh
+      - run: bash packages/tooling/install-bun.sh
+      - run: bun packages/tooling/src/remove-node.ts
       - run: bun install --frozen-lockfile
       - name: Cache the Firebase emulator downloads
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -146,7 +146,7 @@ jobs:
             apps/web/playwright-report/
             apps/web/test-results/
           retention-days: 7
-      # The recordings `scripts/pr-gif.sh` turns into a pull request's GIF.
+      # The recordings `packages/tooling/src/pr-gif.ts` turns into a pull request's GIF.
       - if: success() || failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -181,8 +181,8 @@ jobs:
           persist-credentials: false
       # Bun only (#140): installed from its pinned release, and the runner's own Node removed so
       # nothing falls back to it.
-      - run: bash scripts/install-bun.sh
-      - run: bash scripts/remove-node.sh
+      - run: bash packages/tooling/install-bun.sh
+      - run: bun packages/tooling/src/remove-node.ts
       - run: bun install --frozen-lockfile
       # Built here from the checked-out commit, never from a cache entry: the remote cache is
       # shared, and production must not depend on what some other run stored in it.
@@ -222,8 +222,8 @@ jobs:
           persist-credentials: false
       # Bun only (#140): installed from its pinned release, and the runner's own Node removed so
       # nothing falls back to it.
-      - run: bash scripts/install-bun.sh
-      - run: bash scripts/remove-node.sh
+      - run: bash packages/tooling/install-bun.sh
+      - run: bun packages/tooling/src/remove-node.ts
       - run: bun install --frozen-lockfile
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:

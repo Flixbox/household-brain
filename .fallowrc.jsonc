@@ -12,7 +12,9 @@
       { "name": "app", "patterns": ["apps/web/**"] },
       { "name": "shell", "patterns": ["packages/shell/src/**"] },
       { "name": "entries", "patterns": ["packages/entries/src/**"] },
-      { "name": "firebase", "patterns": ["packages/firebase/src/**"] }
+      { "name": "firebase", "patterns": ["packages/firebase/src/**"] },
+      // Repository tooling run by CI and agents (#142): the app never imports it, it imports no app code.
+      { "name": "tooling", "patterns": ["packages/tooling/src/**"] }
     ],
     "rules": [
       // apps/web connects the features to the shell; nothing imports from it.
@@ -20,7 +22,8 @@
       // The shell knows no features, and features never import from it for wiring.
       { "from": "shell", "allow": ["firebase"] },
       { "from": "entries", "allow": ["firebase"] },
-      { "from": "firebase", "allow": [] }
+      { "from": "firebase", "allow": [] },
+      { "from": "tooling", "allow": [] }
     ]
   }
 }
