@@ -5,7 +5,7 @@ const production = {
   emulators: { auth: { port: 9099 }, firestore: { port: 8080 }, hosting: { port: 4173 } },
   hosting: {
     headers: [
-      { headers: [{ key: 'Cache-Control', value: 'no-cache' }, { key: 'Content-Security-Policy', value: "default-src 'self'; connect-src 'self' https://firestore.googleapis.com; img-src 'self'" }], source: '**' },
+      { headers: [{ key: 'Cache-Control', value: 'no-cache' }, { key: 'Content-Security-Policy', value: "default-src 'self'; connect-src 'self' https://firestore.googleapis.com; frame-src 'self'; img-src 'self'" }], source: '**' },
       { headers: [{ key: 'Cache-Control', value: 'immutable' }], source: '/assets/**' },
     ],
     public: 'apps/web/dist',
@@ -17,8 +17,14 @@ test('serves the e2e build with production rules, and lets it reach the emulator
   expect(e2e.hosting.public).toBe('apps/web/dist-e2e')
   expect(e2e.hosting.headers[0]?.headers).toEqual([
     { key: 'Cache-Control', value: 'no-cache' },
-    { key: 'Content-Security-Policy', value: "default-src 'self'; connect-src http://127.0.0.1:9099 http://127.0.0.1:8080 'self' https://firestore.googleapis.com; img-src 'self'" },
+    { key: 'Content-Security-Policy', value: "default-src 'self'; connect-src http://127.0.0.1:9099 http://127.0.0.1:8080 'self' https://firestore.googleapis.com; frame-src http://127.0.0.1:9099 'self'; img-src 'self'" },
   ])
   expect(e2e.hosting.headers[1]).toEqual(production.hosting.headers[1])
   expect(e2e.emulators).toEqual(production.emulators)
+})
+
+test('fails instead of writing a policy that would block the emulators', () => {
+  expect(() => e2eHostingConfig({ ...production, emulators: { firestore: { port: 8080 } } })).toThrow('no port for the auth emulator')
+  const withoutConnect = { ...production, hosting: { ...production.hosting, headers: [{ headers: [{ key: 'Content-Security-Policy', value: "default-src 'self'; frame-src 'self'" }], source: '**' }] } }
+  expect(() => e2eHostingConfig(withoutConnect)).toThrow('no connect-src')
 })
