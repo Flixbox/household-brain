@@ -380,6 +380,10 @@ adapted to this repository:
   values from outside React read during render: the compiler takes them as unchanging, so read
   them through a store (`useStore($user)`, not `auth.currentUser`). Components need a name
   (`const RootLayout = () => …`); an anonymous one isn't compiled.
+- **An effect returns only a cleanup function.** Write `useEffect(() => { doIt() }, [])` with a block
+  unless `doIt` returns the cleanup: React calls whatever an effect returns, and Chrome's `scrollTo`
+  returns a promise, so an expression body blanked the app when a page was left (#165). TypeScript
+  doesn't catch it.
 - **No barrel files.** No `index.ts` that re-exports a package's modules: barrels pull every module
   into whatever imports one of them, which defeats tree shaking and code splitting. Packages
   expose their modules by path through `exports` patterns in `package.json` (e.g.
