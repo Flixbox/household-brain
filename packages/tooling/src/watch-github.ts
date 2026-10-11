@@ -2,6 +2,7 @@
 import { $ } from 'bun'
 import { Temporal } from 'temporal-polyfill'
 import type { Activity, OpenPr, Run } from './watch-events'
+import { isRecord, textOf } from '@household-brain/core/lib/read'
 
 export const REPO = process.env.REPO ?? 'Flixbox/household-brain'
 const WORKFLOW = process.env.WORKFLOW ?? 'ci.yml'
@@ -19,15 +20,13 @@ const IGNORED = new Set([SELF, 'nx-cloud[bot]'])
 
 type Json = Record<string, unknown>
 
-const isRecord = (value: unknown): value is Json => typeof value === 'object' && value !== null && !Array.isArray(value)
 const records = (value: unknown): Json[] => (Array.isArray(value) ? value.filter(isRecord) : [])
-const text = (value: unknown) => (typeof value === 'string' ? value : '')
 
 /** The line a review comment is on; one on an outdated diff only has its original line. */
 const lineOf = (item: Record<string, unknown>) => [item.line, item.original_line].find((value): value is number => typeof value === 'number')
 const count = (value: unknown) => (typeof value === 'number' ? value : 0)
 const record = (value: unknown): Json => (isRecord(value) ? value : {})
-const oneLine = (value: unknown, length: number) => text(value).replaceAll(/\s+/gu, ' ').slice(0, length)
+const oneLine = (value: unknown, length: number) => textOf(value).replaceAll(/\s+/gu, ' ').slice(0, length)
 
 const gh = async (args: string[], cli = GH): Promise<unknown> => JSON.parse(await $`${cli} ${args}`.quiet().text())
 
@@ -38,11 +37,11 @@ const allPages = async (path: string, cli = GH): Promise<Json[]> => {
 }
 
 const runFrom = (value: Json): Run => ({
-  ageSeconds: Math.floor(Temporal.Instant.from(text(value.startedAt)).until(Temporal.Now.instant()).total('seconds')),
+  ageSeconds: Math.floor(Temporal.Instant.from(textOf(value.startedAt)).until(Temporal.Now.instant()).total('seconds')),
   attempt: count(value.attempt),
-  conclusion: text(value.conclusion),
+  conclusion: textOf(value.conclusion),
   id: count(value.databaseId),
-  status: text(value.status),
+  status: textOf(value.status),
 })
 
 const RUN_FIELDS = 'databaseId,attempt,startedAt,status,conclusion'
@@ -56,22 +55,22 @@ export const runOf = async (sha: string): Promise<Run | null> => {
 /** The newest CI run on main, and its commit. */
 export const newestMainRun = async (): Promise<{ run: Run, sha: string } | null> => {
   const [run] = records(await gh(['run', 'list', '--repo', REPO, '--workflow', WORKFLOW, '--branch', 'main', '--event', 'push', '--limit', '1', '--json', `${RUN_FIELDS},headSha`]))
-  return run ? { run: runFrom(run), sha: text(run.headSha) } : null
+  return run ? { run: runFrom(run), sha: textOf(run.headSha) } : null
 }
 
 export const jobLines = async (run: number): Promise<string[]> =>
   records(record(await gh(['run', 'view', String(run), '--repo', REPO, '--json', 'jobs'])).jobs)
-    .map(job => `  ${text(job.name)}: ${text(job.status)} ${text(job.conclusion)}`)
+    .map(job => `  ${textOf(job.name)}: ${textOf(job.status)} ${textOf(job.conclusion)}`)
 
 export const openPrs = async (): Promise<OpenPr[]> =>
   records(await gh(['pr', 'list', '--repo', REPO, '--state', 'open', '--limit', '100', '--json', 'number,title,reviewDecision,autoMergeRequest,labels,statusCheckRollup']))
     .map(pr => ({
       autoMerge: Boolean(pr.autoMergeRequest),
-      checks: records(pr.statusCheckRollup).map(check => text(check.conclusion) || text(check.state) || 'pending'),
+      checks: records(pr.statusCheckRollup).map(check => textOf(check.conclusion) || textOf(check.state) || 'pending'),
       number: count(pr.number),
       parked: records(pr.labels).some(label => label.name === 'parked'),
-      reviewDecision: text(pr.reviewDecision),
-      title: text(pr.title),
+      reviewDecision: textOf(pr.reviewDecision),
+      title: textOf(pr.title),
     }))
 
 export interface PrState {
@@ -89,13 +88,13 @@ export const prState = async (pr: number): Promise<PrState> => {
   const value = record(await gh(['pr', 'view', String(pr), '--repo', REPO, '--json', 'state,mergeable,headRefOid,mergeCommit,reviewDecision,autoMergeRequest,labels,title,author']))
   return {
     autoMerge: Boolean(value.autoMergeRequest),
-    decision: text(value.reviewDecision),
-    head: text(value.headRefOid),
-    mergeSha: text(record(value.mergeCommit).oid),
-    mergeable: text(value.mergeable),
+    decision: textOf(value.reviewDecision),
+    head: textOf(value.headRefOid),
+    mergeSha: textOf(record(value.mergeCommit).oid),
+    mergeable: textOf(value.mergeable),
     parked: records(value.labels).some(label => label.name === 'parked'),
-    state: text(value.state),
-    title: `${text(value.title)} (by ${text(record(value.author).login)})`,
+    state: textOf(value.state),
+    title: `${textOf(value.title)} (by ${textOf(record(value.author).login)})`,
   }
 }
 
@@ -103,7 +102,7 @@ export const prState = async (pr: number): Promise<PrState> => {
 export const recentlyMerged = async (hours: number): Promise<number[]> => {
   const since = Temporal.Now.instant().subtract({ hours })
   return records(await gh(['pr', 'list', '--repo', REPO, '--state', 'merged', '--limit', '20', '--json', 'number,mergedAt']))
-    .filter(pr => Temporal.Instant.compare(Temporal.Instant.from(text(pr.mergedAt)), since) > 0)
+    .filter(pr => Temporal.Instant.compare(Temporal.Instant.from(textOf(pr.mergedAt)), since) > 0)
     .map(pr => count(pr.number))
 }
 
@@ -114,31 +113,31 @@ export const activityOf = async (pr: number): Promise<Activity[]> => {
     allPages(`repos/${REPO}/pulls/${pr}/reviews`, ACTIVITY_GH),
     allPages(`repos/${REPO}/pulls/${pr}/comments`, ACTIVITY_GH),
   ])
-  const login = (item: Json) => text(record(item.user).login)
+  const login = (item: Json) => textOf(record(item.user).login)
   return [
     ...comments.filter(item => !IGNORED.has(login(item)))
       .map(item => ({ id: `comment ${count(item.id)}`, line: `comment ${count(item.id)} ${login(item)}: ${oneLine(item.body, 200)}` })),
-    ...reviews.filter(item => (item.state !== 'APPROVED' || text(item.body) !== '') && (login(item) !== SELF || text(item.body) !== ''))
-      .map(item => ({ id: `review ${count(item.id)}`, line: `review ${count(item.id)} ${login(item)} ${text(item.state)}: ${oneLine(item.body, 200)}` })),
+    ...reviews.filter(item => (item.state !== 'APPROVED' || textOf(item.body) !== '') && (login(item) !== SELF || textOf(item.body) !== ''))
+      .map(item => ({ id: `review ${count(item.id)}`, line: `review ${count(item.id)} ${login(item)} ${textOf(item.state)}: ${oneLine(item.body, 200)}` })),
     ...reviewComments.filter(item => login(item) !== SELF || !item.in_reply_to_id)
-      .map(item => ({ id: `review-comment ${count(item.id)}`, line: `review-comment ${count(item.id)} ${login(item)} ${text(item.path)}: ${oneLine(item.body, 200)}` })),
+      .map(item => ({ id: `review-comment ${count(item.id)}`, line: `review-comment ${count(item.id)} ${login(item)} ${textOf(item.path)}: ${oneLine(item.body, 200)}` })),
   ]
 }
 
 /** A review's own comments; a pending review's are only visible to its author (the owner's login). */
 export const reviewCommentLines = async (pr: number, review: string): Promise<string[]> =>
   records(await gh(['api', `repos/${REPO}/pulls/${pr}/reviews/${review}/comments`], ACTIVITY_GH))
-    .map(item => `  ${text(item.path)}:${lineOf(item) ?? 'file'}: ${oneLine(item.body, 400)}`)
+    .map(item => `  ${textOf(item.path)}:${lineOf(item) ?? 'file'}: ${oneLine(item.body, 400)}`)
 
 /** Commits main has that `head` doesn't, and the newest of them. */
 export const mainAhead = async (head: string): Promise<{ ahead: number, newest: string }> => {
   const value = record(await gh(['api', `repos/${REPO}/compare/${head}...main`]))
-  return { ahead: count(value.ahead_by), newest: text(records(value.commits).at(-1)?.sha) || '-' }
+  return { ahead: count(value.ahead_by), newest: textOf(records(value.commits).at(-1)?.sha) || '-' }
 }
 
 export const mainHead = async (): Promise<{ sha: string, subject: string }> => {
   const value = record(await gh(['api', `repos/${REPO}/commits/main`]))
-  return { sha: text(value.sha), subject: text(record(value.commit).message).split('\n')[0] ?? '' }
+  return { sha: textOf(value.sha), subject: textOf(record(value.commit).message).split('\n')[0] ?? '' }
 }
 
 /** New issues (not the agent's own) and the owner's comments on issues, newest first. */
@@ -148,10 +147,10 @@ export const issueEventLines = async (): Promise<string[]> => {
     gh(['api', `repos/${REPO}/issues/comments?per_page=50&sort=created&direction=desc`]),
   ])
   return [
-    ...records(issues).filter(issue => !issue.pull_request && text(record(issue.user).login) !== SELF)
-      .map(issue => `NEW_ISSUE #${count(issue.number)} ${text(issue.title)}`),
-    ...records(comments).filter(comment => text(record(comment.user).login) === OWNER && text(comment.html_url).includes('/issues/'))
-      .map(comment => `ISSUE_COMMENT ${count(comment.id)} #${text(comment.issue_url).split('/').at(-1) ?? ''}: ${oneLine(comment.body, 300)}`),
+    ...records(issues).filter(issue => !issue.pull_request && textOf(record(issue.user).login) !== SELF)
+      .map(issue => `NEW_ISSUE #${count(issue.number)} ${textOf(issue.title)}`),
+    ...records(comments).filter(comment => textOf(record(comment.user).login) === OWNER && textOf(comment.html_url).includes('/issues/'))
+      .map(comment => `ISSUE_COMMENT ${count(comment.id)} #${textOf(comment.issue_url).split('/').at(-1) ?? ''}: ${oneLine(comment.body, 300)}`),
   ]
 }
 
@@ -161,8 +160,8 @@ export const openIssueNumbers = async (): Promise<number[]> =>
 export const issueLine = async (issue: number, change: 'closed' | 'reopened'): Promise<string | null> => {
   const value = record(await gh(['api', `repos/${REPO}/issues/${issue}`]))
   if (change === 'closed') {
-    return `ISSUE_CLOSED #${issue} ${text(value.title)} (${text(value.state_reason) || 'closed'}, by ${text(record(value.closed_by).login) || '?'})`
+    return `ISSUE_CLOSED #${issue} ${textOf(value.title)} (${textOf(value.state_reason) || 'closed'}, by ${textOf(record(value.closed_by).login) || '?'})`
   }
   // A brand-new issue is NEW_ISSUE's; only one that was closed before is reopened.
-  return value.closed_at !== null || value.state_reason === 'reopened' ? `ISSUE_REOPENED #${issue} ${text(value.title)}` : null
+  return value.closed_at !== null || value.state_reason === 'reopened' ? `ISSUE_REOPENED #${issue} ${textOf(value.title)}` : null
 }

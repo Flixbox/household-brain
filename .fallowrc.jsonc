@@ -15,7 +15,7 @@
       { "name": "core", "patterns": ["packages/core/src/**"] },
       // Builds the installable, offline app and registers its service worker; knows no app code.
       { "name": "pwa", "patterns": ["packages/pwa/src/**"] },
-      // Repository tooling run by CI and agents (#142): the app never imports it, it imports no app code.
+      // Repository tooling run by CI and agents (#142): the app never imports it; of ours it imports only core.
       { "name": "tooling", "patterns": ["packages/tooling/src/**"] }
     ],
     "rules": [
@@ -27,7 +27,7 @@
       { "from": "firebase", "allow": ["core"] },
       { "from": "core", "allow": [] },
       { "from": "pwa", "allow": ["core"] },
-      { "from": "tooling", "allow": [] }
+      { "from": "tooling", "allow": ["core"] }
     ]
   }
 }
