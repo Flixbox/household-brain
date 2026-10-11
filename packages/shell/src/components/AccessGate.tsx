@@ -54,7 +54,7 @@ export const AccessGate = ({ children }: { children: ReactNode }) => {
             {' '}
             <code data-testid="uid" className="rounded bg-stone-200 px-1.5 py-0.5 dark:bg-stone-800">{access.user.uid}</code>
           </p>
-          <button type="button" className={secondaryButton} onClick={() => { signOutOfApp().catch(() => null) }}>Sign out</button>
+          <button type="button" className={secondaryButton} onClick={() => { signOutOfApp().catch(reportError) }}>Sign out</button>
         </div>
       )}
       {access.state === 'error' && (
@@ -63,7 +63,7 @@ export const AccessGate = ({ children }: { children: ReactNode }) => {
           <p className="text-sm text-stone-500">{access.message}</p>
           <div className="flex gap-3">
             <button type="button" className={button} onClick={() => { globalThis.location.reload() }}>Retry</button>
-            <button type="button" className={secondaryButton} onClick={() => { signOutOfApp().catch(() => null) }}>Sign out</button>
+            <button type="button" className={secondaryButton} onClick={() => { signOutOfApp().catch(reportError) }}>Sign out</button>
           </div>
         </div>
       )}

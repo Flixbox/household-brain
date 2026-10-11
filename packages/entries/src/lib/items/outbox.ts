@@ -71,7 +71,7 @@ const retryLater = (started: number) => {
   }
   backoffMs = Math.min(Math.max(backoffMs * 2, MIN_BACKOFF_MS), MAX_BACKOFF_MS)
   pausedUntil = performance.now() + backoffMs
-  timer = setTimeout(() => { run().catch(ignore) }, backoffMs)
+  timer = setTimeout(() => { run().catch(reportError) }, backoffMs)
 }
 
 const pushOne = async (item: Item, context: PushContext, started: number): Promise<void> => {
