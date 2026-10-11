@@ -389,8 +389,11 @@ adapted to this repository:
   anything that still reaches for it fails instead of quietly using it. Run tools through `bun run`
   (or `bun --bun <bin>`), never `npx`.
 - **Bun runs no dependency install scripts** except for packages in `trustedDependencies` in
-  `package.json`, which is deliberately empty (it also turns off Bun's built-in trusted list). Add a
-  package there only when it truly needs its script, with the reason in the PR.
+  `package.json`. It holds only the placeholder `trust-no-install-scripts`, a name no package has:
+  an **empty** list does not switch off Bun's built-in list of trusted packages, and Bun then built
+  `re2` in CI, whose native module crashed Bun during the deploy (#145). A non-empty list replaces the
+  built-in one. CI fails if a compiled native addon shows up in `node_modules`. Add a package only
+  when it truly needs its script, with the reason in the PR.
 - **`bun test` types are stricter than Vitest's:** `expect(x).toEqual(y)` wants `y` to fit `x`'s type.
   For a deliberately loose comparison write `expect<unknown>(x)`.
 - **The Firestore emulator needs Java 21** (`brew install openjdk@21`); Java 17 fails.
