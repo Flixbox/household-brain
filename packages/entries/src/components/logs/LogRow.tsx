@@ -1,4 +1,5 @@
 import { Link } from 'wouter'
+import { itemPath } from '@household-brain/entries/lib/paths'
 import type { Log } from '@household-brain/entries/lib/documents'
 import type { Item } from '@household-brain/entries/lib/items/model'
 import { logTime } from '@household-brain/entries/lib/logs-messages'
@@ -34,7 +35,7 @@ export const LogRow = ({ log, item, actor }: { log: Log, item: Item | null, acto
           {log.at ? `, ${logTime(log.at)}` : ''}
         </p>
         {item && (
-          <Link href={`/items/${item.id}`} className="text-orange-700 underline dark:text-orange-400">
+          <Link href={itemPath(item.id)} className="text-orange-700 underline dark:text-orange-400">
             Open “{item.title}”
           </Link>
         )}

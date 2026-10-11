@@ -1,3 +1,4 @@
+import { paths } from '@household-brain/entries/lib/paths'
 import { Redirect, Route, Switch } from 'wouter'
 import { EditItem } from './EditItem'
 import { Events } from './Events'
@@ -11,11 +12,11 @@ import { Settings } from './Settings'
  */
 export const Pages = () => (
   <Switch>
-    <Route path="/" component={Home} />
-    <Route path="/items/new" component={NewItem} />
-    <Route path="/items/:itemId" component={EditItem} />
-    <Route path="/settings" component={Settings} />
-    <Route path="/events" component={Events} />
-    <Route><Redirect to="/" replace /></Route>
+    <Route path={paths.home} component={Home} />
+    <Route path={paths.newItem} component={NewItem} />
+    <Route path={paths.editItem} component={EditItem} />
+    <Route path={paths.settings} component={Settings} />
+    <Route path={paths.events} component={Events} />
+    <Route><Redirect to={paths.home} replace /></Route>
   </Switch>
 )

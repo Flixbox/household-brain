@@ -5,6 +5,7 @@ import { useHousehold } from '@household-brain/entries/lib/calendar/use-househol
 import { loadGis } from '@household-brain/entries/lib/google-token'
 import { auth } from '@household-brain/firebase/firebase'
 import { Link } from 'wouter'
+import { paths } from '@household-brain/entries/lib/paths'
 
 export const Settings = () => {
   const household = useHousehold()
@@ -17,7 +18,7 @@ export const Settings = () => {
     <section className="space-y-8">
       <div className="flex items-baseline justify-between">
         <h1 className="text-3xl font-bold">Settings</h1>
-        <Link href="/" className="text-orange-700 underline dark:text-orange-400">Back</Link>
+        <Link href={paths.home} className="text-orange-700 underline dark:text-orange-400">Back</Link>
       </div>
       <CalendarSection household={household} />
       {isOwner && <ShareSection />}

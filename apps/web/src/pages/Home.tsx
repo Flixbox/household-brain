@@ -4,6 +4,7 @@ import { useCategories, useItems } from '@household-brain/entries/lib/items/use-
 import { useStore } from '@nanostores/react'
 import { $user } from '@household-brain/firebase/user'
 import { Link } from 'wouter'
+import { paths } from '@household-brain/entries/lib/paths'
 
 export const Home = () => {
   const user = useStore($user)
@@ -24,7 +25,7 @@ export const Home = () => {
         <p className="rounded-lg bg-orange-100 px-4 py-3 text-orange-950 dark:bg-orange-950 dark:text-orange-100">
           The household calendar isn&apos;t set up yet.
           {' '}
-          <Link href="/settings" className="font-semibold underline">Set it up in Settings</Link>
+          <Link href={paths.settings} className="font-semibold underline">Set it up in Settings</Link>
           .
         </p>
       )}

@@ -6,6 +6,7 @@ import { editItem, removeItem, setExtraDates } from '@household-brain/entries/li
 import { type EntryDate, sameDates } from '@household-brain/entries/lib/items/dates'
 import { reportWriteFailure } from '@household-brain/entries/lib/items/write-failures'
 import { useLocation } from 'wouter'
+import { paths } from '@household-brain/entries/lib/paths'
 import { ItemForm } from './ItemForm'
 
 /** Edit and delete one entry. */
@@ -18,7 +19,7 @@ export const EditForm = ({ item, categories }: { item: Item, categories: Categor
   const current = draftOf(item)
   const after = (write: Promise<unknown>) => {
     write.catch(reportWriteFailure)
-    navigate('/')
+    navigate(paths.home)
     return Promise.resolve()
   }
   // Each handler asks Google first, inside the click, and saves without waiting for the server.
