@@ -166,11 +166,8 @@ adapted to this repository:
      it whose auto-merge is still off, not only on the one the event names.
    - A plain approval is reported as `APPROVED` only. One with text also comes as `ACTIVITY`, so a
      request written into the approval gets answered before auto-merge.
-   - **A PR's new comments are checked before its approval** (#154): the owner often comments and
-     approves in one go, and an `APPROVED` reported first got auto-merge switched on before the
-     comment was read (#152). A comment written in the seconds between the two checks can still come
-     after, so **before enabling auto-merge, read the PR for unanswered comments** (`gh pr view <n> --comments`
-     and its review threads).
+   - **Before enabling auto-merge, read the PR for unanswered comments** (#154): an approval and a
+     comment often arrive together.
    - The bot's own comments and replies in review threads are skipped; its reviews (the reviewer agent posts as
      the same bot) are not.
 
