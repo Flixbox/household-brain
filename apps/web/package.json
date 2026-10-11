@@ -8,12 +8,13 @@
     "dev": "bun run --parallel dev:routes dev:server",
     "dev:routes": "tsr watch",
     "dev:server": "bun --bun vite",
-    "build": "tsr generate && tsc -b && bun --bun vite build",
+    "build": "tsr generate && tsc -b && bun --bun vite build && bun build-sw.ts dist",
     "preview": "bun --bun vite preview",
     "typecheck": "tsc -b",
+    "icons": "pwa-assets-generator",
     "test": "bun test --pass-with-no-tests src",
-    "build:e2e": "tsr generate && bun --bun vite build --mode e2e --outDir dist-e2e",
-    "test:e2e": "tsr generate && bun --bun vite build --mode e2e --outDir dist-e2e && bun --bun playwright test"
+    "build:e2e": "tsr generate && bun --bun vite build --mode e2e --outDir dist-e2e && bun build-sw.ts dist-e2e",
+    "test:e2e": "bun run build:e2e && bun --bun playwright test"
   },
   "dependencies": {
     "@household-brain/entries": "workspace:*",
@@ -35,7 +36,6 @@
     "@vitejs/plugin-react": "6.1.2",
     "babel-plugin-react-compiler": "1.0.0",
     "tailwindcss": "4.3.3",
-    "vite-plugin-pwa": "2.0.0",
-    "workbox-window": "7.4.1"
+    "workbox-build": "7.4.1"
   }
 }

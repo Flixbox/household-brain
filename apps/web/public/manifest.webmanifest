@@ -1,0 +1,22 @@
+{
+  "name": "Household Brain",
+  "short_name": "Household",
+  "description": "Everything in our household that is due on a date, by category.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "lang": "en",
+  "background_color": "#fbf7f1",
+  "theme_color": "#f57c00",
+  "icons": [
+    { "src": "/pwa-64x64.png", "sizes": "64x64", "type": "image/png" },
+    { "src": "/pwa-192x192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/pwa-512x512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/maskable-icon-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "screenshots": [
+    { "src": "/screenshots/wide.png", "sizes": "1280x800", "type": "image/png", "form_factor": "wide", "label": "Entries by category" },
+    { "src": "/screenshots/narrow.png", "sizes": "412x915", "type": "image/png", "form_factor": "narrow", "label": "Entries by category" }
+  ]
+}

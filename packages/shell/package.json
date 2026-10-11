@@ -1,25 +1,23 @@
 {
   "name": "@household-brain/shell",
-  "private": true,
   "version": "0.0.0",
-  "type": "module",
-  "license": "Unlicense",
-  "exports": {
-    "./lib/*": "./src/lib/*.ts",
-    "./components/*": "./src/components/*.tsx"
-  },
-  "scripts": {
-    "typecheck": "tsc -p tsconfig.json",
-    "test": "bun test"
-  },
   "dependencies": {
     "@household-brain/firebase": "workspace:*",
     "@nanostores/react": "2.0.1",
     "firebase": "13.0.0",
     "nanostores": "1.5.5",
-    "react": "19.3.0"
+    "react": "19.3.0",
+    "workbox-window": "7.4.1"
   },
-  "devDependencies": {
-    "vite-plugin-pwa": "2.0.0"
-  }
+  "exports": {
+    "./lib/*": "./src/lib/*.ts",
+    "./components/*": "./src/components/*.tsx"
+  },
+  "license": "Unlicense",
+  "private": true,
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "bun test"
+  },
+  "type": "module"
 }

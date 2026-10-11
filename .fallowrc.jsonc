@@ -3,10 +3,8 @@
   // The schema of the installed version: editors complete and check this file against it. fallow
   // reads only JSON(C) or TOML (it is a Rust binary), so there is no typed .ts config.
   "$schema": "./node_modules/fallow/schema.json",
-  // vite-plugin-pwa loads it by name (`pwaAssets: { config: true }` in apps/web/vite.config.ts).
-  "entry": ["apps/web/pwa-assets.config.ts"],
-  // vite-plugin-pwa's peer: loaded by the plugin's generated register module, not imported by our code.
-  "ignoreDependencies": ["workbox-window"],
+  // The icon generator (`bun run icons`) loads its config by name; the build runs build-sw.ts.
+  "entry": ["apps/web/pwa-assets.config.ts", "apps/web/build-sw.ts"],
   "boundaries": {
     "zones": [
       { "name": "app", "patterns": ["apps/web/**"] },

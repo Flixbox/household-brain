@@ -2,7 +2,7 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
-    "types": ["vite/client", "vite-plugin-pwa/react", "vite-plugin-pwa/pwa-assets"],
+    "types": ["vite/client"],
     "jsx": "react-jsx"
   },
   "include": ["src", "../../packages/firebase/src/env.d.ts"]
