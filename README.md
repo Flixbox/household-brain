@@ -44,6 +44,7 @@ packages/entries/    the entries feature: entries, categories, outbox push, Goog
 packages/shell/      the frame: layout, sign-in gate with the allowlist, update prompt, sign-out
 packages/firebase/   Firebase app, Auth, Firestore, live stores, env checks
 packages/pwa/        the installable, offline app: icons, manifest, service worker (`pwa-build`), update registration
+packages/core/       small helpers every package may use (stringify)
 tests/rules/         Firestore security-rules tests
 .ai/AGENTS.md        notes for agents working here (AGENTS.md and CLAUDE.md link to it)
 ```

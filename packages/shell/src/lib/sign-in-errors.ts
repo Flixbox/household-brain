@@ -1,3 +1,5 @@
+import { stringify } from '@household-brain/core/lib/stringify'
+
 /**
  * Turns a failed Google sign-in into something the person can act on. Returns null when nothing
  * should be shown (the person closed the popup themselves).
@@ -20,7 +22,7 @@ export const signInErrorMessage = (error: unknown): string | null => {
       return 'This address is not an authorised sign-in domain for the Firebase project.'
     }
     default: {
-      return error instanceof Error ? error.message : String(error)
+      return stringify(error)
     }
   }
 }

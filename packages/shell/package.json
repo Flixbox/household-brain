@@ -2,6 +2,7 @@
   "name": "@household-brain/shell",
   "version": "0.0.0",
   "dependencies": {
+    "@household-brain/core": "workspace:*",
     "@household-brain/firebase": "workspace:*",
     "@household-brain/pwa": "workspace:*",
     "@nanostores/react": "2.0.1",

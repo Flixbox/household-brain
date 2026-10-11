@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { createTasksApi } from './api'
+import { stringify } from '@household-brain/core/lib/stringify'
 
 const access = () => ({
   forgetToken: () => null,
@@ -41,7 +42,7 @@ describe('createTasksApi', () => {
     const bodies: unknown[] = []
     const fetchFn = async (url: string, init: RequestInit) => {
       expect(url).toBe('https://tasks.googleapis.com/tasks/v1/lists/list-1/tasks/task-1')
-      bodies.push(JSON.parse(init.body as string))
+      bodies.push(JSON.parse(stringify(init.body)))
       return response({ id: 'task-1', status: 'completed' })
     }
     await createTasksApi(access(), fetchFn).completeTask('list-1', 'task-1')

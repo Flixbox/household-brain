@@ -51,7 +51,6 @@ let pullRequested = false
  * then leaves the outbox's state (busy, pull, problem, retries) to the next one.
  */
 let generation = 0
-const describe = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
 const publish = () => {
   const pending = data.items.filter(item => item.sync === 'pending')
@@ -85,7 +84,7 @@ const pushOne = async (item: Item, context: PushContext, started: number): Promi
     if (isTransient(error)) {
       retryLater(started)
     } else {
-      await recordPushError(item, describe(error))
+      await recordPushError(item, error)
     }
   }
 }
@@ -127,8 +126,8 @@ const pullNow = (context: PushContext): Promise<void> => {
       }
     }, (error: unknown) => {
       if (started === generation) {
-        pullProblem = isTransient(error) ? pullProblem : describe(error)
-        logPullProblem('failure', describe(error))
+        const problem = logPullProblem('failure', error)
+        pullProblem = isTransient(error) ? pullProblem : problem
       }
     })
     .finally(() => {

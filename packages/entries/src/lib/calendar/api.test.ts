@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { createCalendarApi } from './api'
+import { stringify } from '@household-brain/core/lib/stringify'
 
 const respond = (...replies: { status: number, body?: unknown }[]) => {
   const requests: { url: string, init: RequestInit }[] = []
@@ -38,13 +39,13 @@ describe('createCalendarApi', () => {
     expect(requests[0]?.url).toBe('https://www.googleapis.com/calendar/v3/calendars')
     expect(requests[0]?.init.method).toBe('POST')
     expect(new Headers(requests[0]?.init.headers).get('Authorization')).toBe('Bearer token-1')
-    expect(JSON.parse(requests[0]?.init.body as string)).toEqual({ summary: 'Household Brain', timeZone: 'Europe/Berlin' })
+    expect(JSON.parse(stringify(requests[0]?.init.body))).toEqual({ summary: 'Household Brain', timeZone: 'Europe/Berlin' })
   })
 
   it('adds a calendar to the list together with its reminders', async () => {
     const { fetchFn, requests } = respond({ body: { id: 'cal-1' }, status: 200 })
     await createCalendarApi(tokens('t').access, fetchFn).insertListEntry('cal-1', [{ method: 'popup', minutes: 1440 }])
-    expect(JSON.parse(requests[0]?.init.body as string)).toEqual({ defaultReminders: [{ method: 'popup', minutes: 1440 }], id: 'cal-1' })
+    expect(JSON.parse(stringify(requests[0]?.init.body))).toEqual({ defaultReminders: [{ method: 'popup', minutes: 1440 }], id: 'cal-1' })
   })
 
   it('finds owned calendars by exact name', async () => {
