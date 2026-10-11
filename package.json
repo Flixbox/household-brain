@@ -55,5 +55,7 @@
       }
     }
   },
-  "trustedDependencies": []
+  "trustedDependencies": [
+    "trust-no-install-scripts"
+  ]
 }
