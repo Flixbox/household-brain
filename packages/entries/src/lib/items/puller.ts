@@ -8,15 +8,15 @@ import { deleteDateEvents } from './date-push'
 import { dateEventChange } from './date-pull'
 import type { Item, ItemDraft } from './model'
 import type { PushContext } from './push'
-import { isTransient } from './transient'
+import { reportUnlessTransient } from './transient'
 import { importTasks } from './tasks-puller'
 import { logErrorOnce, logGoogleChange, logRecovered } from '@household-brain/entries/lib/logs'
 
 const pullLogMessages = { failure: 'Google Calendar pull failed', problem: 'Google Calendar pull had a problem' } as const
 
-export const logPullProblem = (kind: keyof typeof pullLogMessages, detail: string): void => {
-  logErrorOnce(`pull-${kind}`, pullLogMessages[kind], detail)
-}
+/** Logs a pull problem once until it recovers, and returns it as text. */
+export const logPullProblem = (kind: keyof typeof pullLogMessages, problem: unknown): string =>
+  logErrorOnce(`pull-${kind}`, pullLogMessages[kind], problem)
 
 /** A clean pull (or a new session): the next problem is news again. */
 export const resetPullProblems = (): void => {
@@ -36,7 +36,6 @@ export const resetPullProblems = (): void => {
  */
 
 const isStatus = (error: unknown, status: number) => error instanceof CalendarApiError && error.status === status
-const describe = (error: unknown) => (error instanceof Error ? error.message : String(error))
 const actionFor = (kind: PullDecision['kind']): string => {
   if (kind === 'create') {
     return 'Added'
@@ -70,25 +69,14 @@ const normalise = async (context: PushContext, event: CalendarEvent, patch: Cale
     if (isStatus(error, 412)) {
       return null
     }
-    // Network trouble, rate limits, server errors: fail the pull so it is retried, token unchanged.
-    if (isTransient(error)) {
-      throw error
-    }
-    return `Couldn't adjust "${event.summary ?? event.id}" in Google Calendar: ${describe(error)}`
+    // Network trouble, rate limits, server errors fail the pull so it is retried, token unchanged.
+    return reportUnlessTransient(`Couldn't adjust "${event.summary ?? event.id}" in Google Calendar`, error)
   }
-}
-
-/** Transient failures fail the pull (it is retried); others are reported and the pull goes on. */
-const reportUnlessTransient = (what: string) => (error: unknown) => {
-  if (isTransient(error)) {
-    throw error
-  }
-  return `Couldn't remove ${what} from Google Calendar: ${describe(error)}`
 }
 
 /** Before an entry goes here, its extra dates' events go from Google, so their reminders stop. */
 const removeDateEvents = (context: PushContext, entry: Item): Promise<string | null> =>
-  deleteDateEvents(context, entry).then(() => null, reportUnlessTransient(`the other dates of "${entry.title}"`))
+  deleteDateEvents(context, entry).then(() => null, (error: unknown) => reportUnlessTransient(`Couldn't remove the other dates of "${entry.title}" from Google Calendar`, error))
 
 /** The entry a date event belongs to: the cached copy when it still has the date, else the server's. */
 const ownerOf = async (entryId: string, dateId: string): Promise<Item | null> => {
@@ -116,7 +104,7 @@ const applyDateEvent = async (context: PushContext, event: CalendarEvent, entryI
   }
   return event.status === 'cancelled'
     ? null
-    : context.api.deleteEvent(context.config.calendarId, eventId).then(() => null, reportUnlessTransient(`the leftover "${event.summary ?? eventId}"`))
+    : context.api.deleteEvent(context.config.calendarId, eventId).then(() => null, (error: unknown) => reportUnlessTransient(`Couldn't remove the leftover "${event.summary ?? eventId}" from Google Calendar`, error))
 }
 
 /**

@@ -6,6 +6,7 @@ import type { Item } from './model'
 import type { PushContext } from './push'
 import { recordDateOp } from './store'
 import { isTransient } from './transient'
+import { stringify } from '@household-brain/core/lib/stringify'
 
 /** One write for an extra date's event, with the entry it belongs to. */
 export interface DateWork {
@@ -63,7 +64,7 @@ export const runDateWork = async (context: PushContext, work: DateWork): Promise
     if (isTransient(error)) {
       throw error
     }
-    return error instanceof Error ? error.message : String(error)
+    return stringify(error)
   })
   done.add(keyOf(work))
   if (refusal === null || work.op.kind === 'upsert') {

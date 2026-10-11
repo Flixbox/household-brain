@@ -11,6 +11,7 @@ import { type PushRecord, errorFor, recordFor } from './record'
 import { itemFrom } from '@household-brain/entries/lib/documents'
 import { logError, logEvent } from '@household-brain/entries/lib/logs'
 import { changedDetail, entryLogMessage, errorLogMessage } from '@household-brain/entries/lib/logs-messages'
+import { stringify } from '@household-brain/core/lib/stringify'
 
 export const itemsCollection = collection(db, 'items')
 const itemDoc = (id: string) => doc(db, 'items', id)
@@ -125,12 +126,15 @@ export const recordPush = (item: Item, outcome: PushOutcome, { uid, categories }
   return apply(item, latest => recordFor({ latest, outcome, pushed: item, remote, uid }))
 }
 
-export const recordPushError = (item: Item, message: string) => apply(item, latest => errorFor(latest, item, message)).then(recorded => {
-  if (recorded) {
-    logError(errorLogMessage('Google refused', item.title), item.id, message)
-  }
-  return recorded
-})
+export const recordPushError = (item: Item, error: unknown) => {
+  const message = stringify(error)
+  return apply(item, latest => errorFor(latest, item, message)).then(recorded => {
+    if (recorded) {
+      logError(errorLogMessage('Google refused', item.title), item.id, message)
+    }
+    return recorded
+  })
+}
 
 export const retryItem = (item: Item): Promise<void> =>
   updateDoc(itemDoc(item.id), { sync: 'pending', syncError: null })

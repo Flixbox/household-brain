@@ -11,6 +11,8 @@
       { "name": "shell", "patterns": ["packages/shell/src/**"] },
       { "name": "entries", "patterns": ["packages/entries/src/**"] },
       { "name": "firebase", "patterns": ["packages/firebase/src/**"] },
+      // Small helpers every package may use (#171); imports nothing of ours.
+      { "name": "core", "patterns": ["packages/core/src/**"] },
       // Builds the installable, offline app and registers its service worker; knows no app code.
       { "name": "pwa", "patterns": ["packages/pwa/src/**"] },
       // Repository tooling run by CI and agents (#142): the app never imports it, it imports no app code.
@@ -18,12 +20,13 @@
     ],
     "rules": [
       // apps/web connects the features to the shell; nothing imports from it.
-      { "from": "app", "allow": ["shell", "entries", "firebase", "pwa"] },
+      { "from": "app", "allow": ["shell", "entries", "firebase", "pwa", "core"] },
       // The shell knows no features, and features never import from it for wiring.
-      { "from": "shell", "allow": ["firebase", "pwa"] },
-      { "from": "entries", "allow": ["firebase"] },
-      { "from": "firebase", "allow": [] },
-      { "from": "pwa", "allow": [] },
+      { "from": "shell", "allow": ["firebase", "pwa", "core"] },
+      { "from": "entries", "allow": ["firebase", "core"] },
+      { "from": "firebase", "allow": ["core"] },
+      { "from": "core", "allow": [] },
+      { "from": "pwa", "allow": ["core"] },
       { "from": "tooling", "allow": [] }
     ]
   }

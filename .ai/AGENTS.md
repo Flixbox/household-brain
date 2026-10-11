@@ -386,6 +386,8 @@ adapted to this repository:
   unless `doIt` returns the cleanup: React calls whatever an effect returns, and Chrome's `scrollTo`
   returns a promise, so an expression body blanked the app when a page was left (#165). TypeScript
   doesn't catch it.
+- **Small helpers every package needs live in `packages/core`** (#171), e.g. `stringify()` for any value
+  as text: never `String(error)` or `error.message` by hand. A helper moves there once two packages share it.
 - **No barrel files.** No `index.ts` that re-exports a package's modules: barrels pull every module
   into whatever imports one of them, which defeats tree shaking and code splitting. Packages
   expose their modules by path through `exports` patterns in `package.json` (e.g.

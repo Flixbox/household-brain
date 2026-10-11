@@ -5,6 +5,7 @@ import { auth, db } from '@household-brain/firebase/firebase'
 import { dataOf, queryStore } from '@household-brain/firebase/live'
 import { type Log, logFrom } from '@household-brain/entries/lib/documents'
 import { changedDetail, entryLogMessage, logDetail } from '@household-brain/entries/lib/logs-messages'
+import { stringify } from '@household-brain/core/lib/stringify'
 
 const LOG_LIMIT = 200
 const LOG_MESSAGE_LIMIT = 2000
@@ -38,12 +39,15 @@ const failing = new Set<string>()
 /**
  * An error that keeps happening (Google down, an API switched off) is logged once, when it starts,
  * not on every retry; once `logRecovered` says it works again, the next failure is logged anew.
+ * Returns the problem as text.
  */
-export const logErrorOnce = (key: string, message: string, detail?: string): void => {
+export const logErrorOnce = (key: string, message: string, problem: unknown): string => {
+  const detail = stringify(problem)
   if (!failing.has(key)) {
     failing.add(key)
     logError(message, '', detail)
   }
+  return detail
 }
 
 export const logRecovered = (key: string): void => {

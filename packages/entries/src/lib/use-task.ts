@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { stringify } from '@household-brain/core/lib/stringify'
 
 export type TaskStatus =
   | { kind: 'idle' }
@@ -14,7 +15,7 @@ export const useTask = () => {
     action().then(message => {
       setStatus({ kind: 'done', message })
     }, (error: unknown) => {
-      setStatus({ kind: 'failed', message: error instanceof Error ? error.message : String(error) })
+      setStatus({ kind: 'failed', message: stringify(error) })
     })
   }
   return { busy: status.kind === 'busy', run, status }

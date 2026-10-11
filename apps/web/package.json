@@ -14,6 +14,7 @@
     "test:e2e": "nx run @household-brain/web:playwright"
   },
   "dependencies": {
+    "@household-brain/core": "workspace:*",
     "@household-brain/entries": "workspace:*",
     "@household-brain/firebase": "workspace:*",
     "@household-brain/pwa": "workspace:*",
