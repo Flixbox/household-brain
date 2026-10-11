@@ -100,7 +100,7 @@ const isUnscheduledDeletion = (entry: Item | null, event: CalendarEvent) =>
  * replacing it would undo.
  */
 const readsDifferently = ({ entry, event, categories, recheck }: PullInput) =>
-  Boolean(recheck && entry && entry.pendingOp === null && changedFields(draftOf(entry), draftFrom(event, categories)).length > 0)
+  Boolean(recheck && entry?.pendingOp === null && changedFields(draftOf(entry), draftFrom(event, categories)).length > 0)
 
 /** Our own write coming back, or an entry whose deletion is about to be pushed. */
 const isSettled = (entry: Item | null, event: CalendarEvent, uid: string) =>

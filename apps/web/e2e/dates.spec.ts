@@ -27,7 +27,7 @@ test('an entry can have more dates; the list shows the next one with "+ more"', 
   await expect(row).toContainText(/in \d+ days \+ more/u)
   // The extra date gets its own Google Calendar event, once this app has marked itself as one that
   // recognises them (on its first pull).
-  const summaries = () => google.live().map(event => event.summary).toSorted()
+  const summaries = () => google.live().map(event => event.summary as string).toSorted((first, second) => first.localeCompare(second))
   await expect.poll(summaries).toEqual(['[Membership] Streaming', '[Membership] Streaming · Cancel by'])
   const dateEventId = String(google.live().find(event => String(event.summary).endsWith('· Cancel by'))?.id)
 
@@ -73,7 +73,7 @@ test("while someone's app doesn't know date events yet, extra dates stay out of 
   await page.getByLabel('Label of date 1').fill('Cancel by')
   await page.getByLabel('Date 1', { exact: true }).fill('2099-11-30')
   await page.getByRole('button', { name: 'Save' }).click()
-  const summaries = () => google.live().map(event => event.summary).toSorted()
+  const summaries = () => google.live().map(event => event.summary as string).toSorted((first, second) => first.localeCompare(second))
   await expect.poll(summaries).toEqual(['[Membership] Streaming'])
   await expect.poll(async () => (await readDocument(`syncState/${uid}`))?.schema).toEqual({ integerValue: '4' })
   // Opening the entry pulls again; then wait until the app has made no Google request for a full

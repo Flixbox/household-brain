@@ -1,4 +1,4 @@
-import { type FormEvent, useState } from 'react'
+import { type SubmitEvent, useState } from 'react'
 import { type Category, offeredCategory } from '@household-brain/entries/lib/categories'
 import type { ItemDraft } from '@household-brain/entries/lib/items/model'
 import { useEntryForm } from './use-entry-form'
@@ -40,7 +40,7 @@ export const ItemForm = ({ initial, initialDates = NO_DATES, categories, onSave,
   // Not an edit until saved: a category that arrives meanwhile (another device) still replaces it.
   const shownCategory = offeredCategory(draft.category, categories)
   const [saving, setSaving] = useState(false)
-  const submit = (event: FormEvent) => {
+  const submit = (event: SubmitEvent) => {
     event.preventDefault()
     if (saving) {
       return

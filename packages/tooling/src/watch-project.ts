@@ -43,6 +43,8 @@ const LIMIT_SECONDS = Number(limitMinutes) * 60
 const MERGED_HOURS = Number(process.env.MERGED_HOURS ?? 3)
 const started = Temporal.Now.instant()
 const round = { complete: true }
+/** Read through a function: the checks of a round reset `round.complete`, which TypeScript can't see. */
+const roundComplete = () => round.complete
 
 const say = (lines: readonly string[]) => process.stdout.write(`${lines.join('\n')}\n`)
 const short = (sha: string) => sha.slice(0, 7)
@@ -275,7 +277,7 @@ const checkPrs = async (): Promise<void> => {
   await inOrder(prs, checkPr)
   // From here on, a PR seen for the first time is a new one. Only after a round in which every PR
   // answered: one that failed must still get its comments recorded.
-  await (round.complete ? writeLines('initialized', []) : Promise.resolve())
+  await (roundComplete() ? writeLines('initialized', []) : Promise.resolve())
 }
 
 const watchRound = async (): Promise<void> => {

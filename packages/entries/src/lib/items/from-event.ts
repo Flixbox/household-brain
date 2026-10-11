@@ -58,7 +58,7 @@ const isForeign = (event: CalendarEvent, categories: readonly Category[]): boole
   !event.extendedProperties?.private?.['hb.category'] && !prefixCategory(event, categories).category
 
 /** Repeating events aren't supported yet: they are left alone entirely. */
-export const isRecurring = (event: CalendarEvent) => Boolean(event.recurrence?.length || event.recurringEventId)
+export const isRecurring = (event: CalendarEvent) => Boolean(event.recurrence?.length) || Boolean(event.recurringEventId)
 
 /** The calendar date an event falls on, as `YYYY-MM-DD` (its local date for timed events). */
 export const dueDateOf = (event: CalendarEvent): string =>

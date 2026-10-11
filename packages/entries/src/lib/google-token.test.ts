@@ -80,7 +80,7 @@ describe('revokeCalendarToken (#117)', () => {
     const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit]
     expect(url).toBe('https://oauth2.googleapis.com/revoke')
     expect(url).not.toContain('secret-token')
-    expect(String(init.body)).toBe('token=secret-token')
+    expect((init.body as URLSearchParams).toString()).toBe('token=secret-token')
     expect(init).toMatchObject({ keepalive: true, method: 'POST' })
   })
 

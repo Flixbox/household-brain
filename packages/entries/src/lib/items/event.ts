@@ -100,7 +100,7 @@ export const privateProperties = (item: Item): Record<string, string> => ({
   ...isForeign(item.currency) ? { 'hb.currency': item.currency } : {},
   // Like the currency: only when the entry has one, so other events stay as they were (#86).
   ...item.interval ? { 'hb.interval': item.interval } : {},
-  'hb.start': item.startDate ?? '',
+  'hb.start': item.startDate,
   'hb.status': item.status,
   'hb.url': item.url,
   'hb.v': '1',

@@ -153,7 +153,7 @@ const applyEntryEvent = async (context: PushContext, event: CalendarEvent, reche
   const settled = decision.kind === 'update' && decision.ownCopy
     ? await fixOwnReminders(context, event, decision.draft)
     : await settleEntryEvent(context, event, decision)
-  return settled ?? (removed || null)
+  return settled ?? (removed === '' ? null : removed)
 }
 
 /** The other person's push, alone or merged into local edits: this person's reminders still follow the entry (#43, #74). */
