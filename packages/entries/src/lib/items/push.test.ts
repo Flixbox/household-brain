@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'bun:test'
 import { DEFAULT_CATEGORIES } from '@household-brain/entries/lib/categories'
-import { type CalendarApi, CalendarApiError } from '@household-brain/entries/lib/calendar/api'
+import { CalendarApiError } from '@household-brain/entries/lib/calendar/api'
+import { fakeCalendarApi } from '@household-brain/entries/lib/calendar/fake-api'
 import type { CalendarEvent } from './event'
 import type { Item } from './model'
 import { pushItem } from './push'
+import { testItem } from './test-item'
 
 const config = { calendarId: 'cal-1', ownerUid: 'owner', timeZone: 'Europe/Berlin' }
 
-const base: Item = {
-  amount: '', category: 'coupon', code: '', currency: '', dirty: [], dueDate: '2026-11-03', etags: {}, id: 'evt1', interval: '', notes: '', pendingOp: 'upsert', reminders: '', rev: 'r1', startDate: '', status: 'open', sync: 'pending', syncError: null, title: 'Amazon', url: '',
-}
+const base: Item = testItem
 
 const fakeApi = (behaviour: Partial<Record<'insert' | 'patch' | 'delete' | 'get', number[]>> = {}) => {
   const calls: string[] = []
@@ -19,7 +19,7 @@ const fakeApi = (behaviour: Partial<Record<'insert' | 'patch' | 'delete' | 'get'
       throw new CalendarApiError(status, `${kind} failed`)
     }
   }
-  const api = {
+  const api = fakeCalendarApi({
     deleteEvent: async (_calendarId: string, eventId: string) => {
       calls.push(`delete ${eventId}`)
       failNext('delete')
@@ -39,7 +39,7 @@ const fakeApi = (behaviour: Partial<Record<'insert' | 'patch' | 'delete' | 'get'
       failNext('patch')
       return { etag: '"v2"', id: target.eventId }
     },
-  } as unknown as CalendarApi
+  })
   return { calls, context: (uid = 'owner') => ({ api, categories: DEFAULT_CATEGORIES, config, uid }) }
 }
 

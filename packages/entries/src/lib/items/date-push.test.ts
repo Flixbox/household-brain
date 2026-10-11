@@ -1,16 +1,18 @@
 import { describe, expect, it } from 'bun:test'
 import { DEFAULT_CATEGORIES } from '@household-brain/entries/lib/categories'
-import { type CalendarApi, CalendarApiError } from '@household-brain/entries/lib/calendar/api'
+import { CalendarApiError } from '@household-brain/entries/lib/calendar/api'
+import { fakeCalendarApi } from '@household-brain/entries/lib/calendar/fake-api'
 import { deleteDateEvents, pushDateOp } from './date-push'
 import type { CalendarEvent } from './event'
 import type { Item } from './model'
+import { testItem } from './test-item'
 
 const config = { calendarId: 'cal-1', ownerUid: 'owner', timeZone: 'Europe/Berlin' }
-const item = { dateEvents: { aaaaaaaa: { shape: 'x' } }, extraDates: [{ date: '2099-01-01', id: 'bbbbbbbb', label: 'Renews' }], id: 'eeeeeeeeeeeeeeeeeeeeeeeeee' } as unknown as Item
+const item: Item = { ...testItem, dateEvents: { aaaaaaaa: { shape: 'x' } }, extraDates: [{ date: '2099-01-01', id: 'bbbbbbbb', label: 'Renews' }], id: 'eeeeeeeeeeeeeeeeeeeeeeeeee' }
 
 const fakeApi = (insertStatus?: number, patchStatuses: number[] = []) => {
   const calls: string[] = []
-  const api = {
+  const api = fakeCalendarApi({
     deleteEvent: async (_calendarId: string, eventId: string) => {
       calls.push(`delete ${eventId}`)
     },
@@ -33,7 +35,7 @@ const fakeApi = (insertStatus?: number, patchStatuses: number[] = []) => {
       }
       return patch
     },
-  } as unknown as CalendarApi
+  })
   return { calls, context: { api, categories: DEFAULT_CATEGORIES, config, uid: 'owner' } }
 }
 

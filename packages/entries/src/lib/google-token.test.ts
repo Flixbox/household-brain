@@ -2,6 +2,7 @@ import { cleanTestStorage, getTestStorage, useTestStorageEngine } from '@nanosto
 import { Temporal } from 'temporal-polyfill'
 import { afterEach, describe, expect, it, mock, spyOn } from 'bun:test'
 import { $calendarToken, MEMBER_SCOPES, OWNER_SCOPES, TASKS_SCOPE, acceptToken, forgetCalendarToken, hasCalendarToken, revokeCalendarToken } from './google-token'
+import { stringify } from '@household-brain/core/lib/stringify'
 
 // oxlint-disable-next-line react-hooks/rules-of-hooks -- nanostores' switch to fake storage, not a React hook
 useTestStorageEngine()
@@ -77,10 +78,10 @@ describe('revokeCalendarToken (#117)', () => {
     revokeCalendarToken()
     expect($calendarToken.get()).toBeNull()
     expect(fetch).toHaveBeenCalledTimes(1)
-    const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit]
+    const [url, init] = fetch.mock.calls[0] ?? []
     expect(url).toBe('https://oauth2.googleapis.com/revoke')
-    expect(url).not.toContain('secret-token')
-    expect((init.body as URLSearchParams).toString()).toBe('token=secret-token')
+    expect(stringify(url)).not.toContain('secret-token')
+    expect(init?.body instanceof URLSearchParams ? init.body.toString() : null).toBe('token=secret-token')
     expect(init).toMatchObject({ keepalive: true, method: 'POST' })
   })
 

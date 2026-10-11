@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test'
 import { resetEmulators, seedDocument } from './emulators'
 import { mockGoogle } from './google-mocks'
 import { openMenu, signInAllowlisted } from './session'
+import { recordOf } from '@household-brain/core/lib/read'
 
 const CALENDAR = 'household@group.calendar.google.test'
 
@@ -74,7 +75,7 @@ test('entries: categories and the form, added, edited, deleted, and a double-tap
     await synced()
     const patches = requests.filter(request => request.method === 'PATCH' && request.path.includes('/events/'))
     expect(patches).toHaveLength(1)
-    expect(Object.keys(patches[0]?.body as object).toSorted()).toEqual(['end', 'start'])
+    expect(Object.keys(recordOf(patches[0]?.body)).toSorted()).toEqual(['end', 'start'])
     expect(google.live().find(event => event.summary === '[Coupon] Amazon')).toMatchObject({ start: { dateTime: '2026-11-05T17:00:00' }, summary: '[Coupon] Amazon' })
 
     // Its own reminders: a week ahead and the day before, instead of the default two days and one day.
@@ -198,19 +199,8 @@ test('entries: categories and the form, added, edited, deleted, and a double-tap
 })
 
 test('without Google access an entry waits, "Sync now" sends it, and a reload keeps the access', async ({ page }) => {
-  const { google, requests } = await mockGoogle(page)
-  await page.addInitScript(() => {
-    // The first token request fails, as when Google's window is closed; later ones succeed.
-    const original = (window as unknown as { google: { accounts: { oauth2: { initTokenClient: (config: object) => unknown } } } }).google.accounts.oauth2
-    const realInit = original.initTokenClient
-    let refused = false
-    original.initTokenClient = config => (refused
-      ? realInit(config)
-      : { requestAccessToken: () => {
-        refused = true
-        setTimeout(() => { (config as { error_callback: (error: object) => void }).error_callback({ type: 'popup_closed' }) }, 0)
-      } })
-  })
+  // The first token request fails, as when Google's window is closed; later ones succeed.
+  const { google, requests } = await mockGoogle(page, { refuseFirstToken: true })
   await signInAllowlisted(page, 'owner@household-brain.test')
 
   await page.getByRole('link', { name: 'Add Coupon' }).click()

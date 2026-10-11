@@ -38,13 +38,13 @@ describe('decidePull', () => {
     const replaced = decide({})
     expect(replaced).toMatchObject({ fields: { 'code': 'NEW', 'dueDate': '2026-11-03', 'sync': 'synced' }, kind: 'update', normalise: true })
     // Recorded only after the event was adjusted, so an interrupted pull adjusts it again.
-    expect((replaced as { fields: object }).fields).not.toHaveProperty('etags.owner')
+    expect('fields' in replaced ? replaced.fields : {}).not.toHaveProperty('etags.owner')
   })
 
   it('keeps fields edited locally and takes Google\'s for the rest', () => {
     const decision = decide({ entry: { ...entry, dirty: ['code'], pendingOp: 'upsert', sync: 'pending' } })
     expect(decision).toMatchObject({ kind: 'update', normalise: false })
-    const { fields } = decision as { fields: Record<string, unknown> }
+    const fields = 'fields' in decision ? decision.fields : {}
     expect(fields).not.toHaveProperty('code')
     expect(fields).toMatchObject({ dueDate: '2026-11-03', title: 'Amazon (from Google)' })
     expect(fields).not.toHaveProperty('sync')
