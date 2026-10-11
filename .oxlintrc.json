@@ -200,6 +200,7 @@
       "files": [
         "packages/pwa/src/build.ts",
         "packages/pwa/src/assets.ts",
+        "packages/pwa/src/description.ts",
         "packages/pwa/src/service-worker.ts"
       ],
       "rules": {

@@ -3,7 +3,6 @@ import type { PwaConfig } from '@household-brain/pwa/lib/config'
 /** The installable app: read by `pwa-build` after every build. */
 const config: PwaConfig = {
   backgroundColor: '#fbf7f1',
-  description: 'Everything in our household that is due on a date, by category.',
   icon: 'icons/icon.svg',
   lang: 'en',
   maskableIcon: 'icons/icon-maskable.svg',
