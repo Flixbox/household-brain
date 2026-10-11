@@ -5,7 +5,7 @@ import { Events } from './Events'
 import { Home } from './Home'
 import { NewItem } from './NewItem'
 import { Settings } from './Settings'
-import { ToTop } from './ToTop'
+import { ToTop } from '@household-brain/shell/components/ToTop'
 
 /**
  * The page for the current address. `/items/new` comes before `/items/:itemId`, which would match it
