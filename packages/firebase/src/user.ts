@@ -9,4 +9,9 @@ import { auth } from '@household-brain/firebase/firebase'
  */
 export const $user = atom<User | null>(auth.currentUser)
 
-onMount($user, () => onAuthStateChanged(auth, user => { $user.set(user) }))
+// Catches up with the account at once when a screen starts reading, before the listener's first
+// answer: on a page opened directly (e.g. after a reload), the value from module load is still empty.
+onMount($user, () => {
+  $user.set(auth.currentUser)
+  return onAuthStateChanged(auth, user => { $user.set(user) })
+})
