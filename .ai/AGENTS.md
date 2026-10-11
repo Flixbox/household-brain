@@ -41,10 +41,11 @@ that work with the owner's account.
 You own a pull request from the moment you open it until it is merged and deployed. "Pushed" is not
 "done". These steps keep it moving without anyone having to ask what is going on.
 
-**One pull request at a time.** Open the next one only after the previous one is merged and its
-deploy is green. Never stack pull requests or work on two in parallel: the owner merges with squash,
-which rewrites the history a stacked branch is built on, and every open PR is one more thing for
-the owner to track.
+**One pull request at a time.** Open the next one as soon as the previous one is merged: its CI and
+review run while `main` deploys (owner's rule, it saves the wait). Never stack pull requests or work
+on two open ones in parallel: the owner merges with squash, which rewrites the history a stacked
+branch is built on, and every open PR is one more thing for the owner to track. If the deploy
+fails, its fix comes first.
 
 **One pull request per coherent change** (owner's rule): one feature, one fix or one refactor, whole.
 Side findings, refactors and tooling tweaks go into their own follow-up PR, never along for the
@@ -183,11 +184,11 @@ adapted to this repository:
 | `CI_SLOW` | More than 20 minutes: something hangs. Cancel the run (`gh run cancel <run>`: the bot can only read Actions, so this uses the owner's login), read the logs (`agent-gh api repos/Flixbox/household-brain/actions/jobs/<job-id>/logs`), fix the hang **and** the missing time limit. A flaky download can just be re-run (`gh run rerun <run> --failed`, owner's login again). |
 | `CONFLICT` | Rebase on `main`, run the checks, push once, reply on the PR. |
 | `ACTIVITY` | Answer every comment (section 4), including those of a pending review. |
-| `DEPLOYED` | A minute later, check the live app in the browser (section 5): mandatory, but never blocking. Report, and start the next PR. |
+| `DEPLOYED` | A minute later, check the live app in the browser (section 5): mandatory, but never blocking. Report; the next PR was opened at the merge. |
 | `DEPLOY_FAILED` | Fix it in a follow-up PR (never push to `main`). A deploy that a newer merge cancelled isn't a failure: the watcher follows the newer run, which deploys both. |
 | `MAIN_FAILED` / `MAIN_SLOW` | `main` is broken or hanging, whichever PR caused it. That comes first: fix it in a follow-up PR, or re-run a flaky job, before continuing. |
 | `MAIN_PASSED` | `main`'s newest run passed. Nothing to fix; read the open-PR list that comes with it. |
-| `MAIN_ADVANCED` | `main` got a new commit, whoever merged it. Know what landed: if it was your own PR, its deploy follows; otherwise check whether it touches your work. |
+| `MAIN_ADVANCED` | `main` got a new commit, whoever merged it. Know what landed: if it was your own PR, open the next one now while its deploy runs; otherwise check whether it touches your work. |
 | `MAIN_MOVED` | `main` moved under the PR (another merge). Rebase on `main`, run the checks, push once, so what gets merged is what was tested. |
 | `NEW_ISSUE` / `ISSUE_COMMENT` | Read it; take the work in turn (tech debt first), answer the owner's comment. |
 | `ISSUE_CLOSED` / `ISSUE_REOPENED` | An issue was closed (by whom, and why) or reopened. Drop or resume any work on it; a closed one the owner decided on may need nothing else. |
