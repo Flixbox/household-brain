@@ -1,4 +1,6 @@
 #!/usr/bin/env bun
+/* oxlint-disable import/no-nodejs-modules -- a build step: runs on Bun at build time, never in the browser */
+/* oxlint-disable typescript/no-unsafe-assignment -- the app's config module is imported by path, so untyped here; pwa.config.ts types it as PwaConfig */
 /**
  * Turns a finished web build into an installable app that works offline: `pwa-build <build dir>`,
  * run in the app's folder after the bundler, which reads the app's `pwa.config.ts`.

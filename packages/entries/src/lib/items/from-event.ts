@@ -136,12 +136,12 @@ const timeFix = (event: CalendarEvent, draft: ItemDraft, timeZone: string): Cale
     }
 
 /** The details taken from the description, as the event's own properties, so later pulls read them back. */
-const detailProperties = (draft: ItemDraft): Record<string, string> => Object.fromEntries([
-  ['hb.amount', draft.amount],
-  ['hb.code', draft.code],
-  ['hb.currency', draft.currency],
-  ['hb.url', draft.url],
-].filter(([, value]) => value !== ''))
+const detailProperties = (draft: ItemDraft): Record<string, string> => Object.fromEntries(Object.entries({
+  'hb.amount': draft.amount,
+  'hb.code': draft.code,
+  'hb.currency': draft.currency,
+  'hb.url': draft.url,
+}).filter(([, value]) => value !== ''))
 
 const categoryFix = (event: CalendarEvent, draft: ItemDraft, categories: readonly Category[]): CalendarEvent => {
   if (event.extendedProperties?.private?.['hb.category']) {

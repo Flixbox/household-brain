@@ -1,3 +1,4 @@
+/* oxlint-disable import/no-nodejs-modules -- a build step: runs on Bun at build time, never in the browser */
 import { join } from 'node:path'
 import { favicons } from 'favicons'
 import type { PwaConfig } from '@household-brain/pwa/lib/config'

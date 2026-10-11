@@ -24,10 +24,6 @@
   },
   "rules": {
     // Type-aware rules (oxlint-tsgolint, #167) not switched on yet: #168 turns them on one by one, with their fixes.
-    "typescript/no-unsafe-assignment": "off",
-    "typescript/no-unsafe-call": "off",
-    "typescript/no-unsafe-member-access": "off",
-    "typescript/no-unsafe-return": "off",
     "typescript/prefer-readonly-parameter-types": "off",
     "typescript/promise-function-async": "off",
     "typescript/require-await": "off",
@@ -209,29 +205,6 @@
       "rules": {
         "import/no-default-export": "off",
         "import/no-nodejs-modules": "off"
-      }
-    },
-    {
-      // The build steps run on Bun at build time, never in the browser.
-      "files": [
-        "apps/web/build.ts",
-        "apps/web/dev.ts",
-        "packages/pwa/src/build.ts",
-        "packages/pwa/src/assets.ts",
-        "packages/pwa/src/description.ts",
-        "packages/pwa/src/service-worker.ts"
-      ],
-      "rules": {
-        "import/no-nodejs-modules": "off"
-      }
-    },
-    {
-      // Serwist's fixed name for the precache list it fills in.
-      "files": [
-        "packages/pwa/src/sw.ts"
-      ],
-      "rules": {
-        "eslint/no-underscore-dangle": ["error", { "allow": ["__SW_MANIFEST"] }]
       }
     },
     {

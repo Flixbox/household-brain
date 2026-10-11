@@ -295,9 +295,13 @@ adapted to this repository:
   `example.com` or a real-looking host.
 - **oxlint lints with type information** (`--type-aware`, `oxlint-tsgolint`, #167); the type-aware rules
   still off are listed in `.oxlintrc.json` and get turned on with their fixes in #168.
-- **oxlint runs every category as an error.** A rule is switched off only in `.oxlintrc.json`, with
-  its reason as a comment, never with an inline disable comment. Before switching a rule on, search
-  the file for it: a rule already listed as `"off"` further down wins (the last duplicate key in
+- **oxlint runs every category as an error.** A rule switched off for **one file** is switched off at
+  the top of that file, for the whole file, with a short reason (owner's rule, #181):
+  `/* oxlint-disable import/no-nodejs-modules -- a build step: runs on Bun at build time */`. Never
+  for a single line, never without the reason; `bun run lint` reports a disable comment that no
+  longer turns anything off. A rule off for a whole kind of file (every test, every e2e spec, every
+  config) or for the whole repository stays in `.oxlintrc.json`, with its reason as a comment.
+  Before switching a rule on, search the file for it: a rule already listed as `"off"` further down wins (the last duplicate key in
   JSON counts), and the new entry silently does nothing. Prove a new rule with a file that breaks it.
 - **Every dependency is pinned exactly** (`install.exact` in `bunfig.toml`, enforced by
   npm-package-json-lint); Dependabot bumps them. **No version younger than 48 hours** (#94):

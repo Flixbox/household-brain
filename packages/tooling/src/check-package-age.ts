@@ -8,6 +8,7 @@
  *
  * Run from the repository root (it reads bun.lock and bunfig.toml there).
  */
+import { recordOf, textMapOf, textOf } from '@household-brain/core/lib/read'
 import { $ } from 'bun'
 import { tooYoung } from './age'
 
@@ -41,8 +42,7 @@ const publishedAt = async (spec: string): Promise<Temporal.Instant | null> => {
   if (!response.ok) {
     throw new Error(`${REGISTRY} answered ${response.status} for ${name}`)
   }
-  const { time }: { time?: Record<string, string> } = await response.json()
-  const published = time?.[version]
+  const published = textOf(textMapOf(recordOf(await response.json()).time)[version])
   return published ? Temporal.Instant.from(published) : null
 }
 

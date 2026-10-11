@@ -15,6 +15,7 @@
     "test": "bun test --pass-with-no-tests"
   },
   "dependencies": {
+    "@household-brain/core": "workspace:*",
     "@serwist/build": "9.5.13",
     "@serwist/window": "9.5.13",
     "favicons": "7.3.1",

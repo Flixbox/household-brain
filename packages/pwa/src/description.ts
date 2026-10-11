@@ -1,3 +1,5 @@
+/* oxlint-disable import/no-nodejs-modules -- a build step: runs on Bun at build time, never in the browser */
+import { recordOf } from '@household-brain/core/lib/read'
 import { dirname, join } from 'node:path'
 
 /**
@@ -6,7 +8,7 @@ import { dirname, join } from 'node:path'
  */
 export const workspaceDescription = async (from = process.cwd()): Promise<string> => {
   const file = Bun.file(join(from, 'package.json'))
-  const manifest: { description?: unknown, workspaces?: unknown } = await file.exists() ? await file.json() : {}
+  const manifest = recordOf(await file.exists() ? await file.json() : {})
   if (manifest.workspaces) {
     if (typeof manifest.description !== 'string' || !manifest.description) {
       throw new Error(`${file.name} has no description`)
