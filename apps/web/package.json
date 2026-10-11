@@ -5,7 +5,9 @@
   "type": "module",
   "license": "Unlicense",
   "scripts": {
-    "dev": "tsr watch & bun --bun vite",
+    "dev": "bun run --parallel dev:routes dev:server",
+    "dev:routes": "tsr watch",
+    "dev:server": "bun --bun vite",
     "build": "tsr generate && tsc -b && bun --bun vite build",
     "preview": "bun --bun vite preview",
     "typecheck": "tsc -b",
