@@ -1,8 +1,8 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "types": ["vite/client", "bun"],
+    "types": ["bun"],
     "jsx": "react-jsx"
   },
-  "include": ["src", "../firebase/src/env.d.ts"]
+  "include": ["src", "../firebase/src/build-env.d.ts"]
 }

@@ -22,7 +22,7 @@ export const writeServiceWorker = async (dir: string, config: PwaConfig) => {
   const source = join(tmpdir(), `household-brain-sw-${process.pid}.js`)
   await Bun.write(source, output)
   const { count, warnings } = await injectManifest({
-    // Vite's file names already carry a content hash, so they need no revision of their own.
+    // The bundler's file names already carry a content hash, so they need no revision of their own.
     dontCacheBustURLsMatching: /^assets\//u,
     globDirectory: dir,
     // Only the install dialog shows the screenshots: not worth storing offline.

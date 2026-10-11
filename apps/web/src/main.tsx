@@ -10,6 +10,13 @@ import './index.css'
 onSignOut(revokeCalendarToken)
 onSignOut(clearSearch)
 
+// Development only (folded away in builds): reload when the dev server says the code changed (dev.ts).
+if (process.env.NODE_ENV !== 'production') {
+  new EventSource('/__reload').addEventListener('message', () => {
+    globalThis.location.reload()
+  })
+}
+
 const root = document.querySelector('#root')
 if (!root) {
   throw new Error('index.html has no #root element')

@@ -16,7 +16,7 @@ history live in the GitHub issues.
 
 ```sh
 bun install
-bun run dev               # Vite dev server on http://localhost:5173
+bun run dev               # Bun dev server on http://localhost:5173, reloads on every change
 bun run lint              # oxlint, npm-package-json-lint, fallow (Nx, cached); bun run lint:fix fixes what it can
 bun run typecheck && bun run test
 bun run build             # apps/web/dist
@@ -39,7 +39,7 @@ An Nx workspace on Bun workspaces, run entirely on Bun (no Node). Packages are c
 exported by path (no barrel files); only the app is built.
 
 ```
-apps/web/            the PWA (Vite + React): routes, PWA config and icons, Playwright e2e against the emulators
+apps/web/            the PWA (React, built with Bun): routes, PWA config and icons, Playwright e2e against the emulators
 packages/entries/    the entries feature: entries, categories, outbox push, Google Calendar pull, Google Tasks import, Firestore
 packages/shell/      the frame: layout, sign-in gate with the allowlist, update prompt, sign-out
 packages/firebase/   Firebase app, Auth, Firestore, live stores, env checks

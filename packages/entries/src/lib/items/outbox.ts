@@ -41,7 +41,7 @@ const recorded = new Map<string, string>()
 let unconfirmed = new Set<string>()
 // How long a finished pull is reused instead of pulling again. Shorter in the emulator (e2e) build, so
 // the tests don't wait on it; compared inline so production builds drop the branch.
-const PULL_REUSE_MS = import.meta.env.VITE_USE_EMULATORS === 'true' ? 200 : 3000
+const PULL_REUSE_MS = process.env.BUN_PUBLIC_USE_EMULATORS === 'true' ? 200 : 3000
 let pulling: Promise<void> | null = null
 let pulledAt = Number.NEGATIVE_INFINITY
 let pullProblem: string | null = null

@@ -204,7 +204,6 @@
     {
       "files": [
         "**/*.config.ts",
-        "**/vite.config.ts",
         "**/playwright.config.ts"
       ],
       "rules": {
@@ -213,8 +212,10 @@
       }
     },
     {
-      // The PWA build steps run on Bun at build time, never in the browser.
+      // The build steps run on Bun at build time, never in the browser.
       "files": [
+        "apps/web/build.ts",
+        "apps/web/dev.ts",
         "packages/pwa/src/build.ts",
         "packages/pwa/src/assets.ts",
         "packages/pwa/src/description.ts",
