@@ -14,7 +14,8 @@ let holds = 0
  * phone that window hides the app, and a reload would lose its answer.
  */
 export const holdUpdatesWhile = async <Result>(work: Promise<Result>): Promise<Result> => {
-  const root = globalThis.document?.documentElement
+  // No document in the unit tests, which run without a browser.
+  const root = 'document' in globalThis ? document.documentElement : null
   holds += 1
   root?.setAttribute(HOLD_ATTRIBUTE, '')
   try {

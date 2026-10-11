@@ -4,7 +4,7 @@ import { INTERVALS } from './items/interval'
 import gem from './gemini-gem.md' with { type: 'text' }
 
 /** The instructions pasted into the Gemini Gem: the fenced block of `gemini-gem.md` (#119). */
-const instructions = gem.match(/```text\n(?<text>[\s\S]*?)```/u)?.groups?.text ?? ''
+const instructions = (/```text\n(?<text>[\s\S]*?)```/u.exec(gem))?.groups?.text ?? ''
 
 const listed = (pattern: RegExp) => (instructions.match(pattern)?.groups?.list ?? '').split(', ').toSorted()
 

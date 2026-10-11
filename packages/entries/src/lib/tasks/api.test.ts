@@ -6,7 +6,7 @@ const access = () => ({
   token: async () => 'tasks-token',
 })
 
-const response = (body: unknown, status = 200) => new Response(JSON.stringify(body) ?? '', { status })
+const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status })
 
 describe('createTasksApi', () => {
   it('reads every task list and every open-task page', async () => {
@@ -41,7 +41,7 @@ describe('createTasksApi', () => {
     const bodies: unknown[] = []
     const fetchFn = async (url: string, init: RequestInit) => {
       expect(url).toBe('https://tasks.googleapis.com/tasks/v1/lists/list-1/tasks/task-1')
-      bodies.push(JSON.parse(String(init.body)))
+      bodies.push(JSON.parse(init.body as string))
       return response({ id: 'task-1', status: 'completed' })
     }
     await createTasksApi(access(), fetchFn).completeTask('list-1', 'task-1')

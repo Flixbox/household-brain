@@ -22,6 +22,9 @@ type Json = Record<string, unknown>
 const isRecord = (value: unknown): value is Json => typeof value === 'object' && value !== null && !Array.isArray(value)
 const records = (value: unknown): Json[] => (Array.isArray(value) ? value.filter(isRecord) : [])
 const text = (value: unknown) => (typeof value === 'string' ? value : '')
+
+/** The line a review comment is on; one on an outdated diff only has its original line. */
+const lineOf = (item: Record<string, unknown>) => [item.line, item.original_line].find((value): value is number => typeof value === 'number')
 const count = (value: unknown) => (typeof value === 'number' ? value : 0)
 const record = (value: unknown): Json => (isRecord(value) ? value : {})
 const oneLine = (value: unknown, length: number) => text(value).replaceAll(/\s+/gu, ' ').slice(0, length)
@@ -125,7 +128,7 @@ export const activityOf = async (pr: number): Promise<Activity[]> => {
 /** A review's own comments; a pending review's are only visible to its author (the owner's login). */
 export const reviewCommentLines = async (pr: number, review: string): Promise<string[]> =>
   records(await gh(['api', `repos/${REPO}/pulls/${pr}/reviews/${review}/comments`], ACTIVITY_GH))
-    .map(item => `  ${text(item.path)}:${String(item.line ?? item.original_line ?? 'file')}: ${oneLine(item.body, 400)}`)
+    .map(item => `  ${text(item.path)}:${lineOf(item) ?? 'file'}: ${oneLine(item.body, 400)}`)
 
 /** Commits main has that `head` doesn't, and the newest of them. */
 export const mainAhead = async (head: string): Promise<{ ahead: number, newest: string }> => {

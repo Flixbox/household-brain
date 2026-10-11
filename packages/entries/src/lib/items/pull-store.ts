@@ -159,6 +159,7 @@ const dateChangeFields = (entry: Item, dateId: string, change: DateEventChange):
     case 'rewrite': {
       return { [`dateEvents.${dateId}`]: staleShape() }
     }
+    case 'none':
     default: {
       return null
     }

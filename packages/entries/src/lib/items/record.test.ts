@@ -54,7 +54,7 @@ describe('recordFor an entry without a due date', () => {
 
   it('keeps a date added meanwhile pending, so its event is inserted next', () => {
     const sent = { ...pushed, dirty: ['dueDate'], dueDate: '' } as Item
-    const dated = { ...sent, dueDate: '2026-12-24', rev: 'r2' } as Item
+    const dated = { ...sent, dueDate: '2026-12-24', rev: 'r2' }
     expect(recordFor({ latest: dated, outcome: { kind: 'unscheduled', updated: '' }, pushed: sent, remote: null, uid: 'owner' }))
       .toEqual({ fields: { dirty: ['dueDate'], etags: {} }, kind: 'update' })
   })

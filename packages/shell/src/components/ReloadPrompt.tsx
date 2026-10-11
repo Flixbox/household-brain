@@ -15,11 +15,8 @@ export const ReloadPrompt = () => {
   const needRefresh = useStore($updateWaiting)
   useEffect(startServiceWorker, [])
   useEffect(() => {
-    if (!needRefresh) {
-      return
-    }
     const applyWhenHidden = () => {
-      if (document.visibilityState === 'hidden' && !document.querySelector('[data-hold-updates]')) {
+      if (needRefresh && document.visibilityState === 'hidden' && !document.querySelector('[data-hold-updates]')) {
         applyUpdate()
       }
     }

@@ -62,12 +62,9 @@ const pruneCutoff = (): Timestamp => Timestamp.fromMillis(Temporal.Now.instant()
 export const pruneOldLogs = (): void => {
   getDocs(query(logsCollection, where('at', '<', pruneCutoff()), limit(LOG_LIMIT)))
     .then(snapshot => {
-      if (snapshot.empty) {
-        return
-      }
       const batch = writeBatch(db)
       snapshot.docs.forEach(entry => batch.delete(entry.ref))
-      return batch.commit()
+      return snapshot.empty ? null : batch.commit()
     })
     .catch(() => null)
 }
