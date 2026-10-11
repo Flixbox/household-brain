@@ -36,9 +36,6 @@ export default defineConfig({
     'typescript/prefer-readonly-parameter-types': 'off',
     'typescript/strict-boolean-expressions': 'off',
     'react/rules-of-hooks': 'error',
-    // `<>{children}</>` returns an element: `children` alone is a ReactNode, whose type includes a
-    // promise, which promise-function-async would take for an async component.
-    'react/jsx-no-useless-fragment': ['error', { allowExpressions: true }],
     // Continuation lines of a comment stay lowercase
     'eslint/capitalized-comments': ['error', 'always', { 'ignoreConsecutiveComments': true }],
     // Router links (wouter) are styled like anchors

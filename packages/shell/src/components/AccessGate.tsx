@@ -1,3 +1,4 @@
+/* oxlint-disable react/jsx-no-useless-fragment -- `<>{children}</>` returns an element; `children` alone is a ReactNode, whose type includes a promise, which promise-function-async takes for an async component */
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth'
 import { type ReactNode, useState } from 'react'
 import { useAccess } from '@household-brain/shell/lib/access'
