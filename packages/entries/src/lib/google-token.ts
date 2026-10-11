@@ -78,7 +78,7 @@ let gisLoaded: Promise<void> | null = null
 /**
  * Loads the Google Identity Services script. Settings calls this on mount so that, when a button is
  * clicked, the consent popup opens straight away: a popup opened too long after the click is
- * blocked, especially on iOS Safari.
+ * blocked.
  */
 export const loadGis = (): Promise<void> => {
   if (window.google?.accounts.oauth2) {

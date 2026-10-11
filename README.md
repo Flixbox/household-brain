@@ -68,7 +68,7 @@ The Firebase project is a Google Cloud project; everything below happens in it.
 
 **Firebase**
 - Authentication: enable the Google provider. `authDomain` is `<project>.web.app`, the origin the app
-  is served from, so sign-in works in iOS home-screen apps.
+  is served from, so sign-in doesn't depend on another site's storage, which browsers partition.
 - Firestore: the rules in `firestore.rules` let only allowlisted accounts in. **Allowlist each
   person** by creating `allowlist/<uid>` in the console (the uid is under Authentication → Users after
   their first sign-in; copy it from there). The app itself can never write the allowlist.
