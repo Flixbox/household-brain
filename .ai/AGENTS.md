@@ -421,11 +421,9 @@ CI fails if a compiled native addon shows up in `node_modules`. Add a package on
   polyfills. A newer function such as `URL.canParse` (iOS 17) throws on older iPhones and takes the
   whole screen down. Check support before using a recent API; nothing in lint catches it.
 
-- **The PWA is plain files plus Workbox, no build plugin** (#148). The manifest is
-  `apps/web/public/manifest.webmanifest`, its head links are in `apps/web/index.html`, and the icons
-  in `public/` come from `public/icon.svg`: after changing the SVG, run `bun run icons` in `apps/web`
-  and commit the PNGs. `apps/web/build-sw.ts` (Workbox's `generateSW`) writes `sw.js` after every build;
-  `packages/shell/src/lib/service-worker.ts` registers it and offers updates (`ReloadPrompt`).
+- **The installable, offline app comes from `packages/pwa`** (#148): never hand-write icons, a
+  manifest or head links. Change `apps/web/pwa.config.ts` or the SVGs in `apps/web/icons/`; the
+  build's `pwa-build` step generates the rest.
 
 - **Compare `import.meta.env.X` inline** when the branch must vanish from production builds. Passing
   `import.meta.env` through a helper function stops Vite from folding it, so the dead code ships.

@@ -39,10 +39,11 @@ An Nx workspace on Bun workspaces, run entirely on Bun (no Node). Packages are c
 exported by path (no barrel files); only the app is built.
 
 ```
-apps/web/            the PWA (Vite + React): routes, manifest and service worker build, Playwright e2e against the emulators
+apps/web/            the PWA (Vite + React): routes, PWA config and icons, Playwright e2e against the emulators
 packages/entries/    the entries feature: entries, categories, outbox push, Google Calendar pull, Google Tasks import, Firestore
 packages/shell/      the frame: layout, sign-in gate with the allowlist, update prompt, sign-out
 packages/firebase/   Firebase app, Auth, Firestore, live stores, env checks
+packages/pwa/        the installable, offline app: icons, manifest, service worker (`pwa-build`), update registration
 tests/rules/         Firestore security-rules tests
 .ai/AGENTS.md        notes for agents working here (AGENTS.md and CLAUDE.md link to it)
 ```

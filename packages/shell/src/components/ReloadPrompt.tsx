@@ -1,6 +1,6 @@
 import { useStore } from '@nanostores/react'
 import { useEffect, useState } from 'react'
-import { $updateWaiting, applyUpdate, startServiceWorker } from '@household-brain/shell/lib/service-worker'
+import { $updateWaiting, applyUpdate, startServiceWorker } from '@household-brain/pwa/lib/register'
 
 /**
  * Keeps old versions of the app rare. A new version is installed as soon as it is found and

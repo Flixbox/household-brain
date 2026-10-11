@@ -8,17 +8,17 @@
     "dev": "bun run --parallel dev:routes dev:server",
     "dev:routes": "tsr watch",
     "dev:server": "bun --bun vite",
-    "build": "tsr generate && tsc -b && bun --bun vite build && bun build-sw.ts dist",
+    "build": "tsr generate && tsc -b && bun --bun vite build && pwa-build dist",
     "preview": "bun --bun vite preview",
     "typecheck": "tsc -b",
-    "icons": "pwa-assets-generator",
     "test": "bun test --pass-with-no-tests src",
-    "build:e2e": "tsr generate && bun --bun vite build --mode e2e --outDir dist-e2e && bun build-sw.ts dist-e2e",
+    "build:e2e": "tsr generate && bun --bun vite build --mode e2e --outDir dist-e2e && pwa-build dist-e2e",
     "test:e2e": "bun run build:e2e && bun --bun playwright test"
   },
   "dependencies": {
     "@household-brain/entries": "workspace:*",
     "@household-brain/firebase": "workspace:*",
+    "@household-brain/pwa": "workspace:*",
     "@household-brain/shell": "workspace:*",
     "@nanostores/react": "2.0.1",
     "@tanstack/react-router": "1.170.41",
@@ -32,10 +32,8 @@
     "@rolldown/plugin-babel": "0.2.4",
     "@tailwindcss/vite": "4.3.3",
     "@tanstack/router-cli": "1.167.40",
-    "@vite-pwa/assets-generator": "2.0.0",
     "@vitejs/plugin-react": "6.1.2",
     "babel-plugin-react-compiler": "1.0.0",
-    "tailwindcss": "4.3.3",
-    "workbox-build": "7.4.1"
+    "tailwindcss": "4.3.3"
   }
 }

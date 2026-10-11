@@ -188,12 +188,31 @@
       "files": [
         "**/*.config.ts",
         "**/vite.config.ts",
-        "**/playwright.config.ts",
-        "**/pwa-assets.config.ts"
+        "**/playwright.config.ts"
       ],
       "rules": {
         "import/no-default-export": "off",
         "import/no-nodejs-modules": "off"
+      }
+    },
+    {
+      // The PWA build steps run on Bun at build time, never in the browser.
+      "files": [
+        "packages/pwa/src/build.ts",
+        "packages/pwa/src/assets.ts",
+        "packages/pwa/src/service-worker.ts"
+      ],
+      "rules": {
+        "import/no-nodejs-modules": "off"
+      }
+    },
+    {
+      // Serwist's fixed name for the precache list it fills in.
+      "files": [
+        "packages/pwa/src/sw.ts"
+      ],
+      "rules": {
+        "eslint/no-underscore-dangle": ["error", { "allow": ["__SW_MANIFEST"] }]
       }
     },
     {

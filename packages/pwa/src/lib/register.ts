@@ -1,5 +1,5 @@
 import { atom } from 'nanostores'
-import { Workbox } from 'workbox-window'
+import { Serwist } from '@serwist/window'
 
 /** How often an open app asks the server for a new version. */
 const CHECK_EVERY_MS = 60 * 60 * 1000
@@ -7,8 +7,8 @@ const CHECK_EVERY_MS = 60 * 60 * 1000
 /** Whether a new version of the app is installed and waits until the app lets it take over. */
 export const $updateWaiting = atom(false)
 
-/** The production build's service worker (`apps/web/build-sw.ts`); the dev server has none. */
-const workbox = import.meta.env.PROD && 'serviceWorker' in navigator && new Workbox('/sw.js')
+/** The production build's service worker (`pwa-build`); the dev server has none. */
+const serwist = import.meta.env.PROD && 'serviceWorker' in navigator && new Serwist('/sw.js')
 let started = false
 let reloadWhenTakenOver = false
 
@@ -29,23 +29,23 @@ const watchForUpdates = (registration: ServiceWorkerRegistration) => {
 
 /** Registers the service worker, only once per page however often it is called. */
 export const startServiceWorker = () => {
-  if (!workbox || started) {
+  if (!serwist || started) {
     return
   }
   started = true
-  workbox.addEventListener('waiting', () => $updateWaiting.set(true))
-  workbox.addEventListener('controlling', () => {
+  serwist.addEventListener('waiting', () => $updateWaiting.set(true))
+  serwist.addEventListener('controlling', () => {
     if (reloadWhenTakenOver) {
       window.location.reload()
     }
   })
-  workbox.register().then(registration => registration && watchForUpdates(registration)).catch(() => null)
+  serwist.register().then(registration => registration && watchForUpdates(registration)).catch(() => null)
 }
 
 /** Lets the waiting version take over, then reloads the page into it. */
 export const applyUpdate = () => {
   reloadWhenTakenOver = true
-  if (workbox) {
-    workbox.messageSkipWaiting()
+  if (serwist) {
+    serwist.messageSkipWaiting()
   }
 }

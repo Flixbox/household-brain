@@ -4,5 +4,5 @@
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
     "types": ["bun"]
   },
-  "include": ["vite.config.ts", "build-sw.ts", "pwa-assets.config.ts", "playwright.config.ts", "e2e"]
+  "include": ["vite.config.ts", "pwa.config.ts", "playwright.config.ts", "e2e"]
 }
