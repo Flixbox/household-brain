@@ -348,6 +348,10 @@ adapted to this repository:
   from the repository root, with `bun test` for their logic. The one shell file is
   `packages/tooling/install-bun.sh`: it installs Bun, so it can't be a Bun program. There is no
   `scripts/` folder.
+- **Routes are files in `apps/web/src/routes`** (TanStack Router), and TanStack's own CLI turns them
+  into `routeTree.gen.ts` (#147): `tsr generate` runs before every build, `tsr watch` beside the dev
+  server (`apps/web/tsr.config.json`). No bundler plugin, so the routes don't depend on Vite; the
+  price is no automatic per-route code splitting, which the app's size doesn't need.
 - **The repo is an Nx workspace** (Bun workspaces): `apps/web` is the app, `packages/*` are
   features and shared code, consumed as TypeScript source (modules exported by path, no build
   step). A new feature, e.g. a shopping list, becomes its own `packages/<name>`,

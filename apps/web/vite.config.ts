@@ -1,5 +1,4 @@
 import tailwindcss from '@tailwindcss/vite'
-import { tanstackRouter } from '@tanstack/router-plugin/vite'
 import react, { reactCompilerPreset } from '@vitejs/plugin-react'
 import babel from '@rolldown/plugin-babel'
 import { defineConfig, loadEnv } from 'vite'
@@ -11,7 +10,6 @@ export default defineConfig(({ mode }) => {
   }
   return {
     plugins: [
-      tanstackRouter({ autoCodeSplitting: true, target: 'react' }),
       react(),
       // React Compiler memoises components and hooks at build time (#69), so no hand-written
       // `useMemo`/`useCallback` is needed for speed. It compiles the packages too: Vite builds them as source.
