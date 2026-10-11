@@ -1,6 +1,5 @@
 import { DEFAULT_CATEGORIES } from '@household-brain/entries/lib/categories'
 import type { GoogleTask } from '@household-brain/entries/lib/tasks/api'
-import { Temporal } from 'temporal-polyfill'
 import { type ItemDraft, emptyDraft } from './model'
 import { PLAIN_NUMBER } from './amount'
 import { isDate } from './dates'

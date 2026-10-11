@@ -4,7 +4,7 @@
   // build-info files. `apps/web/tsconfig.json` only lists references, so it extends nothing.
   "compilerOptions": {
     "target": "es2023",
-    "lib": ["ES2023", "DOM"],
+    "lib": ["ES2023", "ESNext.Temporal", "DOM"],
     "module": "esnext",
     "skipLibCheck": true,
 

@@ -110,9 +110,6 @@ comments. Only wait in the foreground for something whose result you need for th
     journeys together in its spec rather than splitting them up for size.
   - Inside a journey, find what a step checks by its own title or id (`google.live().find(...)`),
     not by position: earlier steps leave their entries and events behind.
-  - **Blur a `<select>` after `selectOption` on WebKit** (the iPhone project). A select that keeps
-    focus sometimes swallowed later link clicks, so a following step timed out on a page that never
-    opened (#110); it passed on retry, which hid it as "flaky".
 - **Batch your changes.** Every push cancels the running CI for that branch, so five quick pushes mean
   five cancelled runs and no result.
 - **Check exit codes without pipes**, or with `${PIPESTATUS[0]}`. See the shell lesson below.
@@ -286,10 +283,14 @@ adapted to this repository:
   `exactOptionalPropertyTypes` to TypeScript 7's default `strict`.
 - **No measured numbers in docs or comments** (durations, sizes, counts): they go stale. They belong
   in the PR or issue that measured them; a job's run history shows what is normal.
-- **`Date` is banned; use `Temporal`** (`temporal-polyfill`). Due dates are calendar dates at 17:00 in
+- **`Date` is banned; use `Temporal`** (built into the browsers the app supports and Bun, no polyfill). Due dates are calendar dates at 17:00 in
   `Europe/Berlin`, which `Temporal.PlainDate` and `ZonedDateTime` model; `Date` silently mixes UTC,
   local time and daylight saving. oxlint enforces it. Convert only at the edges (Google's RFC 3339
   strings).
+- **Name other repositories' issues and pull requests only as code text** (`` `owner/repo#123` ``),
+  never as a link, in issues, pull requests and comments, and not at all in commit messages: GitHub
+  adds a "mentioned this" entry to the other repository for every linked mention from this public
+  one (#146).
 - **Example and test domains use the reserved `.test` TLD** (`owner@household-brain.test`), never
   `example.com` or a real-looking host.
 - **oxlint lints with type information** (`--type-aware`, `oxlint-tsgolint`, #167); the type-aware rules
@@ -420,9 +421,11 @@ CI fails if a compiled native addon shows up in `node_modules`. Add a package on
 
 ### App and build
 
-- **Browser functions must exist on the phones that run the app.** Bun's bundler (`target: 'browser'`)
-  adds no polyfills. A newer function such as `URL.canParse` (iOS 17) throws on older iPhones and takes the
-  whole screen down. Check support before using a recent API; nothing in lint catches it.
+- **The app supports current Chrome and Firefox only, no Safari** (#179, the household uses no
+  iPhone). It needs native `Temporal`; where it is missing, `apps/web/src/main.tsx` shows a notice
+  instead of loading the app, and the iPhone e2e project checks only that notice. Bun's bundler
+  (`target: 'browser'`) adds no polyfills: check that a new browser function exists in both before
+  using it; nothing in lint catches it.
 
 - **The installable, offline app comes from `packages/pwa`** (#148): never hand-write icons, a
   manifest or head links. Change `apps/web/pwa.config.ts`, the SVGs in `apps/web/icons/`, or the
@@ -431,8 +434,10 @@ CI fails if a compiled native addon shows up in `node_modules`. Add a package on
 - **Read `process.env.BUN_PUBLIC_*` literally and compare it inline** when a branch must vanish from
   production builds (#146): the bundler only inlines a literal `process.env.X`, so passing it through a
   helper ships the dead code, and a variable that isn't set fails the build (`apps/web/build.ts`).
-- **The dev server reloads the page on every change** (`apps/web/dev.ts`): Bun's hot module
-  reloading can't load import cycles yet (oven-sh/bun#40259), so it is off until that ships.
+- **The dev server is Bun's own, with hot module reloading** (`apps/web/dev.ts`). It runs from the
+  repository root (the `dev` script), because Bun only watches files under its working directory, so
+  that edits in `packages/` reach the page too; Tailwind comes in through the root `bunfig.toml`.
+  CSS changes apply in place, component changes reload the page.
 - **Firebase Hosting matches header `source` against the request path, not the rewrite target.** A
   `no-cache` rule on `/index.html` does not cover `/` or SPA routes, so it needs `**`.
 - **The Content Security Policy is enforced** (`firebase.json` headers, #113) and names each host the

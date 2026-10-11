@@ -11,3 +11,7 @@ linker = "isolated"
 [run]
 # No Node fallback: a script or bin written for `node` (its shebang) runs on Bun instead.
 bun = true
+# The dev server (apps/web/dev.ts, run from here): what apps/web/build.ts passes to Bun.build.
+[serve.static]
+plugins = ["./apps/web/node_modules/bun-plugin-tailwind"]
+env = "BUN_PUBLIC_*"

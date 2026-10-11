@@ -11,7 +11,6 @@
 // once, to create the household calendar. Sharing it would need `calendar.acls`, so it is done by
 // hand instead (README).
 import { persistentJSON } from '@nanostores/persistent'
-import { Temporal } from 'temporal-polyfill'
 import { holdUpdatesWhile } from './update-hold'
 
 const GIS_SCRIPT = 'https://accounts.google.com/gsi/client'

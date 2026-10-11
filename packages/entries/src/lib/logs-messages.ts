@@ -1,5 +1,4 @@
 import type { Timestamp } from 'firebase/firestore'
-import { Temporal } from 'temporal-polyfill'
 import { EDITABLE_FIELDS } from '@household-brain/entries/lib/items/model'
 
 export const entryLogMessage = (action: string, title: string): string => `${action} "${title}"`

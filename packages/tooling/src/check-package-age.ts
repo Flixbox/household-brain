@@ -9,7 +9,6 @@
  * Run from the repository root (it reads bun.lock and bunfig.toml there).
  */
 import { $ } from 'bun'
-import { Temporal } from 'temporal-polyfill'
 import { tooYoung } from './age'
 
 const REGISTRY = 'https://registry.npmjs.org'

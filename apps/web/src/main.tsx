@@ -1,29 +1,15 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import { revokeCalendarToken } from '@household-brain/entries/lib/google-token'
-import { clearSearch } from '@household-brain/entries/lib/items/search'
-import { onSignOut } from '@household-brain/shell/lib/session'
-import { App } from './App'
 import './index.css'
 
-// The features, wired into the shell.
-onSignOut(revokeCalendarToken)
-onSignOut(clearSearch)
+/** Shown instead of the app where Temporal is missing (#179): the owner's wording. */
+const NOTICE = "Safari doesn't support modern web standards as of 2026-10-11. Until temporal-polyfill is supported, this site is inaccessible."
 
-// Development only (folded away in builds): reload when the dev server says the code changed (dev.ts).
-if (process.env.NODE_ENV !== 'production') {
-  new EventSource('/__reload').addEventListener('message', () => {
-    globalThis.location.reload()
-  })
+// Stable Safari has no Temporal yet, and the app's code needs it from its first line on, so it is only
+// loaded where Temporal exists; the household uses no iPhone (#179). Chromium and Firefox have it.
+if ('Temporal' in globalThis) {
+  import('./start').catch(reportError)
+} else {
+  const notice = document.createElement('p')
+  notice.className = 'm-6 max-w-md text-lg'
+  notice.textContent = NOTICE
+  document.querySelector('#root')?.append(notice)
 }
-
-const root = document.querySelector('#root')
-if (!root) {
-  throw new Error('index.html has no #root element')
-}
-
-createRoot(root).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)

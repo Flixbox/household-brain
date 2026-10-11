@@ -1,6 +1,5 @@
 /** The project watcher's questions to GitHub, through the `gh` CLI, answered as plain data. */
 import { $ } from 'bun'
-import { Temporal } from 'temporal-polyfill'
 import type { Activity, OpenPr, Run } from './watch-events'
 import { isRecord, textOf } from '@household-brain/core/lib/read'
 

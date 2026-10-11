@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'bun:test'
-import { Temporal } from 'temporal-polyfill'
 import { hoursSince, tooYoung } from './age'
 
 const now = Temporal.Instant.from('2026-10-11T12:00:00Z')

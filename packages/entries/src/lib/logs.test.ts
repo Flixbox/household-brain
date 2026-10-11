@@ -1,6 +1,5 @@
 import { Timestamp } from 'firebase/firestore'
 import { describe, expect, it } from 'bun:test'
-import { Temporal } from 'temporal-polyfill'
 import { entryLogMessage, errorLogMessage, logTime } from '@household-brain/entries/lib/logs-messages'
 
 describe('log messages', () => {
