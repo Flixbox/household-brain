@@ -4,14 +4,6 @@ import { allowlist } from './emulators'
 declare global {
   interface Window {
     e2eSignIn: (email: string) => Promise<unknown>
-    // Google's sign-in script as the mocks put it in place (google-mocks.ts), as far as tests patch it.
-    google?: {
-      accounts: {
-        oauth2: {
-          initTokenClient: (config: { error_callback: (error: { type: string }) => void }) => unknown
-        }
-      }
-    }
   }
 }
 

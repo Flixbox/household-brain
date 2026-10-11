@@ -22,21 +22,31 @@ const CORS = {
 /**
  * Replaces Google Identity Services with a stub that grants every requested scope, and the Google
  * Calendar API with an in-memory fake. Returns the Calendar requests the app made, for assertions.
+ * `refuseFirstToken`: the first token request fails, as when Google's window is closed; later ones
+ * succeed. It is part of this one init script, since Playwright runs separate ones in no set order.
  */
-export const mockGoogle = async (page: Page, calendarId = 'household@group.calendar.google.test') => {
-  await page.addInitScript(() => {
+export const mockGoogle = async (page: Page, { calendarId = 'household@group.calendar.google.test', refuseFirstToken = false } = {}) => {
+  await page.addInitScript((refuseFirst: boolean) => {
+    let refused = !refuseFirst
     Object.assign(window, {
       google: {
         accounts: {
           oauth2: {
-            initTokenClient: (config: { scope: string, callback: (response: unknown) => void }) => ({
-              requestAccessToken: () => setTimeout(() => { config.callback({ access_token: 'e2e-token', expires_in: 3600, scope: config.scope }) }, 0),
+            initTokenClient: (config: { scope: string, callback: (response: unknown) => void, error_callback: (error: { type: string }) => void }) => ({
+              requestAccessToken: () => {
+                if (!refused) {
+                  refused = true
+                  setTimeout(() => { config.error_callback({ type: 'popup_closed' }) }, 0)
+                  return
+                }
+                setTimeout(() => { config.callback({ access_token: 'e2e-token', expires_in: 3600, scope: config.scope }) }, 0)
+              },
             }),
           },
         },
       },
     })
-  })
+  }, refuseFirstToken)
   await page.route('https://accounts.google.com/gsi/client', route => route.fulfill({ body: '', contentType: 'text/javascript' }))
 
   const requests: CalendarRequest[] = []

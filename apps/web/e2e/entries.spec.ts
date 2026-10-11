@@ -199,23 +199,8 @@ test('entries: categories and the form, added, edited, deleted, and a double-tap
 })
 
 test('without Google access an entry waits, "Sync now" sends it, and a reload keeps the access', async ({ page }) => {
-  const { google, requests } = await mockGoogle(page)
-  await page.addInitScript(() => {
-    // The first token request fails, as when Google's window is closed; later ones succeed.
-    const original = window.google?.accounts.oauth2
-    if (!original) {
-      // Fail instead of quietly testing nothing: this patches the Google mock (mockGoogle above).
-      throw new Error('The Google mock is not in place yet')
-    }
-    const realInit = original.initTokenClient
-    let refused = false
-    original.initTokenClient = config => (refused
-      ? realInit(config)
-      : { requestAccessToken: () => {
-        refused = true
-        setTimeout(() => { config.error_callback({ type: 'popup_closed' }) }, 0)
-      } })
-  })
+  // The first token request fails, as when Google's window is closed; later ones succeed.
+  const { google, requests } = await mockGoogle(page, { refuseFirstToken: true })
   await signInAllowlisted(page, 'owner@household-brain.test')
 
   await page.getByRole('link', { name: 'Add Coupon' }).click()

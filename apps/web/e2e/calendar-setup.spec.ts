@@ -15,7 +15,7 @@ test.beforeEach(async () => {
 })
 
 test('setting up: the owner creates the household calendar, then a second person connects it', async ({ page }) => {
-  const { requests } = await mockGoogle(page, CALENDAR)
+  const { requests } = await mockGoogle(page, { calendarId: CALENDAR })
 
   await test.step('the owner creates the household calendar and is told how to share it', async () => {
     await signInAllowlisted(page, 'owner@household-brain.test')
@@ -44,7 +44,7 @@ test('setting up: the owner creates the household calendar, then a second person
 
   await test.step('a second person connects the shared calendar and gets their own reminders', async () => {
     // Their own Google account: a fresh fake (the newest route handles the calls).
-    const partner = await mockGoogle(page, CALENDAR)
+    const partner = await mockGoogle(page, { calendarId: CALENDAR })
     await signInAllowlisted(page, 'partner@household-brain.test')
     await openMenu(page)
     await page.getByRole('link', { name: 'Settings' }).click()
