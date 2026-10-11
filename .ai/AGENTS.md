@@ -294,9 +294,12 @@ adapted to this repository:
   JSON counts), and the new entry silently does nothing. Prove a new rule with a file that breaks it.
 - **Every dependency is pinned exactly** (`install.exact` in `bunfig.toml`, enforced by
   npm-package-json-lint); Dependabot bumps them. **No version younger than 48 hours** (#94):
-  `install.minimumReleaseAge` in `bunfig.toml`, which Bun checks on every install, so CI fails on a
-  lockfile that pins a younger version; wait and re-run. Dependabot waits as long (`cooldown`). An
-  urgent exception goes into `install.minimumReleaseAgeExcludes` with its reason. **GitHub Actions too**
+  `install.minimumReleaseAge` in `bunfig.toml`. Bun checks it only when it resolves a version
+  (`bun add`, `bun update`); a version already in `bun.lock` is installed unchecked, also with
+  `--frozen-lockfile`. So `scripts/check-package-age.ts` runs first in CI: it asks the npm registry
+  when each version a change adds to `bun.lock` was published, and fails on one that is too young;
+  wait and re-run. Dependabot waits as long (`cooldown`). An urgent exception goes into
+  `install.minimumReleaseAgeExcludes` with its reason; the CI check reads it too. **GitHub Actions too**
   (#102): `scripts/check-action-age.sh` runs first in CI and fails on a pinned action release younger
   than 48 hours; Dependabot's `cooldown` counts loosely and let a younger one through (#101). Wait and re-run. Bun is pinned in `packageManager`, and with its checksum in `scripts/install-bun.sh`.
 - **fallow** (`.fallowrc.jsonc`, part of `bun run lint`) fails on unused files, exports and

@@ -40,6 +40,13 @@ jobs:
       - run: bash scripts/install-bun.sh
       - run: bash scripts/remove-node.sh
       - run: bun install --frozen-lockfile
+      # Bun applies its minimum release age only when it resolves a version, not to one already in
+      # bun.lock, so this checks what the change adds to the lockfile (#94). Install scripts never
+      # ran, so the install before it is harmless.
+      - name: No package version younger than 48 hours
+        run: bun scripts/check-package-age.ts "$BASE"
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || 'HEAD^' }}
       - run: bun run lint
       - run: bun run typecheck
       - run: bun run test
