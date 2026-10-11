@@ -49,6 +49,11 @@ const gif = async ([video, from, to, out]: string[]) => {
   process.stdout.write(`${out} (${size} bytes)\n`)
 }
 
-const commands: Record<string, (args: string[]) => Promise<void>> = { fetch: fetchVideos, gif, sheet }
+const commands: Record<string, { arity: number, run: (args: string[]) => Promise<void> }> = {
+  fetch: { arity: 3, run: fetchVideos },
+  gif: { arity: 4, run: gif },
+  sheet: { arity: 2, run: sheet },
+}
 const [, , command = '', ...args] = process.argv
-await (commands[command] ?? usage)(args)
+const chosen = commands[command]
+await (chosen?.arity === args.length ? chosen.run(args) : usage())

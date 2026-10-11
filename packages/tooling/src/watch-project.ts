@@ -35,6 +35,10 @@ import { type PrState, REPO, activityOf, issueEventLines, issueLine, jobLines, m
 import { appendLines, exists, lock, readLines, writeLines } from './watch-state'
 
 const [, , limitMinutes = '20', maxHours = '12'] = process.argv
+if (!/^\d+$/u.test(limitMinutes) || !/^\d+$/u.test(maxHours)) {
+  process.stderr.write('ci-limit-minutes and max-hours must be whole numbers\n')
+  process.exit(64)
+}
 const LIMIT_SECONDS = Number(limitMinutes) * 60
 const MERGED_HOURS = Number(process.env.MERGED_HOURS ?? 3)
 const started = Temporal.Now.instant()
@@ -95,7 +99,7 @@ const checkActivity = async (pr: number): Promise<boolean> => {
   }
   await appendLines(`pr-${pr}-seen`, fresh.map(item => item.id))
   const lines = await Promise.all(fresh.map(async item =>
-    [item.line].concat(item.id.startsWith('review ') ? await reviewCommentLines(pr, item.id.split(' ')[1] ?? '') : [])))
+    [item.line].concat(item.id.startsWith('review ') ? await reviewCommentLines(pr, item.id.split(' ')[1] ?? '').catch(() => []) : [])))
   return sayAndExit([`PR #${pr}: ACTIVITY:`, ...lines.flat()])
 }
 

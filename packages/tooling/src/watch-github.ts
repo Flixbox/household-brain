@@ -145,7 +145,7 @@ export const issueEventLines = async (): Promise<string[]> => {
     gh(['api', `repos/${REPO}/issues/comments?per_page=50&sort=created&direction=desc`]),
   ])
   return [
-    ...records(issues).filter(issue => !('pull_request' in issue) && text(record(issue.user).login) !== SELF)
+    ...records(issues).filter(issue => !issue.pull_request && text(record(issue.user).login) !== SELF)
       .map(issue => `NEW_ISSUE #${count(issue.number)} ${text(issue.title)}`),
     ...records(comments).filter(comment => text(record(comment.user).login) === OWNER && text(comment.html_url).includes('/issues/'))
       .map(comment => `ISSUE_COMMENT ${count(comment.id)} #${text(comment.issue_url).split('/').at(-1) ?? ''}: ${oneLine(comment.body, 300)}`),
@@ -153,7 +153,7 @@ export const issueEventLines = async (): Promise<string[]> => {
 }
 
 export const openIssueNumbers = async (): Promise<number[]> =>
-  (await allPages(`repos/${REPO}/issues?state=open&per_page=100`)).filter(issue => !('pull_request' in issue)).map(issue => count(issue.number))
+  (await allPages(`repos/${REPO}/issues?state=open&per_page=100`)).filter(issue => !issue.pull_request).map(issue => count(issue.number))
 
 export const issueLine = async (issue: number, change: 'closed' | 'reopened'): Promise<string | null> => {
   const value = record(await gh(['api', `repos/${REPO}/issues/${issue}`]))

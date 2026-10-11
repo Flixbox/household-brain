@@ -11,6 +11,7 @@
  *   initialized    set after the first complete round: from then on, a PR is new, and so is all on it
  *   lock           the running watcher's process id: two would race on these files
  */
+import { $ } from 'bun'
 import { REPO } from './watch-github'
 
 const home = process.env.HOME ?? '.'
@@ -23,6 +24,7 @@ export const exists = (name: string): Promise<boolean> => Bun.file(stateFile(nam
 export const readLines = async (name: string): Promise<string[]> =>
   ((await exists(name)) ? (await Bun.file(stateFile(name)).text()).split('\n').filter(Boolean) : [])
 
+/** Bun.write creates the state directory on first use. */
 export const writeLines = async (name: string, lines: readonly string[]): Promise<void> => {
   await Bun.write(stateFile(name), lines.length > 0 ? `${lines.join('\n')}\n` : '')
 }
@@ -39,12 +41,23 @@ const alive = (pid: number) => {
   }
 }
 
-/** One watcher per state directory; exits 75 when another one runs. */
+/**
+ * One watcher per state directory; exits 75 when another one runs. Creating a directory is atomic, so
+ * of two watchers starting at once only one gets it. A lock left by a watcher that died is taken over.
+ */
 export const lock = async (): Promise<void> => {
-  const [holder] = await readLines('lock')
-  if (holder && Number(holder) !== process.pid && alive(Number(holder))) {
-    process.stderr.write(`another watcher already uses ${DIR}\n`)
-    process.exit(75)
+  await $`mkdir -p ${DIR}`.quiet()
+  if ((await $`mkdir ${stateFile('lock.d')}`.quiet().nothrow()).exitCode !== 0) {
+    const [holder] = await readLines('lock.d/pid')
+    if (holder && alive(Number(holder))) {
+      process.stderr.write(`another watcher already uses ${DIR}\n`)
+      process.exit(75)
+    }
   }
-  await writeLines('lock', [String(process.pid)])
+  await writeLines('lock.d/pid', [String(process.pid)])
+  // Synchronously: an exit handler can't wait for anything.
+  process.on('exit', () => Bun.spawnSync(['rm', '-rf', stateFile('lock.d')]))
+  // Stopped by a signal (a timeout, Ctrl-C): exit normally, so the lock above is released too.
+  process.on('SIGTERM', () => process.exit(143))
+  process.on('SIGINT', () => process.exit(130))
 }
