@@ -30,7 +30,8 @@ const sentWithin = (ms: number) => Promise.race([
  */
 const forgetCachedData = async () => {
   await terminate(db)
-  await clearIndexedDbPersistence(db).catch(() => null)
+  // It fails while another tab still holds the cache; the page reloads anyway, and the failure shows.
+  await clearIndexedDbPersistence(db).catch(reportError)
   globalThis.location.reload()
 }
 
@@ -61,6 +62,6 @@ onAuthStateChanged(auth, user => {
   const ended = signedIn && !user && !signingOut
   signedIn = Boolean(user)
   if (ended) {
-    forgetCachedData().catch(() => null)
+    forgetCachedData().catch(reportError)
   }
 })

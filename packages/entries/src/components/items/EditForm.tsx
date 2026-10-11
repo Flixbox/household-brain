@@ -14,7 +14,7 @@ export const EditForm = ({ item, categories }: { item: Item, categories: Categor
   const [, navigate] = useLocation()
   // Fetch Google's latest now; when it arrives, the fields not edited yet follow it (ItemForm).
   useEffect(() => {
-    refreshNow().catch(() => null)
+    refreshNow().catch(reportError)
   }, [])
   const current = draftOf(item)
   const after = (write: Promise<unknown>) => {

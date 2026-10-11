@@ -7,6 +7,7 @@ import { watchDateGate } from './date-outbox'
 import type { Item } from './model'
 import { itemsCollection } from './store'
 import { categoryFrom, householdFrom, itemFrom } from '@household-brain/entries/lib/documents'
+import { ignoreFailure } from '@household-brain/core/lib/ignore'
 
 const PULL_EVERY_MS = 60_000
 
@@ -26,10 +27,7 @@ interface Triggers {
   tokenChanged: () => unknown
 }
 
-const ignore = (): void => {
-  // A listener error ends the listener; the outbox wakes on the other triggers.
-}
-
+// A listener error (signed out, access removed) ends that listener; the outbox wakes on the others.
 const watchFirestore = (triggers: Triggers): (() => void)[] =>
   [
     onSnapshot(query(itemsCollection, orderBy('updatedAt')), { includeMetadataChanges: true }, snapshot => {
@@ -37,14 +35,14 @@ const watchFirestore = (triggers: Triggers): (() => void)[] =>
         snapshot.docs.map(entry => itemFrom(entry.id, entry.data())),
         new Set(snapshot.docs.filter(entry => entry.metadata.hasPendingWrites).map(entry => entry.id)),
       )
-    }, ignore),
+    }, ignoreFailure),
     onSnapshot(query(collection(db, 'categories'), orderBy('sortOrder')), snapshot => {
       triggers.categories(snapshot.docs.map(entry => categoryFrom(entry.id, entry.data())))
-    }, ignore),
+    }, ignoreFailure),
     watchDateGate(triggers.dateGate),
     onSnapshot(doc(db, 'meta', 'config'), snapshot => {
       triggers.config(snapshot.exists() ? householdFrom(snapshot.data()) : null)
-    }, ignore),
+    }, ignoreFailure),
   ]
 
 /**

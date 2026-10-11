@@ -5,6 +5,7 @@ import { type EuroRates, isForeign, ratesOf } from './currency'
 import { withInterval } from './interval'
 import { amountLabel } from './amount'
 import type { Item } from './model'
+import { ignoreFailure } from '@household-brain/core/lib/ignore'
 
 /**
  * Each device fetches the day's euro rates itself, at most once a day and only while an entry uses
@@ -45,11 +46,12 @@ export const refreshEuroRates = async (today: string) => {
 export const usePrice = ({ amount, currency, interval }: Pick<Item, 'amount' | 'currency' | 'interval'>, today: string): string | null => {
   const foreign = isForeign(currency)
   useEffect(() => {
+    // Offline, the last rates keep converting, and the timer tries again.
     if (foreign) {
-      refreshEuroRates(today).catch(() => null)
+      refreshEuroRates(today).catch(ignoreFailure)
     }
     const every = foreign ? setInterval(() => {
-      refreshEuroRates(today).catch(() => null)
+      refreshEuroRates(today).catch(ignoreFailure)
     }, RETRY_MS) : null
     return () => {
       if (every) {

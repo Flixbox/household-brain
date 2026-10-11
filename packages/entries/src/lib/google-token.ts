@@ -12,6 +12,7 @@
 // hand instead (README).
 import { persistentJSON } from '@nanostores/persistent'
 import { holdUpdatesWhile } from './update-hold'
+import { ignoreFailure } from '@household-brain/core/lib/ignore'
 
 const GIS_SCRIPT = 'https://accounts.google.com/gsi/client'
 const CALENDAR = 'https://www.googleapis.com/auth/calendar'
@@ -197,6 +198,7 @@ export const revokeCalendarToken = () => {
   const token = $calendarToken.get()
   forgetCalendarToken()
   if (token) {
-    fetch(REVOKE_URL, { body: new URLSearchParams({ token: token.value }), keepalive: true, method: 'POST' }).catch(() => null)
+    // An unrevoked token still runs out within the hour, and sign-out goes on either way.
+    fetch(REVOKE_URL, { body: new URLSearchParams({ token: token.value }), keepalive: true, method: 'POST' }).catch(ignoreFailure)
   }
 }

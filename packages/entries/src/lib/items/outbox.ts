@@ -1,3 +1,4 @@
+/* oxlint-disable import/max-dependencies -- the outbox is where token, pushing, pulling, triggers and state meet */
 import { auth } from '@household-brain/firebase/firebase'
 import { MEMBER_SCOPES, calendarToken, hasCalendarToken, loadGis } from '@household-brain/entries/lib/google-token'
 import type { Item } from './model'
@@ -9,6 +10,8 @@ import { isTransient } from './transient'
 import { $outbox } from './outbox-state'
 import { watchOutboxTriggers } from './outbox-triggers'
 import { forgetDateWork, nextDateWork, runDateWork } from './date-outbox'
+import { ignoreFailure } from '@household-brain/core/lib/ignore'
+
 /**
  * The outbox: pushes pending entries to Google Calendar one at a time while a Calendar token is
  * available. Asking Google for a token needs a click, so the outbox never asks itself: without a
@@ -201,8 +204,6 @@ const continueAfterStep = async (): Promise<void> => {
   }
 }
 
-const ignore = () => null
-
 const watch = (): (() => void)[] =>
   watchOutboxTriggers({
     categories: categories => {
@@ -258,7 +259,7 @@ const reset = () => {
 /** Starts watching for pending entries; returns the function that stops it. */
 export const startOutbox = (): () => void => {
   // Load Google's script now, so the consent window opens instantly when Save or "Sync now" is clicked.
-  loadGis().catch(ignore)
+  loadGis().catch(ignoreFailure)
   const stops = [...watch(), reset]
   return () => {
     for (const stop of stops) {
@@ -272,7 +273,8 @@ export const requestSyncAccess = (): void => {
   calendarToken(MEMBER_SCOPES, auth.currentUser?.email).then(() => {
     pausedUntil = 0
     return run(true)
-  }, ignore)
+    // Consent refused or its window closed: the Sync bar keeps offering the click.
+  }, ignoreFailure)
 }
 
 /** "Sync now": gets Google access (call it from a click) and pushes everything waiting. */
