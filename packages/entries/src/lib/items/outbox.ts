@@ -259,6 +259,7 @@ const reset = () => {
 /** Starts watching for pending entries; returns the function that stops it. */
 export const startOutbox = (): () => void => {
   // Load Google's script now, so the consent window opens instantly when Save or "Sync now" is clicked.
+  // Preloading is best effort: a failure comes back, with its message, on the click that needs it.
   loadGis().catch(ignoreFailure)
   const stops = [...watch(), reset]
   return () => {

@@ -26,6 +26,8 @@ export const watchDefaultCategories = (): () => void =>
       pruneCollapsed(categories.map(category => category.slug))
     }
     const missing = missingDefaults(categories)
+    // A failed write or a listener error (signed out, access removed) loses nothing: the next start
+    // compares the categories again and adds what is still missing.
     if (missing.length > 0) {
       firestoreHouseholdStore.saveCategories(missing).catch(ignoreFailure)
     }

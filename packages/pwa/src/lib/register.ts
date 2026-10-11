@@ -45,7 +45,13 @@ export const startServiceWorker = () => {
     if (registration) {
       watchForUpdates(registration)
     }
-  }).catch(reportError)
+  }).catch((error: unknown) => {
+    // Offline, registering can fail as a matter of course, and the next start registers again. Online,
+    // a failure means the app silently stops working offline, so it shows.
+    if (navigator.onLine) {
+      reportError(error)
+    }
+  })
 }
 
 /** Lets the waiting version take over, then reloads the page into it. */
