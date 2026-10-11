@@ -19,7 +19,6 @@ export const NewItem = () => {
     requestSyncAccess()
     addItem(draft, dates).written.catch(reportWriteFailure)
     navigate(paths.home)
-    return Promise.resolve()
   }
   return (
     <section className="space-y-6">

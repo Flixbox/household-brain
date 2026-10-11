@@ -54,8 +54,8 @@ export const watchOutboxTriggers = (triggers: Triggers): (() => void)[] => {
   return [
     ...watchFirestore(triggers),
     $calendarToken.listen(() => triggers.tokenChanged()),
-    () => globalThis.removeEventListener('online', triggers.online),
-    () => document.removeEventListener('visibilitychange', pullIfVisible),
-    () => clearInterval(every),
+    () => { globalThis.removeEventListener('online', triggers.online) },
+    () => { document.removeEventListener('visibilitychange', pullIfVisible) },
+    () => { clearInterval(every) },
   ]
 }

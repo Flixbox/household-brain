@@ -26,7 +26,7 @@ export const CategorySection = ({ category, items, collapsed, foldable = true }:
                 type="button"
                 aria-expanded={!collapsed}
                 aria-controls={listId}
-                onClick={() => toggleCollapsed(category.slug)}
+                onClick={() => { toggleCollapsed(category.slug) }}
                 className="flex w-full items-baseline gap-2 text-left"
               >
                 <span aria-hidden="true" className={`inline-block text-sm text-stone-500 transition-transform ${collapsed ? '-rotate-90' : ''}`}>▾</span>

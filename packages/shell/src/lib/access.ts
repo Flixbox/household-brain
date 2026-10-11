@@ -39,7 +39,7 @@ export const useAccess = (): Access => {
             setAccess({ state: 'denied', user })
           }
         },
-        error => setAccess({ message: error.message, state: 'error', user }),
+        error => { setAccess({ message: error.message, state: 'error', user }) },
       )
     })
     return () => {

@@ -9,4 +9,4 @@ import { auth } from '@household-brain/firebase/firebase'
  */
 export const $user = atom<User | null>(auth.currentUser)
 
-onMount($user, () => onAuthStateChanged(auth, user => $user.set(user)))
+onMount($user, () => onAuthStateChanged(auth, user => { $user.set(user) }))

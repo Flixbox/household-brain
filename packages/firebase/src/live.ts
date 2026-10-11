@@ -33,7 +33,7 @@ export const liveStore = <Value>(subscribe: Subscribe<Value>): ReadableAtom<Live
     let stop: (() => void) | null = null
     let retry: ReturnType<typeof setTimeout> | null = null
     const start = () => {
-      stop = subscribe(data => $store.set({ data, state: 'ready' }), error => {
+      stop = subscribe(data => { $store.set({ data, state: 'ready' }) }, error => {
         // Nobody reads it any more, e.g. right after sign-out, when the rules refuse the listener
         // that is still running for the short unmount delay: nothing to report.
         if ($store.lc === 0) {
@@ -59,11 +59,11 @@ export const liveStore = <Value>(subscribe: Subscribe<Value>): ReadableAtom<Live
 
 /** The documents of a query, live, each read by `read` from its id and data. */
 export const queryStore = <Value>(query: Query, read: (id: string, data: DocumentData) => Value) =>
-  liveStore<Value[]>((next, fail) => onSnapshot(query, snapshot => next(snapshot.docs.map(entry => read(entry.id, entry.data()))), fail))
+  liveStore<Value[]>((next, fail) => onSnapshot(query, snapshot => { next(snapshot.docs.map(entry => read(entry.id, entry.data()))) }, fail))
 
 /** One document, live, read by `read`; null while it doesn't exist (or `read` finds nothing usable). */
 export const docStore = <Value>(ref: DocumentReference, read: (data: DocumentData) => Value | null) =>
-  liveStore<Value | null>((next, fail) => onSnapshot(ref, snapshot => next(snapshot.exists() ? read(snapshot.data()) : null), fail))
+  liveStore<Value | null>((next, fail) => onSnapshot(ref, snapshot => { next(snapshot.exists() ? read(snapshot.data()) : null) }, fail))
 
 /** The data once it is there, else null (loading, or the listener failed). */
 export const dataOf = <Value>(live: Live<Value>): Value | null => (live.state === 'ready' ? live.data : null)

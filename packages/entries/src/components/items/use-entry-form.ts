@@ -25,7 +25,7 @@ export const useEntryForm = (initial: ItemDraft, { editing, initialDates }: { ed
     setSeen(initial)
     setForm(followUntouched(form, initial))
   }
-  const set = (field: EditableField) => (event: { target: { value: string } }) => setForm(current => editField(current, field, event.target.value))
+  const set = (field: EditableField) => (event: { target: { value: string } }) => { setForm(current => editField(current, field, event.target.value)) }
   const gates = useFieldGates(initial, editing)
   const dates = useEntryDates(initialDates)
   const saved = {

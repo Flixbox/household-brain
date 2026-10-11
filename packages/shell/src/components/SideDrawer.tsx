@@ -45,7 +45,7 @@ export const SideDrawer = ({ children }: { children: ReactNode }) => {
           className={`${item} mt-auto`}
           onClick={() => {
             closeMenu()
-            return signOutOfApp()
+            signOutOfApp().catch(reportError)
           }}
         >
           Sign out

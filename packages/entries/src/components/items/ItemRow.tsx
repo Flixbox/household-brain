@@ -23,7 +23,7 @@ export const ItemRow = ({ item, category }: { item: Item, category?: string }) =
   const more = item.status === 'open' && extraDatesOf(item).length > 0 ? ' + more' : ''
   const since = startLabel(item.startDate, now)
   const price = usePrice(item, now.toPlainDate().toString())
-  const { handlers, offset } = useSwipeToDone(() => markDone(item), item.status === 'open')
+  const { handlers, offset } = useSwipeToDone(() => { markDone(item) }, item.status === 'open')
   return (
     // The green "Done" shows behind the row while it is swiped.
     <li className="relative overflow-hidden rounded-lg">

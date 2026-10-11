@@ -89,8 +89,8 @@ export const loadGis = (): Promise<void> => {
     const script = document.createElement('script')
     script.src = GIS_SCRIPT
     script.async = true
-    script.addEventListener('load', () => resolve())
-    script.addEventListener('error', () => reject(new Error('Could not load Google sign-in')))
+    script.addEventListener('load', () => { resolve() })
+    script.addEventListener('error', () => { reject(new Error('Could not load Google sign-in')) })
     document.head.append(script)
   })
   return gisLoaded
@@ -108,7 +108,7 @@ const requestToken = (scopes: readonly string[], hint?: string | null): Promise<
     oauth2.initTokenClient({
       callback: resolve,
       client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-      error_callback: error => reject(new Error(popupProblem(error))),
+      error_callback: error => { reject(new Error(popupProblem(error))) },
       ...(hint ? { hint } : {}),
       include_granted_scopes: true,
       scope: scopes.join(' '),

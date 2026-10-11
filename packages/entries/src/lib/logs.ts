@@ -29,9 +29,9 @@ const writeLog = (kind: Log['kind'], { message, itemId, detail }: { message: str
 }
 
 /** `detail` is what the row shows when opened: which fields changed, what Google answered. */
-export const logEvent = (message: string, itemId?: string, detail?: string): void => writeLog('event', { detail, itemId, message })
+export const logEvent = (message: string, itemId?: string, detail?: string): void => { writeLog('event', { detail, itemId, message }) }
 
-export const logError = (message: string, itemId?: string, detail?: string): void => writeLog('error', { detail, itemId, message })
+export const logError = (message: string, itemId?: string, detail?: string): void => { writeLog('error', { detail, itemId, message }) }
 
 const failing = new Set<string>()
 
@@ -51,8 +51,9 @@ export const logRecovered = (key: string): void => {
 }
 
 /** An entry Google Calendar added, changed or removed, as a pull took it in. */
-export const logGoogleChange = (action: string, title: string, { itemId, changed = [] }: { itemId: string, changed?: readonly string[] }): void =>
+export const logGoogleChange = (action: string, title: string, { itemId, changed = [] }: { itemId: string, changed?: readonly string[] }): void => {
   logEvent(`${entryLogMessage(action, title)} from Google Calendar`, itemId, changedDetail(changed))
+}
 
 // An Instant has no calendar, so the 90 days are counted in hours.
 const pruneCutoff = (): Timestamp => Timestamp.fromMillis(Temporal.Now.instant().subtract({ hours: 24 * 90 }).epochMilliseconds)
