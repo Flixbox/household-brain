@@ -204,7 +204,8 @@ test('without Google access an entry waits, "Sync now" sends it, and a reload ke
     // The first token request fails, as when Google's window is closed; later ones succeed.
     const original = window.google?.accounts.oauth2
     if (!original) {
-      return
+      // Fail instead of quietly testing nothing: this patches the Google mock (mockGoogle above).
+      throw new Error('The Google mock is not in place yet')
     }
     const realInit = original.initTokenClient
     let refused = false
