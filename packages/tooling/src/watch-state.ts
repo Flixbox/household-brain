@@ -56,8 +56,8 @@ export const lock = async (): Promise<void> => {
   }
   await writeLines('lock.d/pid', [String(process.pid)])
   // Synchronously: an exit handler can't wait for anything.
-  process.on('exit', () => Bun.spawnSync(['rm', '-rf', stateFile('lock.d')]))
+  process.on('exit', () => { Bun.spawnSync(['rm', '-rf', stateFile('lock.d')]) })
   // Stopped by a signal (a timeout, Ctrl-C): exit normally, so the lock above is released too.
-  process.on('SIGTERM', () => process.exit(143))
-  process.on('SIGINT', () => process.exit(130))
+  process.on('SIGTERM', () => { process.exit(143) })
+  process.on('SIGINT', () => { process.exit(130) })
 }

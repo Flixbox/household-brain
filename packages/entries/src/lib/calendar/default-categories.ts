@@ -5,7 +5,9 @@ import { firestoreHouseholdStore } from './store'
 import { pruneCollapsed } from '@household-brain/entries/lib/items/collapsed'
 import { categoryFrom } from '@household-brain/entries/lib/documents'
 
-const ignore = () => null
+const ignore = (): void => {
+  // The defaults are added on a later start instead.
+}
 
 /**
  * Keeps this device in line with the household's categories, acting only on the server's answer

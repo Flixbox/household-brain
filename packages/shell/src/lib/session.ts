@@ -9,7 +9,7 @@ const handlers = new Set<() => void>()
 /** Runs `handler` whenever someone signs out of the app. Returns the function that unregisters it. */
 export const onSignOut = (handler: () => void): () => void => {
   handlers.add(handler)
-  return () => handlers.delete(handler)
+  return () => { handlers.delete(handler) }
 }
 
 /** How long sign-out waits for changes still on their way to the server; offline, they can't arrive. */

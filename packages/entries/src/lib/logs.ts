@@ -66,7 +66,7 @@ export const pruneOldLogs = (): void => {
   getDocs(query(logsCollection, where('at', '<', pruneCutoff()), limit(LOG_LIMIT)))
     .then(snapshot => {
       const batch = writeBatch(db)
-      snapshot.docs.forEach(entry => batch.delete(entry.ref))
+      snapshot.docs.forEach(entry => { batch.delete(entry.ref) })
       return snapshot.empty ? null : batch.commit()
     })
     .catch(() => null)
