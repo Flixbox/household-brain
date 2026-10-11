@@ -1,4 +1,5 @@
 import type { Page, Route } from '@playwright/test'
+import { recordOf, textOf } from '@household-brain/core/lib/read'
 
 interface CalendarRequest {
   method: string
@@ -71,17 +72,17 @@ export const mockGoogle = async (page: Page, calendarId = 'household@group.calen
     if (request.method() === 'GET' && path === '/users/me/calendarList') {
       await reply(route, 200, { items: [] })
     } else if (request.method() === 'POST' && path === '/calendars') {
-      await reply(route, 200, { id: calendarId, ...body as object })
+      await reply(route, 200, { id: calendarId, ...recordOf(body) })
     } else if (request.method() === 'GET' && path.startsWith(listPrefix)) {
       const entry = calendarList.get(path.slice(listPrefix.length))
       await (entry ? reply(route, 200, entry) : reply(route, 404, { error: { message: 'Not Found' } }))
     } else if (request.method() === 'POST' && path === '/users/me/calendarList') {
-      const entry = body as { id: string }
+      const entry = { ...recordOf(body), id: textOf(recordOf(body).id) }
       calendarList.set(entry.id, entry)
       await reply(route, 200, entry)
     } else if (request.method() === 'PATCH' && path.startsWith(listPrefix)) {
       const id = path.slice(listPrefix.length)
-      calendarList.set(id, { ...calendarList.get(id), ...body as object })
+      calendarList.set(id, { ...calendarList.get(id), ...recordOf(body) })
       await reply(route, 200, calendarList.get(id))
     } else if (path.includes('/events')) {
       await handleEvent({ body, events, latest: () => version, listing, path, reply: (status, json) => reply(route, status, json), request, stored })
@@ -122,7 +123,7 @@ export const mockGoogle = async (page: Page, calendarId = 'household@group.calen
         await reply(route, 404, { error: { message: 'Not Found' } })
         return
       }
-      const completed = { ...task, ...body as object, status: 'completed' }
+      const completed = { ...task, ...recordOf(body), status: 'completed' }
       list.set(taskId, completed)
       await reply(route, 200, completed)
       return
@@ -202,8 +203,8 @@ const handleEvent = async ({ request, path, body, events, latest, listing, store
   const existing = reachable ? found : null
   const method = request.method()
   if (method === 'POST') {
-    const { id } = body as { id: string }
-    await (events.has(id) ? reply(409, { error: { message: 'duplicate' } }) : reply(200, stored(id, body as object)))
+    const id = textOf(recordOf(body).id)
+    await (events.has(id) ? reply(409, { error: { message: 'duplicate' } }) : reply(200, stored(id, recordOf(body))))
   } else if (!existing) {
     await reply(404, { error: { message: 'Not Found' } })
   } else if (method === 'GET') {
@@ -214,7 +215,7 @@ const handleEvent = async ({ request, path, body, events, latest, listing, store
       await reply(412, { error: { message: 'Precondition Failed' } })
       return
     }
-    const next = patched(existing, body as Record<string, unknown>)
+    const next = patched(existing, recordOf(body))
     const invalid = invalidEvent(next)
     await (invalid ? reply(400, { error: { message: invalid } }) : reply(200, stored(eventId, next)))
   } else {
@@ -242,12 +243,12 @@ const patched = (existing: Record<string, unknown>, changes: Record<string, unkn
 
 /** The two combinations Google rejects, which normalisation must avoid. */
 const invalidEvent = (event: Record<string, unknown>): string | null => {
-  const start = event.start as Record<string, unknown> | undefined
-  const reminders = event.reminders as { useDefault?: boolean, overrides?: unknown[] } | undefined
-  if (start?.date && start.dateTime) {
+  const start = recordOf(event.start)
+  const reminders = recordOf(event.reminders)
+  if (start.date && start.dateTime) {
     return 'Invalid start time: both date and dateTime'
   }
-  if (reminders?.useDefault && (reminders.overrides?.length ?? 0) > 0) {
+  if (reminders.useDefault && Array.isArray(reminders.overrides) && reminders.overrides.length > 0) {
     return 'Cannot specify both default reminders and overrides at the same time.'
   }
   return null

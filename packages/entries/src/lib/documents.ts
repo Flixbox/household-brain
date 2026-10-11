@@ -4,16 +4,13 @@ import { type HouseholdConfig, TIME_ZONE } from './calendar/setup'
 import type { EntryDate } from './items/dates'
 import { type DateEventRecord, EDITABLE_FIELDS, type EditableField, type Item } from './items/model'
 import { intervalFrom } from './items/interval'
-import { isRecord, textOf } from '@household-brain/core/lib/read'
+import { isRecord, textMapOf, textOf } from '@household-brain/core/lib/read'
 
 /**
  * Firestore documents read into the app's types (#68). Field by field, with a fallback for anything
  * missing or of the wrong type: older app versions wrote fewer fields, and a stray document must
  * not take a screen down. Optional fields stay absent when the document has none.
  */
-
-const textMap = (value: unknown): Record<string, string> =>
-  (isRecord(value) ? Object.fromEntries(Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === 'string')) : {})
 
 const isEditableField = (value: unknown): value is EditableField => EDITABLE_FIELDS.some(field => field === value)
 
@@ -66,7 +63,7 @@ export const itemFrom = (id: string, data: DocumentData): Item => ({
   currency: textOf(data.currency),
   dirty: Array.isArray(data.dirty) ? data.dirty.filter(isEditableField) : [],
   dueDate: textOf(data.dueDate),
-  etags: textMap(data.etags),
+  etags: textMapOf(data.etags),
   id,
   interval: intervalFrom(data.interval),
   notes: textOf(data.notes),

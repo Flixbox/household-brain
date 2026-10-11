@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'bun:test'
 import type { Item } from './model'
 import { errorFor, recordFor } from './record'
+import { testItem } from './test-item'
 
-const pushed = { etags: {}, id: 'evt1', rev: 'r1' } as unknown as Item
+const pushed: Item = { ...testItem, etags: {}, id: 'evt1', rev: 'r1' }
 
 describe('recordFor', () => {
   it('marks an unchanged entry synced and stores the etag for this user', () => {

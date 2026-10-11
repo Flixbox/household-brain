@@ -2,6 +2,7 @@ import { type Page, expect, test } from '@playwright/test'
 import { allowlist, readDocument, resetEmulators, seedDocument } from './emulators'
 import { mockGoogle } from './google-mocks'
 import { openMenu, signInAllowlisted, signInAs, signOutWith } from './session'
+import { recordOf, textMapOf } from '@household-brain/core/lib/read'
 
 const CALENDAR = 'household@group.calendar.google.test'
 
@@ -179,7 +180,7 @@ test('edits racing Google Calendar: a waiting edit, a conflict, an open form cat
 
     // Google: someone moves the date and gives it a reminder a week ahead. Here: the code is edited,
     // which pulls first, then pushes.
-    const written = (byId(id)?.extendedProperties as { private?: Record<string, string> } | undefined)?.private ?? {}
+    const written = textMapOf(recordOf(byId(id)?.extendedProperties).private)
     google.edit(id, {
       end: { dateTime: '2026-12-27T17:15:00', timeZone: 'Europe/Berlin' },
       extendedProperties: { private: { ...written, 'hb.reminders': '10080' } },
@@ -210,7 +211,7 @@ test('edits racing Google Calendar: a waiting edit, a conflict, an open form cat
     if (!event) {
       throw new Error('The entry never reached Google')
     }
-    const { private: properties } = event.extendedProperties as { private: Record<string, string> }
+    const properties = textMapOf(recordOf(event.extendedProperties).private)
 
     // Someone changes the link in Google; this device doesn't hear of it (its reads fail), so it edits
     // the code on an outdated copy, and Google answers the first try with a conflict.
@@ -220,7 +221,7 @@ test('edits racing Google Calendar: a waiting edit, a conflict, an open form cat
     await page.getByLabel('Code').fill('NEW20')
     await page.getByRole('button', { name: 'Save' }).click()
 
-    await expect.poll(() => (byId(String(event.id))?.extendedProperties as { private: Record<string, string> } | undefined)?.private)
+    await expect.poll(() => textMapOf(recordOf(byId(String(event.id))?.extendedProperties).private))
       .toMatchObject({ 'hb.code': 'NEW20', 'hb.url': 'https://elsewhere.household-brain.test' })
     google.refuseListings(false)
   })
@@ -238,7 +239,7 @@ test('edits racing Google Calendar: a waiting edit, a conflict, an open form cat
     }
 
     // Someone changes the code in Google; nothing tells this device until it pulls.
-    const { private: properties } = event.extendedProperties as { private: Record<string, string> }
+    const properties = textMapOf(recordOf(event.extendedProperties).private)
     google.edit(String(event.id), { extendedProperties: { private: { ...properties, 'hb.code': 'NEW20' } } })
     await page.getByRole('region', { name: 'Coupon' }).getByRole('link', { name: /Bakery/u }).click()
     await expect(page.getByLabel('Code')).toHaveValue('NEW20')

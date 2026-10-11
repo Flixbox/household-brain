@@ -1,3 +1,5 @@
+import { recordOf } from '@household-brain/core/lib/read'
+
 const PROJECT = 'demo-household-brain'
 const FIRESTORE = 'http://127.0.0.1:8080'
 const AUTH = 'http://127.0.0.1:9099'
@@ -60,5 +62,5 @@ export const readDocument = async (path: string): Promise<Record<string, unknown
   if (response.status === 404) {
     return null
   }
-  return ((await response.json()) as { fields: Record<string, unknown> }).fields
+  return recordOf(recordOf(await response.json()).fields)
 }
