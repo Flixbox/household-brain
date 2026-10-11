@@ -19,8 +19,14 @@ export const signOutWith = async (page: Page, button: Locator) => {
   await expect(page.getByRole('button', { name: 'Sign in with Google' })).toBeVisible()
 }
 
-/** Signs in through the emulator-only hook, without the Google popup. */
-export const signInAs = (page: Page, email: string) => page.evaluate(address => window.e2eSignIn(address), email)
+/**
+ * Signs in through the emulator-only hook, without the Google popup. The app loads after the page
+ * (main.tsx checks for Temporal first), so the hook may not be there yet.
+ */
+export const signInAs = async (page: Page, email: string) => {
+  await page.waitForFunction(() => typeof window.e2eSignIn === 'function')
+  return page.evaluate(address => window.e2eSignIn(address), email)
+}
 
 /** Signs in, reads the user id from the no-access screen, allowlists it, and waits until access is granted. */
 export const signInAllowlisted = async (page: Page, email: string): Promise<string> => {

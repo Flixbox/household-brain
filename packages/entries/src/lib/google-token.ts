@@ -11,7 +11,6 @@
 // once, to create the household calendar. Sharing it would need `calendar.acls`, so it is done by
 // hand instead (README).
 import { persistentJSON } from '@nanostores/persistent'
-import { Temporal } from 'temporal-polyfill'
 import { holdUpdatesWhile } from './update-hold'
 
 const GIS_SCRIPT = 'https://accounts.google.com/gsi/client'
@@ -79,7 +78,7 @@ let gisLoaded: Promise<void> | null = null
 /**
  * Loads the Google Identity Services script. Settings calls this on mount so that, when a button is
  * clicked, the consent popup opens straight away: a popup opened too long after the click is
- * blocked, especially on iOS Safari.
+ * blocked.
  */
 export const loadGis = (): Promise<void> => {
   if (window.google?.accounts.oauth2) {

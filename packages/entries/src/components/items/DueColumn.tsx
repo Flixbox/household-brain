@@ -1,4 +1,3 @@
-import type { Temporal } from 'temporal-polyfill'
 import type { Item } from '@household-brain/entries/lib/items/model'
 import { type Urgency, rowDue } from '@household-brain/entries/lib/items/due'
 import type { EntryDate } from '@household-brain/entries/lib/items/dates'

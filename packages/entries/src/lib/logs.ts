@@ -1,6 +1,5 @@
 import { Timestamp, addDoc, collection, getDocs, limit, orderBy, query, serverTimestamp, where, writeBatch } from 'firebase/firestore'
 import { useStore } from '@nanostores/react'
-import { Temporal } from 'temporal-polyfill'
 import { auth, db } from '@household-brain/firebase/firebase'
 import { dataOf, queryStore } from '@household-brain/firebase/live'
 import { type Log, logFrom } from '@household-brain/entries/lib/documents'

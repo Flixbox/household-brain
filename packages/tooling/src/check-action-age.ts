@@ -7,7 +7,6 @@
  *   bun packages/tooling/src/check-action-age.ts [min-hours=48]    from the repository root; GH_TOKEN reads public repos
  */
 import { Glob } from 'bun'
-import { Temporal } from 'temporal-polyfill'
 import { hoursSince, tooYoung } from './age'
 import { pinnedActions } from './pins'
 

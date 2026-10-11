@@ -29,7 +29,6 @@
  * Run it in the background: its exit is the notification. Bun reads the whole file before running
  * it, so editing the checkout meanwhile is harmless.
  */
-import { Temporal } from 'temporal-polyfill'
 import { type Activity, type Event, FOLLOW_NEWER, cancelledDeployEvent, issueKey, listsOpenPrs, mainRunEvent, newActivity, openPrLines, runEvent } from './watch-events'
 import { type PrState, REPO, activityOf, issueEventLines, issueLine, jobLines, mainAhead, mainHead, newestMainRun, openIssueNumbers, openPrs, prState, recentlyMerged, reviewCommentLines, runOf } from './watch-github'
 import { appendLines, exists, lock, readLines, writeLines } from './watch-state'

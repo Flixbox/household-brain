@@ -1,4 +1,3 @@
-import { Temporal } from 'temporal-polyfill'
 
 /**
  * Whether something published at `published` is younger than `minimumSeconds` at `now`: the 48-hour

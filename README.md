@@ -16,7 +16,7 @@ history live in the GitHub issues.
 
 ```sh
 bun install
-bun run dev               # Bun dev server on http://localhost:5173, reloads on every change
+bun run dev               # Bun dev server on http://localhost:5173, with hot reloading
 bun run lint              # oxlint, npm-package-json-lint, fallow (Nx, cached); bun run lint:fix fixes what it can
 bun run typecheck && bun run test
 bun run build             # apps/web/dist
@@ -29,7 +29,7 @@ bun run emulators         # emulators only, to iterate on bun run test:rules or 
 ```sh
 curl -fsSL https://bun.sh/install | bash -s bun-v1.4.2   # the version in package.json (packageManager); no Node needed
 brew install openjdk@21                            # the Firestore emulator needs Java 21
-bun --bun playwright install chromium webkit        # e2e runs desktop Chrome, Pixel 9 and iPhone 17
+bun --bun playwright install chromium webkit        # e2e runs desktop Chrome and Pixel 9; the iPhone 17 checks the Safari notice
 brew install --cask gcloud-cli && gcloud init      # only for the one-time Google Cloud setup below
 ```
 
@@ -68,7 +68,7 @@ The Firebase project is a Google Cloud project; everything below happens in it.
 
 **Firebase**
 - Authentication: enable the Google provider. `authDomain` is `<project>.web.app`, the origin the app
-  is served from, so sign-in works in iOS home-screen apps.
+  is served from, so sign-in doesn't depend on another site's storage, which browsers partition.
 - Firestore: the rules in `firestore.rules` let only allowlisted accounts in. **Allowlist each
   person** by creating `allowlist/<uid>` in the console (the uid is under Authentication → Users after
   their first sign-in; copy it from there). The app itself can never write the allowlist.

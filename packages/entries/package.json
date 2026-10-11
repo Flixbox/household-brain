@@ -20,7 +20,6 @@
     "firebase": "13.0.0",
     "nanostores": "1.5.5",
     "react": "19.3.0",
-    "temporal-polyfill": "1.0.5",
     "wouter": "3.13.0"
   }
 }

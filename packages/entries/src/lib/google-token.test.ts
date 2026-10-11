@@ -1,5 +1,4 @@
 import { cleanTestStorage, getTestStorage, useTestStorageEngine } from '@nanostores/persistent'
-import { Temporal } from 'temporal-polyfill'
 import { afterEach, describe, expect, it, mock, spyOn } from 'bun:test'
 import { $calendarToken, MEMBER_SCOPES, OWNER_SCOPES, TASKS_SCOPE, acceptToken, forgetCalendarToken, hasCalendarToken, revokeCalendarToken } from './google-token'
 import { stringify } from '@household-brain/core/lib/stringify'

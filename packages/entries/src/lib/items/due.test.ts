@@ -1,4 +1,3 @@
-import { Temporal } from 'temporal-polyfill'
 import { describe, expect, it } from 'bun:test'
 import { dueStatus, rowDue, startLabel } from './due'
 

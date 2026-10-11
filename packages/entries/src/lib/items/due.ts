@@ -1,4 +1,3 @@
-import { Temporal } from 'temporal-polyfill'
 
 /** Every entry is due at this time of day, in the household's time zone. */
 const DUE_TIME = Temporal.PlainTime.from('17:00')

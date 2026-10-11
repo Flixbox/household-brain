@@ -11,7 +11,7 @@
   ],
   "packageManager": "bun@1.4.2",
   "scripts": {
-    "dev": "bun run --filter @household-brain/web dev",
+    "dev": "bun --env-file=apps/web/.env.production --env-file=apps/web/.env.production.local apps/web/dev.ts",
     "build": "nx run @household-brain/web:build",
     "lint": "nx run-many -t lint:oxlint lint:packages lint:fallow",
     "lint:oxlint": "oxlint --max-warnings=0",
