@@ -3,6 +3,7 @@
   "compilerOptions": {
     // The service worker runs in a worker, not a page.
     "lib": ["ES2023", "WebWorker"],
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.sw.tsbuildinfo",
     "types": []
   },
   "include": ["src/sw.ts"]

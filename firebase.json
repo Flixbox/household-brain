@@ -1,4 +1,5 @@
 {
+  "$schema": "./node_modules/firebase-tools/schema/firebase-config.json",
   "firestore": {
     "database": "(default)",
     "rules": "firestore.rules",

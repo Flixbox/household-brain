@@ -294,13 +294,13 @@ adapted to this repository:
 - **Example and test domains use the reserved `.test` TLD** (`owner@household-brain.test`), never
   `example.com` or a real-looking host.
 - **oxlint lints with type information** (`--type-aware`, `oxlint-tsgolint`, #167); the type-aware rules
-  still off are listed in `.oxlintrc.json` and get turned on with their fixes in #168.
+  still off are listed in `oxlint.config.ts` and get turned on with their fixes in #168.
 - **oxlint runs every category as an error.** A rule switched off for **one file** is switched off at
   the top of that file, for the whole file, with a short reason (owner's rule, #181):
   `/* oxlint-disable import/no-nodejs-modules -- a build step: runs on Bun at build time */`. Never
   for a single line, never without the reason; `bun run lint` reports a disable comment that no
   longer turns anything off. A rule off for a whole kind of file (every test, every e2e spec, every
-  config) or for the whole repository stays in `.oxlintrc.json`, with its reason as a comment.
+  config) or for the whole repository stays in `oxlint.config.ts`, with its reason as a comment.
   Before switching a rule on, search the file for it: a rule already listed as `"off"` further down wins (the last duplicate key in
   JSON counts), and the new entry silently does nothing. Prove a new rule with a file that breaks it.
 - **Every dependency is pinned exactly** (`install.exact` in `bunfig.toml`, enforced by
@@ -327,8 +327,9 @@ adapted to this repository:
 - **Never use the `pull_request_target` or `workflow_run` triggers** (both run code with the base
   repository's privileges), and never add self-hosted runners to this public repo.
 - **One TypeScript config to change: `tsconfig.base.json`** (#79). Every tsconfig that compiles files
-  extends it and adds only its own `types`, `jsx`, `include` and build-info files (the solution file
-  `apps/web/tsconfig.json` only lists references); a compiler option all projects share
+  extends it and adds only its own `types`, `jsx`, `include` and build-info files (the solution files
+  `apps/web/tsconfig.json` and `packages/pwa/tsconfig.json` only list references, checked with
+  `tsc -b`; the type-aware lint follows those references too); a compiler option all projects share
   goes into the base. It is an Nx input of every project (`sharedGlobals` in `nx.json`), so changing
   it reruns their typecheck and tests instead of serving them from the cache.
 - **The e2e journeys are a cached Nx task** (#71): `@nx/playwright` infers it as `playwright` (not
@@ -401,8 +402,15 @@ adapted to this repository:
 - Run tasks through Nx at the root: `bun run typecheck`, `bun run test` (`nx run-many`), `bun run build`
   (`nx run @household-brain/web:build`). Nx caches results, so unchanged projects are skipped.
 
-- **oxlint loads `@stylistic/eslint-plugin` through `jsPlugins`.** There is no ESLint here.
-  `.oxlintrc.json` is JSONC, so each disabled rule carries its reason as a comment.
+- **oxlint loads `@stylistic/eslint-plugin` through `jsPlugins`.** There is no ESLint here. Its
+  config is `oxlint.config.ts` (`defineConfig`, found by oxlint without `-c`), so each disabled
+  rule carries its reason as a comment, and its own settings (`maxWarnings`, unused disable
+  comments) live in its `options`, not in the script.
+- **A tool's options go into its config file, not into the `package.json` script** (owner's rule,
+  #183); a script keeps only what the tool can't read from config (env files, file lists, our own
+  scripts' arguments). **Prefer a typed config:** a `.config.ts` where the tool reads one, else a
+  JSON/JSONC file with its `$schema` (`firebase.json`, `nx.json`, `.fallowrc.jsonc`). A package
+  without tests has no `test` script, rather than `--pass-with-no-tests`.
 - **npm-package-json-lint only auto-discovers `.js`/`.json` configs.** `bun run lint` passes
   `-c npmpackagejsonlint.config.ts`. Bun loads that file as an ES module, so `rules` must be a
   named export: a default export arrives wrapped as `{ default }` and reads as an empty config.

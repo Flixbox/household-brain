@@ -1,8 +1,9 @@
 {
-  "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "types": ["bun"]
-  },
-  "include": ["src"],
-  "exclude": ["src/sw.ts"]
+  // The page-side code and the service worker need different types (the page's or the worker's),
+  // so each has its own config, checked together with `tsc -b`.
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.lib.json" },
+    { "path": "./tsconfig.sw.json" }
+  ]
 }
