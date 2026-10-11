@@ -24,10 +24,6 @@
   },
   "rules": {
     // Type-aware rules (oxlint-tsgolint, #167) not switched on yet: #168 turns them on one by one, with their fixes.
-    "typescript/no-unsafe-assignment": "off",
-    "typescript/no-unsafe-call": "off",
-    "typescript/no-unsafe-member-access": "off",
-    "typescript/no-unsafe-return": "off",
     "typescript/prefer-readonly-parameter-types": "off",
     "typescript/promise-function-async": "off",
     "typescript/require-await": "off",
@@ -189,6 +185,25 @@
     "test-results"
   ],
   "overrides": [
+    {
+      // pwa-build loads the app's config module by its path, so the import is untyped here; the app
+      // checks the config's type where it writes it (`const config: PwaConfig` in pwa.config.ts).
+      "files": ["packages/pwa/src/build.ts"],
+      "rules": {
+        "typescript/no-unsafe-assignment": "off"
+      }
+    },
+    {
+      // The type-aware lint reads packages/pwa/tsconfig.json, which leaves the service worker out
+      // (it needs the worker's types, not the page's), so every worker global looks untyped to it.
+      // tsc checks the worker through tsconfig.sw.json (the package's typecheck).
+      "files": ["packages/pwa/src/sw.ts"],
+      "rules": {
+        "typescript/no-unsafe-assignment": "off",
+        "typescript/no-unsafe-call": "off",
+        "typescript/no-unsafe-member-access": "off"
+      }
+    },
     {
       // bun:test types the `.rejects`/`.resolves` matchers as returning nothing, but they return a
       // promise that must be awaited, or the test ends before the assertion runs. And

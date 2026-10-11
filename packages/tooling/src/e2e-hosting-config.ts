@@ -14,6 +14,9 @@ interface FirebaseConfig {
   hosting: { headers: { headers: Header[], source: string }[], public: string }
 }
 
+// The repository's own firebase.json is trusted to have the shape it is read as.
+const configFrom: (text: string) => FirebaseConfig = JSON.parse
+
 const emulatorOrigin = (config: FirebaseConfig, name: string) => {
   const port = config.emulators[name]?.port
   if (!port) {
@@ -49,6 +52,5 @@ export const e2eHostingConfig = (config: FirebaseConfig): FirebaseConfig => {
 }
 
 if (import.meta.main) {
-  const config: FirebaseConfig = await Bun.file('firebase.json').json()
-  await Bun.write('firebase.e2e.json', `${JSON.stringify(e2eHostingConfig(config), null, 2)}\n`)
+  await Bun.write('firebase.e2e.json', `${JSON.stringify(e2eHostingConfig(configFrom(await Bun.file('firebase.json').text())), null, 2)}\n`)
 }

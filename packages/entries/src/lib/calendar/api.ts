@@ -107,9 +107,10 @@ const createCall = (access: Access, fetchFn: Fetch): Call => {
       const detail = await response.text()
       throw new CalendarApiError(response.status, `Google Calendar ${request.method} ${request.path} failed (${response.status}): ${detail}`)
     }
-    // Google's answer is trusted to have the shape its request asks for: `JSON.parse` returns `any`,
-    // the one unchecked step between Google's API and the app's types.
-    return JSON.parse(response.status === 204 ? '{}' : await response.text())
+    // Google's answer is trusted to have the shape its request asks for: the one unchecked step
+    // between Google's API and the app's types, spelled out here rather than hidden in an `any`.
+    const fromJson: (text: string) => Result = JSON.parse
+    return fromJson(response.status === 204 ? '{}' : await response.text())
   }
 }
 

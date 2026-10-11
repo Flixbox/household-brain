@@ -22,12 +22,19 @@ test('the app can be installed and opens offline', async ({ context, page }) => 
   })
 
   await test.step('the manifest describes the app, with the icons an install needs', async () => {
-    const manifest = await (await page.request.get('/manifest.webmanifest')).json()
-    expect(manifest).toMatchObject({ display: 'standalone', id: '/', name: 'Household Brain', start_url: '/' })
-    const icons: { purpose?: string, sizes: string }[] = manifest.icons
-    expect(icons.map(icon => icon.sizes)).toEqual(expect.arrayContaining(['192x192', '512x512']))
-    expect(icons.some(icon => icon.purpose === 'maskable')).toBe(true)
-    expect(manifest.screenshots).toHaveLength(2)
+    const manifest: unknown = await (await page.request.get('/manifest.webmanifest')).json()
+    expect(manifest).toMatchObject({
+      display: 'standalone',
+      icons: expect.arrayContaining([
+        expect.objectContaining({ sizes: '192x192' }),
+        expect.objectContaining({ sizes: '512x512' }),
+        expect.objectContaining({ purpose: 'maskable' }),
+      ]),
+      id: '/',
+      name: 'Household Brain',
+      screenshots: [expect.anything(), expect.anything()],
+      start_url: '/',
+    })
   })
 
   await test.step('a page address opens from the stored app while offline', async () => {
