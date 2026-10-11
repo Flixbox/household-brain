@@ -134,10 +134,14 @@ jobs:
         timeout-minutes: 8
         env:
           E2E_PROJECT: ${{ matrix.project }}
+        # The Hosting emulator serves the e2e build with production's headers and rewrites (#150), so
+        # it must exist before the emulators start.
         run: |
+          bun packages/tooling/src/e2e-hosting-config.ts
+          bun run nx run @household-brain/web:build:e2e
           tests="bun run nx run @household-brain/web:playwright"
           if [ "$E2E_PROJECT" = desktop-chrome ]; then tests="bun run test:rules && $tests"; fi
-          bun run firebase emulators:exec --only auth,firestore --project demo-household-brain "$tests"
+          bun run firebase emulators:exec --config firebase.e2e.json --only auth,firestore,hosting --project demo-household-brain "$tests"
       - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
