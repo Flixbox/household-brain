@@ -9,7 +9,7 @@
     "./components/*": "./src/components/*.tsx"
   },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json",
+    "typecheck": "tsc",
     "test": "bun test"
   },
   "dependencies": {

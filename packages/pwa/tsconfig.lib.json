@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.lib.tsbuildinfo",
+    "types": ["bun"]
+  },
+  "include": ["src"],
+  "exclude": ["src/sw.ts"]
+}
