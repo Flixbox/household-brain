@@ -32,6 +32,9 @@
   "targetDefaults": {
     "playwright": {
       "dependsOn": ["build:e2e"],
+      "options": {
+        "command": "bun --bun playwright test"
+      },
       "inputs": [
         "default",
         "^production",
