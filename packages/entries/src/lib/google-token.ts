@@ -107,7 +107,7 @@ const requestToken = (scopes: readonly string[], hint?: string | null): Promise<
   return new Promise((resolve, reject) => {
     oauth2.initTokenClient({
       callback: resolve,
-      client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+      client_id: process.env.BUN_PUBLIC_GOOGLE_CLIENT_ID,
       error_callback: error => { reject(new Error(popupProblem(error))) },
       ...(hint ? { hint } : {}),
       include_granted_scopes: true,

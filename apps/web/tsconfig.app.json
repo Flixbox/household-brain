@@ -2,8 +2,8 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
-    "types": ["vite/client"],
+    "types": ["bun"],
     "jsx": "react-jsx"
   },
-  "include": ["src", "../../packages/firebase/src/env.d.ts"]
+  "include": ["src", "../../packages/firebase/src/build-env.d.ts"]
 }

@@ -2,11 +2,11 @@ import { describe, expect, it } from 'bun:test'
 import { firebaseOptionsFrom } from './env'
 
 const complete = {
-  VITE_FIREBASE_API_KEY: 'key',
-  VITE_FIREBASE_APP_ID: '1:1:web:1',
-  VITE_FIREBASE_AUTH_DOMAIN: 'household-brain.test',
-  VITE_FIREBASE_MESSAGING_SENDER_ID: '1',
-  VITE_FIREBASE_PROJECT_ID: 'example',
+  BUN_PUBLIC_FIREBASE_API_KEY: 'key',
+  BUN_PUBLIC_FIREBASE_APP_ID: '1:1:web:1',
+  BUN_PUBLIC_FIREBASE_AUTH_DOMAIN: 'household-brain.test',
+  BUN_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '1',
+  BUN_PUBLIC_FIREBASE_PROJECT_ID: 'example',
 }
 
 describe('firebaseOptionsFrom', () => {
@@ -21,8 +21,8 @@ describe('firebaseOptionsFrom', () => {
   })
 
   it('names every missing variable', () => {
-    const { VITE_FIREBASE_APP_ID: _omitted, ...withoutAppId } = complete
-    expect(() => firebaseOptionsFrom({ ...withoutAppId, VITE_FIREBASE_API_KEY: '' }))
-      .toThrow('Missing Firebase config: VITE_FIREBASE_API_KEY, VITE_FIREBASE_APP_ID')
+    const { BUN_PUBLIC_FIREBASE_APP_ID: _omitted, ...withoutAppId } = complete
+    expect(() => firebaseOptionsFrom({ ...withoutAppId, BUN_PUBLIC_FIREBASE_API_KEY: '' }))
+      .toThrow('Missing Firebase config: BUN_PUBLIC_FIREBASE_API_KEY, BUN_PUBLIC_FIREBASE_APP_ID')
   })
 })

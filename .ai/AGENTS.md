@@ -313,7 +313,7 @@ adapted to this repository:
   every package; `shell` and `entries` only `firebase`; nothing imports `apps/web` (its e2e tests
   and config included).
 - **The e2e build must never reach production:** the emulator wiring and the `window.e2eSignIn` hook
-  are behind an inline `import.meta.env.VITE_USE_EMULATORS` comparison, `vite.config.ts` refuses a
+  are behind an inline `process.env.BUN_PUBLIC_USE_EMULATORS` comparison, `apps/web/build.ts` refuses a
   production build with it set, and CI fails if `apps/web/dist/` mentions either. The emulators run
   as `demo-household-brain`, which can't reach real Google services.
 - **CI uses only GitHub-owned and `google-github-actions/*` actions**, pinned to full SHAs (a
@@ -375,8 +375,8 @@ adapted to this repository:
   `@household-brain/entries/lib/items/model`. Siblings in the same folder stay `./x`. oxlint enforces
   it (`import/no-relative-parent-imports`). Only what the package's `exports` cover can be imported
   this way (`lib/*.ts`, `components/*.tsx`), so shared non-component code lives in `lib/`.
-- **React Compiler memoises at build time** (#69, through `@rolldown/plugin-babel` in
-  `apps/web/vite.config.ts`, so the packages too): don't write `useMemo`, `useCallback` or `memo` (oxlint's
+- **React Compiler memoises at build time** (#69, built into Bun's bundler, `reactCompiler` in
+  `apps/web/build.ts`, so the packages too): don't write `useMemo`, `useCallback` or `memo` (oxlint's
   `no-restricted-imports` refuses them). Code has to follow the Rules of React (no mutating props or state, no reading refs while
   rendering), or the compiler skips it or its memoisation changes what renders. That includes
   values from outside React read during render: the compiler takes them as unchanging, so read
@@ -420,17 +420,19 @@ CI fails if a compiled native addon shows up in `node_modules`. Add a package on
 
 ### App and build
 
-- **Browser functions must exist on the build target.** Vite's default target is
-  `baseline-widely-available` (iOS Safari 16.4 among others), and it converts syntax but adds no
-  polyfills. A newer function such as `URL.canParse` (iOS 17) throws on older iPhones and takes the
+- **Browser functions must exist on the phones that run the app.** Bun's bundler (`target: 'browser'`)
+  adds no polyfills. A newer function such as `URL.canParse` (iOS 17) throws on older iPhones and takes the
   whole screen down. Check support before using a recent API; nothing in lint catches it.
 
 - **The installable, offline app comes from `packages/pwa`** (#148): never hand-write icons, a
   manifest or head links. Change `apps/web/pwa.config.ts`, the SVGs in `apps/web/icons/`, or the
   description in the root `package.json` (#161); the build's `pwa-build` step generates the rest.
 
-- **Compare `import.meta.env.X` inline** when the branch must vanish from production builds. Passing
-  `import.meta.env` through a helper function stops Vite from folding it, so the dead code ships.
+- **Read `process.env.BUN_PUBLIC_*` literally and compare it inline** when a branch must vanish from
+  production builds (#146): the bundler only inlines a literal `process.env.X`, so passing it through a
+  helper ships the dead code, and a variable that isn't set fails the build (`apps/web/build.ts`).
+- **The dev server reloads the page on every change** (`apps/web/dev.ts`): Bun's hot module
+  reloading can't load import cycles yet (oven-sh/bun#40259), so it is off until that ships.
 - **Firebase Hosting matches header `source` against the request path, not the rewrite target.** A
   `no-cache` rule on `/index.html` does not cover `/` or SPA routes, so it needs `**`.
 - **The Content Security Policy is enforced** (`firebase.json` headers, #113) and names each host the

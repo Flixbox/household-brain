@@ -1,7 +1,7 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "types": ["vite/client", "bun"]
+    "types": ["bun"]
   },
   "include": ["src"],
   "exclude": ["src/sw.ts"]

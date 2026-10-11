@@ -8,7 +8,7 @@ const CHECK_EVERY_MS = 60 * 60 * 1000
 export const $updateWaiting = atom(false)
 
 /** The production build's service worker (`pwa-build`); the dev server has none. */
-const serwist = import.meta.env.PROD && 'serviceWorker' in navigator && new Serwist('/sw.js')
+const serwist = process.env.NODE_ENV === 'production' && 'serviceWorker' in navigator && new Serwist('/sw.js')
 let started = false
 let reloadWhenTakenOver = false
 
