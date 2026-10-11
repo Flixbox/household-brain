@@ -20,7 +20,6 @@ export const EditForm = ({ item, categories }: { item: Item, categories: Categor
   const after = (write: Promise<unknown>) => {
     write.catch(reportWriteFailure)
     navigate(paths.home)
-    return Promise.resolve()
   }
   // Each handler asks Google first, inside the click, and saves without waiting for the server.
   // Saved: what differs from the newest version the form has seen, i.e. only fields typed in here
@@ -29,11 +28,11 @@ export const EditForm = ({ item, categories }: { item: Item, categories: Categor
     requestSyncAccess()
     // Only dates changed here are written: an untouched list may be older than what's stored.
     const datesSaved = datesChanged && !sameDates(item.extraDates, dates) ? setExtraDates(item.id, dates) : Promise.resolve()
-    return after(Promise.all([editItem(item.id, latest, draft), datesSaved]))
+    after(Promise.all([editItem(item.id, latest, draft), datesSaved]))
   }
   const remove = () => {
     requestSyncAccess()
-    return after(removeItem(item))
+    after(removeItem(item))
   }
   return (
     <>

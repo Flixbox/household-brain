@@ -46,9 +46,11 @@ export const usePrice = ({ amount, currency, interval }: Pick<Item, 'amount' | '
   const foreign = isForeign(currency)
   useEffect(() => {
     if (foreign) {
-      refreshEuroRates(today)
+      refreshEuroRates(today).catch(() => null)
     }
-    const every = foreign ? setInterval(() => refreshEuroRates(today), RETRY_MS) : null
+    const every = foreign ? setInterval(() => {
+      refreshEuroRates(today).catch(() => null)
+    }, RETRY_MS) : null
     return () => {
       if (every) {
         clearInterval(every)

@@ -20,7 +20,7 @@ interface Props {
    * `latest` is the newest version of the entry the form has seen (save what differs from it);
    * `dates` are its extra dates, `datesChanged` whether they were changed here.
    */
-  onSave: (draft: ItemDraft, saved: { latest: ItemDraft, dates: EntryDate[], datesChanged: boolean }) => Promise<unknown>
+  onSave: (draft: ItemDraft, saved: { latest: ItemDraft, dates: EntryDate[], datesChanged: boolean }) => void
   /** Offer the status (open, done, cancelled): when editing, not when adding. */
   withStatus?: boolean
 }
@@ -43,11 +43,11 @@ export const ItemForm = ({ initial, initialDates = NO_DATES, categories, onSave,
   const submit = (event: FormEvent) => {
     event.preventDefault()
     if (saving) {
-      return null
+      return
     }
     setSaving(true)
     const { draft: finished, ...rest } = saved
-    return onSave({ ...finished, category: offeredCategory(finished.category, categories) }, rest)
+    onSave({ ...finished, category: offeredCategory(finished.category, categories) }, rest)
   }
   return (
     <form className="grid gap-4" onSubmit={submit} data-hold-updates={holdUpdates}>

@@ -71,7 +71,7 @@ const retryLater = (started: number) => {
   }
   backoffMs = Math.min(Math.max(backoffMs * 2, MIN_BACKOFF_MS), MAX_BACKOFF_MS)
   pausedUntil = performance.now() + backoffMs
-  timer = setTimeout(run, backoffMs)
+  timer = setTimeout(() => { run().catch(ignore) }, backoffMs)
 }
 
 const pushOne = async (item: Item, context: PushContext, started: number): Promise<void> => {
@@ -147,7 +147,7 @@ const pushNext = async (context: PushContext, started: number): Promise<void> =>
   if (next) {
     await pushOne(next, context, started)
   } else if (date) {
-    await runDateWork(context, date).then(() => { backoffMs = 0 }, () => retryLater(started))
+    await runDateWork(context, date).then(() => { backoffMs = 0 }, () => { retryLater(started) })
   }
 }
 
@@ -268,15 +268,13 @@ export const startOutbox = (): () => void => {
   }
 }
 
-/**
- * Asks Google for Calendar access while a click is still fresh, so pushing can start right away.
- * Never awaited before saving: saving must not depend on Google.
- */
-export const requestSyncAccess = (): Promise<unknown> =>
+/** Asks Google for Calendar access while a click is still fresh, so pushing starts right away; saving never waits for it. */
+export const requestSyncAccess = (): void => {
   calendarToken(MEMBER_SCOPES, auth.currentUser?.email).then(() => {
     pausedUntil = 0
     return run(true)
   }, ignore)
+}
 
 /** "Sync now": gets Google access (call it from a click) and pushes everything waiting. */
 export const syncNow = async (): Promise<void> => {

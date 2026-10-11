@@ -12,7 +12,7 @@ export const SearchBox = () => {
       placeholder="Search"
       className={`${textField} w-full`}
       value={query}
-      onChange={event => $search.set(event.target.value)}
+      onChange={event => { $search.set(event.target.value) }}
     />
   )
 }

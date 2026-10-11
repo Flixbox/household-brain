@@ -29,7 +29,7 @@ export const AmountField = ({ amount, currency, interval, onAmount, onCurrency, 
     </div>
     <Field label="Currency">
       {/* Euros are stored as '', like every entry from before currencies existed. */}
-      <select className={textField} value={currency || 'EUR'} onChange={event => onCurrency({ target: { value: event.target.value === 'EUR' ? '' : event.target.value } })}>
+      <select className={textField} value={currency || 'EUR'} onChange={event => { onCurrency({ target: { value: event.target.value === 'EUR' ? '' : event.target.value } }) }}>
         {choicesFor(currency).map(code => <option key={code} value={code}>{code}</option>)}
       </select>
     </Field>

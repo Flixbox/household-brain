@@ -17,7 +17,7 @@ export const SyncBar = () => {
   const { failed, missingCalendar, needsAccess, pullProblem, waiting } = useOutbox()
   const writeFailures = useWriteFailures()
   const [problem, setProblem] = useState('')
-  const sync = () => syncNow().then(() => setProblem(''), (error: unknown) => setProblem(message(error)))
+  const sync = () => syncNow().then(() => { setProblem('') }, (error: unknown) => { setProblem(message(error)) })
   return (
     <div className="space-y-2">
       {(waiting > 0 || needsAccess) && (
@@ -26,13 +26,13 @@ export const SyncBar = () => {
             {waiting > 0 ? `${waiting === 1 ? '1 change' : `${waiting} changes`} not yet in Google Calendar.` : 'Not synced with Google Calendar on this device yet.'}
           </p>
           {missingCalendar && <Link href={paths.settings} className="font-semibold underline">Set up the calendar</Link>}
-          {needsAccess && !missingCalendar && <button type="button" className="font-semibold text-orange-700 dark:text-orange-400" onClick={sync}>Sync now</button>}
+          {needsAccess && !missingCalendar && <button type="button" className="font-semibold text-orange-700 dark:text-orange-400" onClick={() => { sync().catch(() => null) }}>Sync now</button>}
         </div>
       )}
       {failed.map(item => (
         <div key={item.id} className={errorBar}>
           <p role="alert" className="flex-1">Couldn&apos;t sync “{item.title}”: {item.syncError}</p>
-          <button type="button" className="font-semibold underline" onClick={() => retryItem(item).catch(reportWriteFailure)}>Retry</button>
+          <button type="button" className="font-semibold underline" onClick={() => { retryItem(item).catch(reportWriteFailure) }}>Retry</button>
         </div>
       ))}
       {pullProblem && <p role="alert" className={errorBar}>Couldn&apos;t read changes from Google Calendar: {pullProblem}</p>}

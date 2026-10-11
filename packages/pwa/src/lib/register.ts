@@ -33,13 +33,17 @@ export const startServiceWorker = () => {
     return
   }
   started = true
-  serwist.addEventListener('waiting', () => $updateWaiting.set(true))
+  serwist.addEventListener('waiting', () => { $updateWaiting.set(true) })
   serwist.addEventListener('controlling', () => {
     if (reloadWhenTakenOver) {
       window.location.reload()
     }
   })
-  serwist.register().then(registration => registration && watchForUpdates(registration)).catch(() => null)
+  serwist.register().then(registration => {
+    if (registration) {
+      watchForUpdates(registration)
+    }
+  }).catch(() => null)
 }
 
 /** Lets the waiting version take over, then reloads the page into it. */

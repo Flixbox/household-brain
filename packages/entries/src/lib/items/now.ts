@@ -9,6 +9,6 @@ export const $now = atom(current())
 
 onMount($now, () => {
   $now.set(current())
-  const every = setInterval(() => $now.set(current()), 60_000)
-  return () => clearInterval(every)
+  const every = setInterval(() => { $now.set(current()) }, 60_000)
+  return () => { clearInterval(every) }
 })

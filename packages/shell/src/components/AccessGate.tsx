@@ -12,12 +12,16 @@ const secondaryButton = 'rounded-lg border border-stone-300 px-4 py-2 font-mediu
 const useSignIn = () => {
   const [signInError, setSignInError] = useState<string>()
   const [signingIn, setSigningIn] = useState(false)
-  const signIn = async () => {
-    setSignInError('')
-    setSigningIn(true)
-    const failure: unknown = await signInWithPopup(auth, new GoogleAuthProvider()).then(() => null, (error: unknown) => error)
+  const finish = (failure: unknown) => {
     setSigningIn(false)
     setSignInError(failure ? signInErrorMessage(failure) ?? '' : '')
+  }
+  const signIn = () => {
+    setSignInError('')
+    setSigningIn(true)
+    signInWithPopup(auth, new GoogleAuthProvider()).then(() => {
+      finish(null)
+    }, finish)
   }
   return { signIn, signInError, signingIn }
 }
@@ -50,7 +54,7 @@ export const AccessGate = ({ children }: { children: ReactNode }) => {
             {' '}
             <code data-testid="uid" className="rounded bg-stone-200 px-1.5 py-0.5 dark:bg-stone-800">{access.user.uid}</code>
           </p>
-          <button type="button" className={secondaryButton} onClick={() => signOutOfApp()}>Sign out</button>
+          <button type="button" className={secondaryButton} onClick={() => { signOutOfApp().catch(() => null) }}>Sign out</button>
         </div>
       )}
       {access.state === 'error' && (
@@ -58,8 +62,8 @@ export const AccessGate = ({ children }: { children: ReactNode }) => {
           <p className="font-semibold">Couldn&apos;t check access.</p>
           <p className="text-sm text-stone-500">{access.message}</p>
           <div className="flex gap-3">
-            <button type="button" className={button} onClick={() => globalThis.location.reload()}>Retry</button>
-            <button type="button" className={secondaryButton} onClick={() => signOutOfApp()}>Sign out</button>
+            <button type="button" className={button} onClick={() => { globalThis.location.reload() }}>Retry</button>
+            <button type="button" className={secondaryButton} onClick={() => { signOutOfApp().catch(() => null) }}>Sign out</button>
           </div>
         </div>
       )}

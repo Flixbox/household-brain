@@ -292,6 +292,8 @@ adapted to this repository:
   strings).
 - **Example and test domains use the reserved `.test` TLD** (`owner@household-brain.test`), never
   `example.com` or a real-looking host.
+- **oxlint lints with type information** (`--type-aware`, `oxlint-tsgolint`, #167); the type-aware rules
+  still off are listed in `.oxlintrc.json` and get turned on with their fixes in #168.
 - **oxlint runs every category as an error.** A rule is switched off only in `.oxlintrc.json`, with
   its reason as a comment, never with an inline disable comment. Before switching a rule on, search
   the file for it: a rule already listed as `"off"` further down wins (the last duplicate key in

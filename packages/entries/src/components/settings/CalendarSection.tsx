@@ -13,7 +13,7 @@ export const CalendarSection = ({ household }: { household: HouseholdState }) =>
       {household.state === 'missing' && (
         <>
           <p>There is no household calendar yet. Create it once; it lives in your Google account.</p>
-          <button type="button" className={primaryButton} disabled={busy} onClick={() => run(setUpHousehold)}>
+          <button type="button" className={primaryButton} disabled={busy} onClick={() => { run(setUpHousehold) }}>
             Create the household calendar
           </button>
         </>
@@ -32,7 +32,7 @@ export const CalendarSection = ({ household }: { household: HouseholdState }) =>
             type="button"
             className={primaryButton}
             disabled={busy}
-            onClick={() => run(() => connectToHousehold(household.config))}
+            onClick={() => { run(() => connectToHousehold(household.config)) }}
           >
             Connect my Google Calendar
           </button>

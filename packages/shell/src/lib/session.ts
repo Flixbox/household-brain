@@ -19,7 +19,7 @@ const PENDING_WRITES_GRACE_MS = 5000
 const sentWithin = (ms: number) => Promise.race([
   waitForPendingWrites(db).then(() => true, () => false),
   new Promise<boolean>(resolve => {
-    setTimeout(() => resolve(false), ms)
+    setTimeout(() => { resolve(false) }, ms)
   }),
 ])
 

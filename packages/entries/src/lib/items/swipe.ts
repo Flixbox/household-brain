@@ -21,7 +21,7 @@ export const markDone = (item: Item) => {
   if (clearTimer) {
     clearTimeout(clearTimer)
   }
-  clearTimer = setTimeout(() => $lastDone.set(null), UNDO_MS)
+  clearTimer = setTimeout(() => { $lastDone.set(null) }, UNDO_MS)
 }
 
 /** Puts the entry marked done last back to open. */

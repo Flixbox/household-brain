@@ -14,8 +14,9 @@ import { logErrorOnce, logGoogleChange, logRecovered } from '@household-brain/en
 
 const pullLogMessages = { failure: 'Google Calendar pull failed', problem: 'Google Calendar pull had a problem' } as const
 
-export const logPullProblem = (kind: keyof typeof pullLogMessages, detail: string): void =>
+export const logPullProblem = (kind: keyof typeof pullLogMessages, detail: string): void => {
   logErrorOnce(`pull-${kind}`, pullLogMessages[kind], detail)
+}
 
 /** A clean pull (or a new session): the next problem is news again. */
 export const resetPullProblems = (): void => {

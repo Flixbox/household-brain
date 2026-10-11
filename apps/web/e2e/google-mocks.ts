@@ -29,7 +29,7 @@ export const mockGoogle = async (page: Page, calendarId = 'household@group.calen
         accounts: {
           oauth2: {
             initTokenClient: (config: { scope: string, callback: (response: unknown) => void }) => ({
-              requestAccessToken: () => setTimeout(() => config.callback({ access_token: 'e2e-token', expires_in: 3600, scope: config.scope }), 0),
+              requestAccessToken: () => setTimeout(() => { config.callback({ access_token: 'e2e-token', expires_in: 3600, scope: config.scope }) }, 0),
             }),
           },
         },

@@ -18,7 +18,7 @@ export const RemindersField = ({ value, onChange }: { value: string, onChange: (
       <div className="flex flex-wrap gap-2">
         {REMINDER_CHOICES.map(choice => {
           const pressed = chosen.includes(choice.minutes)
-          return <ToggleChip key={choice.minutes} pressed={pressed} disabled={!pressed && chosen.length >= MAX_REMINDERS} onToggle={() => toggle(choice.minutes)}>{choice.label}</ToggleChip>
+          return <ToggleChip key={choice.minutes} pressed={pressed} disabled={!pressed && chosen.length >= MAX_REMINDERS} onToggle={() => { toggle(choice.minutes) }}>{choice.label}</ToggleChip>
         })}
       </div>
       <p className="text-xs text-stone-500">{chosen.length === 0 ? 'None: this entry never notifies.' : 'Before 17:00 on the due date, while it is open.'}</p>

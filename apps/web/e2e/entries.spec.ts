@@ -208,7 +208,7 @@ test('without Google access an entry waits, "Sync now" sends it, and a reload ke
       ? realInit(config)
       : { requestAccessToken: () => {
         refused = true
-        setTimeout(() => (config as { error_callback: (error: object) => void }).error_callback({ type: 'popup_closed' }), 0)
+        setTimeout(() => { (config as { error_callback: (error: object) => void }).error_callback({ type: 'popup_closed' }) }, 0)
       } })
   })
   await signInAllowlisted(page, 'owner@household-brain.test')

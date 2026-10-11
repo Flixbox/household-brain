@@ -19,6 +19,28 @@
     "suspicious": "error"
   },
   "rules": {
+    // Type-aware rules (oxlint-tsgolint, #167) not switched on yet: #168 turns them on one by one, with their fixes.
+    "typescript/consistent-return": "off",
+    "typescript/no-base-to-string": "off",
+    "typescript/no-deprecated": "off",
+    "typescript/no-unnecessary-condition": "off",
+    "typescript/no-unnecessary-type-arguments": "off",
+    "typescript/no-unnecessary-type-assertion": "off",
+    "typescript/no-unsafe-assignment": "off",
+    "typescript/no-unsafe-call": "off",
+    "typescript/no-unsafe-member-access": "off",
+    "typescript/no-unsafe-return": "off",
+    "typescript/no-unsafe-type-assertion": "off",
+    "typescript/prefer-nullish-coalescing": "off",
+    "typescript/prefer-optional-chain": "off",
+    "typescript/prefer-readonly-parameter-types": "off",
+    "typescript/prefer-regexp-exec": "off",
+    "typescript/promise-function-async": "off",
+    "typescript/require-array-sort-compare": "off",
+    "typescript/require-await": "off",
+    "typescript/strict-boolean-expressions": "off",
+    "typescript/strict-void-return": "off",
+    "typescript/switch-exhaustiveness-check": "off",
     "react/rules-of-hooks": "error",
     "eslint/capitalized-comments": ["error", "always", { "ignoreConsecutiveComments": true }], // continuation lines of a comment stay lowercase
     "react/forbid-component-props": ["error", { "forbid": [{ "propName": "className", "allowedFor": ["Link"] }] }], // router links (wouter) are styled like anchors
@@ -175,6 +197,15 @@
     "test-results"
   ],
   "overrides": [
+    {
+      // bun:test types the `.rejects`/`.resolves` matchers as returning nothing, but they return a
+      // promise that must be awaited, or the test ends before the assertion runs.
+      "files": ["**/*.test.ts"],
+      "rules": {
+        "typescript/await-thenable": "off",
+        "typescript/no-confusing-void-expression": "off"
+      }
+    },
     {
       "files": [
         "**/*.config.ts",
