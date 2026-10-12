@@ -8,7 +8,7 @@ const foreignLabel = (value: number, currency: string, euroRates?: EuroRates | n
   const own = new Intl.NumberFormat('de-DE', { currency, style: 'currency' }).format(value)
   const rate = euroRates?.rates[currency]
   // "≈" sticks to the euro value, so a narrow column wraps before it.
-  return typeof rate === 'number' && rate !== 0 ? `${own} ≈\u00A0${EURO.format(value / rate)}` : own
+  return typeof rate === 'number' && Number.isFinite(rate) && rate !== 0 ? `${own} ≈\u00A0${EURO.format(value / rate)}` : own
 }
 
 /**

@@ -14,16 +14,15 @@ const secondaryButton = 'rounded-lg border border-stone-300 px-4 py-2 font-mediu
 const useSignIn = () => {
   const [signInError, setSignInError] = useState<string>()
   const [signingIn, setSigningIn] = useState(false)
-  const finish = (failure: unknown) => {
-    setSigningIn(false)
-    setSignInError(failure === null ? '' : signInErrorMessage(failure) ?? '')
-  }
   const signIn = () => {
     setSignInError('')
     setSigningIn(true)
     signInWithPopup(auth, new GoogleAuthProvider()).then(() => {
-      finish(null)
-    }, finish)
+      setSigningIn(false)
+    }, (failure: unknown) => {
+      setSigningIn(false)
+      setSignInError(signInErrorMessage(failure) ?? '')
+    })
   }
   return { signIn, signInError, signingIn }
 }
