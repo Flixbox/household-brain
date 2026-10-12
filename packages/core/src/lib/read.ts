@@ -2,6 +2,12 @@
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
+/**
+ * Whether a string that may be missing has text: as a condition, `hasText(x)` says what a bare `x`
+ * would mean (an empty string counts as missing), and it tells TypeScript `x` is a string after it.
+ */
+export const hasText = (value: string | null | undefined): value is string => typeof value === 'string' && value !== ''
+
 /** A string read from untyped data, or `fallback` when the value is anything else. */
 export const textOf = (value: unknown, fallback = ''): string => (typeof value === 'string' ? value : fallback)
 

@@ -3,6 +3,7 @@ import type { CalendarEvent } from './event'
 import { draftFrom, isRecurring } from './from-event'
 import { EDITABLE_FIELDS, type Item, type ItemDraft, changedFields, draftOf } from './model'
 import { isDate } from './dates'
+import { hasText } from '@household-brain/core/lib/read'
 
 /** What to do with one event from Google Calendar. */
 export type PullDecision =
@@ -67,7 +68,7 @@ const changed = ({ entry, event, categories }: PullInput): PullDecision => {
 }
 
 /** RFC 3339 UTC times compare as text once fractional seconds are always present ("…:05Z" → "…:05.000Z"). */
-const comparable = (value: string | undefined) => (value && !value.includes('.') ? value.replace('Z', '.000Z') : value ?? '')
+const comparable = (value: string | undefined) => (hasText(value) && !value.includes('.') ? value.replace('Z', '.000Z') : value ?? '')
 
 /**
  * Compares Google's `updated` with what the entry already has: "older" (a listing from before a
@@ -100,7 +101,7 @@ const isUnscheduledDeletion = (entry: Item | null, event: CalendarEvent) =>
  * replacing it would undo.
  */
 const readsDifferently = ({ entry, event, categories, recheck }: PullInput) =>
-  Boolean(recheck && entry?.pendingOp === null && changedFields(draftOf(entry), draftFrom(event, categories)).length > 0)
+  recheck === true && entry?.pendingOp === null && changedFields(draftOf(entry), draftFrom(event, categories)).length > 0
 
 /** Our own write coming back, or an entry whose deletion is about to be pushed. */
 const isSettled = (entry: Item | null, event: CalendarEvent, uid: string) =>

@@ -1,3 +1,5 @@
+import { hasText } from '@household-brain/core/lib/read'
+
 const BASE = 'https://tasks.googleapis.com/tasks/v1'
 
 export class TasksApiError extends Error {
@@ -69,10 +71,10 @@ const createCall = (access: Access, fetchFn: Fetch): Call => {
 
 /** Every item of a paged listing, following `nextPageToken` from page to page. */
 const allItems = async <Item>(call: Call, listing: { path: string, query: Record<string, string> }, before: { items: Item[], pageToken?: string } = { items: [] }): Promise<Item[]> => {
-  const query = new URLSearchParams({ ...listing.query, ...before.pageToken ? { pageToken: before.pageToken } : {} }).toString()
+  const query = new URLSearchParams({ ...listing.query, ...hasText(before.pageToken) ? { pageToken: before.pageToken } : {} }).toString()
   const page = await call<{ items?: Item[], nextPageToken?: string }>({ method: 'GET', path: `${listing.path}${query ? `?${query}` : ''}` })
   const items = [...before.items, ...page.items ?? []]
-  return page.nextPageToken ? allItems(call, listing, { items, pageToken: page.nextPageToken }) : items
+  return hasText(page.nextPageToken) ? allItems(call, listing, { items, pageToken: page.nextPageToken }) : items
 }
 
 export const createTasksApi = (access: Access, fetchFn: Fetch = async (input, init) => fetch(input, init)): TasksApi => {

@@ -3,6 +3,7 @@ import { newItemPath } from '@household-brain/entries/lib/paths'
 import type { Category } from '@household-brain/entries/lib/categories'
 import type { Board } from '@household-brain/entries/lib/items/board'
 import { ItemRow } from './ItemRow'
+import { hasText } from '@household-brain/core/lib/read'
 
 /** What an empty list says: nothing while searching (the board says no entry matches). */
 const emptyNote = ({ searching, completed }: Board): string | null => {
@@ -26,7 +27,7 @@ export const DateList = ({ board, categories }: { board: Board, categories: Cate
         <h2 className="text-lg font-semibold">All entries</h2>
         <Link href={newItemPath()} aria-label="Add entry" className="text-xl font-semibold text-orange-700 dark:text-orange-400">+</Link>
       </div>
-      {note && <p className="px-3 text-stone-500">{note}</p>}
+      {hasText(note) && <p className="px-3 text-stone-500">{note}</p>}
       <ul>{items.map(item => <ItemRow key={item.id} item={item} category={labelOf.get(item.category) ?? 'Uncategorised'} />)}</ul>
     </section>
   )

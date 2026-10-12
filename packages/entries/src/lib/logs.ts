@@ -6,6 +6,7 @@ import { type Log, logFrom } from '@household-brain/entries/lib/documents'
 import { changedDetail, entryLogMessage, logDetail } from '@household-brain/entries/lib/logs-messages'
 import { stringify } from '@household-brain/core/lib/stringify'
 import { ignoreFailure } from '@household-brain/core/lib/ignore'
+import { hasText } from '@household-brain/core/lib/read'
 
 const LOG_LIMIT = 200
 const LOG_MESSAGE_LIMIT = 2000
@@ -15,7 +16,7 @@ const $logs = queryStore(query(logsCollection, orderBy('at', 'desc'), limit(LOG_
 
 const writeLog = (kind: Log['kind'], { message, itemId, detail }: { message: string, itemId?: string | undefined, detail?: string | undefined }): void => {
   const uid = auth.currentUser?.uid
-  if (!uid) {
+  if (!hasText(uid)) {
     return
   }
   const data = {
@@ -23,8 +24,8 @@ const writeLog = (kind: Log['kind'], { message, itemId, detail }: { message: str
     by: uid,
     kind,
     message: message.slice(0, LOG_MESSAGE_LIMIT),
-    ...itemId ? { itemId } : {},
-    ...detail ? { detail: logDetail(detail) } : {},
+    ...hasText(itemId) ? { itemId } : {},
+    ...hasText(detail) ? { detail: logDetail(detail) } : {},
   }
   // The history is a convenience: a refused or lost entry must not break the change it describes.
   addDoc(logsCollection, data).catch(ignoreFailure)

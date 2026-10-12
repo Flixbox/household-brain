@@ -1,3 +1,4 @@
+import { hasText } from '@household-brain/core/lib/read'
 import { useEffect } from 'react'
 import { useStore } from '@nanostores/react'
 import { persistentJSON } from '@nanostores/persistent'
@@ -60,5 +61,5 @@ export const usePrice = ({ amount, currency, interval }: Pick<Item, 'amount' | '
     }
   }, [foreign, today])
   const price = amountLabel(amount, currency, useStore($euroRates))
-  return price && withInterval(price, interval)
+  return hasText(price) ? withInterval(price, interval) : price
 }

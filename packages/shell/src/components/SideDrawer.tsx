@@ -15,9 +15,9 @@ export const SideDrawer = ({ children }: { children: ReactNode }) => {
   // Leaving the signed-in pages (e.g. losing access) leaves no open menu behind for the next visit.
   useEffect(() => closeMenu, [])
   useEffect(() => {
-    if (open && !dialog.current?.open) {
+    if (open && dialog.current?.open !== true) {
       dialog.current?.showModal()
-    } else if (!open && dialog.current?.open) {
+    } else if (!open && dialog.current?.open === true) {
       dialog.current.close()
     }
   }, [open])

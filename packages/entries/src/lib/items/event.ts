@@ -2,6 +2,7 @@ import { isForeign } from './currency'
 import { reminderMinutes } from './reminders'
 import type { Category } from '@household-brain/entries/lib/categories'
 import type { EditableField, Item } from './model'
+import { hasText } from '@household-brain/core/lib/read'
 
 export const DUE_TIME = '17:00:00'
 export const END_TIME = '17:15:00'
@@ -55,7 +56,7 @@ export const STATUS_TAGS = { cancelled: 'Cancelled', done: 'Done' } as const
 export const summaryOf = (item: Pick<Item, 'title' | 'category'> & Partial<Pick<Item, 'status'>>, categories: readonly Category[]): string => {
   const category = labelOf(item, categories)
   const tag = category && item.status && item.status !== 'open' ? STATUS_TAGS[item.status] : category?.label
-  return tag ? `[${tag}] ${item.title}` : item.title
+  return hasText(tag) ? `[${tag}] ${item.title}` : item.title
 }
 
 type Reminders = NonNullable<CalendarEvent['reminders']>
@@ -68,7 +69,7 @@ export const remindersOf = (item: Pick<Item, 'status'> & { reminders?: string })
   if (item.status !== 'open') {
     return { overrides: [], useDefault: false }
   }
-  if (!item.reminders) {
+  if (!hasText(item.reminders)) {
     return { useDefault: true }
   }
   return { overrides: reminderMinutes(item.reminders).map(minutes => ({ method: 'popup', minutes })), useDefault: false }

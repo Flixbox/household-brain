@@ -42,8 +42,8 @@ export const ItemRow = ({ item, category }: { item: Item, category?: string }) =
       >
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="font-medium">{item.title}</span>
-          {price && <span className="text-sm break-words text-stone-600 tabular-nums dark:text-stone-400">{price}</span>}
-          {category && <span className="text-xs text-stone-500">{category}</span>}
+          {typeof price === 'string' && price !== '' && <span className="text-sm break-words text-stone-600 tabular-nums dark:text-stone-400">{price}</span>}
+          {typeof category === 'string' && category !== '' && <span className="text-xs text-stone-500">{category}</span>}
           {item.code !== '' && <span className="font-mono text-sm break-all text-stone-600 select-all dark:text-stone-400">{item.code}</span>}
         </span>
         <DueColumn item={item} next={next} more={more} since={since} now={now} />

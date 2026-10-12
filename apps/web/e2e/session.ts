@@ -1,5 +1,6 @@
 import { type Locator, type Page, expect } from '@playwright/test'
 import { allowlist } from './emulators'
+import { hasText } from '@household-brain/core/lib/read'
 
 declare global {
   interface Window {
@@ -33,7 +34,7 @@ export const signInAllowlisted = async (page: Page, email: string): Promise<stri
   await page.goto('/')
   await signInAs(page, email)
   const uid = await page.getByTestId('uid').textContent()
-  if (!uid) {
+  if (!hasText(uid)) {
     throw new Error('The no-access screen showed no user id')
   }
   await allowlist(uid)

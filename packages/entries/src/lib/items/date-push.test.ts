@@ -22,7 +22,7 @@ const fakeApi = (insertStatus?: number, patchStatuses: number[] = []) => {
     },
     insertEvent: async (_calendarId: string, event: CalendarEvent) => {
       calls.push(`insert ${event.id}`)
-      if (insertStatus) {
+      if (typeof insertStatus === 'number' && insertStatus !== 0) {
         throw new CalendarApiError(insertStatus, 'insert failed')
       }
       return event
@@ -30,7 +30,7 @@ const fakeApi = (insertStatus?: number, patchStatuses: number[] = []) => {
     patchEvent: async (target: { eventId: string }, patch: CalendarEvent, etag: string) => {
       calls.push(`patch ${target.eventId} ${patch.status} ${'id' in patch ? 'with id' : 'without id'} start.date ${String(patch.start?.date)} if ${etag}`)
       const status = patchStatuses.shift()
-      if (status) {
+      if (typeof status === 'number' && status !== 0) {
         throw new CalendarApiError(status, 'patch failed')
       }
       return patch

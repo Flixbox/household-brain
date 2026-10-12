@@ -77,7 +77,7 @@ export const useSwipeToDone = (onDone: () => void, enabled: boolean) => {
       if (dx !== null && Number.isNaN(dx)) {
         reset()
       } else if (dx !== null) {
-        if (gesture.current?.moved) {
+        if (gesture.current?.moved === true) {
           moved.current = true
         }
         setOffset(dx)

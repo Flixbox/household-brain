@@ -32,6 +32,7 @@
 import { type Activity, type Event, FOLLOW_NEWER, cancelledDeployEvent, issueKey, listsOpenPrs, mainRunEvent, newActivity, openPrLines, runEvent } from './watch-events'
 import { type PrState, REPO, activityOf, issueEventLines, issueLine, jobLines, mainAhead, mainHead, newestMainRun, openIssueNumbers, openPrs, prState, recentlyMerged, reviewCommentLines, runOf } from './watch-github'
 import { appendLines, exists, lock, readLines, writeLines } from './watch-state'
+import { hasText } from '@household-brain/core/lib/read'
 
 const [, , limitMinutes = '20', maxHours = '12'] = process.argv
 if (!/^\d+$/u.test(limitMinutes) || !/^\d+$/u.test(maxHours)) {
@@ -130,7 +131,7 @@ const checkMain = async (): Promise<void> => {
 /** A new commit on main, so it never moves on unnoticed. The one it was at on the first run isn't news. */
 const checkMainHead = async (): Promise<void> => {
   const head = await mainHead().catch(() => null)
-  if (!head?.sha) {
+  if (!hasText(head?.sha)) {
     return
   }
   const [known] = await readLines('main')

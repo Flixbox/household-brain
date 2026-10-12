@@ -19,7 +19,7 @@ const configFrom: (text: string) => FirebaseConfig = JSON.parse
 
 const emulatorOrigin = (config: FirebaseConfig, name: string) => {
   const port = config.emulators[name]?.port
-  if (!port) {
+  if (typeof port !== 'number' || port === 0) {
     throw new Error(`firebase.json sets no port for the ${name} emulator`)
   }
   return `http://127.0.0.1:${port}`

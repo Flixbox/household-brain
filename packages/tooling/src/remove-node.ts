@@ -6,13 +6,14 @@
  *   bun packages/tooling/src/remove-node.ts
  */
 import { $ } from 'bun'
+import { hasText } from '@household-brain/core/lib/read'
 
 // Root in the Playwright container, a sudoer on the runners.
 const remove = async (path: string) => (process.getuid?.() === 0 ? $`rm -f ${path}` : $`sudo rm -f ${path}`)
 
 const removeAll = async (): Promise<void> => {
   const node = Bun.which('node')
-  if (!node) {
+  if (!hasText(node)) {
     return
   }
   const real = (await $`readlink -f ${node}`.text()).trim()

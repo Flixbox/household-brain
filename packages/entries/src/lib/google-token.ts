@@ -13,6 +13,7 @@
 import { persistentJSON } from '@nanostores/persistent'
 import { holdUpdatesWhile } from './update-hold'
 import { ignoreFailure } from '@household-brain/core/lib/ignore'
+import { hasText } from '@household-brain/core/lib/read'
 
 const GIS_SCRIPT = 'https://accounts.google.com/gsi/client'
 const CALENDAR = 'https://www.googleapis.com/auth/calendar'
@@ -109,7 +110,7 @@ const requestToken = async (scopes: readonly string[], hint?: string | null): Pr
       callback: resolve,
       client_id: process.env.BUN_PUBLIC_GOOGLE_CLIENT_ID,
       error_callback: error => { reject(new Error(popupProblem(error))) },
-      ...(hint ? { hint } : {}),
+      ...(hasText(hint) ? { hint } : {}),
       include_granted_scopes: true,
       scope: scopes.join(' '),
     }).requestAccessToken({ prompt: '' })
@@ -132,7 +133,7 @@ const popupProblem = (error: { type: string, message?: string }): string => {
 
 /** Checks a GIS token response; exported for tests. */
 export const acceptToken = (response: TokenResponse, scopes: readonly string[], account: string): Token => {
-  if (response.error) {
+  if (hasText(response.error)) {
     throw new Error(`Google refused access: ${response.error}`)
   }
   const granted = new Set(response.scope.split(' '))

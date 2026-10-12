@@ -5,6 +5,7 @@ import { type HouseholdConfig, createHousehold, joinHousehold } from './setup'
 import { firestoreHouseholdStore } from './store'
 import { logError, logEvent } from '@household-brain/entries/lib/logs'
 import { stringify } from '@household-brain/core/lib/stringify'
+import { hasText } from '@household-brain/core/lib/read'
 
 const email = () => auth.currentUser?.email
 
@@ -16,7 +17,7 @@ const apiFor = (scopes: readonly string[]) => createCalendarApi({
 /** Owner: creates the household calendar (once) and connects the owner's own account. */
 export const setUpHousehold = async (): Promise<string> => {
   const uid = auth.currentUser?.uid
-  if (!uid) {
+  if (!hasText(uid)) {
     throw new Error('Sign in first.')
   }
   try {

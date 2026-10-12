@@ -1,4 +1,5 @@
 import { DEFAULT_REMINDERS } from '@household-brain/entries/lib/calendar/setup'
+import { hasText } from '@household-brain/core/lib/read'
 
 /**
  * An entry's own reminders (#35), kept as text so it travels like the other fields:
@@ -28,7 +29,7 @@ const DEFAULT_MINUTES = largestFirst(DEFAULT_REMINDERS.map(reminder => reminder.
 
 /** The minutes an entry reminds at, largest first; the household default reads as its two reminders. */
 export const reminderMinutes = (value: string | undefined): number[] => {
-  if (!value) {
+  if (!hasText(value)) {
     return DEFAULT_MINUTES
   }
   return value === NONE ? [] : value.split(',').map(Number)
@@ -56,6 +57,6 @@ export const remindersFromText = (text: string | undefined): string => {
   if (text === 'none') {
     return text
   }
-  const value = text && /^\d+(?:,\d+)*$/u.test(text) ? remindersValue(reminderMinutes(text)) : ''
+  const value = hasText(text) && /^\d+(?:,\d+)*$/u.test(text) ? remindersValue(reminderMinutes(text)) : ''
   return value === 'none' ? '' : value
 }

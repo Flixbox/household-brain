@@ -4,6 +4,7 @@ import { $user } from '@household-brain/firebase/user'
 import { pruneOldLogs, useLogs } from '@household-brain/entries/lib/logs'
 import { useItems } from '@household-brain/entries/lib/items/use-items'
 import { LogRow } from './LogRow'
+import { hasText } from '@household-brain/core/lib/read'
 
 export const LogList = () => {
   const items = useItems()
@@ -23,7 +24,7 @@ export const LogList = () => {
   return (
     <ol className="space-y-3" aria-label="Events">
       {logs.map(log => {
-        const item = log.itemId ? items?.find(entry => entry.id === log.itemId) ?? null : null
+        const item = hasText(log.itemId) ? items?.find(entry => entry.id === log.itemId) ?? null : null
         const actor = log.by === user?.uid ? 'You' : 'The other person'
         return <LogRow key={log.id} log={log} item={item} actor={actor} />
       })}

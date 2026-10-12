@@ -1,5 +1,5 @@
 import type { Page, Route } from '@playwright/test'
-import { recordOf, textOf } from '@household-brain/core/lib/read'
+import { hasText, recordOf, textOf } from '@household-brain/core/lib/read'
 
 interface CalendarRequest {
   method: string
@@ -75,7 +75,7 @@ export const mockGoogle = async (page: Page, { calendarId = 'household@group.cal
       return
     }
     const path = decodeURIComponent(new URL(request.url()).pathname.replace('/calendar/v3', ''))
-    const body: unknown = request.postData() ? request.postDataJSON() : null
+    const body: unknown = hasText(request.postData()) ? request.postDataJSON() : null
     requests.push({ body, method: request.method(), path })
 
     const listPrefix = '/users/me/calendarList/'
@@ -107,7 +107,7 @@ export const mockGoogle = async (page: Page, { calendarId = 'household@group.cal
       return
     }
     const path = decodeURIComponent(new URL(request.url()).pathname.replace('/tasks/v1', ''))
-    const body: unknown = request.postData() ? request.postDataJSON() : null
+    const body: unknown = hasText(request.postData()) ? request.postDataJSON() : null
     taskRequests.push({ body, method: request.method(), path })
     if (request.method() === 'GET' && path === '/users/@me/lists') {
       await reply(route, 200, { items: [...taskLists.values()] })
@@ -210,7 +210,7 @@ const handleEvent = async ({ request, path, body, events, latest, listing, store
   // Like Google: a deleted event can still be read (status "cancelled") and revived with a patch,
   // but not deleted again.
   const reachable = found && (found.status !== 'cancelled' || request.method() !== 'DELETE')
-  const existing = reachable ? found : null
+  const existing = reachable === true ? found : null
   const method = request.method()
   if (method === 'POST') {
     const id = textOf(recordOf(body).id)
@@ -221,13 +221,13 @@ const handleEvent = async ({ request, path, body, events, latest, listing, store
     await reply(200, existing)
   } else if (method === 'PATCH') {
     const ifMatch = request.headers()['if-match']
-    if (ifMatch && ifMatch !== existing.etag) {
+    if (hasText(ifMatch) && ifMatch !== existing.etag) {
       await reply(412, { error: { message: 'Precondition Failed' } })
       return
     }
     const next = patched(existing, recordOf(body))
     const invalid = invalidEvent(next)
-    await (invalid ? reply(400, { error: { message: invalid } }) : reply(200, stored(eventId, next)))
+    await (hasText(invalid) ? reply(400, { error: { message: invalid } }) : reply(200, stored(eventId, next)))
   } else {
     stored(eventId, { ...existing, status: 'cancelled' })
     await reply(204, null)
@@ -255,10 +255,10 @@ const patched = (existing: Record<string, unknown>, changes: Record<string, unkn
 const invalidEvent = (event: Record<string, unknown>): string | null => {
   const start = recordOf(event.start)
   const reminders = recordOf(event.reminders)
-  if (start.date && start.dateTime) {
+  if (textOf(start.date) !== '' && textOf(start.dateTime) !== '') {
     return 'Invalid start time: both date and dateTime'
   }
-  if (reminders.useDefault && Array.isArray(reminders.overrides) && reminders.overrides.length > 0) {
+  if (reminders.useDefault === true && Array.isArray(reminders.overrides) && reminders.overrides.length > 0) {
     return 'Cannot specify both default reminders and overrides at the same time.'
   }
   return null

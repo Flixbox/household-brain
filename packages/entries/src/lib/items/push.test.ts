@@ -15,7 +15,7 @@ const fakeApi = (behaviour: Partial<Record<'insert' | 'patch' | 'delete' | 'get'
   const calls: string[] = []
   const failNext = (kind: 'insert' | 'patch' | 'delete' | 'get') => {
     const status = behaviour[kind]?.shift()
-    if (status) {
+    if (typeof status === 'number' && status !== 0) {
       throw new CalendarApiError(status, `${kind} failed`)
     }
   }

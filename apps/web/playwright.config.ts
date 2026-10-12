@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test'
+import { hasText } from '@household-brain/core/lib/read'
 
 // Runs against a production-like build that talks only to the local Firebase emulators, served by
 // the Hosting emulator with production's headers and rewrites (#150). Start it through
@@ -17,10 +18,10 @@ export default defineConfig({
   // Desktop and the phone the app is used on (Android Chrome), plus the iPhone for the Safari notice.
   // CI runs one device per job: `E2E_PROJECT` picks it, and is an Nx input, so a cached result is
   // only ever replayed for the same device.
-  projects: DEVICES.filter(device => !process.env.E2E_PROJECT || device.name === process.env.E2E_PROJECT),
+  projects: DEVICES.filter(device => !hasText(process.env.E2E_PROJECT) || device.name === process.env.E2E_PROJECT),
   // `list` streams progress in CI too, so a hang shows where it is.
-  reporter: process.env.CI ? [['list'], ['github'], ['html', { open: 'never' }]] : 'list',
-  retries: process.env.CI ? 1 : 0,
+  reporter: hasText(process.env.CI) ? [['list'], ['github'], ['html', { open: 'never' }]] : 'list',
+  retries: hasText(process.env.CI) ? 1 : 0,
   testDir: 'e2e',
   // Tests are user journeys of several steps (#44), so they get more than the default 30 s each.
   timeout: 120_000,
@@ -33,7 +34,7 @@ export default defineConfig({
     trace: 'retain-on-failure',
     // Every test is filmed in CI, so a pull request can show the screens it changed as a GIF
     // (`packages/tooling/src/pr-gif.ts`). Demo data only: the tests never see real entries.
-    video: process.env.CI ? 'on' : 'off',
+    video: hasText(process.env.CI) ? 'on' : 'off',
   },
   workers: 1,
 })

@@ -13,6 +13,7 @@
  */
 import { $ } from 'bun'
 import { REPO } from './watch-github'
+import { hasText } from '@household-brain/core/lib/read'
 
 const home = process.env.HOME ?? '.'
 const DIR = process.env.STATE_DIR ?? `${process.env.XDG_STATE_HOME ?? `${home}/.local/state`}/watch-project/${REPO.replace('/', '_')}`
@@ -49,7 +50,7 @@ export const lock = async (): Promise<void> => {
   await $`mkdir -p ${DIR}`.quiet()
   if ((await $`mkdir ${stateFile('lock.d')}`.quiet().nothrow()).exitCode !== 0) {
     const [holder] = await readLines('lock.d/pid')
-    if (holder && alive(Number(holder))) {
+    if (hasText(holder) && alive(Number(holder))) {
       process.stderr.write(`another watcher already uses ${DIR}\n`)
       process.exit(75)
     }

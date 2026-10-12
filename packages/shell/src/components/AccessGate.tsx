@@ -5,6 +5,7 @@ import { useAccess } from '@household-brain/shell/lib/access'
 import { signInErrorMessage } from '@household-brain/shell/lib/sign-in-errors'
 import { auth } from '@household-brain/firebase/firebase'
 import { signOutOfApp } from '@household-brain/shell/lib/session'
+import { hasText } from '@household-brain/core/lib/read'
 
 const button = 'rounded-lg bg-orange-600 px-4 py-2 font-semibold text-white hover:bg-orange-700'
 const secondaryButton = 'rounded-lg border border-stone-300 px-4 py-2 font-medium dark:border-stone-700'
@@ -15,7 +16,7 @@ const useSignIn = () => {
   const [signingIn, setSigningIn] = useState(false)
   const finish = (failure: unknown) => {
     setSigningIn(false)
-    setSignInError(failure ? signInErrorMessage(failure) ?? '' : '')
+    setSignInError(failure === null ? '' : signInErrorMessage(failure) ?? '')
   }
   const signIn = () => {
     setSignInError('')
@@ -44,7 +45,7 @@ export const AccessGate = ({ children }: { children: ReactNode }) => {
       {access.state === 'signed-out' && (
         <div className="space-y-3">
           <button type="button" className={button} onClick={signIn}>Sign in with Google</button>
-          {signInError && <p role="alert" className="text-sm text-red-700 dark:text-red-400">{signInError}</p>}
+          {hasText(signInError) && <p role="alert" className="text-sm text-red-700 dark:text-red-400">{signInError}</p>}
         </div>
       )}
       {access.state === 'denied' && (

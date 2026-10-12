@@ -1,6 +1,7 @@
 import { type EntryDate, extraDatesOf } from './dates'
 import { type CalendarEvent, DUE_TIME, END_TIME, type EventContext, labelOf, privateProperties, remindersOf, summaryOf } from './event'
 import type { Item } from './model'
+import { hasText } from '@household-brain/core/lib/read'
 
 /**
  * Extra dates get their own Google Calendar events (#34): their ids, the link back to their entry,
@@ -48,7 +49,7 @@ export const entryOfEvent = (event: CalendarEvent): string | null => {
     return event.id?.slice(0, 26) ?? null
   }
   const { 'hb.date': dateId, 'hb.entry': entryId } = properties ?? {}
-  return isDateEventId(event.id) && entryId && dateId && event.id === dateEventId(entryId, dateId) ? entryId : null
+  return isDateEventId(event.id) && hasText(entryId) && hasText(dateId) && event.id === dateEventId(entryId, dateId) ? entryId : null
 }
 
 /**

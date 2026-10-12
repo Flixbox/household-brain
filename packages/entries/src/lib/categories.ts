@@ -45,7 +45,7 @@ export const categoryOfTag = <Entry extends Pick<Category, 'slug' | 'label'>>(ta
     return null
   }
   return categories.find(category => category.label.toLowerCase() === word)
-    ?? categories.find(category => CATEGORY_WORDS[category.slug]?.includes(word)) ?? null
+    ?? categories.find(category => CATEGORY_WORDS[category.slug]?.includes(word) === true) ?? null
 }
 
 const FALLBACK_CATEGORY = 'paperwork'
