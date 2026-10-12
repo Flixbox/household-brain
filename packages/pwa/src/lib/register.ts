@@ -9,7 +9,7 @@ const CHECK_EVERY_MS = 60 * 60 * 1000
 export const $updateWaiting = atom(false)
 
 /** The production build's service worker (`pwa-build`); the dev server has none. */
-const serwist = process.env.NODE_ENV === 'production' && 'serviceWorker' in navigator && new Serwist('/sw.js')
+const serwist = process.env.NODE_ENV === 'production' && 'serviceWorker' in navigator ? new Serwist('/sw.js') : null
 let started = false
 let reloadWhenTakenOver = false
 
@@ -31,7 +31,7 @@ const watchForUpdates = (registration: ServiceWorkerRegistration) => {
 
 /** Registers the service worker, only once per page however often it is called. */
 export const startServiceWorker = () => {
-  if (!serwist || started) {
+  if (serwist === null || started) {
     return
   }
   started = true
@@ -57,7 +57,7 @@ export const startServiceWorker = () => {
 /** Lets the waiting version take over, then reloads the page into it. */
 export const applyUpdate = () => {
   reloadWhenTakenOver = true
-  if (serwist) {
+  if (serwist !== null) {
     serwist.messageSkipWaiting()
   }
 }

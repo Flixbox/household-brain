@@ -6,6 +6,7 @@ import { eventIdForTask } from './ids'
 import { importedTask } from './task-import'
 import { logErrorOnce, logEvent, logRecovered } from '@household-brain/entries/lib/logs'
 import { entryLogMessage } from '@household-brain/entries/lib/logs-messages'
+import { hasText } from '@household-brain/core/lib/read'
 
 /**
  * One task: an entry when its notes hold the Gem's JSON (#118), then ticked off. The entry is saved
@@ -15,7 +16,7 @@ import { entryLogMessage } from '@household-brain/entries/lib/logs-messages'
 const takeTask = async (api: TasksApi, listId: string, task: GoogleTask): Promise<void> => {
   const imported = importedTask(task)
   const id = eventIdForTask(task.id)
-  if (imported && id) {
+  if (imported && hasText(id)) {
     const added = await addImportedItem(id, imported.draft, task.id)
     if (added) {
       logEvent(entryLogMessage('Imported', imported.draft.title), id)
@@ -43,7 +44,7 @@ const tasksApi = createTasksApi({
   forgetToken: forgetCalendarToken,
   token: async () => {
     const token = cachedCalendarToken(tasksScopes, account())
-    return token ? Promise.resolve(token) : Promise.reject(new Error('Google Tasks access is no longer available'))
+    return hasText(token) ? Promise.resolve(token) : Promise.reject(new Error('Google Tasks access is no longer available'))
   },
 })
 

@@ -1,6 +1,7 @@
 import { type Page, expect, test } from '@playwright/test'
 import { allowlist, resetEmulators } from './emulators'
 import { openMenu, signInAs, signOutWith } from './session'
+import { hasText } from '@household-brain/core/lib/read'
 
 test.beforeEach(async () => {
   await resetEmulators()
@@ -59,7 +60,7 @@ test('getting in: signed out, turned away without the allowlist, let in with it,
   await test.step('an allowlisted account gets in, and can sign out again', async () => {
     await signInAs(page, 'owner@household-brain.test')
     const uid = await page.getByTestId('uid').textContent()
-    if (!uid) {
+    if (!hasText(uid)) {
       throw new Error('The no-access screen showed no user id')
     }
     await allowlist(uid)

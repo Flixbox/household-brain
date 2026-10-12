@@ -1,6 +1,7 @@
 import type { Item } from '@household-brain/entries/lib/items/model'
 import { type Urgency, rowDue } from '@household-brain/entries/lib/items/due'
 import type { EntryDate } from '@household-brain/entries/lib/items/dates'
+import { hasText } from '@household-brain/core/lib/read'
 
 const URGENCY_TEXT: Record<Urgency, string> = {
   later: 'text-stone-500',
@@ -36,7 +37,7 @@ export const DueColumn = ({ item, next, more, since, now }: Props) => {
     <span className="flex flex-col items-end text-sm">
       <span className={URGENCY_TEXT[due.urgency]}>{due.label}{more}</span>
       <span className="text-xs text-stone-500 tabular-nums">{next.date}{more}</span>
-      {since && <span className="text-xs text-stone-500 tabular-nums">{since}</span>}
+      {hasText(since) && <span className="text-xs text-stone-500 tabular-nums">{since}</span>}
     </span>
   )
 }

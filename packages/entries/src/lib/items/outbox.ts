@@ -105,7 +105,7 @@ const nextToPush = (): Item | undefined =>
 const readyContext = (): PushContext | null => {
   const uid = auth.currentUser?.uid
   const { categories, config } = data
-  if (!uid || !config || !categories || performance.now() < pausedUntil || !hasCalendarToken(MEMBER_SCOPES, auth.currentUser?.email)) {
+  if (typeof uid !== 'string' || uid === '' || !config || !categories || performance.now() < pausedUntil || !hasCalendarToken(MEMBER_SCOPES, auth.currentUser?.email)) {
     return null
   }
   return { api: outboxApi, categories, config, uid }

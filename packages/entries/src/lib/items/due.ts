@@ -1,3 +1,4 @@
+import { hasText } from '@household-brain/core/lib/read'
 
 /** Every entry is due at this time of day, in the household's time zone. */
 const DUE_TIME = Temporal.PlainTime.from('17:00')
@@ -46,7 +47,7 @@ export const rowDue = (item: { dueDate: string, status: 'open' | 'done' | 'cance
  * is still ahead (a coupon not valid yet); null without one.
  */
 export const startLabel = (startDate: string | null | undefined, now: Temporal.ZonedDateTime): string | null => {
-  if (!startDate) {
+  if (!hasText(startDate)) {
     return null
   }
   try {

@@ -150,6 +150,6 @@ export const recordDateOp = async (item: Item, op: DateOp, error: string | null 
     if (!(await transaction.get(ref)).exists()) {
       return
     }
-    const record = op.kind === 'delete' ? deleteField() : { shape: op.shape, ...error ? { error } : {} }
+    const record = op.kind === 'delete' ? deleteField() : { shape: op.shape, ...typeof error === 'string' && error !== '' ? { error } : {} }
     transaction.update(ref, { [`dateEvents.${op.dateId}`]: record })
   })

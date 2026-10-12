@@ -1,5 +1,6 @@
 import type { Env } from 'bun'
 import type { FirebaseOptions } from 'firebase/app'
+import { hasText } from '@household-brain/core/lib/read'
 
 const REQUIRED = {
   apiKey: 'BUN_PUBLIC_FIREBASE_API_KEY',
@@ -11,7 +12,7 @@ const REQUIRED = {
 
 /** Builds the Firebase options from the build's environment, failing loudly when a value is missing. */
 export const firebaseOptionsFrom = (env: Partial<Record<string, string | undefined>>): FirebaseOptions => {
-  const missing = Object.values(REQUIRED).filter(key => !env[key])
+  const missing = Object.values(REQUIRED).filter(key => !hasText(env[key]))
   if (missing.length > 0) {
     throw new Error(`Missing Firebase config: ${missing.join(', ')}`)
   }

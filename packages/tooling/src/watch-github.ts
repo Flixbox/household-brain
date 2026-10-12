@@ -118,7 +118,7 @@ export const activityOf = async (pr: number): Promise<Activity[]> => {
       .map(item => ({ id: `comment ${count(item.id)}`, line: `comment ${count(item.id)} ${login(item)}: ${oneLine(item.body, 200)}` })),
     ...reviews.filter(item => (item.state !== 'APPROVED' || textOf(item.body) !== '') && (login(item) !== SELF || textOf(item.body) !== ''))
       .map(item => ({ id: `review ${count(item.id)}`, line: `review ${count(item.id)} ${login(item)} ${textOf(item.state)}: ${oneLine(item.body, 200)}` })),
-    ...reviewComments.filter(item => login(item) !== SELF || !item.in_reply_to_id)
+    ...reviewComments.filter(item => login(item) !== SELF || (item.in_reply_to_id ?? null) === null)
       .map(item => ({ id: `review-comment ${count(item.id)}`, line: `review-comment ${count(item.id)} ${login(item)} ${textOf(item.path)}: ${oneLine(item.body, 200)}` })),
   ]
 }
@@ -146,7 +146,7 @@ export const issueEventLines = async (): Promise<string[]> => {
     gh(['api', `repos/${REPO}/issues/comments?per_page=50&sort=created&direction=desc`]),
   ])
   return [
-    ...records(issues).filter(issue => !issue.pull_request && textOf(record(issue.user).login) !== SELF)
+    ...records(issues).filter(issue => (issue.pull_request ?? null) === null && textOf(record(issue.user).login) !== SELF)
       .map(issue => `NEW_ISSUE #${count(issue.number)} ${textOf(issue.title)}`),
     ...records(comments).filter(comment => textOf(record(comment.user).login) === OWNER && textOf(comment.html_url).includes('/issues/'))
       .map(comment => `ISSUE_COMMENT ${count(comment.id)} #${textOf(comment.issue_url).split('/').at(-1) ?? ''}: ${oneLine(comment.body, 300)}`),
@@ -154,7 +154,7 @@ export const issueEventLines = async (): Promise<string[]> => {
 }
 
 export const openIssueNumbers = async (): Promise<number[]> =>
-  (await allPages(`repos/${REPO}/issues?state=open&per_page=100`)).filter(issue => !issue.pull_request).map(issue => count(issue.number))
+  (await allPages(`repos/${REPO}/issues?state=open&per_page=100`)).filter(issue => (issue.pull_request ?? null) === null).map(issue => count(issue.number))
 
 export const issueLine = async (issue: number, change: 'closed' | 'reopened'): Promise<string | null> => {
   const value = record(await gh(['api', `repos/${REPO}/issues/${issue}`]))

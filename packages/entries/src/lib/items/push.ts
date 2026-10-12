@@ -5,6 +5,7 @@ import { deleteDateEvents } from './date-push'
 import { type CalendarEvent, eventFor, patchFor, remindersPatch } from './event'
 import { isDate } from './dates'
 import type { Item } from './model'
+import { hasText } from '@household-brain/core/lib/read'
 
 /** Everything a push needs besides the entry. */
 export interface PushContext {
@@ -143,7 +144,7 @@ export const pushItem = async (context: PushContext, item: Item): Promise<PushOu
     return unschedule(context, item)
   }
   const etag = item.etags[context.uid]
-  if (etag) {
+  if (hasText(etag)) {
     return { event: await patch(context, item, etag), kind: 'synced' }
   }
   // No etag for this person yet: a new entry, one only the other person has pushed, or one created by

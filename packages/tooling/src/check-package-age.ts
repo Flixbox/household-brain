@@ -8,7 +8,7 @@
  *
  * Run from the repository root (it reads bun.lock and bunfig.toml there).
  */
-import { recordOf, textMapOf, textOf } from '@household-brain/core/lib/read'
+import { hasText, recordOf, textMapOf, textOf } from '@household-brain/core/lib/read'
 import { $ } from 'bun'
 import { tooYoung } from './age'
 
@@ -51,7 +51,7 @@ const install = bunfig.install ?? {}
 const excluded = new Set(install.minimumReleaseAgeExcludes ?? [])
 
 const [, , base] = process.argv
-if (!base) {
+if (!hasText(base)) {
   throw new Error('Usage: bun packages/tooling/src/check-package-age.ts <base-ref>')
 }
 const before = await $`git show ${base}:bun.lock`.quiet().nothrow()

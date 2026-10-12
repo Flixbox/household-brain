@@ -10,9 +10,10 @@ import type { PwaConfig } from '@household-brain/pwa/lib/config'
 import { writeAssets } from './assets'
 import { workspaceDescription } from './description'
 import { writeServiceWorker } from './service-worker'
+import { hasText } from '@household-brain/core/lib/read'
 
 const [dir] = process.argv.slice(2)
-if (!dir) {
+if (!hasText(dir)) {
   process.stderr.write('Usage: pwa-build <build dir>\n')
   process.exit(64)
 }

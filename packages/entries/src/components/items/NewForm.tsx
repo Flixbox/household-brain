@@ -7,12 +7,13 @@ import { reportWriteFailure } from '@household-brain/entries/lib/items/write-fai
 import { useLocation } from 'wouter'
 import { paths } from '@household-brain/entries/lib/paths'
 import { ItemForm } from './ItemForm'
+import { hasText } from '@household-brain/core/lib/read'
 
 /** A new entry, starting in `category` when that is one of the household's categories. */
 export const NewForm = ({ category }: { category: string | null }) => {
   const categories = useCategories()
   const [, navigate] = useLocation()
-  const known = category && categories.some(entry => entry.slug === category) ? category : ''
+  const known = hasText(category) && categories.some(entry => entry.slug === category) ? category : ''
   const save = (draft: ItemDraft, { dates }: { dates: EntryDate[] }) => {
     // Order matters: ask Google first, inside the click; save without waiting for the server.
     requestSyncAccess()

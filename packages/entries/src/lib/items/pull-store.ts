@@ -182,7 +182,7 @@ export const forgetDateEvents = async (id: string): Promise<void> =>
 /** An entry from the local cache, or null when the cache doesn't have it (then ask the server). */
 export const readEntryFromCache = async (id: string): Promise<Item | null> => {
   const snapshot = await getDocFromCache(itemDoc(id)).catch(() => null)
-  return snapshot?.exists() ? itemFrom(snapshot.id, snapshot.data()) : null
+  return snapshot?.exists() === true ? itemFrom(snapshot.id, snapshot.data()) : null
 }
 
 /** Tells the other devices what this person's app handles (see APP_SCHEMA). */

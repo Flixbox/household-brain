@@ -1,5 +1,6 @@
 import { PLAIN_NUMBER } from './amount'
 import { CURRENCIES } from './currency'
+import { hasText } from '@household-brain/core/lib/read'
 
 /**
  * The details an event made outside the app carries in its description (#83), e.g. one the Gemini
@@ -61,7 +62,7 @@ const amountOf = (text: string): { amount: string, currency: string } | null => 
   const number = /\d[\d.,]*/u.exec(text)?.[0] ?? ''
   const unit = text.replace(number, '').trim()
   const currency = unit === '' ? 'EUR' : SYMBOLS.find(([symbol]) => symbol === unit)?.[1] ?? CURRENCIES.find(code => code === unit.toUpperCase())
-  if (!PLAIN_NUMBER.test(number) || !currency) {
+  if (!PLAIN_NUMBER.test(number) || !hasText(currency)) {
     return null
   }
   return { amount: number, currency: currency === 'EUR' ? '' : currency }
@@ -76,7 +77,7 @@ type Read =
 const readLine = (line: string): Read => {
   const text = line.trim()
   const code = CODE.exec(text)?.groups
-  if (code?.value) {
+  if (hasText(code?.value)) {
     return { code: code.value, kind: 'code', rest: (code.rest ?? '').trim() }
   }
   const amount = amountOf(AMOUNT.exec(text)?.groups?.value ?? '')

@@ -3,6 +3,7 @@ import { itemPath } from '@household-brain/entries/lib/paths'
 import type { Log } from '@household-brain/entries/lib/documents'
 import type { Item } from '@household-brain/entries/lib/items/model'
 import { logTime } from '@household-brain/entries/lib/logs-messages'
+import { hasText } from '@household-brain/core/lib/read'
 
 const marker = {
   error: 'bg-red-600',
@@ -27,7 +28,7 @@ export const LogRow = ({ log, item, actor }: { log: Log, item: Item | null, acto
         <span aria-hidden="true" className="text-stone-400 transition-transform group-open:rotate-180">▾</span>
       </summary>
       <div className="space-y-2 border-t border-stone-200 px-3 py-3 pl-9 text-sm dark:border-stone-800">
-        {log.detail && <p className="whitespace-pre-wrap break-words">{log.detail}</p>}
+        {hasText(log.detail) && <p className="whitespace-pre-wrap break-words">{log.detail}</p>}
         <p className="text-stone-500 dark:text-stone-400">
           {log.kind === 'error' ? 'Error' : 'Event'}
           {' by '}
@@ -39,7 +40,7 @@ export const LogRow = ({ log, item, actor }: { log: Log, item: Item | null, acto
             Open “{item.title}”
           </Link>
         )}
-        {log.itemId && !item && <p className="text-stone-500 dark:text-stone-400">The entry no longer exists.</p>}
+        {hasText(log.itemId) && !item && <p className="text-stone-500 dark:text-stone-400">The entry no longer exists.</p>}
       </div>
     </details>
   </li>

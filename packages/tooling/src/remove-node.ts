@@ -12,7 +12,9 @@ const remove = async (path: string) => (process.getuid?.() === 0 ? $`rm -f ${pat
 
 const removeAll = async (): Promise<void> => {
   const node = Bun.which('node')
-  if (!node) {
+  // Written out rather than `hasText`: CI runs this before `bun install`, so it can't import
+  // workspace packages.
+  if (node === null || node === '') {
     return
   }
   const real = (await $`readlink -f ${node}`.text()).trim()

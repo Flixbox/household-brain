@@ -1,9 +1,10 @@
 import type { Timestamp } from 'firebase/firestore'
 import { EDITABLE_FIELDS } from '@household-brain/entries/lib/items/model'
+import { hasText } from '@household-brain/core/lib/read'
 
 export const entryLogMessage = (action: string, title: string): string => `${action} "${title}"`
 
-export const errorLogMessage = (message: string, title?: string): string => title ? `${message} "${title}"` : message
+export const errorLogMessage = (message: string, title?: string): string => hasText(title) ? `${message} "${title}"` : message
 
 export const logTime = (at: Timestamp): string => Temporal.Instant.fromEpochMilliseconds(at.toMillis())
   .toZonedDateTimeISO(Temporal.Now.timeZoneId())

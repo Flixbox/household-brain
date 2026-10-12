@@ -6,7 +6,7 @@
  *
  *   bun packages/tooling/src/check-action-age.ts [min-hours=48]    from the repository root; GH_TOKEN reads public repos
  */
-import { recordOf } from '@household-brain/core/lib/read'
+import { hasText, recordOf } from '@household-brain/core/lib/read'
 import { Glob } from 'bun'
 import { hoursSince, tooYoung } from './age'
 import { pinnedActions } from './pins'
@@ -16,7 +16,7 @@ const MINIMUM_SECONDS = Number(minHours) * 60 * 60
 
 const github = async (path: string): Promise<Record<string, unknown> | null> => {
   const response = await fetch(`https://api.github.com/${path}`, {
-    headers: { Accept: 'application/vnd.github+json', ...process.env.GH_TOKEN ? { Authorization: `Bearer ${process.env.GH_TOKEN}` } : {} },
+    headers: { Accept: 'application/vnd.github+json', ...hasText(process.env.GH_TOKEN) ? { Authorization: `Bearer ${process.env.GH_TOKEN}` } : {} },
   })
   return response.ok ? recordOf(await response.json()) : null
 }
@@ -25,15 +25,15 @@ const text = (value: unknown): string | null => (typeof value === 'string' && va
 
 /** When the tag was released, else when its commit was made. */
 const releasedAt = async ({ repo, sha, tag }: { repo: string, sha: string, tag: string | null }): Promise<Temporal.Instant | null> => {
-  const release = tag ? text((await github(`repos/${repo}/releases/tags/${tag}`))?.published_at) : null
-  if (release) {
+  const release = hasText(tag) ? text((await github(`repos/${repo}/releases/tags/${tag}`))?.published_at) : null
+  if (hasText(release)) {
     return Temporal.Instant.from(release)
   }
   const commit = (await github(`repos/${repo}/commits/${sha}`))?.commit
   const committed = typeof commit === 'object' && commit !== null && 'committer' in commit && typeof commit.committer === 'object' && commit.committer !== null && 'date' in commit.committer
     ? text(commit.committer.date)
     : null
-  return committed ? Temporal.Instant.from(committed) : null
+  return hasText(committed) ? Temporal.Instant.from(committed) : null
 }
 
 const workflows = await Promise.all(Array.from(new Glob('.github/workflows/*.{yml,yaml}').scanSync('.')).map(async path => Bun.file(path).text()))

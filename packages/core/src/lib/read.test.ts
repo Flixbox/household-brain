@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'bun:test'
-import { isRecord, recordOf, textMapOf, textOf } from './read'
+import { hasText, isRecord, recordOf, textMapOf, textOf } from './read'
 
 describe('isRecord', () => {
   it('takes plain objects only', () => {
     expect([isRecord({ title: 'Coupon' }), isRecord({}), isRecord(null), isRecord([1]), isRecord('x')]).toEqual([true, true, false, false, false])
+  })
+})
+
+describe('hasText', () => {
+  it('is true only for a non-empty string', () => {
+    expect([hasText('Coupon'), hasText(''), hasText(null)]).toEqual([true, false, false])
   })
 })
 

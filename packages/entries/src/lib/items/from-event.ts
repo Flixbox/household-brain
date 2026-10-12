@@ -4,6 +4,7 @@ import { remindersFromText } from './reminders'
 import { detailsFrom } from './event-details'
 import { intervalFrom } from './interval'
 import type { ItemDraft } from './model'
+import { hasText } from '@household-brain/core/lib/read'
 
 const PREFIX = /^\[(?<label>[^\]]+)\]\s*(?<rest>.*)$/u
 const STATUS_PREFIX = new RegExp(`^\\[(?:${Object.values(STATUS_TAGS).join('|')})\\]\\s*(?<rest>.*)$`, 'u')
@@ -47,7 +48,7 @@ const categoryAndTitle = (event: CalendarEvent, categories: readonly Category[])
   // A done or cancelled entry's event carries `[Done]` / `[Cancelled]` instead of its category; only
   // then is it a tag (an open entry may well be called "[Done] …").
   const status = event.extendedProperties?.private?.['hb.status']
-  const tagged = stored && (status === 'done' || status === 'cancelled') ? STATUS_PREFIX.exec(event.summary ?? '')?.groups?.rest ?? null : null
+  const tagged = hasText(stored) && (status === 'done' || status === 'cancelled') ? STATUS_PREFIX.exec(event.summary ?? '')?.groups?.rest ?? null : null
   const tagless = tagged ?? (category ? rest : null)
   const title = tagless === null ? event.summary ?? '' : titleOf(tagless, categories)
   return { category: stored ?? category?.slug ?? 'uncategorised', tagless, title }
@@ -55,7 +56,7 @@ const categoryAndTitle = (event: CalendarEvent, categories: readonly Category[])
 
 /** An event someone put into the calendar by hand, without the app's category or a category prefix. */
 const isForeign = (event: CalendarEvent, categories: readonly Category[]): boolean =>
-  !event.extendedProperties?.private?.['hb.category'] && !prefixCategory(event, categories).category
+  !hasText(event.extendedProperties?.private?.['hb.category']) && !prefixCategory(event, categories).category
 
 /** Repeating events aren't supported yet: they are left alone entirely. */
 export const isRecurring = (event: CalendarEvent) => Boolean(event.recurrence?.length) || Boolean(event.recurringEventId)
@@ -65,14 +66,14 @@ export const dueDateOf = (event: CalendarEvent): string =>
   (event.start?.date ?? event.start?.dateTime ?? '').slice(0, 10)
 
 /** An ISO 4217 code another currency is stored as; euros, and anything else, read as ''. */
-const currencyOf = (code: string | undefined) => (code && code !== 'EUR' && /^[A-Z]{3}$/u.test(code) ? code : '')
+const currencyOf = (code: string | undefined) => (hasText(code) && code !== 'EUR' && /^[A-Z]{3}$/u.test(code) ? code : '')
 
 /**
  * An event made outside the app that the app is about to take in (a category prefix, but no category
  * of its own yet): its details come from its description (#83), and `categoryFix` writes them to it.
  */
 const isAdopting = (event: CalendarEvent, categories: readonly Category[]) =>
-  !event.extendedProperties?.private?.['hb.category'] && Boolean(prefixCategory(event, categories).category)
+  !hasText(event.extendedProperties?.private?.['hb.category']) && Boolean(prefixCategory(event, categories).category)
 
 /** Code, amount, currency, link and notes: from the event's own properties, or for one being taken in, its description. */
 const detailFields = (event: CalendarEvent, categories: readonly Category[]) => {
@@ -144,7 +145,7 @@ const detailProperties = (draft: ItemDraft): Record<string, string> => Object.fr
 }).filter(([, value]) => value !== ''))
 
 const categoryFix = (event: CalendarEvent, draft: ItemDraft, categories: readonly Category[]): CalendarEvent => {
-  if (event.extendedProperties?.private?.['hb.category']) {
+  if (hasText(event.extendedProperties?.private?.['hb.category'])) {
     // A further tag that names a category (`[Coupon] [Deal] …`) goes from the event's title too.
     const { tagless, title } = categoryAndTitle(event, categories)
     return tagless !== null && tagless !== title ? { summary: summaryOf(draft, categories) } : {}

@@ -12,6 +12,7 @@
     "test": "bun test"
   },
   "dependencies": {
+    "@household-brain/core": "workspace:*",
     "firebase": "13.0.0",
     "nanostores": "1.5.5"
   }

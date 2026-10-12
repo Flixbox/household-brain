@@ -1,3 +1,4 @@
+/* oxlint-disable import/max-dependencies -- the puller is where listing, planning, storing and logging meet */
 import { CalendarApiError, type EventCursor, type EventPage } from '@household-brain/entries/lib/calendar/api'
 import type { CalendarEvent } from './event'
 import { READING_RULES, normalisationFor, ownRemindersFix, rulesReadWith } from './from-event'
@@ -11,6 +12,7 @@ import type { PushContext } from './push'
 import { reportUnlessTransient } from './transient'
 import { importTasks } from './tasks-puller'
 import { logErrorOnce, logGoogleChange, logRecovered } from '@household-brain/entries/lib/logs'
+import { hasText } from '@household-brain/core/lib/read'
 
 const pullLogMessages = { failure: 'Google Calendar pull failed', problem: 'Google Calendar pull had a problem' } as const
 
@@ -49,7 +51,7 @@ const loggedChanges = new Set<string>()
 /** `before` is the entry's title before the change: a deleted event in Google carries none. */
 const logEntryDecision = (event: CalendarEvent, decision: PullDecision, before: string): void => {
   const key = `${event.id ?? ''}@${event.updated ?? ''}`
-  if (!event.id || loggedChanges.has(key) || decision.kind === 'skip'
+  if (!hasText(event.id) || loggedChanges.has(key) || decision.kind === 'skip'
     || (decision.kind === 'update' && !decision.normalise && Object.keys(decision.fields).length === 0)) {
     return
   }
@@ -138,7 +140,7 @@ const applyEntryEvent = async (context: PushContext, event: CalendarEvent, reche
   if (removed !== null && decision.kind !== 'delete') {
     await forgetDateEvents(event.id ?? '')
   }
-  const settled = decision.kind === 'update' && decision.ownCopy
+  const settled = decision.kind === 'update' && decision.ownCopy === true
     ? await fixOwnReminders(context, event, decision.draft)
     : await settleEntryEvent(context, event, decision)
   return settled ?? (removed === '' ? null : removed)
@@ -177,7 +179,7 @@ const applyInOrder = async (events: CalendarEvent[], apply: (event: CalendarEven
   events.reduce<Promise<string[]>>(async (previous, event) => {
     const found = await previous
     const problem = await apply(event)
-    return problem ? [...found, problem] : found
+    return hasText(problem) ? [...found, problem] : found
   }, Promise.resolve([]))
 
 interface Listing {
@@ -189,28 +191,28 @@ interface Listing {
 const listAll = async (context: PushContext, cursor: EventCursor, events: CalendarEvent[] = []): Promise<Listing> => {
   const page: EventPage = await context.api.listEvents(context.config.calendarId, cursor)
   const all = [...events, ...page.items ?? []]
-  return page.nextPageToken
+  return hasText(page.nextPageToken)
     ? listAll(context, { ...cursor, pageToken: page.nextPageToken }, all)
-    : { events: all, ...page.nextSyncToken ? { nextSyncToken: page.nextSyncToken } : {} }
+    : { events: all, ...hasText(page.nextSyncToken) ? { nextSyncToken: page.nextSyncToken } : {} }
 }
 
 /** `recheck`: a full listing because the reading rules changed (#97); every event is read again. */
 const pullPages = async (context: PushContext, syncToken: string | null, recheck: boolean): Promise<string[]> => {
-  const listedSince = syncToken ? null : await serverNow(context.uid)
-  const { events, nextSyncToken } = await listAll(context, syncToken ? { syncToken } : {})
+  const listedSince = hasText(syncToken) ? null : await serverNow(context.uid)
+  const { events, nextSyncToken } = await listAll(context, hasText(syncToken) ? { syncToken } : {})
   // Entries first, in Google's order (later changes to the same entry must land last), then the
   // extra dates' events, so each is judged against its entry as this listing left it.
-  const problems = await applyInOrder(events.filter(event => !entryOfEvent(event)), async event => applyEntryEvent(context, event, recheck))
+  const problems = await applyInOrder(events.filter(event => !hasText(entryOfEvent(event))), async event => applyEntryEvent(context, event, recheck))
   if (listedSince) {
     await removeVanished(new Set(events.map(event => event.id ?? '')), listedSince, async entry => {
       const problem = await removeDateEvents(context, entry)
-      if (problem) {
+      if (hasText(problem)) {
         problems.push(problem)
       }
     })
   }
-  const dateProblems = await applyInOrder(events.filter(event => entryOfEvent(event)), async event => applyDateEvent(context, event, entryOfEvent(event) ?? ''))
-  if (nextSyncToken && nextSyncToken !== syncToken) {
+  const dateProblems = await applyInOrder(events.filter(event => hasText(entryOfEvent(event))), async event => applyDateEvent(context, event, entryOfEvent(event) ?? ''))
+  if (hasText(nextSyncToken) && nextSyncToken !== syncToken) {
     await saveSyncToken(context.uid, nextSyncToken, rulesReadWith(context.categories))
   }
   return [...problems, ...dateProblems]
@@ -234,7 +236,7 @@ const pullCalendar = async (context: PushContext): Promise<string[]> => {
   try {
     return await pullPages(context, syncToken, recheck)
   } catch (error) {
-    if (!syncToken || !isStatus(error, 410)) {
+    if (!hasText(syncToken) || !isStatus(error, 410)) {
       throw error
     }
     return pullPages(context, null, recheck)

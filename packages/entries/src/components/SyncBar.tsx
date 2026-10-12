@@ -7,6 +7,7 @@ import { retryItem } from '@household-brain/entries/lib/items/store'
 import { dismissWriteFailures, reportWriteFailure, useWriteFailures } from '@household-brain/entries/lib/items/write-failures'
 import { stringify } from '@household-brain/core/lib/stringify'
 import { ignoreFailure } from '@household-brain/core/lib/ignore'
+import { hasText } from '@household-brain/core/lib/read'
 
 const bar = 'flex flex-wrap items-center gap-3 rounded-lg px-4 py-3 text-sm'
 // Google's error messages can hold long URLs without spaces; let them wrap anywhere, or they widen the
@@ -37,7 +38,7 @@ export const SyncBar = () => {
           <button type="button" className="font-semibold underline" onClick={() => { retryItem(item).catch(reportWriteFailure) }}>Retry</button>
         </div>
       ))}
-      {pullProblem && <p role="alert" className={errorBar}>Couldn&apos;t read changes from Google Calendar: {pullProblem}</p>}
+      {hasText(pullProblem) && <p role="alert" className={errorBar}>Couldn&apos;t read changes from Google Calendar: {pullProblem}</p>}
       {writeFailures.length > 0 && (
         <div className={errorBar}>
           <p role="alert" className="flex-1">Couldn&apos;t save: {writeFailures.join('; ')}</p>

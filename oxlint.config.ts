@@ -32,9 +32,9 @@ export default defineConfig({
     // marked `async` (promise-function-async) even when it has nothing to await, which only the
     // type-aware rule allows.
     'eslint/require-await': 'off',
-    // Type-aware rules (oxlint-tsgolint, #167) not switched on yet: #168 turns them on one by one, with their fixes.
+    // Deep `readonly` on every parameter (React props and library types included) is more ceremony
+    // than protection here (owner's call, #168).
     'typescript/prefer-readonly-parameter-types': 'off',
-    'typescript/strict-boolean-expressions': 'off',
     'react/rules-of-hooks': 'error',
     // Continuation lines of a comment stay lowercase
     'eslint/capitalized-comments': ['error', 'always', { 'ignoreConsecutiveComments': true }],

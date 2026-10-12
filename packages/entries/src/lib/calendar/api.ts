@@ -1,4 +1,5 @@
 import type { CalendarEvent } from '@household-brain/entries/lib/items/event'
+import { hasText } from '@household-brain/core/lib/read'
 
 const BASE = 'https://www.googleapis.com/calendar/v3'
 
@@ -142,10 +143,10 @@ const eventMethods = (call: Call) => ({
   insertEvent: async (calendarId: string, body: CalendarEvent) => call<CalendarEvent>({ body, method: 'POST', path: events(calendarId) }),
   listEvents: async (calendarId: string, { syncToken, pageToken }: EventCursor) => {
     const query = new URLSearchParams({ maxResults: '250', showDeleted: 'true' })
-    if (syncToken) {
+    if (hasText(syncToken)) {
       query.set('syncToken', syncToken)
     }
-    if (pageToken) {
+    if (hasText(pageToken)) {
       query.set('pageToken', pageToken)
     }
     return call<EventPage>({ method: 'GET', path: `${events(calendarId)}?${query}` })

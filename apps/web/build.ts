@@ -10,9 +10,10 @@
  */
 import { cp, rm } from 'node:fs/promises'
 import tailwind from 'bun-plugin-tailwind'
+import { hasText } from '@household-brain/core/lib/read'
 
 const [mode, outdir] = process.argv.slice(2)
-if ((mode !== 'production' && mode !== 'e2e') || !outdir) {
+if ((mode !== 'production' && mode !== 'e2e') || !hasText(outdir)) {
   process.stderr.write('Usage: bun --env-file=.env.<mode> build.ts <production|e2e> <out dir>\n')
   process.exit(64)
 }
