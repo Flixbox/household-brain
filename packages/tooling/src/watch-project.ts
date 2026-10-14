@@ -281,7 +281,9 @@ const checkPrs = async (): Promise<void> => {
 }
 
 const watchRound = async (): Promise<void> => {
-  await inOrder([checkMain, checkMainHead, checkIssues, checkIssueStates, checkPrs], async check => check())
+  // Pull requests before issues: an approval or a failed CI run must not wait behind issue comments
+  // (#197), since the watcher reports one event per run.
+  await inOrder([checkMain, checkMainHead, checkPrs, checkIssues, checkIssueStates], async check => check())
   if (Temporal.Instant.compare(Temporal.Now.instant(), started.add({ hours: Number(maxHours) })) > 0) {
     sayAndExit([`IDLE: nothing happened for ${maxHours} h`])
   }
