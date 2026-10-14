@@ -6,7 +6,7 @@ import { intervalFrom } from './interval'
 import type { ItemDraft } from './model'
 import { hasText } from '@household-brain/core/lib/read'
 
-const PREFIX = /^\[(?<label>[^\]]+)\]\s*(?<rest>.*)$/u
+const PREFIX = /^\[(?<label>[^\]]+)\]\s*(?<rest>(?:\S.*)?)$/u
 const STATUS_PREFIX = new RegExp(`^\\[(?:${Object.values(STATUS_TAGS).join('|')})\\]\\s*(?<rest>.*)$`, 'u')
 
 const prefixCategory = (event: CalendarEvent, categories: readonly Category[]) => {
@@ -14,7 +14,7 @@ const prefixCategory = (event: CalendarEvent, categories: readonly Category[]) =
   return { category: categoryOfTag(label, categories), rest }
 }
 
-const LEADING_TAG = /^(?<tag>\[(?<label>[^\]]+)\]\s*)(?<rest>.*)$/u
+const LEADING_TAG = /^(?<tag>\[(?<label>[^\]]+)\]\s*)(?<rest>(?:\S.*)?)$/u
 
 /**
  * A title without the leading tags that name a category: "[Deal] Shop" after "[Coupon]" is "Shop".

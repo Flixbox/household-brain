@@ -17,14 +17,14 @@ export interface EventDetails {
   notes: string
 }
 
-const CODE = /^code\s*:\s*(?<value>\S+)(?<rest>.*)$/iu
+const CODE = /^code\s*:\s*(?<value>\S+)(?<rest>(?:[^\S\n\r\u2028\u2029].*)?)$/iu
 const AMOUNT = /^amount\s*:\s*(?<value>\S.*)$/iu
 const LINK = /^(?:link|url)\s*:\s*(?<value>\S+)$/iu
 const WEB_ADDRESS = /https?:\/\/[^\s<>"]+/iu
 // Whether a description is HTML is told by the tags Google Calendar's editor writes; otherwise angle
 // brackets (`<https://…>` pasted from an email) are text. Once it is HTML, every tag goes (Google also
 // wraps it in `<html-blob>`), as a literal `<` in HTML is escaped.
-const HTML_TAG = /<\/?(?:a|b|br|div|em|html-blob|i|li|ol|p|span|strong|u|ul)\b[^>]*>/iu
+const HTML_TAG = /<\/?(?:[abipu]|br|div|em|html-blob|li|ol|span|strong|ul)\b[^>]*>/iu
 
 // Longest first, so "R$" wins over "$".
 const SYMBOLS: readonly [string, string][] = [['R$', 'BRL'], ['€', 'EUR'], ['£', 'GBP'], ['$', 'USD']]
