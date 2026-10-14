@@ -1,3 +1,4 @@
+/* oxlint-disable eslint/no-await-in-loop -- the watcher's rounds run one after another, on purpose */
 /**
  * Watches the whole project until something needs attention, then prints it and exits:
  *
@@ -16,11 +17,11 @@
  *   MAIN_SLOW                        the newest CI run on main hangs
  *   NEW_ISSUE / ISSUE_COMMENT        a new issue (not the agent's own), or the owner commented on one
  *   ISSUE_CLOSED / ISSUE_REOPENED    an issue was closed (by anyone) or reopened
- *   IDLE                             nothing happened for max-hours
+ *   IDLE                             nothing happened for max-hours (with --follow: a heartbeat, then it goes on)
  *
  * Every CI result (a PR's, a deploy's or main's) ends with the list of open PRs.
  *
- *   bun packages/tooling/src/watch-project.ts [ci-limit-minutes=20] [max-hours=12]
+ *   bun packages/tooling/src/watch-project.ts [--follow] [ci-limit-minutes=20] [max-hours=12]
  *
  * Open pull requests are watched, and every one seen open stays watched until its deploy (or its
  * closing) is reported; merged ones from the last few hours too, for a fresh state. Each follows its
@@ -28,48 +29,30 @@
  * (watch-state.ts), so start it again after handling each event and it continues with the next one.
  * Run it in the background: its exit is the notification. Bun reads the whole file before running
  * it, so editing the checkout meanwhile is harmless.
+ *
+ * With `--follow` it keeps running instead (#196): each event is printed as it happens and ends with a
+ * `---` line, for a harness that wakes on new output (Claude Code's Monitor), so one watcher lasts the
+ * whole session. It still reports one event at a time, and goes straight on with the next.
  */
-import { type Activity, type Event, FOLLOW_NEWER, cancelledDeployEvent, issueKey, listsOpenPrs, mainRunEvent, newActivity, openPrLines, runEvent } from './watch-events'
+import { type Activity, FOLLOW_NEWER, cancelledDeployEvent, issueKey, mainRunEvent, newActivity, runEvent } from './watch-events'
 import { type PrState, REPO, activityOf, issueEventLines, issueLine, jobLines, mainAhead, mainHead, newestMainRun, openIssueNumbers, openPrs, prState, recentlyMerged, reviewCommentLines, runOf } from './watch-github'
 import { appendLines, exists, lock, readLines, writeLines } from './watch-state'
+import { EVENT_PRINTED, quiet, report, sayAndExit } from './watch-output'
 import { hasText } from '@household-brain/core/lib/read'
 
-const [, , limitMinutes = '20', maxHours = '12'] = process.argv
+const [limitMinutes = '20', maxHours = '12'] = process.argv.slice(2).filter(arg => arg !== '--follow')
 if (!/^\d+$/u.test(limitMinutes) || !/^\d+$/u.test(maxHours)) {
   process.stderr.write('ci-limit-minutes and max-hours must be whole numbers\n')
   process.exit(64)
 }
 const LIMIT_SECONDS = Number(limitMinutes) * 60
 const MERGED_HOURS = Number(process.env.MERGED_HOURS ?? 3)
-const started = Temporal.Now.instant()
 const round = { complete: true }
 /** Read through a function: the checks of a round reset `round.complete`, which TypeScript can't see. */
 const roundComplete = () => round.complete
 
-const say = (lines: readonly string[]) => process.stdout.write(`${lines.join('\n')}\n`)
 const short = (sha: string) => sha.slice(0, 7)
 const byNumber = (first: number, second: number) => first - second
-
-/** Prints the event and exits, unless there is none or it was reported before. */
-const report = async (event: Event | null, pr: number | null = null): Promise<void> => {
-  if (!event || (await readLines('reported')).includes(event.key)) {
-    return
-  }
-  await appendLines('reported', [event.key])
-  const [first = '', ...rest] = event.lines
-  say([pr === null ? first : `PR #${pr}: ${first}`, ...rest])
-  // Every CI result comes with where each open PR stands, so no approval goes unnoticed.
-  if (listsOpenPrs(event.key)) {
-    say(await openPrs().then(openPrLines, () => ['Open PRs: (listing failed)']))
-  }
-  process.exit(0)
-}
-
-/** Prints lines that aren't keyed events (activity, issues) and exits. */
-const sayAndExit = (lines: readonly string[]): never => {
-  say(lines)
-  return process.exit(0)
-}
 
 const inOrder = async <Item>(items: readonly Item[], each: (item: Item) => Promise<unknown>): Promise<void> =>
   items.reduce<Promise<void>>(async (previous, item) => {
@@ -280,16 +263,29 @@ const checkPrs = async (): Promise<void> => {
   await (roundComplete() ? writeLines('initialized', []) : Promise.resolve())
 }
 
-const watchRound = async (): Promise<void> => {
-  // Pull requests before issues: an approval or a failed CI run must not wait behind issue comments
-  // (#197), since the watcher reports one event per run.
-  await inOrder([checkMain, checkMainHead, checkPrs, checkIssues, checkIssueStates], async check => check())
-  if (Temporal.Instant.compare(Temporal.Now.instant(), started.add({ hours: Number(maxHours) })) > 0) {
-    sayAndExit([`IDLE: nothing happened for ${maxHours} h`])
+/** One look at everything; true when it printed an event (following), so the next look comes at once. */
+const lookOnce = async (): Promise<boolean> => {
+  const idle = { due: false }
+  try {
+    // Pull requests before issues: an approval or a failed CI run must not wait behind issue comments
+    // (#197), since the watcher reports one event at a time.
+    await inOrder([checkMain, checkMainHead, checkPrs, checkIssues, checkIssueStates], async check => check())
+    idle.due = Temporal.Instant.compare(Temporal.Now.instant(), quiet.since.add({ hours: Number(maxHours) })) > 0
+    if (idle.due) {
+      sayAndExit([`IDLE: nothing happened for ${maxHours} h`])
+    }
+  } catch (error) {
+    if (error !== EVENT_PRINTED) {
+      throw error
+    }
+    // After a heartbeat the next look waits like after an empty round.
+    return !idle.due
   }
-  await Bun.sleep(60_000)
-  await watchRound()
+  return false
 }
 
+// A loop rather than a function awaiting itself: following, the watcher runs for a whole session.
 await lock()
-await watchRound()
+for (;;) {
+  await (await lookOnce() ? Promise.resolve() : Bun.sleep(60_000))
+}
