@@ -17,7 +17,7 @@ export interface EventDetails {
   notes: string
 }
 
-const CODE = /^code\s*:\s*(?<value>\S+)(?<rest>(?:\s.*)?)$/iu
+const CODE = /^code\s*:\s*(?<value>\S+)(?<rest>(?:[^\S\n\r\u2028\u2029].*)?)$/iu
 const AMOUNT = /^amount\s*:\s*(?<value>\S.*)$/iu
 const LINK = /^(?:link|url)\s*:\s*(?<value>\S+)$/iu
 const WEB_ADDRESS = /https?:\/\/[^\s<>"]+/iu
