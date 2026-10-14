@@ -19,6 +19,7 @@ export const SyncBar = () => {
   const { failed, missingCalendar, needsAccess, pullProblem, waiting } = useOutbox()
   const writeFailures = useWriteFailures()
   const [problem, setProblem] = useState('')
+  const changes = waiting === 1 ? '1 change' : `${waiting} changes`
   // Shows its own problem, so the click has nothing left to handle.
   const sync = async () => syncNow().then(() => { setProblem('') }, (error: unknown) => { setProblem(stringify(error)) })
   return (
@@ -26,7 +27,7 @@ export const SyncBar = () => {
       {(waiting > 0 || needsAccess) && (
         <div className={`${bar} bg-stone-200 dark:bg-stone-800`}>
           <p role="status" className="flex-1">
-            {waiting > 0 ? `${waiting === 1 ? '1 change' : `${waiting} changes`} not yet in Google Calendar.` : 'Not synced with Google Calendar on this device yet.'}
+            {waiting > 0 ? `${changes} not yet in Google Calendar.` : 'Not synced with Google Calendar on this device yet.'}
           </p>
           {missingCalendar && <Link href={paths.settings} className="font-semibold underline">Set up the calendar</Link>}
           {needsAccess && !missingCalendar && <button type="button" className="font-semibold text-orange-700 dark:text-orange-400" onClick={() => { sync().catch(ignoreFailure) }}>Sync now</button>}

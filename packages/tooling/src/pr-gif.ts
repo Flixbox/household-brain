@@ -25,14 +25,17 @@ const usage = (): never => {
 }
 
 const fetchVideos = async ([run, device, dir]: string[]) => {
-  await $`${GH} run download ${run ?? usage()} --repo Flixbox/household-brain --name ${`e2e-videos-${device ?? usage()}`} --dir ${dir ?? usage()}`
-  process.stdout.write(`${(await $`find ${dir ?? usage()} -name '*.webm'`.text()).split('\n').filter(Boolean).toSorted().join('\n')}\n`)
+  const artifact = `e2e-videos-${device ?? usage()}`
+  await $`${GH} run download ${run ?? usage()} --repo Flixbox/household-brain --name ${artifact} --dir ${dir ?? usage()}`
+  const found = await $`find ${dir ?? usage()} -name '*.webm'`.text()
+  process.stdout.write(`${found.split('\n').filter(Boolean).toSorted().join('\n')}\n`)
 }
 
 const sheet = async ([video, out]: string[]) => {
   const fps = Number(process.env.SHEET_FPS ?? 4)
   const duration = Number(await $`ffprobe -v error -show_entries format=duration -of csv=p=0 ${video ?? usage()}`.text())
-  await $`ffmpeg -loglevel error -y -i ${video ?? usage()} -vf ${`fps=${fps},scale=240:-1,tile=6x${sheetRows(duration, fps)}`} -frames:v 1 ${out ?? usage()}`
+  const filter = `fps=${fps},scale=240:-1,tile=6x${sheetRows(duration, fps)}`
+  await $`ffmpeg -loglevel error -y -i ${video ?? usage()} -vf ${filter} -frames:v 1 ${out ?? usage()}`
   process.stdout.write(`${out}: tile n is second n/${fps}\n`)
 }
 
