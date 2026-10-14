@@ -7,8 +7,8 @@ import { auth } from '@household-brain/firebase/firebase'
 import { signOutOfApp } from '@household-brain/shell/lib/session'
 import { hasText } from '@household-brain/core/lib/read'
 
-const button = 'rounded-lg bg-orange-600 px-4 py-2 font-semibold text-white hover:bg-orange-700'
-const secondaryButton = 'rounded-lg border border-stone-300 px-4 py-2 font-medium dark:border-stone-700'
+const buttonClass = 'rounded-lg bg-orange-600 px-4 py-2 font-semibold text-white hover:bg-orange-700'
+const secondaryButtonClass = 'rounded-lg border border-stone-300 px-4 py-2 font-medium dark:border-stone-700'
 
 /** Google sign-in in its window; `signingIn` while that window is open. */
 const useSignIn = () => {
@@ -43,7 +43,7 @@ export const AccessGate = ({ children }: { children: ReactNode }) => {
       {access.state === 'loading' && <p>Loading…</p>}
       {access.state === 'signed-out' && (
         <div className="space-y-3">
-          <button type="button" className={button} onClick={signIn}>Sign in with Google</button>
+          <button type="button" className={buttonClass} onClick={signIn}>Sign in with Google</button>
           {hasText(signInError) && <p role="alert" className="text-sm text-red-700 dark:text-red-400">{signInError}</p>}
         </div>
       )}
@@ -53,9 +53,9 @@ export const AccessGate = ({ children }: { children: ReactNode }) => {
           <p>
             Ask the owner to add your user id to the allowlist:
             {' '}
-            <code data-testid="uid" className="rounded bg-stone-200 px-1.5 py-0.5 dark:bg-stone-800">{access.user.uid}</code>
+            <code data-testid="uid" className="rounded-sm bg-stone-200 px-1.5 py-0.5 dark:bg-stone-800">{access.user.uid}</code>
           </p>
-          <button type="button" className={secondaryButton} onClick={() => { signOutOfApp().catch(reportError) }}>Sign out</button>
+          <button type="button" className={secondaryButtonClass} onClick={() => { signOutOfApp().catch(reportError) }}>Sign out</button>
         </div>
       )}
       {access.state === 'error' && (
@@ -63,8 +63,8 @@ export const AccessGate = ({ children }: { children: ReactNode }) => {
           <p className="font-semibold">Couldn&apos;t check access.</p>
           <p className="text-sm text-stone-500">{access.message}</p>
           <div className="flex gap-3">
-            <button type="button" className={button} onClick={() => { globalThis.location.reload() }}>Retry</button>
-            <button type="button" className={secondaryButton} onClick={() => { signOutOfApp().catch(reportError) }}>Sign out</button>
+            <button type="button" className={buttonClass} onClick={() => { globalThis.location.reload() }}>Retry</button>
+            <button type="button" className={secondaryButtonClass} onClick={() => { signOutOfApp().catch(reportError) }}>Sign out</button>
           </div>
         </div>
       )}

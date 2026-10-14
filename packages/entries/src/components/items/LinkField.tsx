@@ -1,5 +1,5 @@
 import { LINK_PATTERN, openableLink } from '@household-brain/entries/lib/items/link'
-import { textField } from '@household-brain/entries/lib/styles'
+import { textFieldClass } from '@household-brain/entries/lib/styles'
 import { Field } from './Field'
 import { hasText } from '@household-brain/core/lib/read'
 
@@ -11,7 +11,7 @@ export const LinkField = ({ value, onChange }: { value: string, onChange: (event
     <div className="flex items-end gap-2">
       <div className="min-w-0 flex-1">
         <Field label="Link">
-          <input inputMode="url" autoCapitalize="none" pattern={LINK_PATTERN} title="A web address, e.g. example.de or https://example.de/deal" placeholder="example.de" className={`${textField} w-full`} value={value} onChange={onChange} />
+          <input inputMode="url" autoCapitalize="none" pattern={LINK_PATTERN} title="A web address, e.g. example.de or https://example.de/deal" placeholder="example.de" className={`${textFieldClass} w-full`} value={value} onChange={onChange} />
         </Field>
       </div>
       {hasText(href) && (
