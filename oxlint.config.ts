@@ -10,6 +10,8 @@ export default defineConfig({
   ],
   jsPlugins: [
     '@stylistic/eslint-plugin',
+    // React's own plugin, under another name: oxlint's react plugin already answers to `react-hooks`.
+    { name: 'react-compiler', specifier: 'eslint-plugin-react-hooks' },
   ],
   // Rules that need type information (oxlint-tsgolint, #167), for the CLI, editors and lint:fix alike.
   options: {
@@ -36,6 +38,23 @@ export default defineConfig({
     // than protection here (owner's call, #168).
     'typescript/prefer-readonly-parameter-types': 'off',
     'react/rules-of-hooks': 'error',
+    // The React Compiler's own checks (#187): what makes it skip a component, or what it would get
+    // wrong. The compiler memoises this whole codebase, so a skipped component is a silent slowdown.
+    'react-compiler/static-components': 'error',
+    'react-compiler/use-memo': 'error',
+    'react-compiler/void-use-memo': 'error',
+    'react-compiler/preserve-manual-memoization': 'error',
+    'react-compiler/incompatible-library': 'error',
+    'react-compiler/immutability': 'error',
+    'react-compiler/globals': 'error',
+    'react-compiler/refs': 'error',
+    'react-compiler/set-state-in-effect': 'error',
+    'react-compiler/error-boundaries': 'error',
+    'react-compiler/purity': 'error',
+    'react-compiler/set-state-in-render': 'error',
+    'react-compiler/unsupported-syntax': 'error',
+    'react-compiler/config': 'error',
+    'react-compiler/gating': 'error',
     // Continuation lines of a comment stay lowercase
     'eslint/capitalized-comments': ['error', 'always', { 'ignoreConsecutiveComments': true }],
     // Router links (wouter) are styled like anchors
