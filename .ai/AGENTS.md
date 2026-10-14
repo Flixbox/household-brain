@@ -75,7 +75,10 @@ delete and recreate the issue (owner's `gh`), or tell the owner for a pull reque
 
 **Track queued work as GitHub issues.** Every idea or request that isn't being built right now gets
 an issue (assigned to the owner, an existing label such as `enhancement`), and the pull request that
-delivers it says `Closes #n`. Nothing waits only in a chat.
+delivers it says `Closes #n`. Nothing waits only in a chat. A pull request that does only part of
+an issue says `Related to #n` from the start: changing `Closes` to `Related to` later doesn't
+undo GitHub's link, and the merge still closes the issue (#191 closed #172 that way); if it
+happens, reopen the issue with a comment.
 
 **Read the issue and all its comments before starting work on it.** The owner decides things in
 issue comments (e.g. #43); the description alone can be out of date.
