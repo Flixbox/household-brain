@@ -19,9 +19,9 @@ const useSignIn = () => {
     setSigningIn(true)
     signInWithPopup(auth, new GoogleAuthProvider()).then(() => {
       setSigningIn(false)
-    }, (failure: unknown) => {
+    }, (error: unknown) => {
       setSigningIn(false)
-      setSignInError(signInErrorMessage(failure) ?? '')
+      setSignInError(signInErrorMessage(error) ?? '')
     })
   }
   return { signIn, signInError, signingIn }

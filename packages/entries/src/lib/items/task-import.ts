@@ -22,9 +22,11 @@ const nullableText = (value: unknown): boolean => value === null || typeof value
 
 const hasRightType = (field: KnownField, value: unknown): boolean => {
   switch (field) {
-    case 'v': return typeof value === 'number' && Number.isFinite(value)
+    case 'v': { return typeof value === 'number' && Number.isFinite(value)
+    }
     case 'title':
-    case 'category': return typeof value === 'string'
+    case 'category': { return typeof value === 'string'
+    }
     case 'amount':
     case 'code':
     case 'currency':
@@ -32,8 +34,10 @@ const hasRightType = (field: KnownField, value: unknown): boolean => {
     case 'interval':
     case 'notes':
     case 'startDate':
-    case 'url': return nullableText(value)
-    default: return false
+    case 'url': { return nullableText(value)
+    }
+    default: { return false
+    }
   }
 }
 

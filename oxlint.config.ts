@@ -6,6 +6,7 @@ export default defineConfig({
     'react',
     'typescript',
     'oxc',
+    'unicorn',
     'import',
   ],
   jsPlugins: [
@@ -36,6 +37,34 @@ export default defineConfig({
     // than protection here (owner's call, #168).
     'typescript/prefer-readonly-parameter-types': 'off',
     'react/rules-of-hooks': 'error',
+    // The code uses null for "nothing" throughout (Firestore stores null; `undefined` is banned by
+    // `eslint/no-undefined`), so unicorn's ban on null would contradict that.
+    'unicorn/no-null': 'off',
+    // Calls nested four deep still read well (`expect(text(of(x)))`); five is where a name helps.
+    'unicorn/max-nested-calls': ['error', { max: 4 }],
+    // Its fix writes `x === undefined`, which `eslint/no-undefined` bans.
+    'unicorn/no-typeof-undefined': 'off',
+    // Its fix turns `async () => Promise.reject(…)` into a bare `throw`, which then has nothing to
+    // await and fails `typescript/require-await` (#186).
+    'unicorn/no-useless-promise-resolve-reject': 'off',
+    // A catch variable named for what it is (`conflict`) reads better than `error`, and renaming it
+    // to `error` shadows an outer `error`.
+    'unicorn/catch-error-name': 'off',
+    // Its fix turns `Array.from(list.values())` inside a `map` callback into a spread, which
+    // `oxc/no-map-spread` then reports.
+    'unicorn/prefer-spread': 'off',
+    // Its fix deletes `export {}` from a declaration file, which turns `declare module 'bun'` from an
+    // addition to Bun's types into a replacement of them.
+    'unicorn/require-module-specifiers': 'off',
+    // `(await read()).length` is clear; a throwaway variable for each of them reads worse.
+    'unicorn/no-await-expression-member': 'off',
+    // The reduce calls chain promises one after another, the idiom here: a loop with `await` in it is
+    // what `eslint/no-await-in-loop` forbids.
+    'unicorn/no-array-reduce': 'off',
+    // A case listed before `default` keeps `typescript/switch-exhaustiveness-check` satisfied.
+    'unicorn/no-useless-switch-case': 'off',
+    // Components and their files are PascalCase (`ItemForm.tsx`), everything else kebab-case.
+    'unicorn/filename-case': ['error', { cases: { kebabCase: true, pascalCase: true } }],
     // Continuation lines of a comment stay lowercase
     'eslint/capitalized-comments': ['error', 'always', { 'ignoreConsecutiveComments': true }],
     // Router links (wouter) are styled like anchors
@@ -235,6 +264,8 @@ export default defineConfig({
       rules: {
         'import/no-default-export': 'off',
         'import/no-nodejs-modules': 'off',
+        // A config file is a list (this one most of all): its length is its content.
+        'eslint/max-lines': 'off',
       },
     },
     {
@@ -258,9 +289,11 @@ export default defineConfig({
       // Test fakes implement async interfaces without needing to await anything, and a test is a
       // linear script: splitting it to satisfy size limits would hide the steps it checks. Fixtures
       // fill in only the fields a test is about, and fakes stand in for Google's and the browser's
-      // objects, so tests may cast (#68); the app's code may not.
+      // objects, so tests may cast (#68); the app's code may not. A test's helpers sit next to the
+      // steps that use them, and a journey's code run in the browser (`page.evaluate`) must stay inside it.
       files: ['**/*.test.ts', 'tests/**', 'apps/web/e2e/**'],
       rules: {
+        'unicorn/consistent-function-scoping': 'off',
         'eslint/max-lines-per-function': 'off',
         'eslint/max-statements': 'off',
         'typescript/require-await': 'off',
@@ -272,6 +305,13 @@ export default defineConfig({
       files: ['apps/web/e2e/**'],
       rules: {
         'eslint/max-lines': 'off',
+      },
+    },
+    {
+      // Command-line scripts end with an exit code that tells their caller (CI, a shell) how it went.
+      files: ['apps/web/build.ts', 'packages/pwa/src/build.ts', 'packages/tooling/src/**'],
+      rules: {
+        'unicorn/no-process-exit': 'off',
       },
     },
   ],

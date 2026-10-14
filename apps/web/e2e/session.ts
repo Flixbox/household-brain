@@ -3,9 +3,8 @@ import { allowlist } from './emulators'
 import { hasText } from '@household-brain/core/lib/read'
 
 declare global {
-  interface Window {
-    e2eSignIn: (email: string) => Promise<unknown>
-  }
+  // Set on `globalThis` by the e2e build (packages/firebase/src/firebase.ts).
+  var e2eSignIn: (email: string) => Promise<unknown>
 }
 
 /** Opens the app menu (the drawer behind the top bar's button). */
@@ -25,8 +24,8 @@ export const signOutWith = async (page: Page, button: Locator) => {
  * (main.tsx checks for Temporal first), so the hook may not be there yet.
  */
 export const signInAs = async (page: Page, email: string) => {
-  await page.waitForFunction(() => typeof window.e2eSignIn === 'function')
-  return page.evaluate(async address => window.e2eSignIn(address), email)
+  await page.waitForFunction(() => typeof globalThis.e2eSignIn === 'function')
+  return page.evaluate(async address => globalThis.e2eSignIn(address), email)
 }
 
 /** Signs in, reads the user id from the no-access screen, allowlists it, and waits until access is granted. */

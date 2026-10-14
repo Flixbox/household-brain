@@ -53,7 +53,7 @@ describe('a date event changed in Google', () => {
     const asTheirs = { ...asGoogle, extendedProperties: ownWritten.extendedProperties }
     // The other person's write left this person's copy at the defaults: put back as this person.
     expect(change({ ...asTheirs, reminders: { useDefault: true } }, entry)).toEqual({ kind: 'rewrite' })
-    const reversed = [{ method: 'popup', minutes: 1440 }, { method: 'popup', minutes: 10080 }]
+    const reversed = [{ method: 'popup', minutes: 1440 }, { method: 'popup', minutes: 10_080 }]
     expect(change({ ...asTheirs, reminders: { overrides: reversed, useDefault: false } }, entry)).toEqual({ kind: 'none' })
   })
 

@@ -153,7 +153,9 @@ adapted to this repository:
      it continues with the next one.
    - **With a harness that wakes on new output lines** (Claude Code's `Monitor`), run it once with
      `--follow` instead: it keeps running, prints each event as it happens and ends each one with a
-     `---` line, so it never needs restarting (#196). `IDLE` is then a heartbeat, not an exit.
+     `---` line, so it never needs restarting (#196). `IDLE` is then a heartbeat, not an exit. A
+     `Monitor` stops after 30 minutes at most: re-arm it when its expiry notice comes; the watcher
+     picks up where it left off.
    - Bun reads the whole program before running it, so checking out or editing the tooling under a
      running watcher is harmless (the bash watcher had to run from a copy).
    - It stays armed through the merge and reports the deploy. Don't poll by hand alongside it.
@@ -402,7 +404,9 @@ adapted to this repository:
   rendering), or the compiler skips it or its memoisation changes what renders. That includes
   values from outside React read during render: the compiler takes them as unchanging, so read
   them through a store (`useStore($user)`, not `auth.currentUser`). Components need a name
-  (`const RootLayout = () => …`); an anonymous one isn't compiled.
+  (`const RootLayout = () => …`); an anonymous one isn't compiled. Lint runs the compiler's own
+  checks (oxlint's `react/immutability`, `purity`, `refs`, `set-state-in-render` and the rest, #187),
+  so code the compiler would skip or get wrong fails the lint instead of silently losing its memoisation.
 - **An effect returns only a cleanup function.** Write `useEffect(() => { doIt() }, [])` with a block
   unless `doIt` returns the cleanup: React calls whatever an effect returns, and Chrome's `scrollTo`
   returns a promise, so an expression body blanked the app when a page was left (#165). TypeScript

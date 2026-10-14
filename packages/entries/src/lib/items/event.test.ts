@@ -69,7 +69,7 @@ describe('patchFor', () => {
     const weekAhead = { ...item, reminders: '10080,0' }
     expect(eventFor(weekAhead, context)).toMatchObject({
       extendedProperties: { private: { 'hb.reminders': '10080,0' } },
-      reminders: { overrides: [{ method: 'popup', minutes: 10080 }, { method: 'popup', minutes: 0 }], useDefault: false },
+      reminders: { overrides: [{ method: 'popup', minutes: 10_080 }, { method: 'popup', minutes: 0 }], useDefault: false },
     })
     expect(eventFor(item, context).extendedProperties?.private).not.toHaveProperty('hb.reminders')
     expect(patchFor(item, ['reminders'], context)).toEqual({

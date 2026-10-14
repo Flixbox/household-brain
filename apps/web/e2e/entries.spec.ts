@@ -88,7 +88,7 @@ test('entries: categories and the form, added, edited, deleted, and a double-tap
     await synced()
     await expect.poll(() => google.live().find(event => event.summary === '[Coupon] Amazon')).toMatchObject({
       extendedProperties: { private: expect.objectContaining({ 'hb.reminders': '10080,1440' }) },
-      reminders: { overrides: [{ method: 'popup', minutes: 10080 }, { method: 'popup', minutes: 1440 }], useDefault: false },
+      reminders: { overrides: [{ method: 'popup', minutes: 10_080 }, { method: 'popup', minutes: 1440 }], useDefault: false },
     })
 
     // Delete.

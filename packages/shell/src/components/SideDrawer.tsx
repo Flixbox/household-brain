@@ -5,6 +5,14 @@ import { signOutOfApp } from '@household-brain/shell/lib/session'
 
 const item = 'block w-full rounded-lg px-3 py-2 text-left font-medium hover:bg-stone-100 dark:hover:bg-stone-800'
 
+// A click on the dialog itself, not on anything inside it, is a click on the backdrop: the dialog
+// has no padding, so its own box is all nav.
+const closeOnBackdrop = (event: MouseEvent<HTMLDialogElement>) => {
+  if (event.target === event.currentTarget) {
+    closeMenu()
+  }
+}
+
 /**
  * The app menu: a modal drawer from the right with what the app puts in it (`children`) and
  * "Sign out". A native dialog, so focus stays inside and Escape closes it; so does a tap beside it.
@@ -21,13 +29,6 @@ export const SideDrawer = ({ children }: { children: ReactNode }) => {
       dialog.current.close()
     }
   }, [open])
-  // A click on the dialog itself, not on anything inside it, is a click on the backdrop: the dialog
-  // has no padding, so its own box is all nav.
-  const closeOnBackdrop = (event: MouseEvent<HTMLDialogElement>) => {
-    if (event.target === event.currentTarget) {
-      closeMenu()
-    }
-  }
   return (
     <dialog
       ref={dialog}

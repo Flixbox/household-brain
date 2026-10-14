@@ -46,7 +46,7 @@ export const nextDateWork = (items: readonly Item[], context: PushContext, ready
     return null
   }
   const eventContext = { categories: context.categories, timeZone: context.config.timeZone }
-  for (const item of items.filter(ready)) {
+  for (const item of items.filter(entry => ready(entry))) {
     const op = planDates(item, eventContext).find(candidate => !done.has(keyOf({ item, op: candidate })))
     if (op) {
       return { item, op }

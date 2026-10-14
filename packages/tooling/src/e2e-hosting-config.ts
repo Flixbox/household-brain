@@ -52,5 +52,6 @@ export const e2eHostingConfig = (config: FirebaseConfig): FirebaseConfig => {
 }
 
 if (import.meta.main) {
-  await Bun.write('firebase.e2e.json', `${JSON.stringify(e2eHostingConfig(configFrom(await Bun.file('firebase.json').text())), null, 2)}\n`)
+  const config = configFrom(await Bun.file('firebase.json').text())
+  await Bun.write('firebase.e2e.json', `${JSON.stringify(e2eHostingConfig(config), null, 2)}\n`)
 }

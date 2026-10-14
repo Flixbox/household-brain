@@ -26,10 +26,10 @@ const cachedDocuments = async (page: Page) => page.evaluate(async () => {
         resolve(counts.reduce((sum, request) => sum + request.result, 0))
       }
     }
-    open.onerror = () => { resolve(0) }
+    open.addEventListener('error', () => { resolve(0) })
   })
   const names = (await indexedDB.databases()).map(entry => entry.name ?? '').filter(name => name.startsWith('firestore/'))
-  const counts = await Promise.all(names.map(count))
+  const counts = await Promise.all(names.map(async name => count(name)))
   return counts.reduce((sum, value) => sum + value, 0)
 })
 

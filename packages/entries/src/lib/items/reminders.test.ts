@@ -5,17 +5,17 @@ describe('reminders', () => {
   it('reads the household default as its two reminders, and none as none', () => {
     expect(reminderMinutes('')).toEqual([2880, 1440])
     expect(reminderMinutes('none')).toEqual([])
-    expect(reminderMinutes('10080,0')).toEqual([10080, 0])
+    expect(reminderMinutes('10080,0')).toEqual([10_080, 0])
   })
 
   it('stores the default as empty, none as "none", and anything else largest first', () => {
     expect(remindersValue([1440, 2880])).toBe('')
     expect(remindersValue([])).toBe('none')
-    expect(remindersValue([0, 10080, 0])).toBe('10080,0')
+    expect(remindersValue([0, 10_080, 0])).toBe('10080,0')
   })
 
   it("keeps within Google's limits: five at most, none beyond four weeks", () => {
-    expect(remindersValue([0, 1440, 2880, 10080, 20160, 40320])).toBe('40320,20160,10080,2880,1440')
+    expect(remindersValue([0, 1440, 2880, 10_080, 20_160, 40_320])).toBe('40320,20160,10080,2880,1440')
     expect(remindersValue([50_000, -5, 1.5, 60])).toBe('60')
   })
 

@@ -28,7 +28,7 @@ const CORS = {
 export const mockGoogle = async (page: Page, { calendarId = 'household@group.calendar.google.test', refuseFirstToken = false } = {}) => {
   await page.addInitScript((refuseFirst: boolean) => {
     let refused = !refuseFirst
-    Object.assign(window, {
+    Object.assign(globalThis, {
       google: {
         accounts: {
           oauth2: {

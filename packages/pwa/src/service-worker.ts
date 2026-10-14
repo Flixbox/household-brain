@@ -1,6 +1,6 @@
 /* oxlint-disable import/no-nodejs-modules -- a build step: runs on Bun at build time, never in the browser */
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import path from 'node:path'
 import { injectManifest } from '@serwist/build'
 import type { PwaConfig } from '@household-brain/pwa/lib/config'
 
@@ -11,7 +11,7 @@ import type { PwaConfig } from '@household-brain/pwa/lib/config'
 export const writeServiceWorker = async (dir: string, config: PwaConfig) => {
   const compiled = await Bun.build({
     define: { NETWORK_ONLY: JSON.stringify(config.networkOnly) },
-    entrypoints: [join(import.meta.dir, 'sw.ts')],
+    entrypoints: [path.join(import.meta.dir, 'sw.ts')],
     format: 'iife',
     minify: true,
     target: 'browser',
@@ -20,7 +20,7 @@ export const writeServiceWorker = async (dir: string, config: PwaConfig) => {
   if (!compiled.success || !output) {
     throw new AggregateError(compiled.logs, 'The service worker did not compile')
   }
-  const source = join(tmpdir(), `household-brain-sw-${process.pid}.js`)
+  const source = path.join(tmpdir(), `household-brain-sw-${process.pid}.js`)
   await Bun.write(source, output)
   const { count, warnings } = await injectManifest({
     // The bundler's file names already carry a content hash, so they need no revision of their own.
@@ -29,7 +29,7 @@ export const writeServiceWorker = async (dir: string, config: PwaConfig) => {
     // Only the install dialog shows the screenshots: not worth storing offline.
     globIgnores: ['screenshots/**'],
     globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}'],
-    swDest: join(dir, 'sw.js'),
+    swDest: path.join(dir, 'sw.js'),
     swSrc: source,
   })
   if (warnings.length > 0) {

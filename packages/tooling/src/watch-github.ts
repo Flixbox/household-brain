@@ -19,7 +19,7 @@ const IGNORED = new Set([SELF, 'nx-cloud[bot]'])
 
 type Json = Record<string, unknown>
 
-const records = (value: unknown): Json[] => (Array.isArray(value) ? value.filter(isRecord) : [])
+const records = (value: unknown): Json[] => (Array.isArray(value) ? value.filter(item => isRecord(item)) : [])
 
 /** The line a review comment is on; one on an outdated diff only has its original line. */
 const lineOf = (item: Record<string, unknown>) => [item.line, item.original_line].find((value): value is number => typeof value === 'number')
@@ -32,7 +32,7 @@ const gh = async (args: string[], cli = GH): Promise<unknown> => JSON.parse(awai
 /** Every item of a paged list, all pages in one array (`--slurp` wraps each page). */
 const allPages = async (path: string, cli = GH): Promise<Json[]> => {
   const pages = await gh(['api', '--paginate', '--slurp', path], cli)
-  return Array.isArray(pages) ? pages.flatMap(records) : []
+  return Array.isArray(pages) ? pages.flatMap(item => records(item)) : []
 }
 
 const runFrom = (value: Json): Run => ({
@@ -75,8 +75,8 @@ const decisionOf = async (pr: number, reviewDecision: unknown, author: string): 
   }
   const reviews = await allPages(`repos/${REPO}/pulls/${pr}/reviews`).catch(() => [])
   return decisionFrom(reviews
-    .map(item => ({ login: textOf(record(item.user).login), state: textOf(item.state) }))
-    .filter(({ login }) => login !== author && login !== SELF))
+    .map(item => ({ login: login(item), state: textOf(item.state) }))
+    .filter(review => review.login !== author && review.login !== SELF))
 }
 
 export const openPrs = async (): Promise<OpenPr[]> =>
@@ -123,6 +123,9 @@ export const recentlyMerged = async (hours: number): Promise<number[]> => {
     .map(pr => count(pr.number))
 }
 
+/** Who wrote a comment or review. */
+const login = (item: Json) => textOf(record(item.user).login)
+
 /** Comments, reviews (not plain approvals) and review comments on a PR, the agent's own left out. */
 export const activityOf = async (pr: number): Promise<Activity[]> => {
   const [comments, reviews, reviewComments] = await Promise.all([
@@ -130,7 +133,6 @@ export const activityOf = async (pr: number): Promise<Activity[]> => {
     allPages(`repos/${REPO}/pulls/${pr}/reviews`, ACTIVITY_GH),
     allPages(`repos/${REPO}/pulls/${pr}/comments`, ACTIVITY_GH),
   ])
-  const login = (item: Json) => textOf(record(item.user).login)
   return [
     ...comments.filter(item => !IGNORED.has(login(item)))
       .map(item => ({ id: `comment ${count(item.id)}`, line: `comment ${count(item.id)} ${login(item)}: ${oneLine(item.body, 200)}` })),

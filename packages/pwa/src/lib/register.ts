@@ -38,7 +38,7 @@ export const startServiceWorker = () => {
   serwist.addEventListener('waiting', () => { $updateWaiting.set(true) })
   serwist.addEventListener('controlling', () => {
     if (reloadWhenTakenOver) {
-      window.location.reload()
+      globalThis.location.reload()
     }
   })
   serwist.register().then(registration => {

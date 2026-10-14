@@ -25,7 +25,7 @@ test('setting up: the owner creates the household calendar, then a second person
     await expect(page.getByRole('status').filter({ hasText: 'The Household Brain calendar is ready' })).toBeVisible()
 
     const setup = setupOnly(requests)
-    expect(setup.map(call)).toEqual([
+    expect(setup.map(item => call(item))).toEqual([
       'GET /users/me/calendarList',
       'POST /calendars',
       `GET /users/me/calendarList/${CALENDAR}`,
@@ -55,7 +55,7 @@ test('setting up: the owner creates the household calendar, then a second person
     await expect(page.getByRole('status').filter({ hasText: 'Connected' })).toBeVisible()
 
     const setup = setupOnly(partner.requests)
-    expect(setup.map(call)).toEqual([`GET /users/me/calendarList/${CALENDAR}`, 'POST /users/me/calendarList'])
+    expect(setup.map(item => call(item))).toEqual([`GET /users/me/calendarList/${CALENDAR}`, 'POST /users/me/calendarList'])
     expect(setup[1]?.body).toEqual({ defaultReminders: TWO_REMINDERS, id: CALENDAR })
 
     await page.getByRole('button', { name: 'Connect my Google Calendar' }).click()

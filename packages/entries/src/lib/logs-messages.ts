@@ -14,7 +14,7 @@ const DETAIL_LIMIT = 4000
 const FIELD_NAMES: Record<string, string> = { dueDate: 'due date', startDate: 'start date' }
 
 /** A log's detail as stored: web addresses left out (they can carry codes), and kept short. */
-export const logDetail = (text: string): string => text.replace(/https?:\/\/\S+/gu, '[link]').slice(0, DETAIL_LIMIT)
+export const logDetail = (text: string): string => text.replaceAll(/https?:\/\/\S+/gu, '[link]').slice(0, DETAIL_LIMIT)
 
 /**
  * Which of an entry's fields changed, by name only: never their values (amounts, codes). Bookkeeping
