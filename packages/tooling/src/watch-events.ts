@@ -124,11 +124,11 @@ export const decisionFrom = (reviews: readonly { login: string, state: string }[
       latest.set(login, state)
     }
   }
-  const states = [...latest.values()]
-  if (states.includes('CHANGES_REQUESTED')) {
+  const states = new Set(latest.values())
+  if (states.has('CHANGES_REQUESTED')) {
     return 'CHANGES_REQUESTED'
   }
-  return states.includes('APPROVED') ? 'APPROVED' : ''
+  return states.has('APPROVED') ? 'APPROVED' : ''
 }
 
 const review = (decision: string) => {

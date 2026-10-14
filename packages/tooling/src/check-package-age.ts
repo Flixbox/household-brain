@@ -48,9 +48,9 @@ const publishedAt = async (spec: string): Promise<Temporal.Instant | null> => {
 
 const bunfig: { install?: { minimumReleaseAge?: number, minimumReleaseAgeExcludes?: string[] } } = Bun.TOML.parse(await Bun.file('bunfig.toml').text())
 const install = bunfig.install ?? {}
-const excluded = new Set(install.minimumReleaseAgeExcludes ?? [])
+const excluded = new Set(install.minimumReleaseAgeExcludes)
 
-const [, , base] = process.argv
+const [base] = process.argv.slice(2)
 if (!hasText(base)) {
   throw new Error('Usage: bun packages/tooling/src/check-package-age.ts <base-ref>')
 }

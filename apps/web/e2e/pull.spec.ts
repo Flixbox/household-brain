@@ -196,7 +196,7 @@ test('edits racing Google Calendar: a waiting edit, a conflict, an open form cat
       start: { dateTime: '2026-12-27T17:00:00' },
     })
     // This person's own copy follows the merged entry too, although their edit didn't touch it (#74).
-    await expect.poll(() => byId(id)?.reminders).toEqual({ overrides: [{ method: 'popup', minutes: 10080 }], useDefault: false })
+    await expect.poll(() => byId(id)?.reminders).toEqual({ overrides: [{ method: 'popup', minutes: 10_080 }], useDefault: false })
   })
 
   await test.step('an edit made here keeps a field someone else changed in Google meanwhile', async () => {

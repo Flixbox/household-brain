@@ -72,7 +72,9 @@ export const pruneOldLogs = (): void => {
         return
       }
       const batch = writeBatch(db)
-      snapshot.docs.forEach(entry => { batch.delete(entry.ref) })
+      for (const entry of snapshot.docs) {
+        batch.delete(entry.ref)
+      }
       await batch.commit()
     })
     .catch(ignoreFailure)

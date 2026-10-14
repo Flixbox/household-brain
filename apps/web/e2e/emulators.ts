@@ -41,7 +41,7 @@ const valueOf = (value: Seeded): object => {
 
 export const seedDocument = async (path: string, fields: Record<string, Seeded>) => {
   const response = await fetch(
-    `${FIRESTORE}/v1/projects/${PROJECT}/databases/(default)/documents/${path.split('/').map(encodeURIComponent).join('/')}`,
+    `${FIRESTORE}/v1/projects/${PROJECT}/databases/(default)/documents/${path.split('/').map(item => encodeURIComponent(item)).join('/')}`,
     {
       body: JSON.stringify({ fields: Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, valueOf(value)])) }),
       headers: { 'Authorization': 'Bearer owner', 'Content-Type': 'application/json' },
@@ -56,7 +56,7 @@ export const seedDocument = async (path: string, fields: Record<string, Seeded>)
 /** Reads a document as the console would (bypassing the rules); null when it doesn't exist. */
 export const readDocument = async (path: string): Promise<Record<string, unknown> | null> => {
   const response = await fetch(
-    `${FIRESTORE}/v1/projects/${PROJECT}/databases/(default)/documents/${path.split('/').map(encodeURIComponent).join('/')}`,
+    `${FIRESTORE}/v1/projects/${PROJECT}/databases/(default)/documents/${path.split('/').map(item => encodeURIComponent(item)).join('/')}`,
     { headers: { Authorization: 'Bearer owner' } },
   )
   if (response.status === 404) {

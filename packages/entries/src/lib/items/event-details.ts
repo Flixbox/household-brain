@@ -113,7 +113,7 @@ export const detailsFrom = (description: string): EventDetails => {
     amount: amount?.read.kind === 'amount' ? amount.read.amount : '',
     code: code?.read.kind === 'code' ? code.read.code : '',
     currency: amount?.read.kind === 'amount' ? amount.read.currency : '',
-    notes: lines.map(noteOf).filter(note => note !== '').join('\n').trim(),
+    notes: lines.map(item => noteOf(item)).filter(note => note !== '').join('\n').trim(),
     url: address?.read.kind === 'url' ? address.read.url : addressIn(plainText(description)),
   }
 }

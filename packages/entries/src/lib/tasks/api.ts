@@ -70,7 +70,7 @@ const createCall = (access: Access, fetchFn: Fetch): Call => {
 }
 
 /** Every item of a paged listing, following `nextPageToken` from page to page. */
-const allItems = async <Item>(call: Call, listing: { path: string, query: Record<string, string> }, before: { items: Item[], pageToken?: string } = { items: [] }): Promise<Item[]> => {
+const allItems = async <Item>(call: Call, listing: { path: string, query: Record<string, string> }, before: { items: Item[], pageToken?: string }): Promise<Item[]> => {
   const query = new URLSearchParams({ ...listing.query, ...hasText(before.pageToken) ? { pageToken: before.pageToken } : {} }).toString()
   const page = await call<{ items?: Item[], nextPageToken?: string }>({ method: 'GET', path: `${listing.path}${query ? `?${query}` : ''}` })
   const items = [...before.items, ...page.items ?? []]
@@ -83,7 +83,7 @@ export const createTasksApi = (access: Access, fetchFn: Fetch = async (input, in
     completeTask: async (taskListId, taskId) => {
       await call({ body: { status: 'completed' }, method: 'PATCH', path: `/lists/${id(taskListId)}/tasks/${id(taskId)}` })
     },
-    listOpenTasks: async (taskListId: string) => allItems<GoogleTask>(call, { path: `/lists/${id(taskListId)}/tasks`, query: { showCompleted: 'false', showHidden: 'false' } }),
-    listTaskLists: async () => allItems<TaskList>(call, { path: '/users/@me/lists', query: {} }),
+    listOpenTasks: async (taskListId: string) => allItems<GoogleTask>(call, { path: `/lists/${id(taskListId)}/tasks`, query: { showCompleted: 'false', showHidden: 'false' } }, { items: [] }),
+    listTaskLists: async () => allItems<TaskList>(call, { path: '/users/@me/lists', query: {} }, { items: [] }),
   }
 }

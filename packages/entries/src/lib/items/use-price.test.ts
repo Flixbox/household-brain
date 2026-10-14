@@ -11,7 +11,7 @@ describe('refreshEuroRates', () => {
   it('fetches once a day, and after a failure again only once the retry time has passed', async () => {
     let clock = 0
     spyOn(performance, 'now').mockImplementation(() => clock)
-    const fetch = spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('offline')).mockResolvedValue(new Response(JSON.stringify(answer)))
+    const fetch = spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('offline')).mockResolvedValue(Response.json(answer))
 
     await refreshEuroRates('2026-10-02')
     expect($euroRates.get()).toBeNull()

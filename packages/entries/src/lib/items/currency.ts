@@ -22,5 +22,5 @@ export const ratesOf = (answer: unknown): Record<string, number> => {
   if (!Array.isArray(answer)) {
     return {}
   }
-  return Object.fromEntries(answer.filter(isRate).map(entry => [entry.quote, entry.rate]))
+  return Object.fromEntries(answer.filter(item => isRate(item)).map(entry => [entry.quote, entry.rate]))
 }

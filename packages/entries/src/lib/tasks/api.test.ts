@@ -7,7 +7,7 @@ const access = () => ({
   token: async () => 'tasks-token',
 })
 
-const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status })
+const response = (body: unknown, status = 200) => Response.json(body, { status })
 
 describe('createTasksApi', () => {
   it('reads every task list and every open-task page', async () => {

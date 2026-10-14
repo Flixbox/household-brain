@@ -36,22 +36,21 @@ interface TokenClient {
 }
 
 declare global {
-  interface Window {
-    google?: {
-      accounts: {
-        oauth2: {
-          initTokenClient: (config: {
-            client_id: string
-            scope: string
-            include_granted_scopes: boolean
-            hint?: string
-            callback: (response: TokenResponse) => void
-            error_callback: (error: { type: string, message?: string }) => void
-          }) => TokenClient
-        }
+  // On `globalThis`, where Google's script puts it (a page's `window` is `globalThis`).
+  var google: {
+    accounts: {
+      oauth2: {
+        initTokenClient: (config: {
+          client_id: string
+          scope: string
+          include_granted_scopes: boolean
+          hint?: string
+          callback: (response: TokenResponse) => void
+          error_callback: (error: { type: string, message?: string }) => void
+        }) => TokenClient
       }
     }
-  }
+  } | undefined
 }
 
 export interface Token {
@@ -83,7 +82,7 @@ let gisLoaded: Promise<void> | null = null
  * blocked.
  */
 export const loadGis = async (): Promise<void> => {
-  if (window.google?.accounts.oauth2) {
+  if (globalThis.google?.accounts.oauth2) {
     return
   }
   gisLoaded ??= new Promise((resolve, reject) => {
@@ -101,7 +100,7 @@ const usable = (token: Token | null, scopes: readonly string[], account: string 
   token !== null && Boolean(account) && token.account === account && now() < token.usableUntil && scopes.every(scope => token.scopes.includes(scope))
 
 const requestToken = async (scopes: readonly string[], hint?: string | null): Promise<TokenResponse> => {
-  const oauth2 = window.google?.accounts.oauth2
+  const oauth2 = globalThis.google?.accounts.oauth2
   if (!oauth2) {
     throw new Error('Google sign-in is unavailable')
   }

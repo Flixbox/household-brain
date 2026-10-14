@@ -11,7 +11,7 @@ import { Glob } from 'bun'
 import { hoursSince, tooYoung } from './age'
 import { pinnedActions } from './pins'
 
-const [, , minHours = '48'] = process.argv
+const [minHours = '48'] = process.argv.slice(2)
 const MINIMUM_SECONDS = Number(minHours) * 60 * 60
 
 const github = async (path: string): Promise<Record<string, unknown> | null> => {
@@ -36,7 +36,7 @@ const releasedAt = async ({ repo, sha, tag }: { repo: string, sha: string, tag: 
   return hasText(committed) ? Temporal.Instant.from(committed) : null
 }
 
-const workflows = await Promise.all(Array.from(new Glob('.github/workflows/*.{yml,yaml}').scanSync('.')).map(async path => Bun.file(path).text()))
+const workflows = await Promise.all([...new Glob('.github/workflows/*.{yml,yaml}').scanSync('.')].map(async path => Bun.file(path).text()))
 const pins = pinnedActions(workflows.join('\n'))
 // Every workflow pins its actions by commit: finding none means the scan itself broke.
 if (pins.length === 0) {

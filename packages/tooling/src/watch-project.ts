@@ -206,13 +206,13 @@ const firstRun = async (name: string, lines: string[]): Promise<boolean> => {
 /** Issues and the owner's comments on them not reported yet; the ones from before the first run aren't news. */
 const checkIssues = async (): Promise<void> => {
   const lines = await issueEventLines().catch(() => null)
-  if (!lines || await firstRun('issues', lines.map(issueKey))) {
+  if (!lines || await firstRun('issues', lines.map(item => issueKey(item)))) {
     return
   }
   const seen = new Set(await readLines('issues'))
   const fresh = lines.filter(line => !seen.has(issueKey(line)))
   if (fresh.length > 0) {
-    await appendLines('issues', fresh.map(issueKey))
+    await appendLines('issues', fresh.map(item => issueKey(item)))
     sayAndExit(fresh)
   }
 }

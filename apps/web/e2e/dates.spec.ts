@@ -91,12 +91,12 @@ test("while someone's app doesn't know date events yet, extra dates stay out of 
     })
     return requests.length === before
   }, { timeout: 15_000 }).toBe(true)
-  expect(requests.some(isDateInsert)).toBe(false)
+  expect(requests.some(item => isDateInsert(item))).toBe(false)
 
   // Once that person's app is updated too, the date event follows.
   await seedDocument('syncState/older-app', { schema: 2, syncToken: 'sync-1' })
   await expect.poll(summaries).toEqual(['[Membership] Streaming', '[Membership] Streaming · Cancel by'])
-  expect(requests.filter(isDateInsert)).toHaveLength(1)
+  expect(requests.filter(item => isDateInsert(item))).toHaveLength(1)
 
   await test.step('a date event deleted in Google Calendar removes the date in the app', async () => {
     const row = page.getByRole('region', { name: 'Membership' }).getByRole('link', { name: /Streaming/u })

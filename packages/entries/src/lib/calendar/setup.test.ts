@@ -97,7 +97,7 @@ describe('joinHousehold', () => {
   })
 
   it('changes nothing when everything is already right', async () => {
-    const { api, calls } = fakeApi({ 'cal-1': { defaultReminders: [...DEFAULT_REMINDERS].reverse(), id: 'cal-1' } })
+    const { api, calls } = fakeApi({ 'cal-1': { defaultReminders: DEFAULT_REMINDERS.toReversed(), id: 'cal-1' } })
     expect(await joinHousehold(api, config)).toBe(false)
     expect(calls).toEqual(['get cal-1'])
   })

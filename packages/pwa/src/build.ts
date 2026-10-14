@@ -5,7 +5,7 @@
  * Turns a finished web build into an installable app that works offline: `pwa-build <build dir>`,
  * run in the app's folder after the bundler, which reads the app's `pwa.config.ts`.
  */
-import { resolve } from 'node:path'
+import path from 'node:path'
 import type { PwaConfig } from '@household-brain/pwa/lib/config'
 import { writeAssets } from './assets'
 import { workspaceDescription } from './description'
@@ -17,7 +17,7 @@ if (!hasText(dir)) {
   process.stderr.write('Usage: pwa-build <build dir>\n')
   process.exit(64)
 }
-const { default: config }: { default: PwaConfig } = await import(resolve('pwa.config.ts'))
+const { default: config }: { default: PwaConfig } = await import(path.resolve('pwa.config.ts'))
 await writeAssets(dir, config, await workspaceDescription())
 const stored = await writeServiceWorker(dir, config)
 process.stdout.write(`${dir}: icons, manifest and a service worker that stores ${stored} files\n`)

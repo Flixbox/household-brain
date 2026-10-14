@@ -54,6 +54,6 @@ const commands: Record<string, { arity: number, run: (args: string[]) => Promise
   gif: { arity: 4, run: gif },
   sheet: { arity: 2, run: sheet },
 }
-const [, , command = '', ...args] = process.argv
+const [command = '', ...args] = process.argv.slice(2)
 const chosen = commands[command]
 await (chosen?.arity === args.length ? chosen.run(args) : usage())
