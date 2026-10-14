@@ -45,6 +45,8 @@ export default defineConfig({
     // SonarJS's checks (#187): likely bugs (identical branches, conditions always true, ignored results)
     // and complexity, as a guardrail against sprawling code. Its recommended set, but for the rules below.
     // Under `exactOptionalPropertyTypes`, `?: string | undefined` says something `?: string` doesn't.
+    // The rule skips itself under that option only when it gets a TypeScript program, which oxlint's
+    // JS plugins don't, so here it still reports.
     'sonarjs/no-redundant-optional': 'off',
     // The `no-unused-vars` of oxlint itself has this covered, and SonarJS's flags the `{ id: _id, ...rest }`
     // way of leaving a property out.
