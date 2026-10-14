@@ -190,7 +190,7 @@ interface EventCall {
 const listed = (events: Map<string, Record<string, unknown>>, url: string) => {
   const token = new URL(url).searchParams.get('syncToken')
   const since = token === null ? 0 : Number(/^sync-(?<version>\d+)$/u.exec(token)?.groups?.version ?? Number.NaN)
-  return Number.isNaN(since) ? null : [...events.values()].filter(event => Number(String(event.etag).replaceAll(/[^0-9]/gu, '')) > since)
+  return Number.isNaN(since) ? null : [...events.values()].filter(event => Number(String(event.etag).replaceAll(/\D/gu, '')) > since)
 }
 
 const handleEvent = async ({ request, path, body, events, latest, listing, stored, reply }: EventCall) => {
