@@ -153,7 +153,9 @@ adapted to this repository:
      it continues with the next one.
    - **With a harness that wakes on new output lines** (Claude Code's `Monitor`), run it once with
      `--follow` instead: it keeps running, prints each event as it happens and ends each one with a
-     `---` line, so it never needs restarting (#196). `IDLE` is then a heartbeat, not an exit.
+     `---` line, so it never needs restarting (#196). `IDLE` is then a heartbeat, not an exit. A
+     `Monitor` stops after 30 minutes at most: re-arm it when its expiry notice comes; the watcher
+     picks up where it left off.
    - Bun reads the whole program before running it, so checking out or editing the tooling under a
      running watcher is harmless (the bash watcher had to run from a copy).
    - It stays armed through the merge and reports the deploy. Don't poll by hand alongside it.
