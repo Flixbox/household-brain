@@ -13,6 +13,7 @@ export default defineConfig({
   ],
   jsPlugins: [
     '@stylistic/eslint-plugin',
+    'eslint-plugin-playwright',
   ],
   // Rules that need type information (oxlint-tsgolint, #167), for the CLI, editors and lint:fix alike.
   options: {
@@ -322,6 +323,48 @@ export default defineConfig({
       files: ['apps/web/e2e/**'],
       rules: {
         'eslint/max-lines': 'off',
+        // Playwright's own checks (#187): missing awaits on its async calls, fixed waits, focused or
+        // skipped tests, assertions that don't retry. The plugin's recommended set, all as errors.
+        'playwright/consistent-spacing-between-blocks': 'error',
+        'playwright/expect-expect': 'error',
+        'playwright/max-nested-describe': 'error',
+        'playwright/missing-playwright-await': 'error',
+        'playwright/no-conditional-expect': 'error',
+        // Guards that narrow a value before use (`if (!box) throw …`) aren't branching test logic.
+        'playwright/no-conditional-in-test': 'off',
+        'playwright/no-duplicate-hooks': 'error',
+        'playwright/no-duplicate-slow': 'error',
+        'playwright/no-element-handle': 'error',
+        'playwright/no-eval': 'error',
+        'playwright/no-focused-test': 'error',
+        'playwright/no-force-option': 'error',
+        'playwright/no-identical-title': 'error',
+        // A sub-step shares its step's locators (`toggle`, `coupons`); flattening would declare them twice.
+        'playwright/no-nested-step': 'off',
+        'playwright/no-networkidle': 'error',
+        'playwright/no-page-pause': 'error',
+        // A journey that only one device can run skips the others with a reason; a bare skip still fails.
+        'playwright/no-skipped-test': ['error', { allowConditional: true }],
+        'playwright/no-standalone-expect': 'error',
+        'playwright/no-unnecessary-assertions': 'error',
+        'playwright/no-unsafe-references': 'error',
+        'playwright/no-unused-locators': 'error',
+        'playwright/no-useless-await': 'error',
+        'playwright/no-useless-not': 'error',
+        'playwright/no-wait-for-navigation': 'error',
+        'playwright/no-wait-for-selector': 'error',
+        'playwright/no-wait-for-timeout': 'error',
+        'playwright/prefer-hooks-in-order': 'error',
+        'playwright/prefer-hooks-on-top': 'error',
+        'playwright/prefer-locator': 'error',
+        'playwright/prefer-to-have-count': 'error',
+        'playwright/prefer-to-have-length': 'error',
+        'playwright/prefer-web-first-assertions': 'error',
+        'playwright/valid-describe-callback': 'error',
+        'playwright/valid-expect': 'error',
+        'playwright/valid-expect-in-promise': 'error',
+        'playwright/valid-test-tags': 'error',
+        'playwright/valid-title': 'error',
       },
     },
     {

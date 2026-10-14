@@ -125,7 +125,7 @@ test('entries: categories and the form, added, edited, deleted, and a double-tap
     await page.getByRole('button', { name: 'Delete entry' }).click()
     await expect(row).toHaveCount(0)
     await expect(page.getByText('not yet in Google Calendar')).toHaveCount(0)
-    expect(google.live().length, requests.slice(before).map(request => `${request.method} ${request.path}`).join(' | ')).toBe(0)
+    expect(google.live(), requests.slice(before).map(request => `${request.method} ${request.path}`).join(' | ')).toHaveLength(0)
     // At most one insert: the delete may even win before the entry was ever sent.
     expect(requests.slice(before).filter(request => request.method === 'POST' && request.path.endsWith('/events')).length).toBeLessThanOrEqual(1)
   })
@@ -207,7 +207,7 @@ test('without Google access an entry waits, "Sync now" sends it, and a reload ke
   await page.getByLabel('Due date (17:00)').fill('2026-12-01')
   await page.getByRole('button', { name: 'Save' }).click()
   await expect(page.getByText('1 change not yet in Google Calendar.')).toBeVisible()
-  expect(google.live().length).toBe(0)
+  expect(google.live()).toHaveLength(0)
 
   await page.getByRole('button', { name: 'Sync now' }).click()
   await expect(page.getByText('not yet in Google Calendar')).toHaveCount(0)
