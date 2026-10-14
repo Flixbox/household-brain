@@ -1,6 +1,6 @@
 /** The project watcher's questions to GitHub, through the `gh` CLI, answered as plain data. */
 import { $ } from 'bun'
-import type { Activity, OpenPr, Run } from './watch-events'
+import { type Activity, type OpenPr, type Run, decisionFrom } from './watch-events'
 import { isRecord, textOf } from '@household-brain/core/lib/read'
 
 export const REPO = process.env.REPO ?? 'Flixbox/household-brain'
@@ -61,16 +61,34 @@ export const jobLines = async (run: number): Promise<string[]> =>
   records(record(await gh(['run', 'view', String(run), '--repo', REPO, '--json', 'jobs'])).jobs)
     .map(job => `  ${textOf(job.name)}: ${textOf(job.status)} ${textOf(job.conclusion)}`)
 
+/**
+ * GitHub's review decision, or, where it leaves that empty (a ruleset instead of branch protection),
+ * the one the reviews add up to. The PR's author and the agent itself don't count (the reviewer agent
+ * posts as the same bot that opens the PRs), and one approval counts as approved: GitHub's own merge
+ * still enforces how many a ruleset requires. Unknown (empty) when the reviews can't be read: the PR
+ * is then simply not approved yet this round, rather than the whole listing failing.
+ */
+const decisionOf = async (pr: number, reviewDecision: unknown, author: string): Promise<string> => {
+  const given = textOf(reviewDecision)
+  if (given !== '') {
+    return given
+  }
+  const reviews = await allPages(`repos/${REPO}/pulls/${pr}/reviews`).catch(() => [])
+  return decisionFrom(reviews
+    .map(item => ({ login: textOf(record(item.user).login), state: textOf(item.state) }))
+    .filter(({ login }) => login !== author && login !== SELF))
+}
+
 export const openPrs = async (): Promise<OpenPr[]> =>
-  records(await gh(['pr', 'list', '--repo', REPO, '--state', 'open', '--limit', '100', '--json', 'number,title,reviewDecision,autoMergeRequest,labels,statusCheckRollup']))
-    .map(pr => ({
+  Promise.all(records(await gh(['pr', 'list', '--repo', REPO, '--state', 'open', '--limit', '100', '--json', 'number,title,reviewDecision,autoMergeRequest,labels,statusCheckRollup,author']))
+    .map(async pr => ({
       autoMerge: Boolean(pr.autoMergeRequest),
       checks: records(pr.statusCheckRollup).map(check => textOf(check.conclusion) || textOf(check.state) || 'pending'),
       number: count(pr.number),
       parked: records(pr.labels).some(label => label.name === 'parked'),
-      reviewDecision: textOf(pr.reviewDecision),
+      reviewDecision: await decisionOf(count(pr.number), pr.reviewDecision, textOf(record(pr.author).login)),
       title: textOf(pr.title),
-    }))
+    })))
 
 export interface PrState {
   state: string
@@ -87,7 +105,7 @@ export const prState = async (pr: number): Promise<PrState> => {
   const value = record(await gh(['pr', 'view', String(pr), '--repo', REPO, '--json', 'state,mergeable,headRefOid,mergeCommit,reviewDecision,autoMergeRequest,labels,title,author']))
   return {
     autoMerge: Boolean(value.autoMergeRequest),
-    decision: textOf(value.reviewDecision),
+    decision: await decisionOf(pr, value.reviewDecision, textOf(record(value.author).login)),
     head: textOf(value.headRefOid),
     mergeSha: textOf(record(value.mergeCommit).oid),
     mergeable: textOf(value.mergeable),

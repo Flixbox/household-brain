@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { FOLLOW_NEWER, type Run, cancelledDeployEvent, listsOpenPrs, mainRunEvent, newActivity, openPrLines, runEvent } from './watch-events'
+import { FOLLOW_NEWER, type Run, cancelledDeployEvent, decisionFrom, listsOpenPrs, mainRunEvent, newActivity, openPrLines, runEvent } from './watch-events'
 
 const SHA = 'abcdef1234567890abcdef1234567890abcdef12'
 const run = (changes: Partial<Run> = {}): Run => ({ ageSeconds: 60, attempt: 1, conclusion: 'success', id: 7, status: 'completed', ...changes })
@@ -26,6 +26,20 @@ describe('runEvent', () => {
     expect(runEvent({ ...context, label: 'deploy', run: run({ conclusion: 'failure' }) })).toMatchObject({ key: `pr-12 deploy-failed ${SHA} 1` })
     expect(runEvent({ ...context, label: 'deploy', run: run({ conclusion: 'cancelled' }) })).toBe(FOLLOW_NEWER)
     expect(cancelledDeployEvent({ ...context, run: run({ conclusion: 'cancelled' }) }).lines[0]).toContain('no newer run replaces it')
+  })
+})
+
+describe('decisionFrom', () => {
+  it('takes each reviewer\'s latest approval, change request or dismissal; comments don\'t count', () => {
+    expect(decisionFrom([{ login: 'owner', state: 'APPROVED' }, { login: 'owner', state: 'COMMENTED' }])).toBe('APPROVED')
+    expect(decisionFrom([{ login: 'owner', state: 'CHANGES_REQUESTED' }, { login: 'owner', state: 'APPROVED' }])).toBe('APPROVED')
+    expect(decisionFrom([{ login: 'owner', state: 'APPROVED' }, { login: 'owner', state: 'DISMISSED' }])).toBe('')
+  })
+
+  it('lets one reviewer\'s change request outweigh another\'s approval, and is empty without reviews', () => {
+    expect(decisionFrom([{ login: 'owner', state: 'APPROVED' }, { login: 'bot', state: 'CHANGES_REQUESTED' }])).toBe('CHANGES_REQUESTED')
+    expect(decisionFrom([{ login: 'owner', state: 'COMMENTED' }])).toBe('')
+    expect(decisionFrom([])).toBe('')
   })
 })
 

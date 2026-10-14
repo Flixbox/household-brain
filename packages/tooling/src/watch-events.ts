@@ -112,6 +112,25 @@ const ciState = (checks: string[]) => {
   return checks.every(check => DONE.has(check)) ? 'green' : 'running'
 }
 
+/**
+ * The review decision from the reviews themselves, each reviewer's latest that counts (a comment
+ * doesn't undo an approval, a dismissal does), for when GitHub leaves `reviewDecision` empty: it only
+ * fills it in under classic branch protection, not under a ruleset (#197).
+ */
+export const decisionFrom = (reviews: readonly { login: string, state: string }[]): string => {
+  const latest = new Map<string, string>()
+  for (const { login, state } of reviews) {
+    if (state === 'APPROVED' || state === 'CHANGES_REQUESTED' || state === 'DISMISSED') {
+      latest.set(login, state)
+    }
+  }
+  const states = [...latest.values()]
+  if (states.includes('CHANGES_REQUESTED')) {
+    return 'CHANGES_REQUESTED'
+  }
+  return states.includes('APPROVED') ? 'APPROVED' : ''
+}
+
 const review = (decision: string) => {
   if (decision === 'APPROVED') {
     return 'approved'
