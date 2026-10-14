@@ -1,3 +1,4 @@
+/* oxlint-disable eslint/no-await-in-loop -- the watcher's rounds run one after another, on purpose */
 /**
  * Watches the whole project until something needs attention, then prints it and exits:
  *
@@ -264,26 +265,27 @@ const checkPrs = async (): Promise<void> => {
 
 /** One look at everything; true when it printed an event (following), so the next look comes at once. */
 const lookOnce = async (): Promise<boolean> => {
+  const idle = { due: false }
   try {
     // Pull requests before issues: an approval or a failed CI run must not wait behind issue comments
     // (#197), since the watcher reports one event at a time.
     await inOrder([checkMain, checkMainHead, checkPrs, checkIssues, checkIssueStates], async check => check())
+    idle.due = Temporal.Instant.compare(Temporal.Now.instant(), quiet.since.add({ hours: Number(maxHours) })) > 0
+    if (idle.due) {
+      sayAndExit([`IDLE: nothing happened for ${maxHours} h`])
+    }
   } catch (error) {
     if (error !== EVENT_PRINTED) {
       throw error
     }
-    return true
-  }
-  if (Temporal.Instant.compare(Temporal.Now.instant(), quiet.since.add({ hours: Number(maxHours) })) > 0) {
-    sayAndExit([`IDLE: nothing happened for ${maxHours} h`])
+    // After a heartbeat the next look waits like after an empty round.
+    return !idle.due
   }
   return false
 }
 
-const watchRound = async (): Promise<void> => {
-  await (await lookOnce() ? Promise.resolve() : Bun.sleep(60_000))
-  await watchRound()
-}
-
+// A loop rather than a function awaiting itself: following, the watcher runs for a whole session.
 await lock()
-await watchRound()
+for (;;) {
+  await (await lookOnce() ? Promise.resolve() : Bun.sleep(60_000))
+}
