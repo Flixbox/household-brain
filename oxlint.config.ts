@@ -330,7 +330,8 @@ export default defineConfig({
         'playwright/max-nested-describe': 'error',
         'playwright/missing-playwright-await': 'error',
         'playwright/no-conditional-expect': 'error',
-        // Guards that narrow a value before use (`if (!box) throw …`) aren't branching test logic.
+        // The ifs in the journeys are guards that narrow a value before use (`if (!box) throw …`), and
+        // one step that unfolds a section only on the devices where an earlier tap folded it.
         'playwright/no-conditional-in-test': 'off',
         'playwright/no-duplicate-hooks': 'error',
         'playwright/no-duplicate-slow': 'error',
@@ -339,7 +340,8 @@ export default defineConfig({
         'playwright/no-focused-test': 'error',
         'playwright/no-force-option': 'error',
         'playwright/no-identical-title': 'error',
-        // A sub-step shares its step's locators (`toggle`, `coupons`); flattening would declare them twice.
+        // A sub-step uses its step's locators (`toggle`, `coupons`); flattening would move them up into
+        // the whole journey, out of the step they belong to.
         'playwright/no-nested-step': 'off',
         'playwright/no-networkidle': 'error',
         'playwright/no-page-pause': 'error',
