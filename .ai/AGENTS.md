@@ -303,8 +303,9 @@ adapted to this repository:
   never as a link, in issues, pull requests and comments, and not at all in commit messages: GitHub
   adds a "mentioned this" entry to the other repository for every linked mention from this public
   one (#146).
-- **A constant holding Tailwind classes ends in `Class`** (`primaryButtonClass`, `barClass`): the
-  Tailwind lint (#187) checks `className` and constants with that ending, and no other strings.
+- **A constant holding Tailwind classes ends in `Class`** (`primaryButtonClass`), **an object mapping
+  a state to its classes in `Classes`** (`urgencyClasses`): the Tailwind lint (#187) checks
+  `className` and constants with those endings, and no other strings.
 - **Example and test domains use the reserved `.test` TLD** (`owner@household-brain.test`), never
   `example.com` or a real-looking host.
 - **oxlint lints with type information** (`--type-aware`, `oxlint-tsgolint`, #167); the type-aware rules

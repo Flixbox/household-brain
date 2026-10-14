@@ -20,13 +20,13 @@ export default defineConfig({
     'eslint-plugin-better-tailwindcss',
   ],
   // The Tailwind plugin reads the theme from the app's stylesheet, which also pulls in the packages.
-  // Besides `className` and its other defaults, it checks constants named `…Class`, the convention
-  // here for class strings shared by several elements.
+  // Besides `className` and its other defaults, it checks constants named `…Class` (a class string
+  // shared by several elements) and `…Classes` (an object mapping a state to its classes).
   settings: {
     'better-tailwindcss': {
       cwd: 'apps/web',
       entryPoint: 'src/index.css',
-      selectors: [...getDefaultSelectors(), { kind: 'variable', name: '^.+Class$', match: [{ type: 'strings' }] }],
+      selectors: [...getDefaultSelectors(), { kind: 'variable', name: '^.+Class(?:es)?$', match: [{ type: 'strings' }, { type: 'objectValues' }] }],
     },
   },
   // Rules that need type information (oxlint-tsgolint, #167), for the CLI, editors and lint:fix alike.
@@ -68,7 +68,8 @@ export default defineConfig({
     // only see one event's description or one link.
     'sonarjs/super-linear-regex': 'off',
     // Tailwind's class names (#187): unknown, conflicting, duplicated or deprecated classes, and a
-    // consistent order. Every rule of the plugin, but for the two below.
+    // consistent order. Every rule of the plugin, but for the two switched off below and
+    // `no-restricted-classes`, which needs a list of classes to forbid and has none here.
     'better-tailwindcss/enforce-canonical-classes': 'error',
     'better-tailwindcss/enforce-consistent-class-order': 'error',
     'better-tailwindcss/enforce-consistent-important-position': 'error',
