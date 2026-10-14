@@ -1,9 +1,9 @@
+/* oxlint-disable react/rules-of-hooks -- `useTestStorageEngine` is nanostores' switch to fake storage, not a React hook */
 import { cleanTestStorage, getTestStorage, useTestStorageEngine } from '@nanostores/persistent'
 import { afterEach, describe, expect, it, mock, spyOn } from 'bun:test'
 import { $calendarToken, MEMBER_SCOPES, OWNER_SCOPES, TASKS_SCOPE, acceptToken, forgetCalendarToken, hasCalendarToken, revokeCalendarToken } from './google-token'
 import { stringify } from '@household-brain/core/lib/stringify'
 
-// oxlint-disable-next-line react-hooks/rules-of-hooks -- nanostores' switch to fake storage, not a React hook
 useTestStorageEngine()
 const now = () => Temporal.Now.instant().epochMilliseconds
 const ME = 'me@household-brain.test'

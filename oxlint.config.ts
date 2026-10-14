@@ -7,6 +7,8 @@ export default defineConfig({
     'typescript',
     'oxc',
     'unicorn',
+    'promise',
+    'jsdoc',
     'import',
   ],
   jsPlugins: [
@@ -63,6 +65,21 @@ export default defineConfig({
     'unicorn/no-array-reduce': 'off',
     // A case listed before `default` keeps `typescript/switch-exhaustiveness-check` satisfied.
     'unicorn/no-useless-switch-case': 'off',
+    // TypeScript's types already say what each parameter and result is; a tag for each would repeat
+    // them. The jsdoc rules that check a comment's form stay on.
+    'jsdoc/require-param': 'off',
+    'jsdoc/require-returns': 'off',
+    // `.then` is used on purpose where nothing waits for the result (fire and forget from a click or
+    // an effect), and its callbacks there only have side effects, ending the chain.
+    'promise/prefer-await-to-then': 'off',
+    'promise/prefer-await-to-callbacks': 'off',
+    'promise/always-return': 'off',
+    // Callback APIs (Google's sign-in script, IndexedDB, timers) become promises only through `new Promise`.
+    'promise/avoid-new': 'off',
+    // `then(done, failed)` handles a failure of the promise itself, not of `done`; that is the point
+    // where it is used, so it is neither a missing catch nor a `catch` to prefer.
+    'promise/catch-or-return': ['error', { allowThen: true }],
+    'promise/prefer-catch': 'off',
     // Components and their files are PascalCase (`ItemForm.tsx`), everything else kebab-case.
     'unicorn/filename-case': ['error', { cases: { kebabCase: true, pascalCase: true } }],
     // Continuation lines of a comment stay lowercase
