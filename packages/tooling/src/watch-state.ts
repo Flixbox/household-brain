@@ -16,7 +16,8 @@ import { REPO } from './watch-github'
 import { hasText } from '@household-brain/core/lib/read'
 
 const home = process.env.HOME ?? '.'
-const DIR = process.env.STATE_DIR ?? `${process.env.XDG_STATE_HOME ?? `${home}/.local/state`}/watch-project/${REPO.replace('/', '_')}`
+const stateHome = process.env.XDG_STATE_HOME ?? `${home}/.local/state`
+const DIR = process.env.STATE_DIR ?? `${stateHome}/watch-project/${REPO.replace('/', '_')}`
 
 const stateFile = (name: string) => `${DIR}/${name}`
 
