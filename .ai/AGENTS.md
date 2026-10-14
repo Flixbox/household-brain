@@ -101,7 +101,7 @@ comments. Only wait in the foreground for something whose result you need for th
 
 ### 1. Before you push
 
-- **Run the quick checks locally**: `bun run lint && bun run typecheck && bun run test` (seconds). Leave the
+- **Run the quick checks locally**: `bun run lint && bun run test` (seconds; `test` type-checks first). Leave the
   e2e suite (`bun run test:emulated`) to CI, which runs it on every push anyway; run it locally only to
   debug a failure CI found.
 - **Write e2e tests as a few full user journeys, not many small tests.** Every test resets the
@@ -359,6 +359,11 @@ adapted to this repository:
   `nx.includedScripts`), `bun run typecheck` over every project's `typecheck` (the root's own is in
   `nx.targets`). Whole-repo tools take `{workspaceRoot}/**/*` as input: the root project's default
   inputs exclude files that belong to other projects, which once served a stale green from cache.
+- **Nothing runs on code that doesn't type-check** (owner's rule, #193): Bun runs tests and bundles
+  by stripping types, so in Nx `test`, `build` and `build:e2e` depend on the project's `typecheck`
+  and its dependencies' (`^typecheck`). `bun run test` runs every project's `typecheck` (the root
+  project has no `test`, so its type check would be skipped otherwise) and then the tests. For a
+  quick loop inside one package, `bun test` there still runs on its own.
 
 ### Toolchain
 
@@ -413,7 +418,7 @@ adapted to this repository:
   expose their modules by path through `exports` patterns in `package.json` (e.g.
   `@household-brain/entries/components/items/ItemList`), and code imports from the module that
   defines what it needs.
-- Run tasks through Nx at the root: `bun run typecheck`, `bun run test` (`nx run-many`), `bun run build`
+- Run tasks through Nx at the root: `bun run test` (type check and tests, `nx run-many`), `bun run typecheck` (only that), `bun run build`
   (`nx run @household-brain/web:build`). Nx caches results, so unchanged projects are skipped.
 
 - **oxlint loads `@stylistic/eslint-plugin` through `jsPlugins`.** There is no ESLint here. Its

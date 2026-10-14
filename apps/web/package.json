@@ -5,7 +5,7 @@
   "type": "module",
   "license": "Unlicense",
   "scripts": {
-    "build": "tsc -b && bun --env-file=.env.production --env-file=.env.production.local build.ts production dist && pwa-build dist",
+    "build": "bun --env-file=.env.production --env-file=.env.production.local build.ts production dist && pwa-build dist",
     "typecheck": "tsc -b",
     "build:e2e": "bun --env-file=.env.e2e build.ts e2e dist-e2e && pwa-build dist-e2e",
     "test:e2e": "nx run @household-brain/web:playwright"
