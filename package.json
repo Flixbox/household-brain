@@ -19,7 +19,7 @@
     "lint:fallow": "fallow dead-code && fallow dupes",
     "lint:fix": "oxlint --fix && npmPkgJsonLint -c npmpackagejsonlint.config.ts --fix . 'apps/*' 'packages/*'",
     "typecheck": "nx run-many -t typecheck",
-    "test": "nx run-many -t test",
+    "test": "nx run-many -t typecheck test",
     "test:rules": "bun test tests/rules",
     "test:emulated": "bun packages/tooling/src/e2e-hosting-config.ts && nx run @household-brain/web:build:e2e && firebase emulators:exec --config firebase.e2e.json --only auth,firestore,hosting --project demo-household-brain \"bun run test:rules && bun run --filter @household-brain/web test:e2e\"",
     "emulators": "firebase emulators:start --only auth,firestore --project demo-household-brain"
@@ -49,7 +49,7 @@
     ],
     "targets": {
       "typecheck": {
-        "command": "tsc -p tsconfig.json"
+        "command": "tsc"
       }
     }
   },

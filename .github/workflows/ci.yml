@@ -54,7 +54,6 @@ jobs:
           addons=$(find node_modules/.bun -path '*/build/Release/*.node')
           if [ -n "$addons" ]; then echo "::error::A dependency install script built: $addons"; exit 1; fi
       - run: bun run lint
-      - run: bun run typecheck
       - run: bun run test
       - run: bun run build
       - name: Production build has no emulator wiring

@@ -18,7 +18,7 @@ history live in the GitHub issues.
 bun install
 bun run dev               # Bun dev server on http://localhost:5173, with hot reloading
 bun run lint              # oxlint, npm-package-json-lint, fallow (Nx, cached); bun run lint:fix fixes what it can
-bun run typecheck && bun run test
+bun run test              # type check, then unit tests
 bun run build             # apps/web/dist
 bun run test:emulated     # Firebase emulators: rules tests and Playwright e2e (needs Java 21)
 bun run emulators         # emulators only, to iterate on bun run test:rules or the e2e tests against them
