@@ -405,8 +405,8 @@ adapted to this repository:
   values from outside React read during render: the compiler takes them as unchanging, so read
   them through a store (`useStore($user)`, not `auth.currentUser`). Components need a name
   (`const RootLayout = () => …`); an anonymous one isn't compiled. Lint runs the compiler's own
-  checks (`react-compiler/*`, from React's `eslint-plugin-react-hooks`, #187), so code the compiler would
-  skip or get wrong fails the lint instead of silently losing its memoisation.
+  checks (oxlint's `react/immutability`, `purity`, `refs`, `set-state-in-render` and the rest, #187),
+  so code the compiler would skip or get wrong fails the lint instead of silently losing its memoisation.
 - **An effect returns only a cleanup function.** Write `useEffect(() => { doIt() }, [])` with a block
   unless `doIt` returns the cleanup: React calls whatever an effect returns, and Chrome's `scrollTo`
   returns a promise, so an expression body blanked the app when a page was left (#165). TypeScript
