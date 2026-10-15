@@ -23,10 +23,14 @@ describe('draftFrom', () => {
   it('repairs what the entry schema doesn\'t take, so the event keeps its entry (#194)', () => {
     const blank = { ...appEvent, extendedProperties: { private: { ...appEvent.extendedProperties?.private, 'hb.start': '2027-01-01' } }, summary: '[Coupon] ' }
     expect(draftAndRepairsFrom(blank, DEFAULT_CATEGORIES)).toMatchObject({
-      draft: { notes: 'Only online\nStart date: 2027-01-01', startDate: '', title: 'Untitled' },
-      repairs: ['blank title: "Untitled"', 'start date not a date or after the due date: moved to the notes'],
+      draft: { notes: 'Only online', startDate: '', title: 'Untitled' },
+      repairs: ['blank title: "Untitled"', 'start date "2027-01-01" dropped'],
     })
     expect(draftFrom(blank, DEFAULT_CATEGORIES).title).toBe('Untitled')
+    // A value Google keeps reads the same on every pull, so nothing builds up (a push reads it back too).
+    const priced = { ...appEvent, extendedProperties: { private: { ...appEvent.extendedProperties?.private, 'hb.amount': 'ten' } } }
+    expect(draftFrom(priced, DEFAULT_CATEGORIES)).toEqual(draftFrom(priced, DEFAULT_CATEGORIES))
+    expect(draftFrom(priced, DEFAULT_CATEGORIES)).toMatchObject({ amount: '', notes: 'Only online' })
   })
 
   it('reads how often the price is due, and nothing it doesn\'t know (#86)', () => {

@@ -47,19 +47,21 @@ describe('repairedDraft', () => {
     expect(repairedDraft(valid)).toEqual({ draft: valid, repairs: [] })
   })
 
-  it('makes a draft from Google pass, keeping what was typed in the notes', () => {
-    const { draft, repairs } = repairedDraft({
-      ...valid, amount: 'ten', category: '', notes: 'Only online', startDate: '2027-01-01', title: ' ', url: 'see the flyer',
-    })
+  it('makes a draft from Google pass, naming each dropped value', () => {
+    const broken = { ...valid, amount: 'ten', category: '', notes: 'Only online', startDate: '2027-01-01', title: ' ', url: 'see the flyer' }
+    const { draft, repairs } = repairedDraft(broken)
     expect(draftProblems(draft)).toEqual([])
-    expect(draft).toMatchObject({ amount: '', category: 'uncategorised', startDate: '', title: 'Untitled', url: '' })
-    expect(draft.notes).toBe('Only online\nStart date: 2027-01-01\nAmount: ten\nLink: see the flyer')
-    expect(repairs).toHaveLength(5)
+    expect(draft).toMatchObject({ amount: '', category: 'uncategorised', notes: 'Only online', startDate: '', title: 'Untitled', url: '' })
+    expect(repairs).toEqual([
+      'blank title: "Untitled"', 'no category: "uncategorised"', 'start date "2027-01-01" dropped', 'amount "ten" dropped', 'link "see the flyer" dropped',
+    ])
+    // Each pull reads the same event again: a repaired draft needs nothing more.
+    expect(repairedDraft(draft)).toEqual({ draft, repairs: [] })
   })
 
   it('drops a currency or interval it doesn\'t know', () => {
     const { draft, repairs } = repairedDraft({ ...valid, currency: 'real', interval: 'fortnightly' })
     expect(draft).toMatchObject({ currency: '', interval: '' })
-    expect(repairs).toEqual(['unknown currency: euros', 'unknown interval: one-off'])
+    expect(repairs).toEqual(['currency "real" dropped', 'interval "fortnightly" dropped'])
   })
 })

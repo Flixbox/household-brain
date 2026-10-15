@@ -37,8 +37,9 @@ const startsInTime = ({ dueDate, startDate }: { dueDate: string, startDate: stri
 
 /**
  * The editable fields of an entry, with the rules the form enforces: a title, a category, real
- * dates, a start date not after the due date, a plain amount and a web address (#194). Every way
- * into the app (the form, Google Calendar, the Google Tasks inbox) is checked against it.
+ * dates, a start date not after the due date, a plain amount and a web address (#194). Every draft
+ * coming in (the form, Google Calendar, the Google Tasks inbox) is checked against it. A status
+ * change alone (marking done, a swipe) writes only the status, which is always one of the three.
  */
 export const draftSchema = pipe(
   object({
@@ -81,34 +82,34 @@ export const checkedDraft = (draft: ItemDraft): ItemDraft => {
   return draft
 }
 
-const withNote = (notes: string, label: string, value: string) => [notes, `${label}: ${value}`].filter(Boolean).join('\n')
+/** A field the schema doesn't take, dropped; the log names the value, and Google's event keeps it. */
+const dropped = (field: 'amount' | 'currency' | 'dueDate' | 'interval' | 'startDate' | 'url', name: string) => ({
+  fails: (draft: ItemDraft) => !fits[field === 'dueDate' || field === 'startDate' ? 'date' : field](draft[field]),
+  fix: () => ({ [field]: '' }),
+  says: (draft: ItemDraft) => `${name} "${draft[field]}" dropped`,
+})
 
-/** A field the schema doesn't take, moved into the notes so nothing typed is lost. */
-const intoNotes = (field: 'amount' | 'dueDate' | 'startDate' | 'url', label: string) => (draft: ItemDraft): Partial<ItemDraft> =>
-  ({ [field]: '', notes: withNote(draft.notes, label, draft[field]) })
-
-/** Each repair, in order: the start date is checked against the due date as already repaired. */
-const REPAIRS: readonly { fails: (draft: ItemDraft) => boolean, fix: (draft: ItemDraft) => Partial<ItemDraft>, says: string }[] = [
-  { fails: draft => !fits.title(draft.title), fix: () => ({ title: 'Untitled' }), says: 'blank title: "Untitled"' },
-  { fails: draft => !fits.category(draft.category), fix: () => ({ category: 'uncategorised' }), says: 'no category: "uncategorised"' },
-  { fails: draft => !fits.date(draft.dueDate), fix: intoNotes('dueDate', 'Due date'), says: 'due date not a date: moved to the notes' },
-  {
-    fails: draft => !fits.date(draft.startDate) || !startsInTime(draft),
-    fix: intoNotes('startDate', 'Start date'),
-    says: 'start date not a date or after the due date: moved to the notes',
-  },
-  { fails: draft => !fits.amount(draft.amount), fix: intoNotes('amount', 'Amount'), says: 'amount not a number: moved to the notes' },
-  { fails: draft => !fits.currency(draft.currency), fix: () => ({ currency: '' }), says: 'unknown currency: euros' },
-  { fails: draft => !fits.interval(draft.interval), fix: () => ({ interval: '' }), says: 'unknown interval: one-off' },
-  { fails: draft => !fits.url(draft.url), fix: intoNotes('url', 'Link'), says: 'link not a web address: moved to the notes' },
+/**
+ * Each repair, in order: the start date is checked against the due date as already repaired. A
+ * repair gives the same result however often it runs, as each pull reads the same event again.
+ */
+const REPAIRS: readonly { fails: (draft: ItemDraft) => boolean, fix: (draft: ItemDraft) => Partial<ItemDraft>, says: (draft: ItemDraft) => string }[] = [
+  { fails: draft => !fits.title(draft.title), fix: () => ({ title: 'Untitled' }), says: () => 'blank title: "Untitled"' },
+  { fails: draft => !fits.category(draft.category), fix: () => ({ category: 'uncategorised' }), says: () => 'no category: "uncategorised"' },
+  dropped('dueDate', 'due date'),
+  { ...dropped('startDate', 'start date'), fails: draft => !fits.date(draft.startDate) || !startsInTime(draft) },
+  dropped('amount', 'amount'),
+  dropped('currency', 'currency'),
+  dropped('interval', 'interval'),
+  dropped('url', 'link'),
 ]
 
 /**
  * A draft from Google (a Calendar event, a Tasks inbox note) made to pass the schema instead of
- * being refused, so an event never loses its entry. Nothing typed is thrown away: a date, link or
- * amount the schema doesn't take moves into the notes. `repairs` says what changed, for the event log.
+ * being refused, so an event never loses its entry: a blank title becomes "Untitled", a value the
+ * schema doesn't take is dropped. `repairs` says what changed, with the dropped value, for the log.
  */
 export const repairedDraft = (draft: ItemDraft): { draft: ItemDraft, repairs: string[] } => REPAIRS.reduce<{ draft: ItemDraft, repairs: string[] }>(
-  (done, repair) => (repair.fails(done.draft) ? { draft: { ...done.draft, ...repair.fix(done.draft) }, repairs: [...done.repairs, repair.says] } : done),
+  (done, repair) => (repair.fails(done.draft) ? { draft: { ...done.draft, ...repair.fix(done.draft) }, repairs: [...done.repairs, repair.says(done.draft)] } : done),
   { draft, repairs: [] },
 )
