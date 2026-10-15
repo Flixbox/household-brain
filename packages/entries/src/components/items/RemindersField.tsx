@@ -6,11 +6,11 @@ import { ToggleChip } from './ToggleChip'
  * none. It starts as each person's default, 2 days and 1 day. Every person's device applies the same
  * reminders to their own copy of the event, as Google keeps reminders per person.
  */
-export const RemindersField = ({ value, onChange }: { value: string, onChange: (event: { target: { value: string } }) => void }) => {
+export const RemindersField = ({ value, onChange }: { value: string, onChange: (value: string) => void }) => {
   const chosen = reminderMinutes(value)
   const toggle = (minutes: number) => {
     const next = chosen.includes(minutes) ? chosen.filter(other => other !== minutes) : [...chosen, minutes]
-    onChange({ target: { value: remindersValue(next) } })
+    onChange(remindersValue(next))
   }
   return (
     <fieldset className="grid gap-2">
