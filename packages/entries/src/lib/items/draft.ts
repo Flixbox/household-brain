@@ -82,7 +82,10 @@ export const checkedDraft = (draft: ItemDraft): ItemDraft => {
   return draft
 }
 
-/** A field the schema doesn't take, dropped; the log names the value, and Google's event keeps it. */
+/**
+ * A field the schema doesn't take, dropped. The log names the value; Google's event keeps it until
+ * the app writes the whole event again (restoring one deleted in Google).
+ */
 const dropped = (field: 'amount' | 'currency' | 'dueDate' | 'interval' | 'startDate' | 'url', name: string) => ({
   fails: (draft: ItemDraft) => !fits[field === 'dueDate' || field === 'startDate' ? 'date' : field](draft[field]),
   fix: () => ({ [field]: '' }),
