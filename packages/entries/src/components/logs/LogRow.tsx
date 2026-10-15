@@ -5,7 +5,7 @@ import type { Item } from '@household-brain/entries/lib/items/model'
 import { logTime } from '@household-brain/entries/lib/logs-messages'
 import { hasText } from '@household-brain/core/lib/read'
 
-const marker = {
+const markerClasses = {
   error: 'bg-red-600',
   event: 'bg-orange-500',
 } as const
@@ -15,10 +15,10 @@ export const LogRow = ({ log, item, actor }: { log: Log, item: Item | null, acto
   <li className="rounded-lg bg-stone-50 dark:bg-stone-950">
     {/* Opens in place to show what changed or what went wrong, when, by whom, and the entry. */}
     <details className="group">
-      <summary className="flex cursor-pointer list-none gap-3 px-3 py-3">
-        <span className={`mt-1.5 size-3 shrink-0 rounded-full ${marker[log.kind]}`} aria-label={log.kind} />
+      <summary className="flex cursor-pointer list-none gap-3 p-3">
+        <span className={`mt-1.5 size-3 shrink-0 rounded-full ${markerClasses[log.kind]}`} aria-label={log.kind} />
         <span className="min-w-0 flex-1">
-          <span className="block break-words">{log.message}</span>
+          <span className="block wrap-break-word">{log.message}</span>
           <span className="mt-1 block text-sm text-stone-500 dark:text-stone-400">
             {log.at ? logTime(log.at) : 'Waiting for time'}
             {' · '}
@@ -27,8 +27,8 @@ export const LogRow = ({ log, item, actor }: { log: Log, item: Item | null, acto
         </span>
         <span aria-hidden="true" className="text-stone-400 transition-transform group-open:rotate-180">▾</span>
       </summary>
-      <div className="space-y-2 border-t border-stone-200 px-3 py-3 pl-9 text-sm dark:border-stone-800">
-        {hasText(log.detail) && <p className="whitespace-pre-wrap break-words">{log.detail}</p>}
+      <div className="space-y-2 border-t border-stone-200 p-3 pl-9 text-sm dark:border-stone-800">
+        {hasText(log.detail) && <p className="wrap-break-word whitespace-pre-wrap">{log.detail}</p>}
         <p className="text-stone-500 dark:text-stone-400">
           {log.kind === 'error' ? 'Error' : 'Event'}
           {' by '}

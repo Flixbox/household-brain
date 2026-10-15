@@ -2,7 +2,7 @@ import { connectToHousehold, setUpHousehold } from '@household-brain/entries/lib
 import type { HouseholdState } from '@household-brain/entries/lib/calendar/use-household'
 import { useTask } from '@household-brain/entries/lib/use-task'
 import { StatusLine } from './StatusLine'
-import { primaryButton } from '@household-brain/entries/lib/styles'
+import { primaryButtonClass } from '@household-brain/entries/lib/styles'
 
 export const CalendarSection = ({ household }: { household: HouseholdState }) => {
   const { busy, run, status } = useTask()
@@ -13,7 +13,7 @@ export const CalendarSection = ({ household }: { household: HouseholdState }) =>
       {household.state === 'missing' && (
         <>
           <p>There is no household calendar yet. Create it once; it lives in your Google account.</p>
-          <button type="button" className={primaryButton} disabled={busy} onClick={() => { run(setUpHousehold) }}>
+          <button type="button" className={primaryButtonClass} disabled={busy} onClick={() => { run(setUpHousehold) }}>
             Create the household calendar
           </button>
         </>
@@ -30,7 +30,7 @@ export const CalendarSection = ({ household }: { household: HouseholdState }) =>
           </p>
           <button
             type="button"
-            className={primaryButton}
+            className={primaryButtonClass}
             disabled={busy}
             onClick={() => { run(async () => connectToHousehold(household.config)) }}
           >

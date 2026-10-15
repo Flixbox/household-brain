@@ -2,7 +2,7 @@ import { type SubmitEvent, useState } from 'react'
 import { type Category, offeredCategory } from '@household-brain/entries/lib/categories'
 import type { ItemDraft } from '@household-brain/entries/lib/items/model'
 import { useEntryForm } from './use-entry-form'
-import { primaryButton, textField } from '@household-brain/entries/lib/styles'
+import { primaryButtonClass, textFieldClass } from '@household-brain/entries/lib/styles'
 import { Field } from './Field'
 import { StatusField } from './StatusField'
 import { ExtraDatesField } from './ExtraDatesField'
@@ -51,27 +51,27 @@ export const ItemForm = ({ initial, initialDates = NO_DATES, categories, onSave,
   }
   return (
     <form className="grid gap-4" onSubmit={submit} data-hold-updates={holdUpdates}>
-      <Field label="Title" required><input required pattern=".*\S.*" title="Enter a title" className={textField} value={draft.title} onChange={set('title')} /></Field>
+      <Field label="Title" required><input required pattern=".*\S.*" title="Enter a title" className={textFieldClass} value={draft.title} onChange={set('title')} /></Field>
       <Field label="Category" required>
-        <select required className={textField} value={shownCategory} onChange={set('category')}>
+        <select required className={textFieldClass} value={shownCategory} onChange={set('category')}>
           <option value="" disabled>Choose…</option>
           {categories.map(category => <option key={category.slug} value={category.slug}>{category.label}</option>)}
         </select>
       </Field>
       <Field label="Due date (17:00)" required={dateRequired}>
-        <input type="date" required={dateRequired} title={dateRequired ? 'Required until every phone runs the latest version' : 'Leave it empty for something that never expires, e.g. a gift card credit'} className={textField} value={draft.dueDate} onChange={set('dueDate')} />
+        <input type="date" required={dateRequired} title={dateRequired ? 'Required until every phone runs the latest version' : 'Leave it empty for something that never expires, e.g. a gift card credit'} className={textFieldClass} value={draft.dueDate} onChange={set('dueDate')} />
       </Field>
       <Field label="Start date (optional)">
-        <input type="date" max={draft.dueDate || '9999-12-31'} title="When it started or becomes valid; not after the due date" className={textField} value={draft.startDate} onChange={set('startDate')} />
+        <input type="date" max={draft.dueDate || '9999-12-31'} title="When it started or becomes valid; not after the due date" className={textFieldClass} value={draft.startDate} onChange={set('startDate')} />
       </Field>
       <ExtraDatesField dates={dates} onChange={setDates} />
       {remindersShown && <RemindersField value={draft.reminders} onChange={set('reminders')} />}
       {withStatus && <StatusField value={draft.status} onChange={set('status')} />}
-      <Field label="Code"><input className={textField} value={draft.code} onChange={set('code')} /></Field>
+      <Field label="Code"><input className={textFieldClass} value={draft.code} onChange={set('code')} /></Field>
       <AmountField amount={draft.amount} currency={draft.currency} interval={draft.interval} onAmount={set('amount')} onCurrency={set('currency')} onInterval={set('interval')} />
       <LinkField value={draft.url} onChange={set('url')} />
-      <Field label="Notes"><textarea rows={3} className={textField} value={draft.notes} onChange={set('notes')} /></Field>
-      <button type="submit" className={primaryButton} disabled={saving}>Save</button>
+      <Field label="Notes"><textarea rows={3} className={textFieldClass} value={draft.notes} onChange={set('notes')} /></Field>
+      <button type="submit" className={primaryButtonClass} disabled={saving}>Save</button>
     </form>
   )
 }

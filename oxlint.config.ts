@@ -1,4 +1,5 @@
 /* oxlint-disable eslint/sort-keys -- the rules are grouped by topic, each group under the comment that explains it */
+import { getDefaultSelectors } from 'eslint-plugin-better-tailwindcss/defaults'
 import { defineConfig } from 'oxlint'
 
 export default defineConfig({
@@ -16,7 +17,18 @@ export default defineConfig({
     'eslint-plugin-playwright',
     'eslint-plugin-regexp',
     'eslint-plugin-sonarjs',
+    'eslint-plugin-better-tailwindcss',
   ],
+  // The Tailwind plugin reads the theme from the app's stylesheet, which also pulls in the packages.
+  // Besides `className` and its other defaults, it checks constants named `…Class` (a class string
+  // shared by several elements) and `…Classes` (an object mapping a state to its classes).
+  settings: {
+    'better-tailwindcss': {
+      cwd: 'apps/web',
+      entryPoint: 'src/index.css',
+      selectors: [...getDefaultSelectors(), { kind: 'variable', name: '^.+Class(?:es)?$', match: [{ type: 'strings' }, { type: 'objectValues' }] }],
+    },
+  },
   // Rules that need type information (oxlint-tsgolint, #167), for the CLI, editors and lint:fix alike.
   options: {
     maxWarnings: 0,
@@ -55,6 +67,25 @@ export default defineConfig({
     // restarts at each position, which only slows down on long pathological input, and these patterns
     // only see one event's description or one link.
     'sonarjs/super-linear-regex': 'off',
+    // Tailwind's class names (#187): unknown, conflicting, duplicated or deprecated classes, and a
+    // consistent order. Every rule of the plugin, but for the two switched off below and
+    // `no-restricted-classes`, which needs a list of classes to forbid and has none here.
+    'better-tailwindcss/enforce-canonical-classes': 'error',
+    'better-tailwindcss/enforce-consistent-class-order': 'error',
+    'better-tailwindcss/enforce-consistent-important-position': 'error',
+    // It spreads every longer class string over several lines, grouped by variant; one line reads fine.
+    'better-tailwindcss/enforce-consistent-line-wrapping': 'off',
+    'better-tailwindcss/enforce-consistent-variable-syntax': 'error',
+    'better-tailwindcss/enforce-consistent-variant-order': 'error',
+    // `ms-`/`start-` instead of `ml-`/`left-` only matters for right-to-left languages, which the app has none of.
+    'better-tailwindcss/enforce-logical-properties': 'off',
+    'better-tailwindcss/enforce-shorthand-classes': 'error',
+    'better-tailwindcss/no-concatenated-classes': 'error',
+    'better-tailwindcss/no-conflicting-classes': 'error',
+    'better-tailwindcss/no-deprecated-classes': 'error',
+    'better-tailwindcss/no-duplicate-classes': 'error',
+    'better-tailwindcss/no-unknown-classes': 'error',
+    'better-tailwindcss/no-unnecessary-whitespace': 'error',
     'sonarjs/class-name': 'error',
     'sonarjs/no-fallthrough': 'error',
     'sonarjs/no-equals-in-for-termination': 'error',

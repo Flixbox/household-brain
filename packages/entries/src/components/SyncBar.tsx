@@ -9,10 +9,10 @@ import { stringify } from '@household-brain/core/lib/stringify'
 import { ignoreFailure } from '@household-brain/core/lib/ignore'
 import { hasText } from '@household-brain/core/lib/read'
 
-const bar = 'flex flex-wrap items-center gap-3 rounded-lg px-4 py-3 text-sm'
+const barClass = 'flex flex-wrap items-center gap-3 rounded-lg px-4 py-3 text-sm'
 // Google's error messages can hold long URLs without spaces; let them wrap anywhere, or they widen the
 // page on a phone.
-const errorBar = `${bar} wrap-anywhere bg-red-100 text-red-950 dark:bg-red-950 dark:text-red-100`
+const errorBarClass = `${barClass} bg-red-100 wrap-anywhere text-red-950 dark:bg-red-950 dark:text-red-100`
 
 /** Shows what is not in Google Calendar yet, and offers the click that Google access needs. */
 export const SyncBar = () => {
@@ -25,7 +25,7 @@ export const SyncBar = () => {
   return (
     <div className="space-y-2">
       {(waiting > 0 || needsAccess) && (
-        <div className={`${bar} bg-stone-200 dark:bg-stone-800`}>
+        <div className={`${barClass} bg-stone-200 dark:bg-stone-800`}>
           <p role="status" className="flex-1">
             {waiting > 0 ? `${changes} not yet in Google Calendar.` : 'Not synced with Google Calendar on this device yet.'}
           </p>
@@ -34,19 +34,19 @@ export const SyncBar = () => {
         </div>
       )}
       {failed.map(item => (
-        <div key={item.id} className={errorBar}>
+        <div key={item.id} className={errorBarClass}>
           <p role="alert" className="flex-1">Couldn&apos;t sync “{item.title}”: {item.syncError}</p>
           <button type="button" className="font-semibold underline" onClick={() => { retryItem(item).catch(reportWriteFailure) }}>Retry</button>
         </div>
       ))}
-      {hasText(pullProblem) && <p role="alert" className={errorBar}>Couldn&apos;t read changes from Google Calendar: {pullProblem}</p>}
+      {hasText(pullProblem) && <p role="alert" className={errorBarClass}>Couldn&apos;t read changes from Google Calendar: {pullProblem}</p>}
       {writeFailures.length > 0 && (
-        <div className={errorBar}>
+        <div className={errorBarClass}>
           <p role="alert" className="flex-1">Couldn&apos;t save: {writeFailures.join('; ')}</p>
           <button type="button" className="font-semibold underline" onClick={dismissWriteFailures}>Dismiss</button>
         </div>
       )}
-      {problem && waiting > 0 && <p role="alert" className={errorBar}>{problem}</p>}
+      {problem && waiting > 0 && <p role="alert" className={errorBarClass}>{problem}</p>}
     </div>
   )
 }

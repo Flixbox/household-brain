@@ -3,7 +3,7 @@ import { type MouseEvent, type ReactNode, useEffect, useRef } from 'react'
 import { $menuOpen, closeMenu } from '@household-brain/shell/lib/menu'
 import { signOutOfApp } from '@household-brain/shell/lib/session'
 
-const item = 'block w-full rounded-lg px-3 py-2 text-left font-medium hover:bg-stone-100 dark:hover:bg-stone-800'
+const itemClass = 'block w-full rounded-lg px-3 py-2 text-left font-medium hover:bg-stone-100 dark:hover:bg-stone-800'
 
 // A click on the dialog itself, not on anything inside it, is a click on the backdrop: the dialog
 // has no padding, so its own box is all nav.
@@ -39,11 +39,11 @@ export const SideDrawer = ({ children }: { children: ReactNode }) => {
       className="fixed inset-y-0 right-0 left-auto m-0 h-dvh max-h-none w-72 max-w-[85vw] bg-white p-0 text-stone-900 shadow-xl backdrop:bg-black/40 dark:bg-stone-900 dark:text-stone-100"
     >
       <nav className="flex h-full flex-col gap-1 p-4">
-        <button type="button" onClick={closeMenu} className={`${item} mb-2 self-end`} aria-label="Close menu">✕</button>
+        <button type="button" onClick={closeMenu} className={`${itemClass} mb-2 self-end`} aria-label="Close menu">✕</button>
         {children}
         <button
           type="button"
-          className={`${item} mt-auto`}
+          className={`${itemClass} mt-auto`}
           onClick={() => {
             closeMenu()
             signOutOfApp().catch(reportError)

@@ -1,6 +1,6 @@
 import { CURRENCIES } from '@household-brain/entries/lib/items/currency'
 import { INTERVALS } from '@household-brain/entries/lib/items/interval'
-import { textField } from '@household-brain/entries/lib/styles'
+import { textFieldClass } from '@household-brain/entries/lib/styles'
 import { Field } from './Field'
 
 /** The usual currencies, plus the entry's own should it be another (one set in another app). */
@@ -25,16 +25,16 @@ interface Props {
 export const AmountField = ({ amount, currency, interval, onAmount, onCurrency, onInterval }: Props) => (
   <div className="flex flex-wrap gap-2">
     <div className="flex-1">
-      <Field label="Amount"><input inputMode="decimal" pattern="[0-9]+([.,][0-9]{1,2})?" title="A number, e.g. 9.99" className={textField} value={amount} onChange={onAmount} /></Field>
+      <Field label="Amount"><input inputMode="decimal" pattern="[0-9]+([.,][0-9]{1,2})?" title="A number, e.g. 9.99" className={textFieldClass} value={amount} onChange={onAmount} /></Field>
     </div>
     <Field label="Currency">
       {/* Euros are stored as '', like every entry from before currencies existed. */}
-      <select className={textField} value={currency || 'EUR'} onChange={event => { onCurrency({ target: { value: event.target.value === 'EUR' ? '' : event.target.value } }) }}>
+      <select className={textFieldClass} value={currency || 'EUR'} onChange={event => { onCurrency({ target: { value: event.target.value === 'EUR' ? '' : event.target.value } }) }}>
         {choicesFor(currency).map(code => <option key={code} value={code}>{code}</option>)}
       </select>
     </Field>
     <Field label="Every">
-      <select className={textField} value={interval} onChange={onInterval}>
+      <select className={textFieldClass} value={interval} onChange={onInterval}>
         <option value="">Once</option>
         {INTERVALS.map(entry => <option key={entry.value} value={entry.value}>{entry.label}</option>)}
       </select>

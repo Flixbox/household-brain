@@ -7,14 +7,14 @@ import { Link } from 'wouter'
 import { paths } from '@household-brain/entries/lib/paths'
 import { Pages } from './pages/Pages'
 
-const menuLink = 'block rounded-lg px-3 py-2 font-medium hover:bg-stone-100 dark:hover:bg-stone-800'
+const menuLinkClass = 'block rounded-lg px-3 py-2 font-medium hover:bg-stone-100 dark:hover:bg-stone-800'
 
 // The app's own entries in the shell's menu; following one closes the menu.
 const menu = (
   <>
-    <Link href={paths.home} onClick={closeMenu} className={menuLink}>Entries</Link>
-    <Link href={paths.settings} onClick={closeMenu} className={menuLink}>Settings</Link>
-    <Link href={paths.events} onClick={closeMenu} className={menuLink}>Events</Link>
+    <Link href={paths.home} onClick={closeMenu} className={menuLinkClass}>Entries</Link>
+    <Link href={paths.settings} onClick={closeMenu} className={menuLinkClass}>Settings</Link>
+    <Link href={paths.events} onClick={closeMenu} className={menuLinkClass}>Events</Link>
   </>
 )
 
