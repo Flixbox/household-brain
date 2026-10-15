@@ -54,6 +54,9 @@ repository), never with the owner's account.
 - **Queued work is an issue** (assigned to the owner, an existing label), never only a chat. The
   delivering PR says `Closes #n`; a PR that does part of an issue says `Related to #n` from the start,
   because changing it later doesn't undo GitHub's link (#191 closed #172 that way).
+- **The agent doesn't answer third parties** (owner's rule): a comment from anyone but the owner (an
+  upstream maintainer, a passer-by) gets no reply from the bot. Answering for the owner would make it
+  a meat proxy. Tell the owner instead, and leave the reply to them.
 - **Read an issue and all its comments before starting it:** the owner decides in comments (#43).
 - **Keep going without being asked.** After a deploy and its live check, take the next issue; tech
   debt, refactors, tooling and bugs before features. Ask only for what is the owner's to decide. The
@@ -106,8 +109,9 @@ Every PR that changes the UI shows it in a GIF in its description (after the
 
 ### Comments and review
 
-- **Every comment gets an answer:** fix what is asked in one push, reply in the thread, resolve it
-  once settled. One that needs the owner's decision stays open.
+- **Every comment of the owner's gets an answer** (a third party's doesn't, see above): fix what is
+  asked in one push, reply in the thread, resolve it once settled. One that needs the owner's
+  decision stays open.
 - **One reviewer agent per PR** (read-only, findings with severity and evidence). Fix blockers and
   should-fix items in one push and say in the description what was addressed.
 

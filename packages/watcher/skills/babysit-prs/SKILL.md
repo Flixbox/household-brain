@@ -48,7 +48,7 @@ approved one whose auto-merge is still off, not only on the one the event names.
 
 | Event | What to do |
 | --- | --- |
-| `NEW_PR` | A pull request appeared (a dependency bot's too). Review it like any other; for a dependency bump, check what CI can't see. |
+| `NEW_PR` | A pull request appeared (a dependency bot's too). Review it like any other; for a dependency bump, check what CI can't see. Reviewing it is fine; answering its author's comments isn't (see `ACTIVITY`). |
 | `CI_PASSED` | Report it. |
 | `CI_FAILED` | Read the failing job (`gh run view <run> --log-failed`), reproduce locally, fix, push once. |
 | `CI_SLOW` | Something hangs. Cancel the run, read its logs, fix the hang **and** the missing time limit. |
@@ -56,7 +56,7 @@ approved one whose auto-merge is still off, not only on the one the event names.
 | `MAIN_MOVED` | The default branch moved under the pull request. Rebase, run the checks, push once, so what gets merged is what was tested. |
 | `APPROVED` | The owner approved. If the review's findings are fixed, read the pull request for unanswered comments, then enable auto-merge (`gh pr merge <n> --auto --squash`, or as the repository's notes say). A plain approval comes only as this; one with text also comes as `ACTIVITY`: answer it first. |
 | `READY_TO_MERGE` | Approved and green, auto-merge still off: enable it the same way, unless review findings are still open. |
-| `ACTIVITY` | Answer every comment, including those of a pending review: fix what is asked in one push, then reply in the thread and resolve it once settled. A comment that needs the owner's decision stays open. |
+| `ACTIVITY` | Answer every comment **from the owner**, including those of a pending review: fix what is asked in one push, then reply in the thread and resolve it once settled. A comment that needs the owner's decision stays open. Don't answer anyone else (a maintainer, a bot, a passer-by): tell the owner and leave the reply to them, or the agent becomes a proxy speaking for the owner. |
 | `DEPLOYED` | Check the deployed app as the repository's notes say. |
 | `DEPLOY_FAILED` | Fix it in a follow-up pull request. A deploy a newer merge cancelled isn't a failure: the watcher follows the newer run. |
 | `MAIN_FAILED` / `MAIN_SLOW` | The default branch is broken or hanging, whichever pull request caused it. That comes first. |
