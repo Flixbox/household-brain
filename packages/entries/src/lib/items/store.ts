@@ -1,25 +1,20 @@
-import { arrayUnion, collection, deleteField, doc, runTransaction, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore'
+import { arrayUnion, collection, doc, runTransaction, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore'
 import { auth, db } from '@household-brain/firebase/firebase'
-import type { Category } from '@household-brain/entries/lib/categories'
-import type { DateOp } from './date-events'
-import { draftFrom } from './from-event'
 import type { EntryDate } from './dates'
-import { EDITABLE_FIELDS, type Item, type ItemDraft, changedFields, draftOf } from './model'
+import { EDITABLE_FIELDS, type Item, changedFields, draftOf } from './model'
+import { type ItemDraft, checkedDraft } from './draft'
 import { newEventId } from './ids'
-import type { PushOutcome } from './push'
-import { type PushRecord, errorFor, recordFor } from './record'
-import { itemFrom } from '@household-brain/entries/lib/documents'
-import { logError, logEvent } from '@household-brain/entries/lib/logs'
-import { changedDetail, entryLogMessage, errorLogMessage } from '@household-brain/entries/lib/logs-messages'
-import { stringify } from '@household-brain/core/lib/stringify'
+import { logEvent } from '@household-brain/entries/lib/logs'
+import { changedDetail, entryLogMessage } from '@household-brain/entries/lib/logs-messages'
 
 export const itemsCollection = collection(db, 'items')
-const itemDoc = (id: string) => doc(db, 'items', id)
+export const itemDoc = (id: string) => doc(db, 'items', id)
 const stamp = () => ({ rev: newEventId(), updatedAt: serverTimestamp(), updatedBy: auth.currentUser?.uid ?? '' })
 
 // The write functions return Firestore's promise, which only settles once the server confirmed the
 // write. Callers must not wait for it before moving on: offline it never settles, yet the change is
-// already in the local cache and shown everywhere.
+// already in the local cache and shown everywhere. A draft that fails the entry schema (`draft.ts`)
+// is refused, as a failed write: drafts from Google are repaired before they get here.
 
 /** Saves a new entry, marked for pushing. Returns its id at once and the server write separately. */
 const newEntry = (id: string, draft: ItemDraft, extraDates: EntryDate[]) => ({
@@ -28,8 +23,10 @@ const newEntry = (id: string, draft: ItemDraft, extraDates: EntryDate[]) => ({
 
 export const addItem = (draft: ItemDraft, extraDates: EntryDate[] = []): { id: string, written: Promise<void> } => {
   const id = newEventId()
-  const written = setDoc(itemDoc(id), newEntry(id, draft, extraDates))
-  logEvent(entryLogMessage('Added', draft.title), id)
+  const written = Promise.try(() => checkedDraft(draft)).then(async valid => {
+    logEvent(entryLogMessage('Added', valid.title), id)
+    return setDoc(itemDoc(id), newEntry(id, valid, extraDates))
+  })
   return { id, written }
 }
 
@@ -38,15 +35,17 @@ export const addItem = (draft: ItemDraft, extraDates: EntryDate[] = []): { id: s
  * so a second device importing the same task meanwhile adds nothing. A transaction needs the server,
  * so offline it fails at once instead of waiting.
  */
-export const addImportedItem = async (id: string, draft: ItemDraft, taskId: string): Promise<boolean> =>
-  runTransaction(db, async transaction => {
+export const addImportedItem = async (id: string, draft: ItemDraft, taskId: string): Promise<boolean> => {
+  const valid = checkedDraft(draft)
+  return runTransaction(db, async transaction => {
     const ref = itemDoc(id)
     if (!(await transaction.get(ref)).exists()) {
-      transaction.set(ref, { ...newEntry(id, draft, []), taskId })
+      transaction.set(ref, { ...newEntry(id, valid, []), taskId })
       return true
     }
     return false
   })
+}
 
 /**
  * Saves an edit. Only fields that differ from what the form opened with are written and pushed, so
@@ -78,7 +77,7 @@ const statusAction = (status: Item['status']): string => {
 const editAction = (opened: ItemDraft, draft: ItemDraft): string => draft.status === opened.status ? 'Edited' : statusAction(draft.status)
 
 export const editItem = async (id: string, opened: ItemDraft, draft: ItemDraft): Promise<void> =>
-  saveEdit({ draft, id, message: entryLogMessage(editAction(opened, draft), draft.title), opened })
+  saveEdit({ draft: checkedDraft(draft), id, message: entryLogMessage(editAction(opened, draft), draft.title), opened })
 
 /** Sets an entry's status (e.g. done after a swipe): only the status is written and pushed. */
 export const setItemStatus = async (item: Item, status: Item['status']): Promise<void> => saveEdit({
@@ -105,51 +104,5 @@ export const removeItem = async (item: Pick<Item, 'id' | 'title'>): Promise<void
   return written
 }
 
-/** Applies a push record in a transaction; resolves to false when nothing could be recorded. */
-const apply = async (item: Item, decide: (latest: Item | null) => PushRecord): Promise<boolean> =>
-  runTransaction(db, async transaction => {
-    const ref = itemDoc(item.id)
-    const snapshot = await transaction.get(ref)
-    const record = decide(snapshot.exists() ? itemFrom(snapshot.id, snapshot.data()) : null)
-    if (record.kind === 'delete') {
-      transaction.delete(ref)
-    } else if (record.kind === 'update') {
-      // Becoming "synced" counts as a change: a full sync running meanwhile must not drop the entry.
-      transaction.update(ref, record.fields.sync === 'synced' ? { ...record.fields, updatedAt: serverTimestamp() } : record.fields)
-    }
-    return record.kind !== 'nothing'
-  })
-
-/** Records a push; Google's event after it is read back as a draft with the household's categories. */
-export const recordPush = async (item: Item, outcome: PushOutcome, { uid, categories }: { uid: string, categories: readonly Category[] }) => {
-  const remote = outcome.kind === 'synced' ? draftFrom(outcome.event, categories) : null
-  return apply(item, latest => recordFor({ latest, outcome, pushed: item, remote, uid }))
-}
-
-export const recordPushError = async (item: Item, error: unknown) => {
-  const message = stringify(error)
-  return apply(item, latest => errorFor(latest, item, message)).then(recorded => {
-    if (recorded) {
-      logError(errorLogMessage('Google refused', item.title), item.id, message)
-    }
-    return recorded
-  })
-}
-
 export const retryItem = async (item: Item): Promise<void> =>
   updateDoc(itemDoc(item.id), { sync: 'pending', syncError: null })
-
-/**
- * Records in the ledger what a date write left in Google: the shape written (also when Google refused
- * it, with the error, so it isn't retried until the entry changes), or nothing after a delete. Skipped
- * when the entry is gone meanwhile.
- */
-export const recordDateOp = async (item: Item, op: DateOp, error: string | null = null): Promise<void> =>
-  runTransaction(db, async transaction => {
-    const ref = itemDoc(item.id)
-    if (!(await transaction.get(ref)).exists()) {
-      return
-    }
-    const record = op.kind === 'delete' ? deleteField() : { shape: op.shape, ...typeof error === 'string' && error !== '' ? { error } : {} }
-    transaction.update(ref, { [`dateEvents.${op.dateId}`]: record })
-  })

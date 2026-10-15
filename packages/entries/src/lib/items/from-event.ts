@@ -3,7 +3,7 @@ import { type CalendarEvent, DUE_TIME, END_TIME, type EventContext, STATUS_TAGS,
 import { remindersFromText } from './reminders'
 import { detailsFrom } from './event-details'
 import { intervalFrom } from './interval'
-import type { ItemDraft } from './model'
+import { type ItemDraft, repairedDraft } from './draft'
 import { hasText } from '@household-brain/core/lib/read'
 
 const PREFIX = /^\[(?<label>[^\]]+)\]\s*(?<rest>(?:\S.*)?)$/u
@@ -95,7 +95,7 @@ const detailFields = (event: CalendarEvent, categories: readonly Category[]) => 
  * recognise (#92): each person's next pull then reads the whole calendar again once, so entries
  * taken in under the old rules are brought up to the new ones (#97).
  */
-export const READING_RULES = 2
+export const READING_RULES = 3
 
 /**
  * The reading rules a full listing counts as read under. The rules recognise every default
@@ -106,8 +106,8 @@ export const READING_RULES = 2
 export const rulesReadWith = (categories: readonly Pick<Category, 'slug'>[]): number =>
   (missingDefaults(categories).length === 0 ? READING_RULES : READING_RULES - 1)
 
-/** The entry fields an event carries. */
-export const draftFrom = (event: CalendarEvent, categories: readonly Category[]): ItemDraft => {
+/** The entry fields an event carries, as written there. */
+const fieldsOf = (event: CalendarEvent, categories: readonly Category[]): ItemDraft => {
   const properties = event.extendedProperties?.private ?? {}
   const status = properties['hb.status']
   const { category, title } = categoryAndTitle(event, categories)
@@ -122,6 +122,18 @@ export const draftFrom = (event: CalendarEvent, categories: readonly Category[])
     status: status === 'done' || status === 'cancelled' ? status : 'open',
   }
 }
+
+/**
+ * The entry an event becomes, made to pass the entry schema (`repairedDraft`): an event someone
+ * edited in Google Calendar, e.g. with an empty title, still keeps its entry. `repairs` says what
+ * was changed, for the event log.
+ */
+export const draftAndRepairsFrom = (event: CalendarEvent, categories: readonly Category[]): { draft: ItemDraft, repairs: string[] } =>
+  repairedDraft(fieldsOf(event, categories))
+
+/** The entry fields an event carries, repaired where the entry schema doesn't take them. */
+export const draftFrom = (event: CalendarEvent, categories: readonly Category[]): ItemDraft =>
+  draftAndRepairsFrom(event, categories).draft
 
 // A timed event's dateTime carries an offset ("…T17:00:00+01:00"); only the clock time matters here.
 export const isAt = (time: CalendarEvent['start'], clock: string, timeZone: string) =>

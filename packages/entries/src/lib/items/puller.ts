@@ -7,7 +7,8 @@ import { applyDateChange, applyPulled, dropStray, forgetDateEvents, markSchema, 
 import { APP_SCHEMA, entryOfEvent, isOrphanDate } from './date-events'
 import { deleteDateEvents } from './date-push'
 import { dateEventChange } from './date-pull'
-import type { Item, ItemDraft } from './model'
+import type { Item } from './model'
+import type { ItemDraft } from './draft'
 import type { PushContext } from './push'
 import { reportUnlessTransient } from './transient'
 import { importTasks } from './tasks-puller'
@@ -57,7 +58,8 @@ const logEntryDecision = (event: CalendarEvent, decision: PullDecision, before: 
   }
   loggedChanges.add(key)
   const title = decision.kind === 'delete' ? before : decision.draft.title
-  logGoogleChange(actionFor(decision.kind), title, { changed: decision.kind === 'update' ? Object.keys(decision.fields) : [], itemId: event.id })
+  const repairs = decision.kind === 'delete' ? [] : decision.repairs ?? []
+  logGoogleChange(actionFor(decision.kind), title, { changed: decision.kind === 'update' ? Object.keys(decision.fields) : [], itemId: event.id, repairs })
 }
 
 const normalise = async (context: PushContext, event: CalendarEvent, patch: CalendarEvent): Promise<string | null> => {

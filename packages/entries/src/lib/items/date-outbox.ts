@@ -4,7 +4,7 @@ import { type DateOp, dateEventsAllowed, planDates } from './date-events'
 import { pushDateOp } from './date-push'
 import type { Item } from './model'
 import type { PushContext } from './push'
-import { recordDateOp } from './store'
+import { recordDateOp } from './push-store'
 import { isTransient } from './transient'
 import { stringify } from '@household-brain/core/lib/stringify'
 

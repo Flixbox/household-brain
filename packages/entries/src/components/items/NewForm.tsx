@@ -1,4 +1,5 @@
-import { type ItemDraft, emptyDraft } from '@household-brain/entries/lib/items/model'
+import { emptyDraft } from '@household-brain/entries/lib/items/model'
+import type { ItemDraft } from '@household-brain/entries/lib/items/draft'
 import { requestSyncAccess } from '@household-brain/entries/lib/items/outbox'
 import { addItem } from '@household-brain/entries/lib/items/store'
 import type { EntryDate } from '@household-brain/entries/lib/items/dates'

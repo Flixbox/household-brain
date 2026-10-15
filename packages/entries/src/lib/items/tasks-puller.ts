@@ -4,6 +4,7 @@ import { type GoogleTask, type TasksApi, createTasksApi } from '@household-brain
 import { addImportedItem } from './store'
 import { eventIdForTask } from './ids'
 import { importedTask } from './task-import'
+import { repairedDraft } from './draft'
 import { logErrorOnce, logEvent, logRecovered } from '@household-brain/entries/lib/logs'
 import { entryLogMessage } from '@household-brain/entries/lib/logs-messages'
 import { hasText } from '@household-brain/core/lib/read'
@@ -11,15 +12,17 @@ import { hasText } from '@household-brain/core/lib/read'
 /**
  * One task: an entry when its notes hold the Gem's JSON (#118), then ticked off. The entry is saved
  * first, under an id that comes from the task, so an interruption before the tick never imports it
- * twice: the next pull finds the entry and only ticks the task off.
+ * twice: the next pull finds the entry and only ticks the task off. What the entry schema doesn't
+ * take is repaired rather than refused (`repairedDraft`), and the log says what was changed.
  */
 const takeTask = async (api: TasksApi, listId: string, task: GoogleTask): Promise<void> => {
   const imported = importedTask(task)
   const id = eventIdForTask(task.id)
   if (imported && hasText(id)) {
-    const added = await addImportedItem(id, imported.draft, task.id)
+    const { draft, repairs } = repairedDraft(imported.draft)
+    const added = await addImportedItem(id, draft, task.id)
     if (added) {
-      logEvent(entryLogMessage('Imported', imported.draft.title), id)
+      logEvent(entryLogMessage('Imported', draft.title), id, repairs.length > 0 ? `Repaired: ${repairs.join('; ')}` : '')
     }
     await api.completeTask(listId, task.id)
   }

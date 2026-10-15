@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import type { Category } from '@household-brain/entries/lib/categories'
-import { type Item, type ItemDraft, draftOf } from '@household-brain/entries/lib/items/model'
+import { type Item, draftOf } from '@household-brain/entries/lib/items/model'
+import type { ItemDraft } from '@household-brain/entries/lib/items/draft'
 import { refreshNow, requestSyncAccess } from '@household-brain/entries/lib/items/outbox'
 import { editItem, removeItem, setExtraDates } from '@household-brain/entries/lib/items/store'
 import { type EntryDate, sameDates } from '@household-brain/entries/lib/items/dates'

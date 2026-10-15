@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import { DEFAULT_CATEGORIES } from '@household-brain/entries/lib/categories'
 import type { CalendarEvent } from './event'
-import { READING_RULES, draftFrom, normalisationFor, ownRemindersFix, rulesReadWith } from './from-event'
+import { READING_RULES, draftAndRepairsFrom, draftFrom, normalisationFor, ownRemindersFix, rulesReadWith } from './from-event'
 
 const context = { categories: DEFAULT_CATEGORIES, timeZone: 'Europe/Berlin' }
 const appEvent: CalendarEvent = {
@@ -18,6 +18,15 @@ describe('draftFrom', () => {
     expect(draftFrom(appEvent, DEFAULT_CATEGORIES)).toEqual({
       amount: '10', category: 'coupon', code: 'X1', currency: '', dueDate: '2026-11-03', interval: '', notes: 'Only online', reminders: '', startDate: '2026-10-01', status: 'open', title: 'Amazon', url: '',
     })
+  })
+
+  it('repairs what the entry schema doesn\'t take, so the event keeps its entry (#194)', () => {
+    const blank = { ...appEvent, extendedProperties: { private: { ...appEvent.extendedProperties?.private, 'hb.start': '2027-01-01' } }, summary: '[Coupon] ' }
+    expect(draftAndRepairsFrom(blank, DEFAULT_CATEGORIES)).toMatchObject({
+      draft: { notes: 'Only online\nStart date: 2027-01-01', startDate: '', title: 'Untitled' },
+      repairs: ['blank title: "Untitled"', 'start date not a date or after the due date: moved to the notes'],
+    })
+    expect(draftFrom(blank, DEFAULT_CATEGORIES).title).toBe('Untitled')
   })
 
   it('reads how often the price is due, and nothing it doesn\'t know (#86)', () => {
