@@ -1,4 +1,5 @@
 import type { EntryDate } from './dates'
+import type { ItemDraft } from './draft'
 
 /** The ledger of one extra date's Google event. */
 export interface DateEventRecord {
@@ -6,26 +7,12 @@ export interface DateEventRecord {
   error?: string
 }
 
-/** An entry as the app keeps it in Firestore (`items/{id}`); the id is also the Google event id. */
-export interface Item {
+/**
+ * An entry as the app keeps it in Firestore (`items/{id}`); the id is also the Google event id. Its
+ * editable fields are the draft's (`draft.ts`); a field older entries lack is filled in when read.
+ */
+export interface Item extends ItemDraft {
   id: string
-  title: string
-  category: string
-  /** ISO calendar date, `YYYY-MM-DD`; always due at 17:00 Europe/Berlin. */
-  dueDate: string
-  /** Optional `YYYY-MM-DD` it started or becomes valid (a membership's start, a coupon's first day); '' if none. */
-  startDate: string
-  status: 'open' | 'done' | 'cancelled'
-  code: string
-  amount: string
-  /** The amount's currency: an ISO 4217 code such as `BRL`, or '' for euros. Absent on older entries. */
-  currency: string
-  /** How often the amount is due (`interval.ts`): '' for a one-off price. Absent on older entries. */
-  interval: string
-  url: string
-  notes: string
-  /** The entry's own reminders as text (`reminders.ts`): '' for the household default. Absent on older entries. */
-  reminders: string
   /** Last Google etag seen, per user: reminders are per person, so etags can differ between users. */
   etags: Record<string, string>
   sync: 'pending' | 'synced' | 'error'
@@ -59,7 +46,6 @@ export interface Item {
 
 export const EDITABLE_FIELDS = ['title', 'category', 'dueDate', 'startDate', 'status', 'code', 'amount', 'currency', 'interval', 'url', 'notes', 'reminders'] as const
 export type EditableField = typeof EDITABLE_FIELDS[number]
-export type ItemDraft = Pick<Item, EditableField>
 
 export const emptyDraft = (category = ''): ItemDraft => ({
   amount: '',

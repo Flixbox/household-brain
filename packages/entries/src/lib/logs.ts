@@ -56,9 +56,13 @@ export const logRecovered = (key: string): void => {
   failing.delete(key)
 }
 
-/** An entry Google Calendar added, changed or removed, as a pull took it in. */
-export const logGoogleChange = (action: string, title: string, { itemId, changed = [] }: { itemId: string, changed?: readonly string[] }): void => {
-  logEvent(`${entryLogMessage(action, title)} from Google Calendar`, itemId, changedDetail(changed))
+/**
+ * An entry Google Calendar added, changed or removed, as a pull took it in; `repairs`: what the
+ * entry schema changed in Google's version (`repairedDraft`).
+ */
+export const logGoogleChange = (action: string, title: string, { itemId, changed = [], repairs = [] }: { itemId: string, changed?: readonly string[], repairs?: readonly string[] }): void => {
+  const repaired = repairs.length > 0 ? `Repaired: ${repairs.join('; ')}` : ''
+  logEvent(`${entryLogMessage(action, title)} from Google Calendar`, itemId, [changedDetail(changed), repaired].filter(Boolean).join('\n'))
 }
 
 // An Instant has no calendar, so the 90 days are counted in hours.

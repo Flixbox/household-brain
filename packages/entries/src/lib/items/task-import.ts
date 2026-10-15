@@ -1,6 +1,7 @@
 import { DEFAULT_CATEGORIES } from '@household-brain/entries/lib/categories'
 import type { GoogleTask } from '@household-brain/entries/lib/tasks/api'
-import { type ItemDraft, emptyDraft } from './model'
+import { emptyDraft } from './model'
+import type { ItemDraft } from './draft'
 import { PLAIN_NUMBER } from './amount'
 import { isDate } from './dates'
 import { intervalFrom } from './interval'

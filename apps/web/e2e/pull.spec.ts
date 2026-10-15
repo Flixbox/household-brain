@@ -3,6 +3,7 @@ import { allowlist, readDocument, resetEmulators, seedDocument } from './emulato
 import { mockGoogle } from './google-mocks'
 import { openMenu, signInAllowlisted, signInAs, signOutWith } from './session'
 import { recordOf, textMapOf } from '@household-brain/core/lib/read'
+import { READING_RULES } from '@household-brain/entries/lib/items/from-event'
 
 const CALENDAR = 'household@group.calendar.google.test'
 
@@ -151,7 +152,7 @@ test('events made in Google Calendar: taken in and shaped, left alone when put i
     await seedDocument(`syncState/${uid}`, { schema: 4, syncToken })
     await pullUntil(page, async () => page.getByRole('region', { name: 'Coupon' }).getByRole('link', { name: /^Popcorn/u }).count(), 1)
     await expect.poll(() => google.live().find(event => event.id === 'oldrules1')?.summary).toBe('[Coupon] Popcorn')
-    await expect.poll(async () => (await readDocument(`syncState/${uid}`))?.readingRules).toEqual({ integerValue: '2' })
+    await expect.poll(async () => (await readDocument(`syncState/${uid}`))?.readingRules).toEqual({ integerValue: String(READING_RULES) })
   })
 
   await test.step("an extra date's event in Google never becomes an entry, and a stray one is removed", async () => {

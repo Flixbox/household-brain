@@ -4,7 +4,8 @@ import { holdUpdatesValue } from '@household-brain/entries/lib/update-hold'
 import { useEntryDates } from './use-entry-dates'
 import { normaliseLink } from '@household-brain/entries/lib/items/link'
 import { useRemindersAllowed, useUndatedAllowed } from '@household-brain/entries/lib/items/use-undated'
-import { type EditableField, type FormState, type ItemDraft, changedFields, editField, followUntouched, openForm } from '@household-brain/entries/lib/items/model'
+import { type EditableField, type FormState, changedFields, editField, followUntouched, openForm } from '@household-brain/entries/lib/items/model'
+import { type ItemDraft, draftProblems } from '@household-brain/entries/lib/items/draft'
 
 /**
  * The form's fields: what it shows, the newest version it has seen, and a setter per field. When
@@ -42,3 +43,18 @@ const useFieldGates = (initial: ItemDraft, editing: boolean) => ({
   dateRequired: !useUndatedAllowed() && !(editing && initial.dueDate === ''),
   remindersShown: useRemindersAllowed() || initial.reminders !== '',
 })
+
+/**
+ * Whether the entry schema takes a draft (#194): `accepts` checks it at Save, `problems` is what it
+ * found wrong. After the browser's checks it has the last word, so what the form sends is never
+ * refused by the save functions once the form has closed.
+ */
+export const useDraftCheck = () => {
+  const [problems, setProblems] = useState<string[]>([])
+  const accepts = (draft: ItemDraft) => {
+    const found = draftProblems(draft)
+    setProblems(found)
+    return found.length === 0
+  }
+  return { accepts, problems }
+}

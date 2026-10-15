@@ -34,6 +34,11 @@ describe('decidePull', () => {
     expect(decide({ entry: created, event: { ...event, updated: '2026-10-01T10:00:05.000Z' } })).toMatchObject({ kind: 'update', normalise: true })
   })
 
+  it('says what the entry schema repaired in Google\'s version, for the log (#194)', () => {
+    expect(decide({ entry: null, event: { ...event, summary: '[Coupon]' } })).toMatchObject({ draft: { title: 'Untitled' }, kind: 'create', repairs: ['blank title: "Untitled"'] })
+    expect(decide({})).toMatchObject({ kind: 'update', repairs: [] })
+  })
+
   it('takes Google\'s version of an entry without local edits', () => {
     const replaced = decide({})
     expect(replaced).toMatchObject({ fields: { 'code': 'NEW', 'dueDate': '2026-11-03', 'sync': 'synced' }, kind: 'update', normalise: true })

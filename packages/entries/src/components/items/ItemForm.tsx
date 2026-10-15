@@ -1,7 +1,7 @@
 import { type SubmitEvent, useState } from 'react'
 import { type Category, offeredCategory } from '@household-brain/entries/lib/categories'
-import type { ItemDraft } from '@household-brain/entries/lib/items/model'
-import { useEntryForm } from './use-entry-form'
+import type { ItemDraft } from '@household-brain/entries/lib/items/draft'
+import { useDraftCheck, useEntryForm } from './use-entry-form'
 import { primaryButtonClass, textFieldClass } from '@household-brain/entries/lib/styles'
 import { Field } from './Field'
 import { StatusField } from './StatusField'
@@ -40,14 +40,19 @@ export const ItemForm = ({ initial, initialDates = NO_DATES, categories, onSave,
   // Not an edit until saved: a category that arrives meanwhile (another device) still replaces it.
   const shownCategory = offeredCategory(draft.category, categories)
   const [saving, setSaving] = useState(false)
+  const { accepts, problems } = useDraftCheck()
   const submit = (event: SubmitEvent) => {
     event.preventDefault()
     if (saving) {
       return
     }
-    setSaving(true)
     const { draft: finished, ...rest } = saved
-    onSave({ ...finished, category: offeredCategory(finished.category, categories) }, rest)
+    const entry = { ...finished, category: offeredCategory(finished.category, categories) }
+    if (!accepts(entry)) {
+      return
+    }
+    setSaving(true)
+    onSave(entry, rest)
   }
   return (
     <form className="grid gap-4" onSubmit={submit} data-hold-updates={holdUpdates}>
@@ -71,6 +76,7 @@ export const ItemForm = ({ initial, initialDates = NO_DATES, categories, onSave,
       <AmountField amount={draft.amount} currency={draft.currency} interval={draft.interval} onAmount={set('amount')} onCurrency={set('currency')} onInterval={set('interval')} />
       <LinkField value={draft.url} onChange={set('url')} />
       <Field label="Notes"><textarea rows={3} className={textFieldClass} value={draft.notes} onChange={set('notes')} /></Field>
+      {problems.length > 0 && <p role="alert" className="text-sm text-red-700 dark:text-red-400">{problems.join(' ')}</p>}
       <button type="submit" className={primaryButtonClass} disabled={saving}>Save</button>
     </form>
   )

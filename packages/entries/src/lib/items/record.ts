@@ -1,4 +1,5 @@
-import type { Item, ItemDraft } from './model'
+import type { Item } from './model'
+import type { ItemDraft } from './draft'
 import type { PushOutcome } from './push'
 
 /** What to write after a push, given the entry as it is now (`latest`) and as it was pushed (`pushed`). */

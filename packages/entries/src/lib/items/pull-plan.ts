@@ -1,7 +1,8 @@
 import type { Category } from '@household-brain/entries/lib/categories'
 import type { CalendarEvent } from './event'
-import { draftFrom, isRecurring } from './from-event'
-import { EDITABLE_FIELDS, type Item, type ItemDraft, changedFields, draftOf } from './model'
+import { draftAndRepairsFrom, draftFrom, isRecurring } from './from-event'
+import { EDITABLE_FIELDS, type Item, changedFields, draftOf } from './model'
+import type { ItemDraft } from './draft'
 import { isDate } from './dates'
 import { hasText } from '@household-brain/core/lib/read'
 
@@ -9,15 +10,18 @@ import { hasText } from '@household-brain/core/lib/read'
 export type PullDecision =
   | { kind: 'skip' }
   | { kind: 'delete' }
-  /** A new entry; `draft` also tells the caller what to normalise. */
-  | { kind: 'create', draft: ItemDraft, fields: Record<string, unknown> }
+  /**
+   * A new entry; `draft` also tells the caller what to normalise. `repairs`: what the entry schema
+   * made the event's fields into (`repairedDraft`), for the event log.
+   */
+  | { kind: 'create', draft: ItemDraft, fields: Record<string, unknown>, repairs?: string[] }
   /**
    * Overwrite the entry with Google's version (`normalise`: the entry has no local edits), merge it
    * into local edits, or, for the other person's push of the version it already holds, change nothing
    * (`fields` empty). `ownCopy`: this person's own copy of the event (reminders are per person) still
    * has to follow `draft`, and their etag is recorded only once it does (`fixOwnReminders` in the puller).
    */
-  | { kind: 'update', draft: ItemDraft, fields: Record<string, unknown>, normalise: boolean, ownCopy?: boolean }
+  | { kind: 'update', draft: ItemDraft, fields: Record<string, unknown>, normalise: boolean, ownCopy?: boolean, repairs?: string[] }
 
 export interface PullInput {
   /** The entry with this event's id, or null. */
@@ -41,7 +45,7 @@ const deleted = ({ entry }: PullInput): PullDecision =>
  */
 const rememberEtag = (event: CalendarEvent): PullDecision => ({ draft: draftFrom(event, []), fields: {}, kind: 'update', normalise: false, ownCopy: true })
 
-const merged = (entry: Item, draft: ItemDraft): PullDecision => {
+const merged = (entry: Item, draft: ItemDraft, repairs: string[]): PullDecision => {
   const theirs = EDITABLE_FIELDS.filter(field => !entry.dirty.includes(field))
   // This person's etag and the version are recorded only after their own copy is checked (`ownCopy`).
   const fields = Object.fromEntries(theirs.map(field => [field, draft[field]]))
@@ -49,22 +53,22 @@ const merged = (entry: Item, draft: ItemDraft): PullDecision => {
   // own push only rewrites the reminders when its own edits touched the status or the reminders.
   const local = draftOf(entry)
   const mine = { ...draft, ...Object.fromEntries(entry.dirty.map(field => [field, local[field]])) }
-  return { draft: mine, fields, kind: 'update', normalise: false, ownCopy: true }
+  return { draft: mine, fields, kind: 'update', normalise: false, ownCopy: true, repairs }
 }
 
 const changed = ({ entry, event, categories }: PullInput): PullDecision => {
-  const draft = draftFrom(event, categories)
+  const { draft, repairs } = draftAndRepairsFrom(event, categories)
   const googleUpdated = event.updated ?? ''
   const synced = { dirty: [], googleUpdated, pendingOp: null, sync: 'synced', syncError: null }
   if (!entry) {
     // The etag for this person is recorded only after the event is adjusted (or found fine): until
     // someone's is, the same version is adjusted again (`decidePull`).
-    return { draft, fields: { ...draft, ...synced, etags: {}, id: event.id }, kind: 'create' }
+    return { draft, fields: { ...draft, ...synced, etags: {}, id: event.id }, kind: 'create', repairs }
   }
   if (hasLocalEdits(entry)) {
-    return merged(entry, draft)
+    return merged(entry, draft, repairs)
   }
-  return { draft, fields: { ...draft, ...synced }, kind: 'update', normalise: true }
+  return { draft, fields: { ...draft, ...synced }, kind: 'update', normalise: true, repairs }
 }
 
 /** RFC 3339 UTC times compare as text once fractional seconds are always present ("…:05Z" → "…:05.000Z"). */

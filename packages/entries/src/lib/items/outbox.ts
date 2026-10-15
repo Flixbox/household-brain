@@ -4,7 +4,7 @@ import { MEMBER_SCOPES, calendarToken, hasCalendarToken, loadGis } from '@househ
 import type { Item } from './model'
 import { type PushContext, pushItem } from './push'
 import { logPullProblem, pullChanges, resetPullProblems } from './puller'
-import { recordPush, recordPushError } from './store'
+import { recordPush, recordPushError } from './push-store'
 import { outboxApi } from './outbox-api'
 import { isTransient } from './transient'
 import { $outbox } from './outbox-state'
