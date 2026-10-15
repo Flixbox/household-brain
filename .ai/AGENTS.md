@@ -36,7 +36,8 @@ repository), never with the owner's account.
   and review run while `main` deploys. Never stack branches: the owner squash-merges, which breaks
   a branch built on another (it happened). A failed deploy's fix comes first.
 - **One pull request per coherent change** (owner's rule): one feature, fix or refactor, whole. Side
-  findings go into their own follow-up. A coherent change is never split just to be smaller.
+  findings, refactors and tooling tweaks go into their own follow-up, never along for the ride. A
+  coherent change is never split just to be smaller.
 - **Low complexity** (owner's rule): the simplest thing that works; an out-of-the-box tool over a
   hand-built one, a dependency over in-house machinery. Unavoidable complexity goes into its own
   package, not across the app.
@@ -71,8 +72,9 @@ repository), never with the owner's account.
 - **Never pipe a command whose exit code matters** (`bun run lint | tail` succeeded on a failing
   lint once); use `set -o pipefail` or `${PIPESTATUS[0]}`.
 - **e2e tests are a few long journeys**, not many small tests: each test pays for emulator resets,
-  seeding and sign-in on three devices. Add a `test.step` to the journey for that area; find what a
-  step checks by its own title or id, not by position (earlier steps leave data behind).
+  seeding and sign-in on every device. Add a `test.step` to the journey for that area, and keep an
+  area's journeys together in its spec (e2e files have no length limit); find what a step checks by
+  its own title or id, not by position (earlier steps leave data behind).
 
 ### A GIF for every UI change
 
@@ -98,7 +100,9 @@ Every PR that changes the UI shows it in a GIF in its description (after the
   GH=agent-gh SELF='flixbox-ai-agent[bot]' bun packages/watcher/src/watch-project.ts --follow
   ```
 
-  It reads comments with the owner's login, the only one that sees the owner's pending reviews.
+  It reads comments with the owner's login, the only one that sees the owner's pending reviews. It
+  follows a merged PR through `main`'s deploy: `DEPLOYED` asks for the live check below,
+  `DEPLOY_FAILED` for a follow-up PR.
 
 ### Comments and review
 
@@ -121,10 +125,11 @@ Every PR that changes the UI shows it in a GIF in its description (after the
 Mandatory, never blocking: if it finds something broken, or the browser fails, carry on and fix it
 in the next PR (first, if the app is unusable). Report what it showed.
 
-1. Open `https://household-brain-sf.web.app` and reload until the page runs the new build: compare
-   the `/assets/index-*.js` it loaded with `curl https://household-brain-sf.web.app/`. The service
-   worker serves the old build for a few reloads, and answers a page `fetch` from its cache.
-2. Check the page renders, signed in, with no console errors.
+1. Open `https://household-brain-sf.web.app` and reload until the page runs the new build (take an
+   "update available" prompt if one shows): compare the `/assets/index-*.js` it loaded with
+   `curl https://household-brain-sf.web.app/`. The service worker serves the old build for a few
+   reloads, and answers a page `fetch` from its cache.
+2. Check the page renders, sign-in or the signed-in screen works, and the console shows no errors.
 3. Exercise what the PR changed, where safe. **Never create, change or delete real entries, or touch
    the real Google Calendar, to test.**
 
@@ -143,6 +148,8 @@ in the next PR (first, if the app is unusable). Report what it showed.
 - **Tailwind classes in a constant:** its name ends in `Class`, an object of them in `Classes`; the
   Tailwind lint (#187) checks only those and `className`.
 - **Example and test domains use `.test`**, never `example.com` or a real-looking host.
+- **oxlint runs every category as an error, with type information**, and a disable comment that no
+  longer turns anything off fails the lint.
 - **A rule switched off for one file is switched off at its top, with a reason** (owner's rule,
   #181): `/* oxlint-disable <rule> -- <reason> */`, never for a single line. A rule off for a kind of
   file or the whole repository goes into `oxlint.config.ts` with its reason. Before switching a rule
@@ -155,12 +162,16 @@ in the next PR (first, if the app is unusable). Report what it showed.
 - **No imports from parent folders** (#77): import by the package's own name and path.
 - **No barrel files**: packages expose modules by path, and code imports from the defining module.
 - **The shell knows no features**, and features don't wire into it; `apps/web/src/main.tsx` connects
-  them. Packages never import from `apps/web`.
-- **State lives in nanostores**; Firestore data a screen shows comes from a live store
-  (`@household-brain/firebase/live`), not an `onSnapshot` per component. No direct `localStorage`.
+  them. Packages never import from `apps/web`. fallow enforces which package may import which
+  (`.fallowrc.jsonc`); change the boundaries there, not around them.
+- **State lives in nanostores**, `@nanostores/persistent` for what survives a reload; no direct
+  `localStorage`. Firestore data a screen shows comes from a live store
+  (`@household-brain/firebase/live`), not an `onSnapshot` per component; a listener with special needs
+  (pending-write metadata, server-only answers, the allowlist) stays explicit.
 - **Helpers two packages share go into `packages/core`** (#171): `stringify()` for any value as text,
   never `String(error)`. A failure dropped on purpose goes to `ignoreFailure` with a comment saying
-  why nothing is lost (#174); one someone should see goes to `reportError`.
+  why nothing is lost (#174); one someone should see goes to `reportError`. A `catch` that turns a
+  failure into a value (`.catch(() => null)` meaning "not there") is neither, and stays.
 - **A tool's options go into its config file** (owner's rule, #183), a typed one where the tool
   reads it, not into the `package.json` script.
 - **Read `process.env.BUN_PUBLIC_*` literally and compare it inline** where a branch must vanish from
@@ -175,14 +186,17 @@ in the next PR (first, if the app is unusable). Report what it showed.
   browser function exists in both before using it.
 - **Icons, manifest and head links come from `packages/pwa`** (#148): change `apps/web/pwa.config.ts`
   or the icons, never hand-write them.
-- **The e2e build must never reach production** (`apps/web/build.ts` and CI refuse it).
+- **The emulator wiring and the e2e sign-in hook must never ship in the production build**: they sit
+  behind an inline `process.env.BUN_PUBLIC_USE_EMULATORS` comparison, and CI checks the production
+  build for them.
 - **No server.** If a feature ever needs one, look at a free Cloudflare Worker first and file an issue
   saying why, rather than adding a backend.
 
 ## Dependencies, CI and tooling
 
-- **Bun, and only Bun** (#140): package manager, runtime, test runner. Run tools with `bun run` or
-  `bun --bun`, never `npx`; there is no Node fallback.
+- **Bun, and only Bun** (#140): package manager, runtime, test runner. Run tools and scripts through
+  Bun (`bun run`, `bun --bun`, `bun <file>`), never `npx`; there is no Node fallback.
+- **Run tasks through Nx at the root:** `bun run test`, `bun run typecheck`, `bun run build`.
 - **Every dependency pinned exactly; nothing younger than 48 hours** (#94, #102): CI refuses a too
   young package or action; wait and re-run. An urgent exception goes into
   `install.minimumReleaseAgeExcludes` with its reason.
@@ -191,12 +205,13 @@ in the next PR (first, if the app is unusable). Report what it showed.
   only when it truly needs its script, with the reason in the PR.
 - **CI uses only GitHub-owned and `google-github-actions/*` actions, pinned to full SHAs.** Never
   `pull_request_target` or `workflow_run`, never self-hosted runners.
-- **Every CI job has a time limit** and test reporters stream progress: a hang once ran silently for
-  hours.
+- **Every CI job has a time limit, Playwright a `globalTimeout`,** and test reporters stream
+  progress: a hang once ran silently for hours.
 - **Filter runs by workflow** (`--workflow ci.yml`): a merge also starts Dependabot runs.
 - **One TypeScript config to change: `tsconfig.base.json`** (#79).
 - **A new package** gets its own `package.json` and `tsconfig.json`, and goes into the `workspace:*`
-  exceptions in `npmpackagejsonlint.config.ts` once another package depends on it.
+  exceptions in `npmpackagejsonlint.config.ts` once another package depends on it. That config's
+  `rules` stay a named export: Bun loads it as a module, and a default export reads as empty.
 - **A whole-repository Nx target takes `{workspaceRoot}/**/*` as input**: the root project's default
   inputs leave out other projects' files, which once served a stale green from cache.
 - **Nothing runs on code that doesn't type-check** (owner's rule, #193): tests and builds depend on
@@ -215,7 +230,8 @@ in the next PR (first, if the app is unusable). Report what it showed.
 ## Manual steps no code does
 
 - **The Gemini Gem "Household Brain v2"** follows `packages/entries/src/lib/gemini-gem.md` (#119).
-  After a PR that changes it is merged, paste it into the Gem (Gemini as the owner → Gems →
+  A unit test fails when it doesn't list exactly the app's category slugs and price intervals, so
+  changing either changes the instructions in the same PR. After a PR that changes them is merged, paste it into the Gem (Gemini as the owner → Gems →
   Household Brain v2 → Instructions → Save), and say so in the PR.
 - **New sign-ups are switched off** in Firebase Authentication. To add a person: switch sign-up on
   (console → Authentication → Settings → User actions), let them sign in once, allowlist their uid
