@@ -716,7 +716,7 @@ export default defineConfig({
     },
     {
       // Command-line scripts end with an exit code that tells their caller (CI, a shell) how it went.
-      files: ['apps/web/build.ts', 'packages/pwa/src/build.ts', 'packages/tooling/src/**'],
+      files: ['apps/web/build.ts', 'packages/pwa/src/build.ts', 'packages/tooling/src/**', 'packages/watcher/src/**'],
       rules: {
         'unicorn/no-process-exit': 'off',
       },

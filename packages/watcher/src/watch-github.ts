@@ -1,19 +1,23 @@
 /** The project watcher's questions to GitHub, through the `gh` CLI, answered as plain data. */
 import { $ } from 'bun'
 import { type Activity, type OpenPr, type Run, decisionFrom } from './watch-events'
-import { isRecord, textOf } from '@household-brain/core/lib/read'
+import { hasText, isRecord, textOf } from './read'
 
-export const REPO = process.env.REPO ?? 'Flixbox/household-brain'
-const WORKFLOW = process.env.WORKFLOW ?? 'ci.yml'
-// The agent runs this as its bot: GH=agent-gh (see .ai/AGENTS.md). Defaults to plain gh.
+// Settings, all from the environment (#200), so the watcher works in any repository:
+// GH: the `gh` to ask with, e.g. a wrapper logged in as a bot (GH=agent-gh). Defaults to plain gh.
 const GH = process.env.GH ?? 'gh'
-// Comments are read with the owner's login: a pending (unsubmitted) review is only visible to its
-// author, and the owner leaves those. Override with ACTIVITY_GH.
+// REPO: `owner/name`; by default the repository `gh` finds in the current folder.
+export const REPO = hasText(process.env.REPO) ? process.env.REPO : (await $`${GH} repo view --json nameWithOwner -q .nameWithOwner`.text()).trim()
+// WORKFLOW: the CI workflow file whose runs are followed (a PR's checks, main's deploy).
+const WORKFLOW = process.env.WORKFLOW ?? 'ci.yml'
+// ACTIVITY_GH: comments are read with the owner's login: a pending (unsubmitted) review is only
+// visible to its author, and the owner leaves those.
 const ACTIVITY_GH = process.env.ACTIVITY_GH ?? 'gh'
-const OWNER = process.env.OWNER ?? 'Flixbox'
-// The agent's own comments and replies in review threads are not news to it. Its reviews (the
-// reviewer agent posts as the same bot) still are.
-const SELF = process.env.SELF ?? 'flixbox-ai-agent[bot]'
+// OWNER: whose issue comments are news; by default the repository's owner.
+const OWNER = process.env.OWNER ?? REPO.split('/')[0] ?? ''
+// SELF: the agent's own login. Its comments and replies in review threads are not news to it; its
+// reviews (a reviewer agent posting as the same login) still are. None by default.
+const SELF = process.env.SELF ?? ''
 // Nx Cloud's status comment on every push needs no answer.
 const IGNORED = new Set([SELF, 'nx-cloud[bot]'])
 

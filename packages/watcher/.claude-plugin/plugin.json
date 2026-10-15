@@ -1,0 +1,6 @@
+{
+  "name": "project-watcher",
+  "description": "Watches a GitHub repository's pull requests, CI, deploys and issues, and reports each event as it happens, with the routine for acting on it.",
+  "version": "1.0.0",
+  "license": "Unlicense"
+}
