@@ -94,7 +94,8 @@ export default defineConfig({
     'sonarjs/no-nested-assignment': 'error',
     'sonarjs/no-redundant-boolean': 'error',
     'sonarjs/prefer-single-boolean-return': 'error',
-    'sonarjs/unused-import': 'error',
+    // Oxlint's own `no-unused-vars` reports the same imports (#209), all but those named `_…`.
+    'sonarjs/unused-import': 'off',
     'sonarjs/fixme-tag': 'error',
     'sonarjs/todo-tag': 'error',
     'sonarjs/no-case-label-in-switch': 'error',
@@ -182,6 +183,7 @@ export default defineConfig({
     'sonarjs/no-os-command-from-path': 'error',
     'sonarjs/no-misleading-array-reverse': 'error',
     'sonarjs/no-element-overwrite': 'error',
+    // Not left to fallow's duplication check (#209): fallow skips test files and copies under five lines.
     'sonarjs/no-identical-functions': 'error',
     'sonarjs/no-empty-collection': 'error',
     'sonarjs/no-redundant-assignments': 'error',
