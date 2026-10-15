@@ -16,7 +16,7 @@ One watcher for the whole repository: every open pull request, merged ones until
 default branch's CI, new issues, the owner's comments on issues, and issues closed or reopened.
 
 ```sh
-bun ${CLAUDE_PLUGIN_ROOT}/src/watch-project.ts --follow
+SELF='<your login>' bun ${CLAUDE_PLUGIN_ROOT}/src/watch-project.ts --follow
 ```
 
 - **Run it under Claude Code's `Monitor`** with `--follow`: it keeps running, prints each event as
@@ -31,7 +31,8 @@ bun ${CLAUDE_PLUGIN_ROOT}/src/watch-project.ts --follow
   - `OWNER`: whose issue comments are news (the repository's owner by default).
   - `ACTIVITY_GH`: the `gh` that reads comments; plain `gh` by default, because only the owner's own
     login sees their pending (unsubmitted) review.
-  - `SELF`: your own login, so your comments aren't reported back to you (your reviews still are).
+  - `SELF`: **set it to the login you comment as** (a bot's is `name[bot]`); without it your own
+    comments, replies and issues are reported back to you as news. Your reviews still are.
 - It remembers what it reported (per repository, under `$XDG_STATE_HOME/watch-project`), and only
   one runs per repository at a time.
 - It follows each pull request's **current** head commit, so a push needs no restart, and stays armed
@@ -53,8 +54,8 @@ approved one whose auto-merge is still off, not only on the one the event names.
 | `CI_SLOW` | Something hangs. Cancel the run, read its logs, fix the hang **and** the missing time limit. |
 | `CONFLICT` | Rebase on the default branch, run the checks, push once, reply on the pull request. |
 | `MAIN_MOVED` | The default branch moved under the pull request. Rebase, run the checks, push once, so what gets merged is what was tested. |
-| `APPROVED` | The owner approved. A plain approval comes only as this; one with text also comes as `ACTIVITY`. |
-| `READY_TO_MERGE` | Approved and green, auto-merge off. |
+| `APPROVED` | The owner approved. If the review's findings are fixed, read the pull request for unanswered comments, then enable auto-merge (`gh pr merge <n> --auto --squash`, or as the repository's notes say). A plain approval comes only as this; one with text also comes as `ACTIVITY`: answer it first. |
+| `READY_TO_MERGE` | Approved and green, auto-merge still off: enable it the same way, unless review findings are still open. |
 | `ACTIVITY` | Answer every comment, including those of a pending review: fix what is asked in one push, then reply in the thread and resolve it once settled. A comment that needs the owner's decision stays open. |
 | `DEPLOYED` | Check the deployed app as the repository's notes say. |
 | `DEPLOY_FAILED` | Fix it in a follow-up pull request. A deploy a newer merge cancelled isn't a failure: the watcher follows the newer run. |

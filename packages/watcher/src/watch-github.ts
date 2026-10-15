@@ -7,7 +7,16 @@ import { hasText, isRecord, textOf } from './read'
 // GH: the `gh` to ask with, e.g. a wrapper logged in as a bot (GH=agent-gh). Defaults to plain gh.
 const GH = process.env.GH ?? 'gh'
 // REPO: `owner/name`; by default the repository `gh` finds in the current folder.
-export const REPO = hasText(process.env.REPO) ? process.env.REPO : (await $`${GH} repo view --json nameWithOwner -q .nameWithOwner`.text()).trim()
+const currentRepo = async (): Promise<string> => {
+  const answer = await $`${GH} repo view --json nameWithOwner -q .nameWithOwner`.quiet().nothrow()
+  const repo = answer.stdout.toString().trim()
+  if (answer.exitCode !== 0 || !hasText(repo)) {
+    process.stderr.write(`Which repository? Run this inside a GitHub repository's folder with ${GH} logged in, or set REPO=owner/name.\n${answer.stderr.toString()}`)
+    process.exit(2)
+  }
+  return repo
+}
+export const REPO = hasText(process.env.REPO) ? process.env.REPO : await currentRepo()
 // WORKFLOW: the CI workflow file whose runs are followed (a PR's checks, main's deploy).
 const WORKFLOW = process.env.WORKFLOW ?? 'ci.yml'
 // ACTIVITY_GH: comments are read with the owner's login: a pending (unsubmitted) review is only
