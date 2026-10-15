@@ -13,7 +13,7 @@
  */
 import { $ } from 'bun'
 import { REPO } from './watch-github'
-import { hasText } from '@household-brain/core/lib/read'
+import { hasText } from './read'
 
 const home = process.env.HOME ?? '.'
 const stateHome = process.env.XDG_STATE_HOME ?? `${home}/.local/state`

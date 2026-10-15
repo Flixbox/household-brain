@@ -21,7 +21,7 @@
  *
  * Every CI result (a PR's, a deploy's or main's) ends with the list of open PRs.
  *
- *   bun packages/tooling/src/watch-project.ts [--follow] [ci-limit-minutes=20] [max-hours=12]
+ *   bun packages/watcher/src/watch-project.ts [--follow] [ci-limit-minutes=20] [max-hours=12]
  *
  * Open pull requests are watched, and every one seen open stays watched until its deploy (or its
  * closing) is reported; merged ones from the last few hours too, for a fresh state. Each follows its
@@ -38,7 +38,7 @@ import { type Activity, FOLLOW_NEWER, cancelledDeployEvent, issueKey, mainRunEve
 import { type PrState, REPO, activityOf, issueEventLines, issueLine, jobLines, mainAhead, mainHead, newestMainRun, openIssueNumbers, openPrs, prState, recentlyMerged, reviewCommentLines, runOf } from './watch-github'
 import { appendLines, exists, lock, readLines, writeLines } from './watch-state'
 import { EVENT_PRINTED, quiet, report, sayAndExit } from './watch-output'
-import { hasText } from '@household-brain/core/lib/read'
+import { hasText } from './read'
 
 const [limitMinutes = '20', maxHours = '12'] = process.argv.slice(2).filter(arg => arg !== '--follow')
 if (!/^\d+$/u.test(limitMinutes) || !/^\d+$/u.test(maxHours)) {

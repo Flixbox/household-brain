@@ -1,0 +1,11 @@
+{
+  "name": "household-brain",
+  "owner": { "name": "Flixbox" },
+  "plugins": [
+    {
+      "name": "project-watcher",
+      "source": "./packages/watcher",
+      "description": "Watches a GitHub repository's pull requests, CI, deploys and issues, and reports each event as it happens (#200)."
+    }
+  ]
+}

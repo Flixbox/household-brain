@@ -9,8 +9,7 @@
     "check-package-age": "./src/check-package-age.ts",
     "e2e-hosting-config": "./src/e2e-hosting-config.ts",
     "pr-gif": "./src/pr-gif.ts",
-    "remove-node": "./src/remove-node.ts",
-    "watch-project": "./src/watch-project.ts"
+    "remove-node": "./src/remove-node.ts"
   },
   "scripts": {
     "typecheck": "tsc",

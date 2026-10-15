@@ -1,0 +1,14 @@
+{
+  "name": "@household-brain/watcher",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "license": "Unlicense",
+  "bin": {
+    "watch-project": "./src/watch-project.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc",
+    "test": "bun test"
+  }
+}

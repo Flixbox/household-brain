@@ -113,10 +113,16 @@
         "e2e-hosting-config": "./src/e2e-hosting-config.ts",
         "pr-gif": "./src/pr-gif.ts",
         "remove-node": "./src/remove-node.ts",
-        "watch-project": "./src/watch-project.ts",
       },
       "dependencies": {
         "@household-brain/core": "workspace:*",
+      },
+    },
+    "packages/watcher": {
+      "name": "@household-brain/watcher",
+      "version": "0.0.0",
+      "bin": {
+        "watch-project": "./src/watch-project.ts",
       },
     },
   },
@@ -498,6 +504,8 @@
     "@household-brain/shell": ["@household-brain/shell@workspace:packages/shell"],
 
     "@household-brain/tooling": ["@household-brain/tooling@workspace:packages/tooling"],
+
+    "@household-brain/watcher": ["@household-brain/watcher@workspace:packages/watcher"],
 
     "@household-brain/web": ["@household-brain/web@workspace:apps/web"],
 

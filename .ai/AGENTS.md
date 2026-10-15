@@ -28,7 +28,7 @@ that work with the owner's account.
 
 - **Pull requests and comments:** `agent-gh pr create --assignee Flixbox …`, `agent-gh pr comment …`.
   Every pull request is assigned to the owner (`Flixbox`), always.
-- **Project watcher:** `GH=agent-gh bun packages/tooling/src/watch-project.ts`. It still reads comments with the owner's
+- **Project watcher:** `GH=agent-gh SELF='flixbox-ai-agent[bot]' bun packages/watcher/src/watch-project.ts --follow` (section 2). It still reads comments with the owner's
   login, because only the owner's account can see the owner's pending (unsubmitted) reviews.
 - **What the bot can't do**, on purpose: change repository settings or rulesets, merge past checks,
   or approve. Settings changes the owner asks for are made with the owner's `gh` login. Merging is
@@ -139,66 +139,26 @@ adapted to this repository:
 ### 2. After every push
 
 1. **Update the PR description** so it describes what the branch does now.
-2. **Keep the project watcher running in the background**, and let its exit wake you:
+2. **Keep the project watcher running** under a `Monitor`, and act on what it reports. The watcher is
+   a Claude Code plugin in this repository (`packages/watcher`, #200), whose `babysit-prs` skill
+   holds the routine: how to run it, what each event asks for, reading comments before auto-merge.
+   This repository's command, as the bot:
 
    ```sh
-   GH=agent-gh bun packages/tooling/src/watch-project.ts
+   GH=agent-gh SELF='flixbox-ai-agent[bot]' bun packages/watcher/src/watch-project.ts --follow
    ```
 
-   - One watcher for the whole project: every open PR, merged ones until their deploy, `main`'s CI,
-     new issues, the owner's comments on issues, and issues closed or reopened. Each event comes prefixed with its PR
-     (`PR #12: CI_PASSED …`).
-   - It follows each PR's **current** head commit, so a push needs no restart.
-   - It remembers what it already reported, so after handling an event you simply start it again and
-     it continues with the next one.
-   - **With a harness that wakes on new output lines** (Claude Code's `Monitor`), run it once with
-     `--follow` instead: it keeps running, prints each event as it happens and ends each one with a
-     `---` line, so it never needs restarting (#196). `IDLE` is then a heartbeat, not an exit. A
-     `Monitor` stops after 30 minutes at most: re-arm it when its expiry notice comes; the watcher
-     picks up where it left off.
-   - Bun reads the whole program before running it, so checking out or editing the tooling under a
-     running watcher is harmless (the bash watcher had to run from a copy).
-   - It stays armed through the merge and reports the deploy. Don't poll by hand alongside it.
-   - It watches `main` too, also between PRs: every new commit (`MAIN_ADVANCED`), failing or
-     hanging runs (`MAIN_FAILED`, `MAIN_SLOW`), and new commits an open PR lacks (`MAIN_MOVED`).
-   - A PR it has seen open stays watched until its deploy or its closing is reported, comments
-     included: on a PR it already follows, one written just before a merge is still reported after
-     it (#129).
-   - A PR labelled **`parked`** (left open on purpose) only reports its CI and comments, not
-     conflicts, approvals or `main` moving on. To park a PR, add the label; remove it to bring the
-     PR back.
-   - **Every CI result** (a PR's, a deploy's or `main`'s, passed or failed) ends with the list of open
-     PRs: approved or awaiting approval, auto-merge on or off, CI state. Act on every approved PR in
-     it whose auto-merge is still off, not only on the one the event names.
-   - A plain approval is reported as `APPROVED` only. One with text also comes as `ACTIVITY`, so a
-     request written into the approval gets answered before auto-merge.
-   - **Before enabling auto-merge, read the PR for unanswered comments** (#154): an approval and a
-     comment often arrive together.
-   - The bot's own comments and replies in review threads are skipped; its reviews (the reviewer agent posts as
-     the same bot) are not.
+   - It still reads comments with the owner's login (`ACTIVITY_GH` stays plain `gh`), because only
+     the owner's account sees the owner's pending reviews.
+   - Here, `APPROVED` and `READY_TO_MERGE` mean: if the PR is well reviewed (section 4), enable
+     auto-merge (`agent-gh pr merge <n> --auto --squash`), after reading it for unanswered comments
+     as its own step (#154). `CI_SLOW`: cancelling and re-running need the owner's `gh` login, the
+     bot can only read Actions. `DEPLOYED`: the live check in section 4.
+   - Other projects install the plugin from this repository's marketplace
+     (`/plugin marketplace add Flixbox/household-brain`, then `/plugin install
+     project-watcher@household-brain`); a change to the watcher reaches them through `main`.
 
-### 3. When the watcher reports
-
-| Event | What to do |
-| --- | --- |
-| `NEW_PR` | A pull request appeared (Dependabot's too). Review it like any other: one reviewer pass, and for a dependency bump check what CI can't see, such as a build whose output silently changed. |
-| `CI_PASSED` | Report it and start the watcher again. |
-| `APPROVED` | The owner approved. If the PR is well reviewed (section 5), enable auto-merge now: `agent-gh pr merge <n> --auto --squash`. Don't wait for anything else. |
-| `READY_TO_MERGE` | Approved and green, but auto-merge is off: enable it, unless review findings are still open (then fix them first, within the four-round cap). |
-| `CI_FAILED` | Read the failing job (`agent-gh run view <run> --log-failed`), reproduce locally, fix, push once. |
-| `CI_SLOW` | More than 20 minutes: something hangs. Cancel the run (`gh run cancel <run>`: the bot can only read Actions, so this uses the owner's login), read the logs (`agent-gh api repos/Flixbox/household-brain/actions/jobs/<job-id>/logs`), fix the hang **and** the missing time limit. A flaky download can just be re-run (`gh run rerun <run> --failed`, owner's login again). |
-| `CONFLICT` | Rebase on `main`, run the checks, push once, reply on the PR. |
-| `ACTIVITY` | Answer every comment (section 4), including those of a pending review. |
-| `DEPLOYED` | A minute later, check the live app in the browser (section 5): mandatory, but never blocking. Report; the next PR was opened at the merge. |
-| `DEPLOY_FAILED` | Fix it in a follow-up PR (never push to `main`). A deploy that a newer merge cancelled isn't a failure: the watcher follows the newer run, which deploys both. |
-| `MAIN_FAILED` / `MAIN_SLOW` | `main` is broken or hanging, whichever PR caused it. That comes first: fix it in a follow-up PR, or re-run a flaky job, before continuing. |
-| `MAIN_PASSED` | `main`'s newest run passed. Nothing to fix; read the open-PR list that comes with it. |
-| `MAIN_ADVANCED` | `main` got a new commit, whoever merged it. Know what landed: if it was your own PR, open the next one now while its deploy runs; otherwise check whether it touches your work. |
-| `MAIN_MOVED` | `main` moved under the PR (another merge). Rebase on `main`, run the checks, push once, so what gets merged is what was tested. |
-| `NEW_ISSUE` / `ISSUE_COMMENT` | Read it; take the work in turn (tech debt first), answer the owner's comment. |
-| `ISSUE_CLOSED` / `ISSUE_REOPENED` | An issue was closed (by whom, and why) or reopened. Drop or resume any work on it; a closed one the owner decided on may need nothing else. |
-
-### 4. Comments and review
+### 3. Comments and review
 
 - **Every comment gets an answer.** Fix what is asked, in one push, then reply in the thread saying
   what changed (`gh pr comment`, or a reply on the review comment). Resolve the thread once it is
@@ -210,7 +170,7 @@ adapted to this repository:
   addressed.
 - Fix review findings **in one push**, then go back to step 2.
 
-### 5. Merge and deploy
+### 4. Merge and deploy
 
 - **Merging:** once the owner has **approved** the PR and you consider it well reviewed, enable
   auto-merge yourself (`agent-gh pr merge <n> --auto --squash`); it merges once the required checks
@@ -249,7 +209,7 @@ adapted to this repository:
   silently for 1.5 hours in CI because nothing put a limit on it (GitHub's default is 6 hours).
 - **CI test reporters must stream progress** (`list`), not only write a report at the end. With
   `github` + `html` alone, a hang produced no output at all after "Running 12 tests".
-- **Watch a pipeline with a deadline**: `packages/tooling/src/watch-project.ts` (see the babysitting guide above).
+- **Watch a pipeline with a deadline**: the project watcher, `packages/watcher` (see the babysitting guide above).
 - **Each push to a PR branch cancels the running CI** (`concurrency` with `cancel-in-progress`).
   Batch fixes into one push, or no run ever finishes.
 - **Pushing anything under `.github/workflows/` needs the `workflow` scope** on the GitHub token
@@ -372,11 +332,13 @@ adapted to this repository:
 
 ### Toolchain
 
-- **Repository tooling lives in `packages/tooling`** (#142), TypeScript run by Bun: the project
-  watcher, the GIF tool, CI's age checks and Node removal, each run as `bun packages/tooling/src/<tool>.ts`
+- **Repository tooling lives in `packages/tooling`** (#142), TypeScript run by Bun: the GIF tool,
+  CI's age checks and Node removal, each run as `bun packages/tooling/src/<tool>.ts`
   from the repository root, with `bun test` for their logic. The one shell file is
   `packages/tooling/install-bun.sh`: it installs Bun, so it can't be a Bun program. There is no
-  `scripts/` folder.
+  `scripts/` folder. The project watcher is a package of its own, `packages/watcher` (#200): a Claude
+  Code plugin, installed by copying only its folder, so it imports nothing of ours (its own
+  `read.ts` repeats the three helpers it needs).
 - **Pages are routed with `wouter`** (#164): `apps/web/src/App.tsx` lists the page addresses, each
   page is a component in `apps/web/src/pages/`. No generated route tree, no extra build step.
 - **The repo is an Nx workspace** (Bun workspaces): `apps/web` is the app, `packages/*` are

@@ -16,7 +16,9 @@
       // Builds the installable, offline app and registers its service worker; knows no app code.
       { "name": "pwa", "patterns": ["packages/pwa/src/**"] },
       // Repository tooling run by CI and agents (#142): the app never imports it; of ours it imports only core.
-      { "name": "tooling", "patterns": ["packages/tooling/src/**"] }
+      { "name": "tooling", "patterns": ["packages/tooling/src/**"] },
+      // The project watcher, a Claude Code plugin installed on its own (#200): it imports nothing of ours.
+      { "name": "watcher", "patterns": ["packages/watcher/src/**"] }
     ],
     "rules": [
       // apps/web connects the features to the shell; nothing imports from it.
@@ -27,7 +29,8 @@
       { "from": "firebase", "allow": ["core"] },
       { "from": "core", "allow": [] },
       { "from": "pwa", "allow": ["core"] },
-      { "from": "tooling", "allow": ["core"] }
+      { "from": "tooling", "allow": ["core"] },
+      { "from": "watcher", "allow": [] }
     ]
   }
 }
