@@ -1,22 +1,20 @@
 # Agent notes for household-brain
 
-There is no separate spec. **The code explains itself**, with short comments next to it for the
-reasons a reader can't see (keep them true in the same pull request that changes the code).
-**Decisions and their history live in the GitHub issues.** The README holds only what a human has to
-do by hand (setup) and how to run things. This file holds the rules for working here and what agents
-have learned the hard way; add to it when something bites.
+Rules for working here, and the lessons behind them. **The code explains itself**: what a module or
+tool does is in its comments, kept true in the same pull request that changes it; don't restate it
+here. **Decisions and their history live in the GitHub issues**, linked as `#n` below. The README
+holds what a human does by hand. Add a rule here when something bites.
 
 ## Working as the bot
 
-The agent pushes, opens and updates pull requests, comments, and reads CI as **`flixbox-ai-agent[bot]`**
-(the private GitHub App "Flixbox [AI Agent]", installed only on this repository). It never does
-that work with the owner's account.
+The agent works on GitHub only as **`flixbox-ai-agent[bot]`** (a GitHub App installed on this
+repository), never with the owner's account.
 
-- **Tokens:** `agent-gh-token` (in `~/.local/bin`) signs a JWT with the app's private key
-  (`~/.config/household-brain-agent/app.pem`, App ID in `app-id` next to it) and prints a 1-hour
-  installation token, cached for 50 minutes. `agent-gh` is `gh` with that token. The key is never
-  committed, pasted or sent anywhere except GitHub's token endpoint.
-- **Each worktree**, once after creating it:
+- **`agent-gh`** is `gh` with the app's token; `agent-gh-token` (in `~/.local/bin`) prints one,
+  signed with `~/.config/household-brain-agent/app.pem`. The key is never committed, pasted or sent
+  anywhere but GitHub's token endpoint. To revoke: suspend or uninstall the app; to rotate: a new
+  key on the app's page, replace `app.pem`, delete the old key.
+- **Each new worktree**, once:
 
   ```sh
   git config user.name 'flixbox-ai-agent[bot]'
@@ -26,450 +24,202 @@ that work with the owner's account.
     '!f() { test "$1" = get || exit 0; echo username=x-access-token; echo "password=$(agent-gh-token)"; }; f'
   ```
 
-- **Pull requests and comments:** `agent-gh pr create --assignee Flixbox …`, `agent-gh pr comment …`.
-  Every pull request is assigned to the owner (`Flixbox`), always.
-- **Project watcher:** `GH=agent-gh SELF='flixbox-ai-agent[bot]' bun packages/watcher/src/watch-project.ts --follow` (section 2). It still reads comments with the owner's
-  login, because only the owner's account can see the owner's pending (unsubmitted) reviews.
-- **What the bot can't do**, on purpose: change repository settings or rulesets, merge past checks,
-  or approve. Settings changes the owner asks for are made with the owner's `gh` login. Merging is
-  the owner's auto-merge.
-- **Revoking or rotating:** suspend or uninstall the app in GitHub's settings; for a new key,
-  generate one on the app's page, replace `app.pem`, and delete the old key on GitHub.
+- **Every pull request is assigned to the owner:** `agent-gh pr create --assignee Flixbox …`.
+- **The bot can't**, on purpose: change settings or rulesets, merge past checks, approve, cancel or
+  re-run CI. Those use the owner's `gh` login, when the owner asks.
+- **Commit as the repo-local identity**, never the machine's global work email (history was rewritten
+  once to remove it).
 
-## Babysitting a pull request
+## How work flows
 
-You own a pull request from the moment you open it until it is merged and deployed. "Pushed" is not
-"done". These steps keep it moving without anyone having to ask what is going on.
+- **One pull request at a time.** Open the next one as soon as the previous one merges, so its CI
+  and review run while `main` deploys. Never stack branches: the owner squash-merges, which breaks
+  a branch built on another (it happened). A failed deploy's fix comes first.
+- **One pull request per coherent change** (owner's rule): one feature, fix or refactor, whole. Side
+  findings go into their own follow-up. A coherent change is never split just to be smaller.
+- **Low complexity** (owner's rule): the simplest thing that works; an out-of-the-box tool over a
+  hand-built one, a dependency over in-house machinery. Unavoidable complexity goes into its own
+  package, not across the app.
+- **No docs-only pull requests**, unless the owner asks for one (#156): a docs or agent-note change
+  rides along with the next real PR, and that PR's description says so.
+- **Abstract only when it pays:** a shared helper only when it makes the code simpler or two places
+  need the same logic.
+- **Rules live in this file**, not in an agent's memory. A rule the owner states goes in here, in the
+  next PR.
+- **Nothing personal on GitHub: the repository is public.** No real amounts, balances, codes, card
+  or phone numbers, providers tied to the owner or names, anywhere (issues, PRs, commits, code,
+  tests). Use made-up examples. Edit history keeps a slip, so delete and recreate the issue (owner's
+  `gh`), or tell the owner for a PR.
+- **Queued work is an issue** (assigned to the owner, an existing label), never only a chat. The
+  delivering PR says `Closes #n`; a PR that does part of an issue says `Related to #n` from the start,
+  because changing it later doesn't undo GitHub's link (#191 closed #172 that way).
+- **Read an issue and all its comments before starting it:** the owner decides in comments (#43).
+- **Keep going without being asked.** After a deploy and its live check, take the next issue; tech
+  debt, refactors, tooling and bugs before features. Ask only for what is the owner's to decide. The
+  work isn't done while issues remain open.
+- **Stuck? File an issue** for what blocks you, assigned to the owner, and carry on with other work.
+- **Long things run in the background** (tests, builds, CI, watchers, reviewers); do the next thing
+  meanwhile.
 
-**One pull request at a time.** Open the next one as soon as the previous one is merged: its CI and
-review run while `main` deploys (owner's rule, it saves the wait). Never stack pull requests or work
-on two open ones in parallel: the owner merges with squash, which rewrites the history a stacked
-branch is built on, and every open PR is one more thing for the owner to track. If the deploy
-fails, its fix comes first.
+## A pull request, from push to deploy
 
-**One pull request per coherent change** (owner's rule): one feature, one fix or one refactor, whole.
-Side findings, refactors and tooling tweaks go into their own follow-up PR, never along for the
-ride. This rule outranks the next one: a coherent change is never split just to make PRs smaller.
+### Before pushing
 
-**Keep each pull request low in complexity** (owner's rule), within that change. Prefer the simplest
-solution that does the job, an out-of-the-box one over a hand-built one, and a dependency over
-in-house machinery. Where complexity is unavoidable, encapsulate it in a dependency or a separate
-package instead of spreading it through the app.
+- `bun run lint && bun run test` locally (`test` type-checks first). Leave the e2e suite to CI;
+  run it locally only to debug a failure.
+- **One push per batch of changes:** each push cancels the branch's running CI.
+- **Never pipe a command whose exit code matters** (`bun run lint | tail` succeeded on a failing
+  lint once); use `set -o pipefail` or `${PIPESTATUS[0]}`.
+- **e2e tests are a few long journeys**, not many small tests: each test pays for emulator resets,
+  seeding and sign-in on three devices. Add a `test.step` to the journey for that area; find what a
+  step checks by its own title or id, not by position (earlier steps leave data behind).
 
-**No pull requests that only change docs.** A README or agent-note change (a new rule, a docs issue)
-rides along with the next real feature, refactor or fix PR, the one exception to "one coherent change", and
-that PR's description says so and closes the docs issue.
+### A GIF for every UI change
 
-**Abstract only when it pays.** Introduce or extend a shared helper, or file an issue proposing one,
-only when it makes the code simpler or two or more places depend on the same logic. Otherwise leave
-the special cases explicit and say why.
+Every PR that changes the UI shows it in a GIF in its description (after the
+[record-browser-gif skill](https://github.com/deepseek-ai/deepseek-harness/blob/master/.agents/skills/record-browser-gif/SKILL.md)):
 
-**Rules live in this file, not in an agent's memory.** An agent's memory is ephemeral. When the owner
-states a rule for this repository, write it here (in the next real PR, see above).
+- **Record only CI's e2e videos with demo data, never the live app** (real entries, public PRs).
+  `bun packages/tooling/src/pr-gif.ts` turns a run's video into a GIF of at most 10 MB.
+- A step only shows on video if it waits for the changed state; crop to what changed and slow it down.
+- Publish it on the `assets` branch (never merged; `gh pr edit --attach` refuses the bot's token) and
+  embed `https://github.com/Flixbox/household-brain/blob/assets/pr-<n>-<what>.gif?raw=true`. Never
+  commit a GIF to the PR's branch.
+- No visible change: say so in the description.
 
-**Nothing personal goes on GitHub: the repository is public.** Issues, pull requests, comments,
-commits, code and tests never contain the household's real entries: amounts, balances, codes, card
-or phone numbers, providers tied to the owner, names of people. Use made-up examples ("a gift card
-credit", "Coupon 10 €"). Editing a slip away isn't enough, because GitHub keeps the edit history:
-delete and recreate the issue (owner's `gh`), or tell the owner for a pull request.
+### After every push
 
-**Track queued work as GitHub issues.** Every idea or request that isn't being built right now gets
-an issue (assigned to the owner, an existing label such as `enhancement`), and the pull request that
-delivers it says `Closes #n`. Nothing waits only in a chat. A pull request that does only part of
-an issue says `Related to #n` from the start: changing `Closes` to `Related to` later doesn't
-undo GitHub's link, and the merge still closes the issue (#191 closed #172 that way); if it
-happens, reopen the issue with a comment.
+- **Update the PR description** to what the branch does now.
+- **Keep the project watcher running** under a `Monitor`. It is this repository's Claude Code plugin
+  (`packages/watcher`, #200); its `babysit-prs` skill has the routine (what each event asks for).
+  Here, as the bot:
 
-**Read the issue and all its comments before starting work on it.** The owner decides things in
-issue comments (e.g. #43); the description alone can be out of date.
+  ```sh
+  GH=agent-gh SELF='flixbox-ai-agent[bot]' bun packages/watcher/src/watch-project.ts --follow
+  ```
 
-**Keep going without being asked.** Once a pull request is deployed and its browser check is done,
-start the next planned piece of work, or fix what the owner reported, without waiting to be told.
-Ask only for decisions that belong to the owner (security trade-offs, product decisions, scope).
-The work isn't done while open issues remain: when one pull request is deployed, take the next issue.
-**Tech debt and refactors come first:** take open refactor, cleanup, tooling and bug issues before
-new feature issues.
+  It reads comments with the owner's login, the only one that sees the owner's pending reviews.
 
-**Stuck? File an issue and move on.** When something can't be finished without the owner (a
-setting the bot can't change, a decision, a broken tool), file an issue describing what is blocked
-and why, assigned to the owner, and continue with the next work instead of waiting.
+### Comments and review
 
-**Run long things in the background and keep working.** Test suites, builds, installs, CI and PR
-watchers, reviewer agents: start them in the background (their exit is the notification) and do the
-next useful thing meanwhile, such as reading review findings, updating the PR description or the
-comments. Only wait in the foreground for something whose result you need for the very next step.
+- **Every comment gets an answer:** fix what is asked in one push, reply in the thread, resolve it
+  once settled. One that needs the owner's decision stays open.
+- **One reviewer agent per PR** (read-only, findings with severity and evidence). Fix blockers and
+  should-fix items in one push and say in the description what was addressed.
 
-### 1. Before you push
+### Merge
 
-- **Run the quick checks locally**: `bun run lint && bun run test` (seconds; `test` type-checks first). Leave the
-  e2e suite (`bun run test:emulated`) to CI, which runs it on every push anyway; run it locally only to
-  debug a failure CI found.
-- **Write e2e tests as a few full user journeys, not many small tests.** Every test resets the
-  emulators and seeds data in `beforeEach`, then signs in and usually mocks Google, on each of the
-  three devices; that repeated setup is a large share of the e2e time. So extend the journey that
-  covers the area (one sign-in, then a `test.step(...)` per behaviour) instead of adding a new
-  `test(...)`; open a new journey only for a new area or a setup that can't be shared.
-  - e2e files have no length limit (`max-lines` is off for `apps/web/e2e/**`): keep an area's
-    journeys together in its spec rather than splitting them up for size.
-  - Inside a journey, find what a step checks by its own title or id (`google.live().find(...)`),
-    not by position: earlier steps leave their entries and events behind.
-- **Batch your changes.** Every push cancels the running CI for that branch, so five quick pushes mean
-  five cancelled runs and no result.
-- **Check exit codes without pipes**, or with `${PIPESTATUS[0]}`. See the shell lesson below.
+- **Enable auto-merge** (`agent-gh pr merge <n> --auto --squash`) only with the owner's approval and
+  once the PR is well reviewed: the findings fixed and the fixes looked at. Four review rounds is the
+  soft cap; after it, fix and merge, and say what wasn't re-reviewed.
+- **Read the PR for unanswered comments first, as its own step**, never chained to the merge command
+  (#154): an approval and a comment often arrive together.
+- `main` only takes PRs with green CI; never push to it. A failed deploy gets a follow-up PR.
 
-**Every pull request that changes the UI shows it in a GIF**, in its description: the part of the
-screen that changed, in use. This follows the [record-browser-gif
-skill](https://github.com/deepseek-ai/deepseek-harness/blob/master/.agents/skills/record-browser-gif/SKILL.md),
-adapted to this repository:
-- **Record only the e2e build with demo data**, never the live app: it shows the household's real
-  entries, and pull requests are public. CI films every e2e test and uploads the videos per device
-  (`e2e-videos-<device>`), so the journey step that covers the change is the recording.
-- Turn it into a GIF with `bun packages/tooling/src/pr-gif.ts` (`fetch`, then `sheet` to find the seconds, then `gif`),
-  from the run of the commit the description talks about. At most 10 MB.
-- Publish it on the `assets` branch (an orphan branch that is never merged) and embed it in the
-  description as `![what it shows](https://github.com/Flixbox/household-brain/blob/assets/pr-<n>-<what>.gif?raw=true)`.
-  `gh pr edit --attach` doesn't work for the bot: it refuses a GitHub App token. To publish: clone
-  the branch (`git clone --branch assets --single-branch --depth 1 …`), add the GIF, commit, and
-  push with the bot's token. Never commit a GIF to the pull request's own branch.
-- The tests click faster than the video records: a step only shows on video if it waits for the
-  changed state (an assertion on it) before moving on. Crop to the part that changed and slow the
-  clip down (`SPEED`), or the GIF is a blur.
-- When the change has no visible part (CI, sync logic), say so in the description instead.
+### The live check after every deploy
 
-### 2. After every push
+Mandatory, never blocking: if it finds something broken, or the browser fails, carry on and fix it
+in the next PR (first, if the app is unusable). Report what it showed.
 
-1. **Update the PR description** so it describes what the branch does now.
-2. **Keep the project watcher running** under a `Monitor`, and act on what it reports. The watcher is
-   a Claude Code plugin in this repository (`packages/watcher`, #200), whose `babysit-prs` skill
-   holds the routine: how to run it, what each event asks for, reading comments before auto-merge.
-   This repository's command, as the bot:
+1. Open `https://household-brain-sf.web.app` and reload until the page runs the new build: compare
+   the `/assets/index-*.js` it loaded with `curl https://household-brain-sf.web.app/`. The service
+   worker serves the old build for a few reloads, and answers a page `fetch` from its cache.
+2. Check the page renders, signed in, with no console errors.
+3. Exercise what the PR changed, where safe. **Never create, change or delete real entries, or touch
+   the real Google Calendar, to test.**
 
-   ```sh
-   GH=agent-gh SELF='flixbox-ai-agent[bot]' bun packages/watcher/src/watch-project.ts --follow
-   ```
+## Rules for the code
 
-   - It still reads comments with the owner's login (`ACTIVITY_GH` stays plain `gh`), because only
-     the owner's account sees the owner's pending reviews.
-   - Here, `APPROVED` and `READY_TO_MERGE` mean: if the PR is well reviewed (section 4), enable
-     auto-merge (`agent-gh pr merge <n> --auto --squash`), after reading it for unanswered comments
-     as its own step (#154). `CI_SLOW`: cancelling and re-running need the owner's `gh` login, the
-     bot can only read Actions. `DEPLOYED`: the live check in section 4.
-   - Other projects install the plugin from this repository's marketplace
-     (`/plugin marketplace add Flixbox/household-brain`, then `/plugin install
-     project-watcher@household-brain`); a change to the watcher reaches them through `main`.
-
-### 3. Comments and review
-
-- **Every comment gets an answer.** Fix what is asked, in one push, then reply in the thread saying
-  what changed (`gh pr comment`, or a reply on the review comment). Resolve the thread once it is
-  settled.
-- If a comment needs the owner's decision, say so in the thread and leave it open.
-
-- Every pull request gets one reviewer agent: read-only, reporting findings with severity and
-  evidence. Fix blockers and should-fix items before merge, and say in the PR description what was
-  addressed.
-- Fix review findings **in one push**, then go back to step 2.
-
-### 4. Merge and deploy
-
-- **Merging:** once the owner has **approved** the PR and you consider it well reviewed, enable
-  auto-merge yourself (`agent-gh pr merge <n> --auto --squash`); it merges once the required checks
-  are green. "Well reviewed": the reviewer agent's findings are fixed and the fixes themselves were
-  looked at. One review round is usually enough; **four rounds is the soft cap**: after the fourth,
-  fix what it found and merge (with the owner's approval) rather than reviewing again, and say in the
-  PR what was not re-reviewed. Without the owner's approval, never enable auto-merge.
-- After the merge, the same watcher follows the `main` run through `deploy` and reports
-  `DEPLOYED` or `DEPLOY_FAILED`.
-- **If the deploy fails, open a follow-up pull request** with the fix. Never push to `main`
-  directly; it only accepts PRs with green CI.
-- **One minute after every deploy, check the live app in the browser** (Claude in Chrome). This is
-  **mandatory, but never blocking**: if the check finds something broken, or the browser breaks or
-  times out, go on with the next PR anyway and fix what broke there (or in a follow-up PR first,
-  if the live app is unusable). Say in the report what the check showed. The check:
-  1. Open `https://household-brain-sf.web.app` and **reload** it, so the new service worker and build
-     are the ones running. If an "update available" prompt appears, take it. **Make sure the new
-     build is the one running:** compare the `/assets/index-*.js` the page loaded with the one in
-     `curl https://household-brain-sf.web.app/`, and reload until they match; the service worker
-     can serve the previous build for a few reloads. A `fetch` from inside the page doesn't tell:
-     the service worker answers it from its cache.
-  2. Check that the page renders, sign-in or the signed-in screen works, and the browser console
-     shows no errors.
-  3. Exercise what the PR changed, where that is safe on real data. Never create, change or delete
-     real entries, or touch the real Google Calendar, just to test.
-  4. Report what you saw. If it is broken, open a follow-up PR right away.
-
-## Lessons learned
-
-### CI and monitoring
-
-- **The e2e tests run against the Firebase Hosting emulator** (#150), which serves the e2e build with
-  production's headers, CSP and rewrites (`firebase.e2e.json`, written by
-  `packages/tooling/src/e2e-hosting-config.ts`). Change those in `firebase.json` only.
-- **Every job has a `timeout-minutes`, and Playwright has a `globalTimeout`.** A hang once sat
-  silently for 1.5 hours in CI because nothing put a limit on it (GitHub's default is 6 hours).
-- **CI test reporters must stream progress** (`list`), not only write a report at the end. With
-  `github` + `html` alone, a hang produced no output at all after "Running 12 tests".
-- **Watch a pipeline with a deadline**: the project watcher, `packages/watcher` (see the babysitting guide above).
-- **Each push to a PR branch cancels the running CI** (`concurrency` with `cancel-in-progress`).
-  Batch fixes into one push, or no run ever finishes.
-- **Pushing anything under `.github/workflows/` needs the `workflow` scope** on the GitHub token
-  (`gh auth refresh -h github.com -s workflow`).
-
-- **A commit triggers more than CI.** A merge to `main` also starts Dependabot runs, and the first run
-  listed for a commit was a Dependabot one, so a watcher reported "success" before the deploy had
-  even started. Always filter by workflow (`--workflow ci.yml`).
-- **Right after a push, GitHub can still report the PR's previous head commit.** A watcher using
-  `--pr` then watched the cancelled run of the old commit. Watch by the commit you just pushed.
-
-- **Stacked PRs conflict after a squash merge.** PR 6 was built on PR 5's branch; squash-merging
-  PR 5 rewrote that history and left PR 6 conflicting, unnoticed until the owner pointed it out. One
-  PR at a time, and the watcher reports conflicts.
-
-- **The e2e job runs in Microsoft's Playwright image**, which already has the browsers and their system
-  packages. Installing them per run was slow and once hung. The image version must
-  equal `@playwright/test`: when Dependabot bumps the package, CI's first e2e step fails with a
-  message, and `ci.yml` needs the matching version in two places: `container.image` (tag and digest:
-  `docker manifest inspect`, or the registry's `docker-content-digest` header) and
-  `PLAYWRIGHT_IMAGE_VERSION` next to it, which that first step compares.
-
-### Shell
-
-- **A pipe hides the exit code.** `bun run lint | tail` succeeds even when lint fails, and a commit
-  chained after it with `&&` went through with a lint error. Check `${PIPESTATUS[0]}`, use
-  `set -o pipefail`, or don't pipe a command whose exit code matters.
-
-### Code rules
-
-- **Arrow functions only, never the `function` keyword** (#67): `const name = (…) => …`, components
-  included. oxlint reports declarations and non-arrow components (`func-style: expression`,
-  `react/function-component-definition`); a `function` expression (`const f = function …`) slips
-  through, so don't write one. An arrow constant isn't hoisted: whatever runs at module load, such as
-  a route file's `createFileRoute({ component })`, comes after the definitions it uses. A direct use
-  before the definition is reported, a callback that runs at load isn't. Calls inside other functions
-  may point further down.
-- **No type assertions (`as`) in the app's code** (#68); `as const` is fine. Narrow with a type guard
-  (`(value: unknown): value is Rate => …`), build the typed value explicitly, or read it with a parser:
-  Firestore documents go through `lib/documents.ts` (`itemFrom`, `categoryFrom`, `householdFrom`),
-  never `snapshot.data() as Item`. oxlint enforces it (`consistent-type-assertions: never`); tests
-  and e2e may cast their partial fixtures and fakes. tsconfig adds `noUncheckedIndexedAccess` and
-  `exactOptionalPropertyTypes` to TypeScript 7's default `strict`.
+- **Arrow functions only** (#67), components too: an arrow isn't hoisted, so what runs at module load
+  comes after what it uses.
+- **No `as` casts in app code** (#68; `as const` is fine): narrow with a type guard or a parser
+  (Firestore documents go through `lib/documents.ts`). Tests may cast their fixtures.
+- **`Date` is banned; use `Temporal`.** Due dates are calendar dates at 17:00 Europe/Berlin; convert
+  only at the edges (Google's RFC 3339 strings).
 - **No measured numbers in docs or comments** (durations, sizes, counts): they go stale. They belong
-  in the PR or issue that measured them; a job's run history shows what is normal.
-- **`Date` is banned; use `Temporal`** (built into the browsers the app supports and Bun, no polyfill). Due dates are calendar dates at 17:00 in
-  `Europe/Berlin`, which `Temporal.PlainDate` and `ZonedDateTime` model; `Date` silently mixes UTC,
-  local time and daylight saving. oxlint enforces it. Convert only at the edges (Google's RFC 3339
-  strings).
-- **Name other repositories' issues and pull requests only as code text** (`` `owner/repo#123` ``),
-  never as a link, in issues, pull requests and comments, and not at all in commit messages: GitHub
-  adds a "mentioned this" entry to the other repository for every linked mention from this public
-  one (#146).
-- **A constant holding Tailwind classes ends in `Class`** (`primaryButtonClass`), **an object mapping
-  a state to its classes in `Classes`** (`urgencyClasses`): the Tailwind lint (#187) checks
-  `className` and constants with those endings, and no other strings.
-- **Example and test domains use the reserved `.test` TLD** (`owner@household-brain.test`), never
-  `example.com` or a real-looking host.
-- **oxlint lints with type information** (`--type-aware`, `oxlint-tsgolint`, #167); the type-aware rules
-  still off are listed in `oxlint.config.ts` and get turned on with their fixes in #168.
-- **oxlint runs every category as an error.** A rule switched off for **one file** is switched off at
-  the top of that file, for the whole file, with a short reason (owner's rule, #181):
-  `/* oxlint-disable import/no-nodejs-modules -- a build step: runs on Bun at build time */`. Never
-  for a single line, never without the reason; `bun run lint` reports a disable comment that no
-  longer turns anything off. A rule off for a whole kind of file (every test, every e2e spec, every
-  config) or for the whole repository stays in `oxlint.config.ts`, with its reason as a comment.
-  Before switching a rule on, search the file for it: a rule already listed as `"off"` further down wins (the last duplicate key in
-  JSON counts), and the new entry silently does nothing. Prove a new rule with a file that breaks it.
-- **Every dependency is pinned exactly** (`install.exact` in `bunfig.toml`, enforced by
-  npm-package-json-lint); Dependabot bumps them. **No version younger than 48 hours** (#94):
-  `install.minimumReleaseAge` in `bunfig.toml`. Bun checks it only when it resolves a version
-  (`bun add`, `bun update`); a version already in `bun.lock` is installed unchecked, also with
-  `--frozen-lockfile`. So `packages/tooling/src/check-package-age.ts` runs first in CI: it asks the npm registry
-  when each version a change adds to `bun.lock` was published, and fails on one that is too young;
-  wait and re-run. Dependabot waits as long (`cooldown`). An urgent exception goes into
-  `install.minimumReleaseAgeExcludes` with its reason; the CI check reads it too. **GitHub Actions too**
-  (#102): `packages/tooling/src/check-action-age.ts` runs first in CI and fails on a pinned action release younger
-  than 48 hours; Dependabot's `cooldown` counts loosely and let a younger one through (#101). Wait and re-run. Bun is pinned in `packageManager`, and with its checksum in `packages/tooling/install-bun.sh`.
-- **fallow** (`.fallowrc.jsonc`, part of `bun run lint`) fails on unused files, exports and
-  dependencies, on duplication, and on imports across the package boundaries: `apps/web` may use
-  every package; `shell` and `entries` only `firebase`; nothing imports `apps/web` (its e2e tests
-  and config included).
-- **The e2e build must never reach production:** the emulator wiring and the `window.e2eSignIn` hook
-  are behind an inline `process.env.BUN_PUBLIC_USE_EMULATORS` comparison, `apps/web/build.ts` refuses a
-  production build with it set, and CI fails if `apps/web/dist/` mentions either. The emulators run
-  as `demo-household-brain`, which can't reach real Google services.
-- **CI uses only GitHub-owned and `google-github-actions/*` actions**, pinned to full SHAs (a
-  repository setting); Bun is installed by `packages/tooling/install-bun.sh` from its release (version and
-  checksum pinned), not through `oven-sh/setup-bun`, a third-party action.
-- **Never use the `pull_request_target` or `workflow_run` triggers** (both run code with the base
-  repository's privileges), and never add self-hosted runners to this public repo.
-- **One TypeScript config to change: `tsconfig.base.json`** (#79). Every tsconfig that compiles files
-  extends it and adds only its own `types`, `jsx`, `include` and build-info files (the solution files
-  `apps/web/tsconfig.json` and `packages/pwa/tsconfig.json` only list references, checked with
-  `tsc -b`; the type-aware lint follows those references too); a compiler option all projects share
-  goes into the base. It is an Nx input of every project (`sharedGlobals` in `nx.json`), so changing
-  it reruns their typecheck and tests instead of serving them from the cache.
-- **The e2e journeys are a cached Nx task** (#71): `@nx/playwright` infers it as `playwright` (not
-  `e2e`: Nx would load `apps/web/.env.e2e` into a target of that name), and CI runs it per device
-  (`E2E_PROJECT`), after the cached `build:e2e`. When none of its inputs changed, the result and its
-  videos are replayed. (The plugin's per-file `e2e-ci` refuses to run without Nx Agents, a paid
-  service.) **Review its inputs whenever the tests come to depend on something new** outside
-  `apps/web` and the packages, or a cached green hides a broken journey. They are the app, the
-  packages, `e2eEnvironment` in `nx.json` (the Firebase config and rules, Bun from the root
-  `package.json`, `ci.yml`, `E2E_PROJECT`) and the versions of `@playwright/test` and
-  `firebase-tools` (the emulators). Tools only the root `package.json` lists are not covered by the
-  app's dependencies: name them there. These inputs replace the plugin's own, so they restate its
-  list: compare them with `nx show project @household-brain/web` without the override when
-  `@nx/playwright` is bumped.
-- **Lint and typecheck are Nx targets:** `bun run lint` is `nx run-many` over the root project's
-  `lint:oxlint`, `lint:packages` and `lint:fallow` (only those root scripts are Nx targets, through
-  `nx.includedScripts`), `bun run typecheck` over every project's `typecheck` (the root's own is in
-  `nx.targets`). Whole-repo tools take `{workspaceRoot}/**/*` as input: the root project's default
-  inputs exclude files that belong to other projects, which once served a stale green from cache.
-- **Nothing runs on code that doesn't type-check** (owner's rule, #193): Bun runs tests and bundles
-  by stripping types, so in Nx `test`, `build` and `build:e2e` depend on the project's `typecheck`
-  and its dependencies' (`^typecheck`). `bun run test` runs every project's `typecheck` (the root
-  project has no `test`, so its type check would be skipped otherwise) and then the tests. For a
-  quick loop inside one package, `bun test` there still runs on its own.
+  in the PR or issue that measured them.
+- **Other repositories' issues and PRs only as code text** (`` `owner/repo#123` ``), never linked,
+  and not at all in commit messages: every link from this public repo notifies theirs (#146).
+- **Tailwind classes in a constant:** its name ends in `Class`, an object of them in `Classes`; the
+  Tailwind lint (#187) checks only those and `className`.
+- **Example and test domains use `.test`**, never `example.com` or a real-looking host.
+- **A rule switched off for one file is switched off at its top, with a reason** (owner's rule,
+  #181): `/* oxlint-disable <rule> -- <reason> */`, never for a single line. A rule off for a kind of
+  file or the whole repository goes into `oxlint.config.ts` with its reason. Before switching a rule
+  on, check it isn't listed as `off` further down (the last duplicate wins), and prove it with a file
+  that breaks it.
+- **Effects return only a cleanup:** `useEffect(() => { doIt() }, [])` with a block; an expression
+  body returned Chrome's `scrollTo` promise and blanked the app (#165).
+- **React Compiler memoises** (#69): no `useMemo`, `useCallback` or `memo`; follow the Rules of React,
+  read values from outside React through a store, and name components.
+- **No imports from parent folders** (#77): import by the package's own name and path.
+- **No barrel files**: packages expose modules by path, and code imports from the defining module.
+- **The shell knows no features**, and features don't wire into it; `apps/web/src/main.tsx` connects
+  them. Packages never import from `apps/web`.
+- **State lives in nanostores**; Firestore data a screen shows comes from a live store
+  (`@household-brain/firebase/live`), not an `onSnapshot` per component. No direct `localStorage`.
+- **Helpers two packages share go into `packages/core`** (#171): `stringify()` for any value as text,
+  never `String(error)`. A failure dropped on purpose goes to `ignoreFailure` with a comment saying
+  why nothing is lost (#174); one someone should see goes to `reportError`.
+- **A tool's options go into its config file** (owner's rule, #183), a typed one where the tool
+  reads it, not into the `package.json` script.
+- **Read `process.env.BUN_PUBLIC_*` literally and compare it inline** where a branch must vanish from
+  production (#146): the bundler only inlines a literal read.
+- **Calling a new outside service means adding its origin to `connect-src`** in `firebase.json` in
+  the same PR (#113), or the browser blocks it in production.
+- **Watch the allowlist entry with `onSnapshot`**, don't read it once: a one-shot read raced sign-out
+  and locked the app out offline.
+- **Firebase Hosting header rules match the request path**, not the rewrite target: a rule for every
+  page needs `**`.
+- **Current Chrome and Firefox only, no Safari** (#179). Bun's bundler adds no polyfills: check a new
+  browser function exists in both before using it.
+- **Icons, manifest and head links come from `packages/pwa`** (#148): change `apps/web/pwa.config.ts`
+  or the icons, never hand-write them.
+- **The e2e build must never reach production** (`apps/web/build.ts` and CI refuse it).
+- **No server.** If a feature ever needs one, look at a free Cloudflare Worker first and file an issue
+  saying why, rather than adding a backend.
 
-### Toolchain
+## Dependencies, CI and tooling
 
-- **Repository tooling lives in `packages/tooling`** (#142), TypeScript run by Bun: the GIF tool,
-  CI's age checks and Node removal, each run as `bun packages/tooling/src/<tool>.ts`
-  from the repository root, with `bun test` for their logic. The one shell file is
-  `packages/tooling/install-bun.sh`: it installs Bun, so it can't be a Bun program. There is no
-  `scripts/` folder. The project watcher is a package of its own, `packages/watcher` (#200): a Claude
-  Code plugin, installed by copying only its folder, so it imports nothing of ours (its own
-  `read.ts` repeats the three helpers it needs).
-- **Pages are routed with `wouter`** (#164): `apps/web/src/App.tsx` lists the page addresses, each
-  page is a component in `apps/web/src/pages/`. No generated route tree, no extra build step.
-- **The repo is an Nx workspace** (Bun workspaces): `apps/web` is the app, `packages/*` are
-  features and shared code, consumed as TypeScript source (modules exported by path, no build
-  step). A new feature, e.g. a shopping list, becomes its own `packages/<name>`,
-  and `apps/web` pages render what it exports. Packages never import from `apps/web`.
-  A new package also goes into the `workspace:*` exceptions in `npmpackagejsonlint.config.ts`
-  (exceptions are exact names), and gets its own `package.json` and `tsconfig.json`.
-- **The shell knows no features.** `packages/shell` is the frame (layout, sign-in gate, update
-  prompt, sign-out); features never import from it for wiring, and it never imports from them.
-  `apps/web/src/main.tsx` connects the two, e.g. `onSignOut(forgetCalendarToken)`.
-- **State lives in nanostores.** Plain `nanostores` atoms for in-memory state shared outside React,
-  `@nanostores/persistent` for state that survives a reload (the Calendar token, UI preferences),
-  read in components with `useStore` from `@nanostores/react`. No hand-rolled listener sets and no
-  direct `localStorage` calls.
-  - **Firestore data a screen shows** comes from a live store (`queryStore` / `docStore` in
-    `@household-brain/firebase/live`): it listens only while read, shares one listener between all
-    readers, and resets when it stops. Not a `useEffect` with `onSnapshot` per component. Listeners
-    with special needs (pending-write metadata in the outbox, server-only answers) stay explicit.
-- **No imports from parent folders** (`../`, #77). Inside a package, a module from another folder is
-  imported by the package's own name and path, as everyone else imports it:
-  `@household-brain/entries/lib/items/model`. Siblings in the same folder stay `./x`. oxlint enforces
-  it (`import/no-relative-parent-imports`). Only what the package's `exports` cover can be imported
-  this way (`lib/*.ts`, `components/*.tsx`), so shared non-component code lives in `lib/`.
-- **React Compiler memoises at build time** (#69, built into Bun's bundler, `reactCompiler` in
-  `apps/web/build.ts`, so the packages too): don't write `useMemo`, `useCallback` or `memo` (oxlint's
-  `no-restricted-imports` refuses them). Code has to follow the Rules of React (no mutating props or state, no reading refs while
-  rendering), or the compiler skips it or its memoisation changes what renders. That includes
-  values from outside React read during render: the compiler takes them as unchanging, so read
-  them through a store (`useStore($user)`, not `auth.currentUser`). Components need a name
-  (`const RootLayout = () => …`); an anonymous one isn't compiled. Lint runs the compiler's own
-  checks (oxlint's `react/immutability`, `purity`, `refs`, `set-state-in-render` and the rest, #187),
-  so code the compiler would skip or get wrong fails the lint instead of silently losing its memoisation.
-- **An effect returns only a cleanup function.** Write `useEffect(() => { doIt() }, [])` with a block
-  unless `doIt` returns the cleanup: React calls whatever an effect returns, and Chrome's `scrollTo`
-  returns a promise, so an expression body blanked the app when a page was left (#165). TypeScript
-  doesn't catch it.
-- **Small helpers every package needs live in `packages/core`** (#171), e.g. `stringify()` for any value
-  as text: never `String(error)` or `error.message` by hand. A helper moves there once two packages share it.
-- **A failure dropped on purpose goes to `ignoreFailure`** (`@household-brain/core/lib/ignore`, #174),
-  never a bare `() => null`, with a comment saying why nothing is lost. A failure someone should
-  see (data left behind, a feature that silently stops) goes to `reportError` instead. A `catch`
-  that turns a failure into a value (`.catch(() => null)` meaning "not there") is neither and stays.
-- **No barrel files.** No `index.ts` that re-exports a package's modules: barrels pull every module
-  into whatever imports one of them, which defeats tree shaking and code splitting. Packages
-  expose their modules by path through `exports` patterns in `package.json` (e.g.
-  `@household-brain/entries/components/items/ItemList`), and code imports from the module that
-  defines what it needs.
-- Run tasks through Nx at the root: `bun run test` (type check and tests, `nx run-many`), `bun run typecheck` (only that), `bun run build`
-  (`nx run @household-brain/web:build`). Nx caches results, so unchanged projects are skipped.
+- **Bun, and only Bun** (#140): package manager, runtime, test runner. Run tools with `bun run` or
+  `bun --bun`, never `npx`; there is no Node fallback.
+- **Every dependency pinned exactly; nothing younger than 48 hours** (#94, #102): CI refuses a too
+  young package or action; wait and re-run. An urgent exception goes into
+  `install.minimumReleaseAgeExcludes` with its reason.
+- **No dependency install scripts:** `trustedDependencies` holds only a placeholder, because an empty
+  list lets Bun's own list through (a native module once crashed the deploy, #145). Add a package
+  only when it truly needs its script, with the reason in the PR.
+- **CI uses only GitHub-owned and `google-github-actions/*` actions, pinned to full SHAs.** Never
+  `pull_request_target` or `workflow_run`, never self-hosted runners.
+- **Every CI job has a time limit** and test reporters stream progress: a hang once ran silently for
+  hours.
+- **Filter runs by workflow** (`--workflow ci.yml`): a merge also starts Dependabot runs.
+- **One TypeScript config to change: `tsconfig.base.json`** (#79).
+- **A new package** gets its own `package.json` and `tsconfig.json`, and goes into the `workspace:*`
+  exceptions in `npmpackagejsonlint.config.ts` once another package depends on it.
+- **A whole-repository Nx target takes `{workspaceRoot}/**/*` as input**: the root project's default
+  inputs leave out other projects' files, which once served a stale green from cache.
+- **Nothing runs on code that doesn't type-check** (owner's rule, #193): tests and builds depend on
+  the type check in Nx.
+- **Review the e2e task's Nx inputs** when the tests come to depend on something new outside the app
+  and packages (#71), or a cached green hides a broken journey.
+- **The e2e job's Playwright image must match `@playwright/test`**: when Dependabot bumps it, update
+  the image tag, digest and `PLAYWRIGHT_IMAGE_VERSION` in `ci.yml`.
+- **Change hosting headers, CSP and rewrites in `firebase.json` only**; the e2e config is generated
+  from it (#150).
+- Pushing under `.github/workflows/` needs the `workflow` scope on the token.
+- **`bun test`'s `toEqual` wants the expected value to fit the actual one's type**; write
+  `expect<unknown>(x)` for a deliberately loose comparison.
+- **The Firestore emulator needs Java 21**; Java 17 fails.
 
-- **oxlint loads `@stylistic/eslint-plugin` through `jsPlugins`.** There is no ESLint here. Its
-  config is `oxlint.config.ts` (`defineConfig`, found by oxlint without `-c`), so each disabled
-  rule carries its reason as a comment, and its own settings (`maxWarnings`, unused disable
-  comments) live in its `options`, not in the script.
-- **A tool's options go into its config file, not into the `package.json` script** (owner's rule,
-  #183); a script keeps only what the tool can't read from config (env files, file lists, our own
-  scripts' arguments). **Prefer a typed config:** a `.config.ts` where the tool reads one, else a
-  JSON/JSONC file with its `$schema` (`firebase.json`, `nx.json`, `.fallowrc.jsonc`). A package
-  without tests has no `test` script, rather than `--pass-with-no-tests`.
-- **npm-package-json-lint only auto-discovers `.js`/`.json` configs.** `bun run lint` passes
-  `-c npmpackagejsonlint.config.ts`. Bun loads that file as an ES module, so `rules` must be a
-  named export: a default export arrives wrapped as `{ default }` and reads as an empty config.
-- **Bun, and only Bun** (#140): it is the package manager (workspaces, `bun.lock`), the runtime of
-  every script, Nx, the Firebase CLI and Playwright, and the unit test runner (`bun test`, imports
-  from `bun:test`). There is no Node fallback: `bunfig.toml` sets `run.bun`, so whatever a script
-  starts as `node` runs on Bun, and CI removes the runners' own Node (`packages/tooling/src/remove-node.ts`), so
-  anything that still reaches for it fails instead of quietly using it. Run tools through `bun run`
-  (or `bun --bun <bin>`), never `npx`.
-- **Bun runs no dependency install scripts** except for packages in `trustedDependencies` in
-  `package.json`. It holds only the placeholder `trust-no-install-scripts`, a name no package has:
-  an **empty** list does not switch off Bun's built-in list of trusted packages, and Bun then built
-  `re2` in CI, whose native module crashed Bun during the deploy (#145). A non-empty list replaces the
-  built-in one (a real package of that name would also have to be among our dependencies to matter).
-CI fails if a compiled native addon shows up in `node_modules`. Add a package only
-  when it truly needs its script, with the reason in the PR.
-- **`bun test` types are stricter than Vitest's:** `expect(x).toEqual(y)` wants `y` to fit `x`'s type.
-  For a deliberately loose comparison write `expect<unknown>(x)`.
-- **The Firestore emulator needs Java 21** (`brew install openjdk@21`); Java 17 fails.
+## Manual steps no code does
 
-### App and build
-
-- **The app supports current Chrome and Firefox only, no Safari** (#179, the household uses no
-  iPhone). It needs native `Temporal`; where it is missing, `apps/web/src/main.tsx` shows a notice
-  instead of loading the app, and the iPhone e2e project checks only that notice. Bun's bundler
-  (`target: 'browser'`) adds no polyfills: check that a new browser function exists in both before
-  using it; nothing in lint catches it.
-
-- **The installable, offline app comes from `packages/pwa`** (#148): never hand-write icons, a
-  manifest or head links. Change `apps/web/pwa.config.ts`, the SVGs in `apps/web/icons/`, or the
-  description in the root `package.json` (#161); the build's `pwa-build` step generates the rest.
-
-- **Read `process.env.BUN_PUBLIC_*` literally and compare it inline** when a branch must vanish from
-  production builds (#146): the bundler only inlines a literal `process.env.X`, so passing it through a
-  helper ships the dead code, and a variable that isn't set fails the build (`apps/web/build.ts`).
-- **The dev server is Bun's own, with hot module reloading** (`apps/web/dev.ts`). It runs from the
-  repository root (the `dev` script), because Bun only watches files under its working directory, so
-  that edits in `packages/` reach the page too; Tailwind comes in through the root `bunfig.toml`.
-  CSS changes apply in place, component changes reload the page.
-- **Firebase Hosting matches header `source` against the request path, not the rewrite target.** A
-  `no-cache` rule on `/index.html` does not cover `/` or SPA routes, so it needs `**`.
-- **The Content Security Policy is enforced** (`firebase.json` headers, #113) and names each host the
-  app talks to. Calling a new outside service (another Google API, a new rates source) means adding
-  its origin to `connect-src` in the same PR, or the browser blocks it in production. The e2e
-  journeys get the same header (#150), so they catch a missing host for every call they make; still
-  check the live app's console after the deploy for calls they don't.
-- **Watch the allowlist entry with `onSnapshot`, don't read it once.** A one-shot server read raced
-  sign-out (stale "allowed") and locked the app out offline.
-
-- **New sign-ups are switched off** in Firebase Authentication, on purpose, since both household
-  members have accounts (2026-10-02). Existing accounts sign in as usual; a new account is refused
-  (`auth/admin-restricted-operation`, or `ADMIN_ONLY_OPERATION` from the REST API). The Firestore
-  allowlist is still the lock on the data. **To add a person:** switch sign-up on (Firebase console →
-  Authentication → Settings → User actions), let them sign in once, allowlist their uid (copy it from
-  Authentication → Users, not from a screenshot), and switch sign-up off again. While it is off,
-  nobody can sign in for the *first* time, the owner included after deleting their account.
-
-- **No server so far; if one is ever needed, look at a free Cloudflare Worker first.** Its free tier
-  is tight on compute per request, but scheduled (cron) runs are much less restrictive. When a
-  feature needs one, file an issue saying what it is needed for, instead of adding a backend.
-
-- **The Gemini Gem "Household Brain v2" follows `packages/entries/src/lib/gemini-gem.md`** (#119), the only
-  copy of its instructions. A unit test fails when they don't list exactly the app's category slugs
-  and price intervals, so changing either means changing the instructions in the same PR. After such
-  a PR is merged, paste the new text into the Gem (Gemini, signed in as the owner → Gems → Household
-  Brain v2 → Instructions → Save), and say in the PR that it was done.
-
-### Repository and accounts
-
-- **`main` only accepts merges from pull requests with green CI**, and force-push is blocked.
-- **Pull requests opened with the owner's GitHub account can't be approved by the owner.** Merging
-  is done by enabling auto-merge, never by a required review.
-- **Commit as the repo-local identity** (`git config user.email`), never the machine-global work
-  email. History was rewritten once to remove it.
+- **The Gemini Gem "Household Brain v2"** follows `packages/entries/src/lib/gemini-gem.md` (#119).
+  After a PR that changes it is merged, paste it into the Gem (Gemini as the owner → Gems →
+  Household Brain v2 → Instructions → Save), and say so in the PR.
+- **New sign-ups are switched off** in Firebase Authentication. To add a person: switch sign-up on
+  (console → Authentication → Settings → User actions), let them sign in once, allowlist their uid
+  (copied from Authentication → Users, not a screenshot), switch it off again. While it is off,
+  nobody can sign in for the first time.
+- **Merging is the owner's auto-merge**, never a required review: the owner can't approve PRs opened
+  with their own account.
