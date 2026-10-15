@@ -1,17 +1,19 @@
-import { LINK_PATTERN, openableLink } from '@household-brain/entries/lib/items/link'
+import { openableLink } from '@household-brain/entries/lib/items/link'
 import { textFieldClass } from '@household-brain/entries/lib/styles'
 import { Field } from './Field'
+import { FieldProblems } from './FieldProblems'
 import { hasText } from '@household-brain/core/lib/read'
 
 /** The link field, with a button that opens the link in a new tab once it is a web address (#65). */
-export const LinkField = ({ value, onChange }: { value: string, onChange: (event: { target: { value: string } }) => void }) => {
+export const LinkField = ({ value, onChange, errors }: { value: string, onChange: (value: string) => void, errors: readonly unknown[] }) => {
   const href = openableLink(value)
   return (
     // The button sits beside the label, not in it, or it would become part of the field's name.
     <div className="flex items-end gap-2">
       <div className="min-w-0 flex-1">
         <Field label="Link">
-          <input inputMode="url" autoCapitalize="none" pattern={LINK_PATTERN} title="A web address, e.g. example.de or https://example.de/deal" placeholder="example.de" className={`${textFieldClass} w-full`} value={value} onChange={onChange} />
+          <input inputMode="url" autoCapitalize="none" title="A web address, e.g. example.de or https://example.de/deal" placeholder="example.de" className={`${textFieldClass} w-full`} value={value} onChange={event => { onChange(event.target.value) }} />
+          <FieldProblems errors={errors} />
         </Field>
       </div>
       {hasText(href) && (

@@ -10,3 +10,9 @@ export const Field = ({ label, required = false, children }: { label: string, re
     {children}
   </label>
 )
+
+/** The part of a TanStack Form field (#195) a plain text control needs. */
+export interface FormField {
+  state: { value: string, meta: { errors: readonly unknown[] } }
+  handleChange: (value: string) => void
+}

@@ -41,6 +41,13 @@ test('entries: categories and the form, added, edited, deleted, and a double-tap
     await expect(page.locator('form[data-hold-updates]')).toHaveCount(1)
     await page.getByLabel('Due date (17:00)').fill('2026-11-03')
     await page.getByLabel('Code').fill('SUMMER25')
+    // What the entry schema refuses is named next to its field at Save, and nothing is saved (#195).
+    await page.getByLabel('Title').fill(' ')
+    await page.getByLabel('Amount').fill('ten')
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(page.getByRole('alert').filter({ hasText: 'Enter a title' })).toBeVisible()
+    await expect(page.getByRole('alert').filter({ hasText: 'Enter the amount as a number' })).toBeVisible()
+    await page.getByLabel('Title').fill('Amazon')
     await page.getByLabel('Amount').fill('10')
     // How often it is due shows after the price in the list (#86).
     await page.getByLabel('Every').selectOption('monthly')
