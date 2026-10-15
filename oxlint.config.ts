@@ -94,7 +94,8 @@ export default defineConfig({
     'sonarjs/no-nested-assignment': 'error',
     'sonarjs/no-redundant-boolean': 'error',
     'sonarjs/prefer-single-boolean-return': 'error',
-    'sonarjs/unused-import': 'error',
+    // Oxlint's own `no-unused-vars` reports the same imports (#209).
+    'sonarjs/unused-import': 'off',
     'sonarjs/fixme-tag': 'error',
     'sonarjs/todo-tag': 'error',
     'sonarjs/no-case-label-in-switch': 'error',
@@ -182,7 +183,8 @@ export default defineConfig({
     'sonarjs/no-os-command-from-path': 'error',
     'sonarjs/no-misleading-array-reverse': 'error',
     'sonarjs/no-element-overwrite': 'error',
-    'sonarjs/no-identical-functions': 'error',
+    // Fallow's duplication check finds the same copies, and also those across files (#209).
+    'sonarjs/no-identical-functions': 'off',
     'sonarjs/no-empty-collection': 'error',
     'sonarjs/no-redundant-assignments': 'error',
     'sonarjs/prefer-type-guard': 'error',
