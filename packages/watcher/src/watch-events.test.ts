@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { FOLLOW_NEWER, type Run, cancelledDeployEvent, decisionFrom, listsOpenPrs, mainRunEvent, newActivity, openPrLines, runEvent } from './watch-events'
+import { FOLLOW_NEWER, type Run, answerFirst, cancelledDeployEvent, decisionFrom, listsOpenPrs, mainRunEvent, newActivity, openPrLines, runEvent } from './watch-events'
 
 const SHA = 'abcdef1234567890abcdef1234567890abcdef12'
 const run = (changes: Partial<Run> = {}): Run => ({ ageSeconds: 60, attempt: 1, conclusion: 'success', id: 7, status: 'completed', ...changes })
@@ -77,5 +77,16 @@ describe('newActivity', () => {
   it('keeps what was not seen, once', () => {
     const items = [{ id: 'comment 1', line: 'a' }, { id: 'comment 2', line: 'b' }, { id: 'comment 2', line: 'b' }]
     expect(newActivity(new Set(['comment 1']), items)).toEqual([{ id: 'comment 2', line: 'b' }])
+  })
+})
+
+describe('answerFirst (#222)', () => {
+  it('puts what someone waits for an answer to before CI and deploys, each in the order found', () => {
+    const deployed = ['PR #271: DEPLOYED: live', 'Open PRs:', '#272 …: approved']
+    const approved = ['PR #272: APPROVED by the owner.']
+    const activity = ['PR #272: ACTIVITY:', 'review-comment 1 owner …']
+    const issue = ['NEW_ISSUE #9 Something']
+    const main = ['MAIN_PASSED: CI run 1 on main passed']
+    expect(answerFirst([deployed, main, activity, approved, issue])).toEqual([activity, approved, issue, deployed, main])
   })
 })

@@ -1,6 +1,7 @@
 /* oxlint-disable eslint/no-await-in-loop -- the watcher's rounds run one after another, on purpose */
 /**
- * Watches the whole project until something needs attention, then prints it and exits:
+ * Watches the whole project until something needs attention, then prints every event pending, the
+ * ones someone waits for an answer to (ACTIVITY, APPROVED, …, new issues and comments) first (#222):
  *
  *   PR #<n>: NEW_PR                  a pull request opened (by anyone, Dependabot included)
  *   PR #<n>: CI_PASSED / CI_FAILED   CI finished for the PR's current head commit
@@ -26,18 +27,18 @@
  * Open pull requests are watched, and every one seen open stays watched until its deploy (or its
  * closing) is reported; merged ones from the last few hours too, for a fresh state. Each follows its
  * PR's *current* head commit, so a push needs no restart. It remembers what it reported
- * (watch-state.ts), so start it again after handling each event and it continues with the next one.
+ * (watch-state.ts), so start it again after handling the events and it continues with the next ones.
  * Run it in the background: its exit is the notification. Bun reads the whole file before running
  * it, so editing the checkout meanwhile is harmless.
  *
- * With `--follow` it keeps running instead (#196): each event is printed as it happens and ends with a
- * `---` line, for a harness that wakes on new output (Claude Code's Monitor), so one watcher lasts the
- * whole session. It still reports one event at a time, and goes straight on with the next.
+ * With `--follow` it keeps running instead (#196): each look's events are printed when the look ends,
+ * each ending with a `---` line, for a harness that wakes on new output (Claude Code's Monitor), so
+ * one watcher lasts the whole session.
  */
 import { type Activity, FOLLOW_NEWER, cancelledDeployEvent, issueKey, mainRunEvent, newActivity, runEvent } from './watch-events'
 import { type PrState, REPO, activityOf, issueEventLines, issueLine, jobLines, mainAhead, mainHead, newestMainRun, openIssueNumbers, openPrs, prState, recentlyMerged, reviewCommentLines, runOf } from './watch-github'
 import { appendLines, exists, lock, readLines, writeLines } from './watch-state'
-import { EVENT_PRINTED, quiet, report, sayAndExit } from './watch-output'
+import { flush, queue, quiet, report } from './watch-output'
 import { hasText } from './read'
 
 const [limitMinutes = '20', maxHours = '12'] = process.argv.slice(2).filter(arg => arg !== '--follow')
@@ -71,6 +72,14 @@ const seenActivity = async (pr: number, items: Activity[]): Promise<Set<string>>
   return new Set(await readLines(seenFile))
 }
 
+/** Records the new comments and reviews as seen and keeps them for this round's events. */
+const queueActivity = async (pr: number, fresh: Activity[]): Promise<void> => {
+  await appendLines(`pr-${pr}-seen`, fresh.map(item => item.id))
+  const lines = await Promise.all(fresh.map(async item =>
+    [item.line].concat(item.id.startsWith('review ') ? await reviewCommentLines(pr, item.id.split(' ')[1] ?? '').catch(() => []) : [])))
+  queue([`PR #${pr}: ACTIVITY:`, ...lines.flat()])
+}
+
 /** New comments and reviews on a PR; false when GitHub couldn't be asked (tried again next round). */
 const checkActivity = async (pr: number): Promise<boolean> => {
   const items = await activityOf(pr).catch(() => null)
@@ -79,13 +88,10 @@ const checkActivity = async (pr: number): Promise<boolean> => {
     return false
   }
   const fresh = newActivity(await seenActivity(pr, items), items)
-  if (fresh.length === 0) {
-    return true
+  if (fresh.length > 0) {
+    await queueActivity(pr, fresh)
   }
-  await appendLines(`pr-${pr}-seen`, fresh.map(item => item.id))
-  const lines = await Promise.all(fresh.map(async item =>
-    [item.line].concat(item.id.startsWith('review ') ? await reviewCommentLines(pr, item.id.split(' ')[1] ?? '').catch(() => []) : [])))
-  return sayAndExit([`PR #${pr}: ACTIVITY:`, ...lines.flat()])
+  return true
 }
 
 /** A finished or slow CI run of `sha`: a PR's head, or a merged PR's commit on main (`deploy`). */
@@ -213,7 +219,7 @@ const checkIssues = async (): Promise<void> => {
   const fresh = lines.filter(line => !seen.has(issueKey(line)))
   if (fresh.length > 0) {
     await appendLines('issues', fresh.map(item => issueKey(item)))
-    sayAndExit(fresh)
+    queue(fresh)
   }
 }
 
@@ -236,7 +242,7 @@ const checkIssueStates = async (): Promise<void> => {
   }
   await writeLines('open-issues', now)
   if (lines.length > 0) {
-    sayAndExit(lines)
+    queue(lines)
   }
 }
 
@@ -263,23 +269,16 @@ const checkPrs = async (): Promise<void> => {
   await (roundComplete() ? writeLines('initialized', []) : Promise.resolve())
 }
 
-/** One look at everything; true when it printed an event (following), so the next look comes at once. */
+/** One look at everything; true when it printed events (following), so the next look comes at once. */
 const lookOnce = async (): Promise<boolean> => {
-  const idle = { due: false }
-  try {
-    // Pull requests before issues: an approval or a failed CI run must not wait behind issue comments
-    // (#197), since the watcher reports one event at a time.
-    await inOrder([checkMain, checkMainHead, checkPrs, checkIssues, checkIssueStates], async check => check())
-    idle.due = Temporal.Instant.compare(Temporal.Now.instant(), quiet.since.add({ hours: Number(maxHours) })) > 0
-    if (idle.due) {
-      sayAndExit([`IDLE: nothing happened for ${maxHours} h`])
-    }
-  } catch (error) {
-    if (error !== EVENT_PRINTED) {
-      throw error
-    }
-    // After a heartbeat the next look waits like after an empty round.
-    return !idle.due
+  await inOrder([checkMain, checkMainHead, checkPrs, checkIssues, checkIssueStates], async check => check())
+  if (flush()) {
+    return true
+  }
+  // After a heartbeat the next look waits like after an empty round.
+  if (Temporal.Instant.compare(Temporal.Now.instant(), quiet.since.add({ hours: Number(maxHours) })) > 0) {
+    queue([`IDLE: nothing happened for ${maxHours} h`])
+    flush()
   }
   return false
 }

@@ -19,11 +19,13 @@ default branch's CI, new issues, the owner's comments on issues, and issues clos
 SELF='<your login>' bun ${CLAUDE_PLUGIN_ROOT}/src/watch-project.ts --follow
 ```
 
-- **Run it under Claude Code's `Monitor`** with `--follow`: it keeps running, prints each event as
-  it happens and ends each one with a `---` line. `IDLE` is a heartbeat, not an exit. A `Monitor`
+- **Run it under Claude Code's `Monitor`** with `--follow`: it keeps running, prints each look's events
+  when the look ends, and ends each one with a `---` line. `IDLE` is a heartbeat, not an exit. A `Monitor`
   stops after 30 minutes at most: re-arm it when its expiry notice comes; the watcher remembers what
-  it reported and picks up where it left off. Without `--follow` it exits after one event: start it
-  again after handling it.
+  it reported and picks up where it left off. Without `--follow` it exits after one look, with every
+  event that look found: start it again after handling them.
+- **Each look prints every pending event, the ones to answer first** (comments, reviews, approvals,
+  conflicts, new issues), then CI, deploys and the rest: handle the answers before anything else.
 - **Settings**, from the environment:
   - `GH`: the `gh` to ask with, e.g. a wrapper logged in as a bot. Plain `gh` by default.
   - `REPO`: `owner/name`. By default, the repository `gh` finds in the current folder.
