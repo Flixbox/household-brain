@@ -48,8 +48,8 @@ export const report = async (event: Event | null, pr: number | null = null): Pro
 }
 
 /**
- * Prints the round's events, answers first, and after them a reminder for each approved PR waiting
- * on the agent (#224); then exits, or when following, ends each with `---` and returns whether
+ * Prints the round's events, answers first, and after them a reminder for each open PR waiting on
+ * the agent (#224, #226); then exits, or when following, ends each with `---` and returns whether
  * anything was printed, so the next round can start at once.
  */
 export const flush = async (): Promise<boolean> => {

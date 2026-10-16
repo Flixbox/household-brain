@@ -119,7 +119,7 @@ const branchProblem = (pr: OpenPr): string | null => {
   if (pr.mergeState === 'DIRTY') {
     return `REMINDER: PR #${pr.number} has conflicts with main: rebase it.`
   }
-  return pr.mergeState === 'BEHIND' ? `REMINDER: PR #${pr.number} is behind main and can't merge: rebase it and run the checks again.` : null
+  return pr.mergeState === 'BEHIND' ? `REMINDER: PR #${pr.number} is behind main: rebase it and run the checks again.` : null
 }
 
 /** An approved PR whose CI has finished and that waits on the agent (#224). */
