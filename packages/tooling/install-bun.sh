@@ -11,8 +11,8 @@
 #   packages/tooling/install-bun.sh        installs into ~/.bun/bin and adds it to $GITHUB_PATH when set
 set -euo pipefail
 
-BUN_VERSION=1.4.2
-BUN_SHA256=36368faef7527875d5ffa52e53cd48021741f2a83eb6208a8dd64068d422a913 # bun-linux-x64.zip
+BUN_VERSION=1.4.3
+BUN_SHA256=3e730528d89775f03f87f05c06787c4df4099d0a37f3f252e7b829cb23816e18 # bun-linux-x64.zip
 
 wanted=$(sed -n 's/.*"packageManager": "bun@\([^"]*\)".*/\1/p' package.json)
 if [ "$wanted" != "$BUN_VERSION" ]; then
