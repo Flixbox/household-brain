@@ -113,6 +113,21 @@ const ciState = (checks: string[]) => {
 }
 
 /**
+ * A reminder for each approved PR whose CI has finished (#224), repeated on every notification until it
+ * is dealt with: green with auto-merge off asks for auto-merge, a failed run for a fix. Parked PRs and
+ * running CI don't count.
+ */
+export const reminderLines = (prs: readonly OpenPr[]): string[] => prs
+  .filter(pr => pr.reviewDecision === 'APPROVED' && !pr.parked)
+  .flatMap(pr => {
+    const ci = ciState(pr.checks)
+    if (ci === 'failed') {
+      return [`REMINDER: PR #${pr.number} is approved and CI failed: fix it.`]
+    }
+    return ci === 'green' && !pr.autoMerge ? [`REMINDER: PR #${pr.number} is approved and CI is green, but auto-merge is off: enable it.`] : []
+  })
+
+/**
  * The review decision from the reviews themselves, each reviewer's latest that counts (a comment
  * doesn't undo an approval, a dismissal does), for when GitHub leaves `reviewDecision` empty: it only
  * fills it in under classic branch protection, not under a ruleset (#197).

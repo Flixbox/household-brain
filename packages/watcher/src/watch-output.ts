@@ -4,7 +4,7 @@
  * command whose exit is the notification) or, with `--follow`, ends each event with a `---` line and
  * goes on (#196).
  */
-import { type Event, answerFirst, listsOpenPrs, openPrLines } from './watch-events'
+import { type Event, answerFirst, listsOpenPrs, openPrLines, reminderLines } from './watch-events'
 import { openPrs } from './watch-github'
 import { appendLines, readLines } from './watch-state'
 
@@ -48,14 +48,19 @@ export const report = async (event: Event | null, pr: number | null = null): Pro
 }
 
 /**
- * Prints the round's events, answers first; then exits, or when following, ends each with `---` and
- * returns whether anything was printed, so the next round can start at once.
+ * Prints the round's events, answers first, and after them a reminder for each approved PR waiting
+ * on the agent (#224); then exits, or when following, ends each with `---` and returns whether
+ * anything was printed, so the next round can start at once.
  */
-export const flush = (): boolean => {
+export const flush = async (): Promise<boolean> => {
   if (found.length === 0) {
     return false
   }
+  const reminders = await openPrs().then(reminderLines, () => [])
   printFound()
+  if (reminders.length > 0) {
+    say(FOLLOW ? [...reminders, '---'] : reminders)
+  }
   quiet.since = Temporal.Now.instant()
   if (!FOLLOW) {
     process.exit(0)
