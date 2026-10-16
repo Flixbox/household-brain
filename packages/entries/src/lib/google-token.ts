@@ -3,9 +3,10 @@
 // doesn't lose it; there is no refresh token anywhere. The trade-off: injected script could read a
 // token that expires within the hour. A token belongs to the account it was asked for (the signed-in
 // person's email as the hint) and is never used for another person.
-// Background sync continues to require only Calendar scopes, so cached tokens from before Tasks was
-// added remain usable. The Settings connection gesture asks for the separate Tasks scope as well;
-// background work checks for it and never opens a consent window itself. The Calendar scopes are
+// Background sync requires only the Calendar scopes, so a token without Tasks still syncs. Every
+// request for a new token also asks for Tasks (`requestedScopes`): a token renewed through "Sync now"
+// would otherwise drop it, and the Tasks inbox stopped importing once the first token expired.
+// Background work checks for Tasks and never opens a consent window itself. The Calendar scopes are
 // `calendar.events` (not the narrower `calendar.app.created`, which may not cover a calendar another
 // account owns) and `calendar.calendarlist` for everyone; the owner also grants `calendar.app.created`
 // once, to create the household calendar. Sharing it would need `calendar.acls`, so it is done by
@@ -99,6 +100,14 @@ export const loadGis = async (): Promise<void> => {
 const usable = (token: Token | null, scopes: readonly string[], account: string | null | undefined): token is Token =>
   token !== null && Boolean(account) && token.account === account && now() < token.usableUntil && scopes.every(scope => token.scopes.includes(scope))
 
+/**
+ * What a token request asks Google for: the scopes needed now, those asked for besides, and always
+ * Tasks, so a renewed token keeps the Tasks inbox working. Only `scopes` must be granted
+ * (`acceptToken`); Google doesn't ask again for a permission already given.
+ */
+export const requestedScopes = (scopes: readonly string[], alsoAsk: readonly string[] = []): string[] =>
+  [...new Set([...scopes, ...alsoAsk, TASKS_SCOPE])]
+
 const requestToken = async (scopes: readonly string[], hint?: string | null): Promise<TokenResponse> => {
   const oauth2 = globalThis.google?.accounts.oauth2
   if (!oauth2) {
@@ -161,7 +170,7 @@ export const calendarToken = async (scopes: readonly string[], account: string |
   // One request at a time: parallel callers share it instead of opening several Google windows.
   // The Google window can hide the app on a phone; no new version may load meanwhile.
   // `alsoAsk` is asked for but optional: a person who declines it still gets a token for `scopes`.
-  pending ??= holdUpdatesWhile(loadGis().then(async () => requestToken([...scopes, ...alsoAsk], account)))
+  pending ??= holdUpdatesWhile(loadGis().then(async () => requestToken(requestedScopes(scopes, alsoAsk), account)))
     .then(response => acceptToken(response, scopes, account ?? ''))
     .finally(() => {
       pending = null

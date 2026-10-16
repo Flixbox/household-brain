@@ -57,6 +57,10 @@ const tasksApi = createTasksApi({
  */
 export const importTasks = async (): Promise<void> => {
   if (!hasCalendarToken(tasksScopes, account())) {
+    // Syncing, but without Tasks access: say so, instead of tasks quietly piling up in the inbox.
+    if (hasCalendarToken(MEMBER_SCOPES, account())) {
+      logErrorOnce('tasks-import', 'Google Tasks import paused', 'This device has no Google Tasks access. The next Google window (Sync now, or Settings) asks for it.')
+    }
     return
   }
   // Tasks are an optional way in: a failure (the API switched off, no network) is tried again
