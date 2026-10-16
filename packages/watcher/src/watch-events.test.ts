@@ -101,12 +101,13 @@ describe('reminderLines (#224)', () => {
     ])
   })
 
-  it('stays quiet about running CI, auto-merge already on, parked or unapproved PRs', () => {
+  it('stays quiet about running or unreported CI, auto-merge already on, parked or unapproved PRs', () => {
     expect(reminderLines([
       pr({ checks: ['SUCCESS', 'pending'] }),
       pr({ autoMerge: true }),
       pr({ parked: true }),
       pr({ reviewDecision: 'REVIEW_REQUIRED' }),
+      pr({ checks: [] }),
     ])).toEqual([])
   })
 })

@@ -56,8 +56,9 @@ export const flush = async (): Promise<boolean> => {
   if (found.length === 0) {
     return false
   }
-  const reminders = await openPrs().then(reminderLines, () => [])
+  // The events first: a slow listing must not hold them back.
   printFound()
+  const reminders = await openPrs().then(reminderLines, () => [])
   if (reminders.length > 0) {
     say(FOLLOW ? [...reminders, '---'] : reminders)
   }

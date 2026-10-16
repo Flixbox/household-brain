@@ -118,7 +118,8 @@ const ciState = (checks: string[]) => {
  * running CI don't count.
  */
 export const reminderLines = (prs: readonly OpenPr[]): string[] => prs
-  .filter(pr => pr.reviewDecision === 'APPROVED' && !pr.parked)
+  // No checks at all means CI hasn't reported yet, not that it passed.
+  .filter(pr => pr.reviewDecision === 'APPROVED' && !pr.parked && pr.checks.length > 0)
   .flatMap(pr => {
     const ci = ciState(pr.checks)
     if (ci === 'failed') {
