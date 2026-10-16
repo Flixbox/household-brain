@@ -93,10 +93,11 @@ const decisionOf = async (pr: number, reviewDecision: unknown, author: string): 
 }
 
 export const openPrs = async (): Promise<OpenPr[]> =>
-  Promise.all(records(await gh(['pr', 'list', '--repo', REPO, '--state', 'open', '--limit', '100', '--json', 'number,title,reviewDecision,autoMergeRequest,labels,statusCheckRollup,author']))
+  Promise.all(records(await gh(['pr', 'list', '--repo', REPO, '--state', 'open', '--limit', '100', '--json', 'number,title,reviewDecision,autoMergeRequest,labels,statusCheckRollup,author,mergeStateStatus']))
     .map(async pr => ({
       autoMerge: Boolean(pr.autoMergeRequest),
       checks: records(pr.statusCheckRollup).map(check => textOf(check.conclusion) || textOf(check.state) || 'pending'),
+      mergeState: textOf(pr.mergeStateStatus),
       number: count(pr.number),
       parked: records(pr.labels).some(label => label.name === 'parked'),
       reviewDecision: await decisionOf(count(pr.number), pr.reviewDecision, textOf(record(pr.author).login)),

@@ -67,7 +67,7 @@ approved one whose auto-merge is still off, not only on the one the event names.
 | `NEW_ISSUE` / `ISSUE_COMMENT` | Read it, take the work in turn, answer the owner's comment. |
 | `ISSUE_CLOSED` / `ISSUE_REOPENED` | Drop or resume any work on it. |
 | `CLOSED` | Closed without merging: stop working on it. |
-| `REMINDER` | Comes after every notification while an approved PR waits on you: CI green and auto-merge off (enable it, after reading its comments), or CI failed (fix it). It repeats until that is done. |
+| `REMINDER` | Comes after every notification while a PR waits on you: its branch is behind main or in conflict (rebase it, run the checks, push once), or it is approved with CI green and auto-merge off (enable it, after reading its comments) or with CI failed (fix it). It repeats until that is done. |
 
 ## Before enabling auto-merge
 

@@ -55,9 +55,9 @@ describe('mainRunEvent', () => {
 describe('openPrLines', () => {
   it('says where each PR stands', () => {
     expect(openPrLines([
-      { autoMerge: false, checks: ['SUCCESS', 'SKIPPED'], number: 3, parked: true, reviewDecision: '', title: 'Bump a tool' },
-      { autoMerge: true, checks: ['SUCCESS', 'IN_PROGRESS'], number: 4, parked: false, reviewDecision: 'APPROVED', title: 'Add a page' },
-      { autoMerge: false, checks: ['FAILURE'], number: 5, parked: false, reviewDecision: 'CHANGES_REQUESTED', title: 'Fix a bug' },
+      { autoMerge: false, checks: ['SUCCESS', 'SKIPPED'], mergeState: 'CLEAN', number: 3, parked: true, reviewDecision: '', title: 'Bump a tool' },
+      { autoMerge: true, checks: ['SUCCESS', 'IN_PROGRESS'], mergeState: 'CLEAN', number: 4, parked: false, reviewDecision: 'APPROVED', title: 'Add a page' },
+      { autoMerge: false, checks: ['FAILURE'], mergeState: 'CLEAN', number: 5, parked: false, reviewDecision: 'CHANGES_REQUESTED', title: 'Fix a bug' },
     ])).toEqual([
       'Open PRs:',
       '  #3 Bump a tool: parked, awaiting approval, auto-merge off, CI green',
@@ -92,7 +92,7 @@ describe('answerFirst (#222)', () => {
 })
 
 describe('reminderLines (#224)', () => {
-  const pr = (changes: Partial<OpenPr>): OpenPr => ({ autoMerge: false, checks: ['SUCCESS'], number: 1, parked: false, reviewDecision: 'APPROVED', title: 'x', ...changes })
+  const pr = (changes: Partial<OpenPr>): OpenPr => ({ autoMerge: false, checks: ['SUCCESS'], mergeState: 'CLEAN', number: 1, parked: false, reviewDecision: 'APPROVED', title: 'x', ...changes })
 
   it('reminds of an approved PR with green CI and auto-merge off, and of one whose CI failed', () => {
     expect(reminderLines([pr({ number: 284 }), pr({ checks: ['SUCCESS', 'FAILURE'], number: 290 })])).toEqual([
@@ -109,5 +109,21 @@ describe('reminderLines (#224)', () => {
       pr({ reviewDecision: 'REVIEW_REQUIRED' }),
       pr({ checks: [] }),
     ])).toEqual([])
+  })
+})
+
+describe('reminders for branches that can\'t merge (#226)', () => {
+  const pr = (changes: Partial<OpenPr>): OpenPr => ({ autoMerge: true, checks: ['SUCCESS'], mergeState: 'CLEAN', number: 314, parked: false, reviewDecision: 'APPROVED', title: 'x', ...changes })
+
+  it('reminds of a branch behind main or in conflict, approved or not', () => {
+    expect(reminderLines([pr({ mergeState: 'BEHIND' }), pr({ mergeState: 'DIRTY', number: 9, reviewDecision: '' })])).toEqual([
+      'REMINDER: PR #314 is behind main: rebase it and run the checks again.',
+      'REMINDER: PR #9 has conflicts with main: rebase it.',
+    ])
+  })
+
+  it('says so in the open-PR list, and leaves parked PRs and clean branches alone', () => {
+    expect(openPrLines([pr({ mergeState: 'BEHIND', title: 'Triggers' })])).toEqual(['Open PRs:', '  #314 Triggers: approved, auto-merge on, CI green, behind main'])
+    expect(reminderLines([pr({ mergeState: 'BEHIND', parked: true }), pr({})])).toEqual([])
   })
 })
