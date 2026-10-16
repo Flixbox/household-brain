@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { FOLLOW_NEWER, type Run, answerFirst, cancelledDeployEvent, decisionFrom, listsOpenPrs, mainRunEvent, newActivity, openPrLines, runEvent } from './watch-events'
+import { FOLLOW_NEWER, type OpenPr, type Run, answerFirst, cancelledDeployEvent, decisionFrom, listsOpenPrs, mainRunEvent, newActivity, openPrLines, reminderLines, runEvent } from './watch-events'
 
 const SHA = 'abcdef1234567890abcdef1234567890abcdef12'
 const run = (changes: Partial<Run> = {}): Run => ({ ageSeconds: 60, attempt: 1, conclusion: 'success', id: 7, status: 'completed', ...changes })
@@ -88,5 +88,26 @@ describe('answerFirst (#222)', () => {
     const issue = ['NEW_ISSUE #9 Something']
     const main = ['MAIN_PASSED: CI run 1 on main passed']
     expect(answerFirst([deployed, main, activity, approved, issue])).toEqual([activity, approved, issue, deployed, main])
+  })
+})
+
+describe('reminderLines (#224)', () => {
+  const pr = (changes: Partial<OpenPr>): OpenPr => ({ autoMerge: false, checks: ['SUCCESS'], number: 1, parked: false, reviewDecision: 'APPROVED', title: 'x', ...changes })
+
+  it('reminds of an approved PR with green CI and auto-merge off, and of one whose CI failed', () => {
+    expect(reminderLines([pr({ number: 284 }), pr({ checks: ['SUCCESS', 'FAILURE'], number: 290 })])).toEqual([
+      'REMINDER: PR #284 is approved and CI is green, but auto-merge is off: enable it.',
+      'REMINDER: PR #290 is approved and CI failed: fix it.',
+    ])
+  })
+
+  it('stays quiet about running or unreported CI, auto-merge already on, parked or unapproved PRs', () => {
+    expect(reminderLines([
+      pr({ checks: ['SUCCESS', 'pending'] }),
+      pr({ autoMerge: true }),
+      pr({ parked: true }),
+      pr({ reviewDecision: 'REVIEW_REQUIRED' }),
+      pr({ checks: [] }),
+    ])).toEqual([])
   })
 })

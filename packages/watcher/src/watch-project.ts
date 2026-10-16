@@ -19,6 +19,8 @@
  *   NEW_ISSUE / ISSUE_COMMENT        a new issue (not the agent's own), or the owner commented on one
  *   ISSUE_CLOSED / ISSUE_REOPENED    an issue was closed (by anyone) or reopened
  *   IDLE                             nothing happened for max-hours (with --follow: a heartbeat, then it goes on)
+ *   REMINDER: PR #<n> …              after every notification, each approved PR whose CI finished
+ *                                    and that waits on the agent: auto-merge to enable, or CI to fix
  *
  * Every CI result (a PR's, a deploy's or main's) ends with the list of open PRs.
  *
@@ -272,13 +274,13 @@ const checkPrs = async (): Promise<void> => {
 /** One look at everything; true when it printed events (following), so the next look comes at once. */
 const lookOnce = async (): Promise<boolean> => {
   await inOrder([checkMain, checkMainHead, checkPrs, checkIssues, checkIssueStates], async check => check())
-  if (flush()) {
+  if (await flush()) {
     return true
   }
   // After a heartbeat the next look waits like after an empty round.
   if (Temporal.Instant.compare(Temporal.Now.instant(), quiet.since.add({ hours: Number(maxHours) })) > 0) {
     queue([`IDLE: nothing happened for ${maxHours} h`])
-    flush()
+    await flush()
   }
   return false
 }
