@@ -27,7 +27,7 @@ bun run emulators         # emulators only, to iterate on bun run test:rules or 
 **Machine setup (once):**
 
 ```sh
-curl -fsSL https://bun.sh/install | bash -s bun-v1.4.2   # the version in package.json (packageManager); no Node needed
+curl -fsSL https://bun.sh/install | bash -s bun-v1.4.3   # the version in package.json (packageManager); no Node needed
 brew install openjdk@21                            # the Firestore emulator needs Java 21
 bun --bun playwright install chromium webkit        # e2e runs desktop Chrome and Pixel 9; the iPhone 17 checks the Safari notice
 brew install --cask gcloud-cli && gcloud init      # only for the one-time Google Cloud setup below
