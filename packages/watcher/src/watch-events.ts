@@ -100,6 +100,8 @@ export interface OpenPr {
   autoMerge: boolean
   parked: boolean
   checks: string[]
+  /** GitHub's `mergeStateStatus`: `BEHIND` (out of date with the base branch), `DIRTY` (conflicts), … */
+  mergeState: string
 }
 
 const FAILED = new Set(['FAILURE', 'ERROR', 'TIMED_OUT', 'CANCELLED', 'STARTUP_FAILURE', 'ACTION_REQUIRED'])
@@ -112,21 +114,35 @@ const ciState = (checks: string[]) => {
   return checks.every(check => DONE.has(check)) ? 'green' : 'running'
 }
 
+/** A branch that can't merge as it is (#226): behind the base branch, or in conflict with it. */
+const branchProblem = (pr: OpenPr): string | null => {
+  if (pr.mergeState === 'DIRTY') {
+    return `REMINDER: PR #${pr.number} has conflicts with main: rebase it.`
+  }
+  return pr.mergeState === 'BEHIND' ? `REMINDER: PR #${pr.number} is behind main and can't merge: rebase it and run the checks again.` : null
+}
+
+/** An approved PR whose CI has finished and that waits on the agent (#224). */
+const approvalProblem = (pr: OpenPr): string | null => {
+  if (pr.reviewDecision !== 'APPROVED') {
+    return null
+  }
+  // No checks at all means CI hasn't reported yet, not that it passed.
+  const ci = pr.checks.length > 0 ? ciState(pr.checks) : 'running'
+  if (ci === 'failed') {
+    return `REMINDER: PR #${pr.number} is approved and CI failed: fix it.`
+  }
+  return ci === 'green' && !pr.autoMerge ? `REMINDER: PR #${pr.number} is approved and CI is green, but auto-merge is off: enable it.` : null
+}
+
 /**
- * A reminder for each approved PR whose CI has finished (#224), repeated on every notification until it
- * is dealt with: green with auto-merge off asks for auto-merge, a failed run for a fix. Parked PRs and
- * running CI don't count.
+ * A reminder for each open PR that waits on the agent, repeated on every notification until it is
+ * dealt with: a branch behind main or in conflict (#226), approved with green CI and auto-merge off,
+ * or approved with failed CI (#224). Parked PRs don't count.
  */
 export const reminderLines = (prs: readonly OpenPr[]): string[] => prs
-  // No checks at all means CI hasn't reported yet, not that it passed.
-  .filter(pr => pr.reviewDecision === 'APPROVED' && !pr.parked && pr.checks.length > 0)
-  .flatMap(pr => {
-    const ci = ciState(pr.checks)
-    if (ci === 'failed') {
-      return [`REMINDER: PR #${pr.number} is approved and CI failed: fix it.`]
-    }
-    return ci === 'green' && !pr.autoMerge ? [`REMINDER: PR #${pr.number} is approved and CI is green, but auto-merge is off: enable it.`] : []
-  })
+  .filter(pr => !pr.parked)
+  .flatMap(pr => [branchProblem(pr), approvalProblem(pr)].filter(line => line !== null))
 
 /**
  * The review decision from the reviews themselves, each reviewer's latest that counts (a comment
@@ -155,9 +171,16 @@ const review = (decision: string) => {
 }
 
 /** Where each open PR stands; every CI result comes with it, so no approval goes unnoticed. */
+const branchState = (mergeState: string) => {
+  if (mergeState === 'DIRTY') {
+    return ', conflicts with main'
+  }
+  return mergeState === 'BEHIND' ? ', behind main' : ''
+}
+
 export const openPrLines = (prs: OpenPr[]): string[] => [
   'Open PRs:',
-  ...prs.map(pr => `  #${pr.number} ${pr.title.slice(0, 60)}: ${pr.parked ? 'parked, ' : ''}${review(pr.reviewDecision)}, auto-merge ${pr.autoMerge ? 'on' : 'off'}, CI ${ciState(pr.checks)}`),
+  ...prs.map(pr => `  #${pr.number} ${pr.title.slice(0, 60)}: ${pr.parked ? 'parked, ' : ''}${review(pr.reviewDecision)}, auto-merge ${pr.autoMerge ? 'on' : 'off'}, CI ${ciState(pr.checks)}${branchState(pr.mergeState)}`),
 ]
 
 /** Event keys after which the open PRs are listed. */

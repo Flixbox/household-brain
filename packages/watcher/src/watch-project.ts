@@ -19,8 +19,9 @@
  *   NEW_ISSUE / ISSUE_COMMENT        a new issue (not the agent's own), or the owner commented on one
  *   ISSUE_CLOSED / ISSUE_REOPENED    an issue was closed (by anyone) or reopened
  *   IDLE                             nothing happened for max-hours (with --follow: a heartbeat, then it goes on)
- *   REMINDER: PR #<n> …              after every notification, each approved PR whose CI finished
- *                                    and that waits on the agent: auto-merge to enable, or CI to fix
+ *   REMINDER: PR #<n> …              after every notification, each open PR that waits on the agent: a
+ *                                    branch behind main or in conflict, or approved with CI finished
+ *                                    (auto-merge to enable, or CI to fix)
  *
  * Every CI result (a PR's, a deploy's or main's) ends with the list of open PRs.
  *
