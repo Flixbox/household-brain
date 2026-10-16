@@ -31,9 +31,9 @@
  * Run it in the background: its exit is the notification. Bun reads the whole file before running
  * it, so editing the checkout meanwhile is harmless.
  *
- * With `--follow` it keeps running instead (#196): each event is printed as it happens and ends with a
- * `---` line, for a harness that wakes on new output (Claude Code's Monitor), so one watcher lasts the
- * whole session. Each look still prints everything it found, answers first.
+ * With `--follow` it keeps running instead (#196): each look's events are printed when the look ends,
+ * each ending with a `---` line, for a harness that wakes on new output (Claude Code's Monitor), so
+ * one watcher lasts the whole session.
  */
 import { type Activity, FOLLOW_NEWER, cancelledDeployEvent, issueKey, mainRunEvent, newActivity, runEvent } from './watch-events'
 import { type PrState, REPO, activityOf, issueEventLines, issueLine, jobLines, mainAhead, mainHead, newestMainRun, openIssueNumbers, openPrs, prState, recentlyMerged, reviewCommentLines, runOf } from './watch-github'

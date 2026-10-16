@@ -17,7 +17,20 @@ const say = (lines: readonly string[]) => process.stdout.write(`${lines.join('\n
 /** The events found so far in this round, printed together by `flush`. */
 const found: (readonly string[])[] = []
 
-/** Keeps lines that aren't keyed events (activity, issues) for this round's `flush`. */
+/**
+ * An event is recorded as reported when it is found, before the round prints it. So a round that
+ * ends early (an error, a stop signal: both end in `exit`) still prints what it found, rather than
+ * leaving events recorded but never shown. Synchronously: an exit handler can't wait.
+ */
+const printFound = () => {
+  for (const lines of answerFirst(found)) {
+    say(FOLLOW ? [...lines, '---'] : lines)
+  }
+  found.length = 0
+}
+process.on('exit', printFound)
+
+/** Keeps an event's lines for this round's `flush`. */
 export const queue = (lines: readonly string[]): void => {
   found.push(lines)
 }
@@ -42,10 +55,7 @@ export const flush = (): boolean => {
   if (found.length === 0) {
     return false
   }
-  for (const lines of answerFirst(found)) {
-    say(FOLLOW ? [...lines, '---'] : lines)
-  }
-  found.length = 0
+  printFound()
   quiet.since = Temporal.Now.instant()
   if (!FOLLOW) {
     process.exit(0)

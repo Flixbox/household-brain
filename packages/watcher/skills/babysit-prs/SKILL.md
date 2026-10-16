@@ -19,8 +19,8 @@ default branch's CI, new issues, the owner's comments on issues, and issues clos
 SELF='<your login>' bun ${CLAUDE_PLUGIN_ROOT}/src/watch-project.ts --follow
 ```
 
-- **Run it under Claude Code's `Monitor`** with `--follow`: it keeps running, prints each event as
-  it happens and ends each one with a `---` line. `IDLE` is a heartbeat, not an exit. A `Monitor`
+- **Run it under Claude Code's `Monitor`** with `--follow`: it keeps running, prints each look's events
+  when the look ends, and ends each one with a `---` line. `IDLE` is a heartbeat, not an exit. A `Monitor`
   stops after 30 minutes at most: re-arm it when its expiry notice comes; the watcher remembers what
   it reported and picks up where it left off. Without `--follow` it exits after one look, with every
   event that look found: start it again after handling them.
