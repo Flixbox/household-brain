@@ -1,9 +1,10 @@
 /**
- * How the project watcher (watch-project.ts) prints an event: once, and then it either exits (the
- * default, for a background command whose exit is the notification) or, with `--follow`, ends the
- * event with a `---` line and goes on (#196).
+ * How the project watcher (watch-project.ts) prints events: every event a round finds, together, the
+ * ones someone waits for an answer to first (#222). Then it exits (the default, for a background
+ * command whose exit is the notification) or, with `--follow`, ends each event with a `---` line and
+ * goes on (#196).
  */
-import { type Event, listsOpenPrs, openPrLines } from './watch-events'
+import { type Event, answerFirst, listsOpenPrs, openPrLines } from './watch-events'
 import { openPrs } from './watch-github'
 import { appendLines, readLines } from './watch-state'
 
@@ -11,37 +12,43 @@ const FOLLOW = process.argv.includes('--follow')
 
 /** When the last event (or, following, the last heartbeat) was printed. */
 export const quiet = { since: Temporal.Now.instant() }
-/** Thrown, when following, to end the round after an event; the next round starts at once. */
-export const EVENT_PRINTED = new Error('event printed')
 const say = (lines: readonly string[]) => process.stdout.write(`${lines.join('\n')}\n`)
 
-/** After an event: exit, or when following, mark its end and start the next round. */
-const done = (): never => {
-  if (!FOLLOW) {
-    return process.exit(0)
-  }
-  say(['---'])
-  quiet.since = Temporal.Now.instant()
-  throw EVENT_PRINTED
+/** The events found so far in this round, printed together by `flush`. */
+const found: (readonly string[])[] = []
+
+/** Keeps lines that aren't keyed events (activity, issues) for this round's `flush`. */
+export const queue = (lines: readonly string[]): void => {
+  found.push(lines)
 }
 
-/** Prints the event, then `done`, unless there is none or it was reported before. */
+/** Keeps the event for this round's `flush`, unless there is none or it was reported before. */
 export const report = async (event: Event | null, pr: number | null = null): Promise<void> => {
   if (!event || (await readLines('reported')).includes(event.key)) {
     return
   }
   await appendLines('reported', [event.key])
   const [first = '', ...rest] = event.lines
-  say([pr === null ? first : `PR #${pr}: ${first}`, ...rest])
   // Every CI result comes with where each open PR stands, so no approval goes unnoticed.
-  if (listsOpenPrs(event.key)) {
-    say(await openPrs().then(openPrLines, () => ['Open PRs: (listing failed)']))
-  }
-  done()
+  const prs = listsOpenPrs(event.key) ? await openPrs().then(openPrLines, () => ['Open PRs: (listing failed)']) : []
+  queue([pr === null ? first : `PR #${pr}: ${first}`, ...rest, ...prs])
 }
 
-/** Prints lines that aren't keyed events (activity, issues), then `done`. */
-export const sayAndExit = (lines: readonly string[]): never => {
-  say(lines)
-  return done()
+/**
+ * Prints the round's events, answers first; then exits, or when following, ends each with `---` and
+ * returns whether anything was printed, so the next round can start at once.
+ */
+export const flush = (): boolean => {
+  if (found.length === 0) {
+    return false
+  }
+  for (const lines of answerFirst(found)) {
+    say(FOLLOW ? [...lines, '---'] : lines)
+  }
+  found.length = 0
+  quiet.since = Temporal.Now.instant()
+  if (!FOLLOW) {
+    process.exit(0)
+  }
+  return true
 }

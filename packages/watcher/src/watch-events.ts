@@ -159,3 +159,13 @@ export const newActivity = (seen: ReadonlySet<string>, items: Activity[]): Activ
 
 /** Issue events are remembered by their first 80 characters (a title or comment may change later). */
 export const issueKey = (line: string) => line.slice(0, 80)
+
+/** Events that ask the agent to answer someone: comments, reviews, approvals, conflicts, new issues. */
+const ANSWER_FIRST = /^(?:PR #\d+: )?(?:ACTIVITY|APPROVED|READY_TO_MERGE|CONFLICT|NEW_ISSUE|ISSUE_COMMENT)\b/u
+
+/**
+ * A round's events in the order to print them (#222): what someone waits for an answer to first, then
+ * CI, deploys and the rest, each group in the order it was found.
+ */
+export const answerFirst = (events: readonly (readonly string[])[]): (readonly string[])[] =>
+  events.toSorted((first, second) => Number(!ANSWER_FIRST.test(first[0] ?? '')) - Number(!ANSWER_FIRST.test(second[0] ?? '')))
