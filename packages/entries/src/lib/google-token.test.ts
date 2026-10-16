@@ -1,7 +1,7 @@
 /* oxlint-disable react/rules-of-hooks -- `useTestStorageEngine` is nanostores' switch to fake storage, not a React hook */
 import { cleanTestStorage, getTestStorage, useTestStorageEngine } from '@nanostores/persistent'
 import { afterEach, describe, expect, it, mock, spyOn } from 'bun:test'
-import { $calendarToken, MEMBER_SCOPES, OWNER_SCOPES, TASKS_SCOPE, acceptToken, forgetCalendarToken, hasCalendarToken, revokeCalendarToken } from './google-token'
+import { $calendarToken, MEMBER_SCOPES, OWNER_SCOPES, TASKS_SCOPE, acceptToken, forgetCalendarToken, hasCalendarToken, requestedScopes, revokeCalendarToken } from './google-token'
 import { stringify } from '@household-brain/core/lib/stringify'
 
 useTestStorageEngine()
@@ -30,6 +30,17 @@ describe('acceptToken', () => {
     const scopes = [...MEMBER_SCOPES, TASKS_SCOPE]
     expect(MEMBER_SCOPES).not.toContain(TASKS_SCOPE)
     expect(acceptToken(response(scopes.join(' ')), scopes, ME).scopes).toContain(TASKS_SCOPE)
+  })
+})
+
+describe('requestedScopes', () => {
+  it('always asks for Tasks too, so a renewed token keeps the Tasks inbox importing', () => {
+    expect(requestedScopes(MEMBER_SCOPES)).toEqual([...MEMBER_SCOPES, TASKS_SCOPE])
+    expect(requestedScopes(OWNER_SCOPES, [TASKS_SCOPE])).toEqual([...OWNER_SCOPES, TASKS_SCOPE])
+  })
+
+  it('still accepts a grant without Tasks: only the needed scopes must be granted', () => {
+    expect(acceptToken(response(MEMBER_SCOPES.join(' ')), MEMBER_SCOPES, ME).scopes).not.toContain(TASKS_SCOPE)
   })
 })
 
