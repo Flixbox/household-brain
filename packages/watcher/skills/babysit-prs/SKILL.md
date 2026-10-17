@@ -20,7 +20,8 @@ SELF='<your login>' bun ${CLAUDE_PLUGIN_ROOT}/src/watch-project.ts --follow
 ```
 
 - **Run it under Claude Code's `Monitor`** with `--follow`: it keeps running, prints each event the
-  moment it finds it, and ends each one with a `---` line. `IDLE` is a heartbeat, not an exit. A `Monitor`
+  moment it finds it, and ends each one with a `---` line. The owner's comments and new issues have
+  their own poller, every 30 s, so they never wait for CI and deploys. `IDLE` is a heartbeat, not an exit. A `Monitor`
   stops after 30 minutes at most: re-arm it when its expiry notice comes; the watcher remembers what
   it reported and picks up where it left off. Without `--follow` it exits after one look, with every
   event that look found: start it again after handling them.
@@ -37,6 +38,8 @@ SELF='<your login>' bun ${CLAUDE_PLUGIN_ROOT}/src/watch-project.ts --follow
     login sees their pending (unsubmitted) review.
   - `GH_TIMEOUT_SECONDS`: how long one `gh` call may take (30 by default); a slower one counts as a
     failed read and is tried again next look, so one slow endpoint doesn't hold up the rest.
+  - `GH_PARALLEL`: how many `gh` calls run at once (4 by default); the pull requests are checked in
+    parallel, and the cap keeps the bursts within GitHub's rate limits.
   - `CLAUDE_CONFIG_DIR`: where the Claude login lives (`~/.claude` by default). Every notification
     ends with the owner's Claude usage (`Usage: session 12% used (88% left, resets 2026-10-17 14:10), week 66% used (34% left, resets …)`,
     the windows `/usage` shows: how much is used and left, and when each resets),

@@ -15,3 +15,15 @@ export const textOf = (value: unknown, fallback = ''): string => (typeof value =
 export const ignoreFailure = (): void => {
   // Nothing to do, on purpose.
 }
+
+/**
+ * Waits for every one of the promises, then fails with the first failure, if any. Unlike
+ * `Promise.all`, nothing is still running when it fails: a watcher that exits on the failure would
+ * otherwise drop what the others were about to report.
+ */
+export const allSettled = async (work: readonly Promise<unknown>[]): Promise<void> => {
+  const failed = (await Promise.allSettled(work)).find(result => result.status === 'rejected')
+  if (failed) {
+    throw failed.reason
+  }
+}

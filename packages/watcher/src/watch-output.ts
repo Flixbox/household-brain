@@ -7,10 +7,10 @@
  */
 import { type Event, answerFirst, clockTime, listsOpenPrs, openPrLines, reminderLines, stamped } from './watch-events'
 import { openPrs } from './watch-github'
-import { appendLines, readLines } from './watch-state'
+import { addLine } from './watch-state'
 import { usageLine } from './watch-usage'
 
-const FOLLOW = process.argv.includes('--follow')
+export const FOLLOW = process.argv.includes('--follow')
 
 /** When the last event (or, following, the last heartbeat) was printed. */
 export const quiet = { since: Temporal.Now.instant() }
@@ -50,10 +50,10 @@ export const queue = (lines: readonly string[], written: unknown = null): void =
 
 /** Keeps the event for this round's `flush`, unless there is none or it was reported before. */
 export const report = async (event: Event | null, pr: number | null = null): Promise<void> => {
-  if (!event || (await readLines('reported')).includes(event.key)) {
+  // Checked and recorded in one step: two pollers finding the same event report it once.
+  if (!event || !await addLine('reported', event.key)) {
     return
   }
-  await appendLines('reported', [event.key])
   const [first = '', ...rest] = event.lines
   // Every CI result comes with where each open PR stands, so no approval goes unnoticed.
   const prs = listsOpenPrs(event.key) ? await openPrs().then(openPrLines, () => ['Open PRs: (listing failed)']) : []
