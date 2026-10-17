@@ -221,9 +221,10 @@ const watchedPrs = async (): Promise<number[] | null> => {
     return null
   }
   const [open, merged, followed, reported] = lists
-  // A merged PR whose deploy (or a closed one whose closing) was reported, and that is no longer
-  // followed, needs no look: on a slow `gh` each look costs seconds, all of it before the rest (#235).
-  const settled = (pr: number) => reported.some(line => line.startsWith(`pr-${pr} deployed `) || line === `pr-${pr} closed`)
+  // A merged PR whose deploy was reported, and that is no longer followed, needs no look: on a slow
+  // `gh` each look costs seconds, all of it before the rest (#235). Only the deploy settles it: a PR
+  // closed once and then reopened and merged still has its deploy to report.
+  const settled = (pr: number) => reported.some(line => line.startsWith(`pr-${pr} deployed `))
   const unsettled = merged.filter(pr => followed.includes(pr) || !settled(pr))
   return [...new Set([...open, ...unsettled, ...followed])].toSorted(byNumber)
 }
