@@ -138,6 +138,11 @@ describe('usageFrom (#233, #238)', () => {
     expect(usageFrom({ five_hour: { resets_at: 'soon', utilization: 3 } }, 'UTC')).toBe('Usage: session 3% used (97% left), week ?')
   })
 
+  it('rounds the use, keeps used and left adding up to 100, and keeps both within 0 to 100', () => {
+    expect(usageFrom({ five_hour: { utilization: 12.5 }, seven_day: { utilization: 101.2 } }, 'UTC')).toBe('Usage: session 13% used (87% left), week 100% used (0% left)')
+    expect(usageFrom({ five_hour: { utilization: -0.6 } }, 'UTC')).toBe('Usage: session 0% used (100% left), week ?')
+  })
+
   it('says unknown for anything else', () => {
     expect(usageFrom(null)).toBe('Usage: unknown')
     expect(usageFrom({ error: 'unauthorized' })).toBe('Usage: unknown')
