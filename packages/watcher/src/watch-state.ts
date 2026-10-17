@@ -87,6 +87,11 @@ export const addLine = async (name: string, line: string): Promise<boolean> => o
 // to 29999 picked from the state directory, so each repository has its own. Set it if another
 // program happens to listen on that port.
 const LOCK_PORT = Number(process.env.LOCK_PORT ?? 20_000 + (Bun.hash.crc32(DIR) % 10_000))
+// Port 0 would let the system pick any free port, so every watcher would get one: no lock at all.
+if (!Number.isInteger(LOCK_PORT) || LOCK_PORT < 1 || LOCK_PORT > 65_535) {
+  process.stderr.write('LOCK_PORT must be a port number from 1 to 65535\n')
+  process.exit(64)
+}
 
 /**
  * One watcher per state directory; exits 75 when another one runs. The lock is a listening port on
@@ -100,7 +105,8 @@ export const lock = async (): Promise<void> => {
   try {
     // Anyone connecting is hung up on at once: the port only marks that a watcher runs.
     // Unref'd: the port never keeps the process alive by itself; the watcher's own loop does.
-    Bun.listen({ hostname: '127.0.0.1', port: LOCK_PORT, socket: { data: ignoreFailure, open: socket => { socket.end() } } }).unref()
+    // Exclusive: without it, some systems let a second process open the same port.
+    Bun.listen({ exclusive: true, hostname: '127.0.0.1', port: LOCK_PORT, socket: { data: ignoreFailure, open: socket => { socket.end() } } }).unref()
   } catch {
     process.stderr.write(`another watcher already uses ${DIR} (it holds 127.0.0.1:${LOCK_PORT}; if another program does, set LOCK_PORT)\n`)
     process.exit(75)

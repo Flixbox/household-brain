@@ -24,12 +24,17 @@ const watcher = (dir: string, holdMs: number) => Bun.spawn([process.execPath, '-
   stdout: 'pipe',
 })
 
-/** Waits until a watcher has taken the lock (its first line), or has ended without it. */
+/** Waits for a watcher's first line: whether it took the lock, or ended without it. */
 const startedLocked = async (process: ReturnType<typeof watcher>) => {
   const reader = process.stdout.getReader()
-  const { value } = await reader.read()
+  const read = async (text: string): Promise<string> => {
+    const { done, value } = await reader.read()
+    const more = text + new TextDecoder().decode(value)
+    return done || more.includes('\n') ? more : read(more)
+  }
+  const line = await read('')
   reader.releaseLock()
-  return new TextDecoder().decode(value).includes('locked')
+  return line.includes('locked')
 }
 
 describe('lock (#245)', () => {
@@ -51,10 +56,16 @@ describe('lock (#245)', () => {
     expect(await new Response(second.stdout).text()).toContain('locked')
   }, 30_000)
 
+  it('refuses a port that would lock nothing', async () => {
+    const zero = Bun.spawn([process.execPath, '-e', LOCKER], { env: { ...process.env, GH: 'false', HOLD_MS: '0', LOCK_PORT: '0', REPO: 'owner/repo', STATE_DIR: await stateDir() }, stderr: 'ignore', stdout: 'ignore' })
+    expect(await zero.exited).toBe(64)
+  }, 30_000)
+
   it('is kept per state directory', async () => {
     const [one, other] = [watcher(await stateDir(), 3000), watcher(await stateDir(), 3000)]
     expect(await Promise.all([startedLocked(one), startedLocked(other)])).toEqual([true, true])
     one.kill()
     other.kill()
+    await Promise.all([one.exited, other.exited])
   }, 30_000)
 })
