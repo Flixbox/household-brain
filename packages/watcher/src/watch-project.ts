@@ -230,7 +230,7 @@ const watchedPrs = async (): Promise<number[] | null> => {
 const checkPrs = async (): Promise<void> => {
   // A round with a failed listing is skipped rather than run with pull requests missing.
   const prs = await watchedPrs()
-  const states = prs ? await prStates(prs).catch(() => null) : null
+  const states = prs ? await prStates(prs) : null
   if (!prs || !states) {
     return
   }

@@ -151,7 +151,7 @@ export interface PrState {
 }
 
 const PR_FIELDS = 'state mergeable headRefOid mergeCommit { oid } reviewDecision autoMergeRequest { enabledAt } title'
-  + ' labels(first: 20) { nodes { name } } author { login kind: __typename } reviews(last: 100) { nodes { state author { login kind: __typename } } }'
+  + ' labels(first: 100) { nodes { name } } author { login kind: __typename } reviews(last: 100) { nodes { state author { login kind: __typename } } }'
 const PRS_PER_QUERY = 50
 
 /** GraphQL names a bot `name`, the REST API (and `SELF`) `name[bot]`: the REST form, as everywhere else. */
@@ -189,13 +189,24 @@ const statesOf = async (prs: readonly number[]): Promise<[number, PrState][]> =>
   })
 }
 
+/** Each PR on its own, so one GitHub won't answer for is the only one missing. */
+const oneByOne = async (prs: readonly number[]): Promise<[number, PrState][]> => {
+  const each = await Promise.all(prs.map(async pr => statesOf([pr]).catch((): [number, PrState][] => [])))
+  return each.flat()
+}
+
+/** A batch's states; if the batch fails (one PR GitHub won't answer for fails it all), each PR alone. */
+const batchStates = async (prs: readonly number[]): Promise<[number, PrState][]> =>
+  statesOf(prs).catch(async () => oneByOne(prs))
+
 /**
  * The state of every PR asked about, in one GraphQL query per fifty (#235): one `pr view` each, plus
- * their reviews, took seconds per PR on a slow `gh`, and a look waited for all of them.
+ * their reviews, took seconds per PR on a slow `gh`, and a look waited for all of them. A PR whose
+ * state couldn't be read is missing from the answer; its caller tries again next look.
  */
 export const prStates = async (prs: readonly number[]): Promise<Map<number, PrState>> => {
   const chunks = Array.from({ length: Math.ceil(prs.length / PRS_PER_QUERY) }, (_chunk, index) => prs.slice(index * PRS_PER_QUERY, (index + 1) * PRS_PER_QUERY))
-  return new Map((await Promise.all(chunks.map(async chunk => statesOf(chunk)))).flat())
+  return new Map((await Promise.all(chunks.map(async chunk => batchStates(chunk)))).flat())
 }
 
 /** Pull requests merged in the last `hours`. */
