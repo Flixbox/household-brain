@@ -1,5 +1,5 @@
 /** The project watcher's questions to GitHub, through the `gh` CLI, answered as plain data. */
-import { type Activity, type OpenPr, type Run, decisionFrom } from './watch-events'
+import { type Activity, type OpenPr, type Run, clockTime, decisionFrom } from './watch-events'
 import { hasText, ignoreFailure, isRecord, textOf } from './read'
 
 // Settings, all from the environment (#200), so the watcher works in any repository:
@@ -217,8 +217,9 @@ export const recentlyMerged = async (hours: number): Promise<number[]> => {
     .map(pr => count(pr.number))
 }
 
-/** Who wrote a comment or review. */
+/** Who wrote a comment or review, and when (#240): `Flixbox at 12:09:20`. */
 const login = (item: Json) => textOf(record(item.user).login)
+const byline = (item: Json) => `${login(item)} at ${clockTime(item.created_at ?? item.submitted_at) ?? '?'}`
 
 /** Comments, reviews (not plain approvals) and review comments on a PR, the agent's own left out. */
 export const activityOf = async (pr: number): Promise<Activity[]> => {
@@ -229,11 +230,11 @@ export const activityOf = async (pr: number): Promise<Activity[]> => {
   ])
   return [
     ...comments.filter(item => !IGNORED.has(login(item)))
-      .map(item => ({ id: `comment ${count(item.id)}`, line: `comment ${count(item.id)} ${login(item)}: ${oneLine(item.body, 200)}` })),
+      .map(item => ({ id: `comment ${count(item.id)}`, line: `comment ${count(item.id)} ${byline(item)}: ${oneLine(item.body, 200)}` })),
     ...reviews.filter(item => (item.state !== 'APPROVED' || textOf(item.body) !== '') && (login(item) !== SELF || textOf(item.body) !== ''))
-      .map(item => ({ id: `review ${count(item.id)}`, line: `review ${count(item.id)} ${login(item)} ${textOf(item.state)}: ${oneLine(item.body, 200)}` })),
+      .map(item => ({ id: `review ${count(item.id)}`, line: `review ${count(item.id)} ${byline(item)} ${textOf(item.state)}: ${oneLine(item.body, 200)}` })),
     ...reviewComments.filter(item => login(item) !== SELF || (item.in_reply_to_id ?? null) === null)
-      .map(item => ({ id: `review-comment ${count(item.id)}`, line: `review-comment ${count(item.id)} ${login(item)} ${textOf(item.path)}: ${oneLine(item.body, 200)}` })),
+      .map(item => ({ id: `review-comment ${count(item.id)}`, line: `review-comment ${count(item.id)} ${byline(item)} ${textOf(item.path)}: ${oneLine(item.body, 200)}` })),
   ]
 }
 
@@ -253,17 +254,17 @@ export const mainHead = async (): Promise<{ sha: string, subject: string }> => {
   return { sha: textOf(value.sha), subject: textOf(record(value.commit).message).split('\n')[0] ?? '' }
 }
 
-/** New issues (not the agent's own) and the owner's comments on issues, newest first. */
-export const issueEventLines = async (): Promise<string[]> => {
+/** New issues (not the agent's own) and the owner's comments on issues, newest first, with when each was written. */
+export const issueEventLines = async (): Promise<{ at: unknown, line: string }[]> => {
   const [issues, comments] = await Promise.all([
     gh(['api', `repos/${REPO}/issues?state=all&per_page=50&sort=created&direction=desc`]),
     gh(['api', `repos/${REPO}/issues/comments?per_page=50&sort=created&direction=desc`]),
   ])
   return [
     ...records(issues).filter(issue => (issue.pull_request ?? null) === null && textOf(record(issue.user).login) !== SELF)
-      .map(issue => `NEW_ISSUE #${count(issue.number)} ${textOf(issue.title)}`),
+      .map(issue => ({ at: issue.created_at, line: `NEW_ISSUE #${count(issue.number)} ${textOf(issue.title)}` })),
     ...records(comments).filter(comment => textOf(record(comment.user).login) === OWNER && textOf(comment.html_url).includes('/issues/'))
-      .map(comment => `ISSUE_COMMENT ${count(comment.id)} #${textOf(comment.issue_url).split('/').at(-1) ?? ''}: ${oneLine(comment.body, 300)}`),
+      .map(comment => ({ at: comment.created_at, line: `ISSUE_COMMENT ${count(comment.id)} #${textOf(comment.issue_url).split('/').at(-1) ?? ''}: ${oneLine(comment.body, 300)}` })),
   ]
 }
 

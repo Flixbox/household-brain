@@ -1,7 +1,10 @@
 /* oxlint-disable eslint/no-await-in-loop -- the watcher's rounds run one after another, on purpose */
 /**
  * Watches the whole project until something needs attention, then prints every event pending, the
- * ones someone waits for an answer to (ACTIVITY, APPROVED, …, new issues and comments) first (#222):
+ * ones someone waits for an answer to (ACTIVITY, APPROVED, …, new issues and comments) first (#222).
+ * Each event starts with when it was found, and for a comment or issue when it was written
+ * (`[12:27:03, written 12:09:20] ISSUE_COMMENT …`, #240); a comment or review under ACTIVITY names
+ * when it was written after its author:
  *
  *   PR #<n>: NEW_PR                  a pull request opened (by anyone, Dependabot included)
  *   PR #<n>: CI_PASSED / CI_FAILED   CI finished for the PR's current head commit
@@ -37,9 +40,9 @@
  * Run it in the background: its exit is the notification. Bun reads the whole file before running
  * it, so editing the checkout meanwhile is harmless.
  *
- * With `--follow` it keeps running instead (#196): each look's events are printed when the look ends,
- * each ending with a `---` line, for a harness that wakes on new output (Claude Code's Monitor), so
- * one watcher lasts the whole session.
+ * With `--follow` it keeps running instead (#196): each event is printed the moment it is found
+ * (#240), ending with a `---` line, for a harness that wakes on new output (Claude Code's Monitor), so
+ * one watcher lasts the whole session; the reminders and the usage close each look that found any.
  */
 import { type Activity, FOLLOW_NEWER, cancelledDeployEvent, mainRunEvent, newActivity, runEvent } from './watch-events'
 import { type PrState, REPO, activityOf, jobLines, mainAhead, mainHead, mergeCommand, newestMainRun, openPrs, prStates, recentlyMerged, reviewCommentLines, runOf } from './watch-github'
