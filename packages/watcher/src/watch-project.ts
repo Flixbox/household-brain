@@ -215,8 +215,17 @@ const watchedPrs = async (): Promise<number[] | null> => {
     openPrs().then(prs => prs.map(pr => pr.number)),
     recentlyMerged(MERGED_HOURS),
     readLines('tracked').then(lines => lines.map(Number)),
+    readLines('reported'),
   ]).catch(() => null)
-  return lists ? [...new Set(lists.flat())].toSorted(byNumber) : null
+  if (!lists) {
+    return null
+  }
+  const [open, merged, followed, reported] = lists
+  // A merged PR whose deploy (or a closed one whose closing) was reported, and that is no longer
+  // followed, needs no look: on a slow `gh` each look costs seconds, all of it before the rest (#235).
+  const settled = (pr: number) => reported.some(line => line.startsWith(`pr-${pr} deployed `) || line === `pr-${pr} closed`)
+  const unsettled = merged.filter(pr => followed.includes(pr) || !settled(pr))
+  return [...new Set([...open, ...unsettled, ...followed])].toSorted(byNumber)
 }
 
 const checkPrs = async (): Promise<void> => {
@@ -234,7 +243,9 @@ const checkPrs = async (): Promise<void> => {
 
 /** One look at everything; true when it printed events (following), so the next look comes at once. */
 const lookOnce = async (): Promise<boolean> => {
-  await inOrder([checkMain, checkMainHead, checkPrs, checkIssues, checkIssueStates], async check => check())
+  // The owner's issue comments first, the pull requests last: walking every PR can take minutes on a
+  // slow `gh`, and the owner's comments mustn't wait for it (#235).
+  await inOrder([checkIssues, checkIssueStates, checkMain, checkMainHead, checkPrs], async check => check())
   if (await flush()) {
     return true
   }
