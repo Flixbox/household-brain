@@ -77,10 +77,13 @@ const seenActivity = async (pr: number, items: Activity[]): Promise<Set<string>>
 
 /** Records the new comments and reviews as seen and keeps them for this round's events. */
 const queueActivity = async (pr: number, fresh: Activity[]): Promise<void> => {
-  await appendLines(`pr-${pr}-seen`, fresh.map(item => item.id))
-  const lines = await Promise.all(fresh.map(async item =>
-    [item.line].concat(item.id.startsWith('review ') ? await reviewCommentLines(pr, item.id.split(' ')[1] ?? '').catch(() => []) : [])))
-  queue([`PR #${pr}: ACTIVITY:`, ...lines.flat()])
+  // A review whose line comments couldn't be read stays unseen: the next look reports it with them.
+  const read = await Promise.all(fresh.map(async item => {
+    const comments = item.id.startsWith('review ') ? await reviewCommentLines(pr, item.id.split(' ')[1] ?? '').catch(() => null) : []
+    return { comments, item }
+  }))
+  await appendLines(`pr-${pr}-seen`, read.filter(entry => entry.comments !== null).map(entry => entry.item.id))
+  queue([`PR #${pr}: ACTIVITY:`, ...read.flatMap(({ comments, item }) => [item.line].concat(comments ?? ['  (its line comments couldn\'t be read yet: they come next look)']))])
 }
 
 /** New comments and reviews on a PR; false when GitHub couldn't be asked (tried again next round). */
@@ -100,10 +103,11 @@ const checkActivity = async (pr: number): Promise<boolean> => {
 /** A finished or slow CI run of `sha`: a PR's head, or a merged PR's commit on main (`deploy`). */
 const checkRun = async (pr: number, sha: string, label: 'pr' | 'deploy'): Promise<void> => {
   const run = await runOf(sha).catch(() => null)
-  if (!run) {
+  // Jobs that can't be read yet: the result waits a look rather than coming out without them.
+  const jobs = run ? await jobLines(run.id).catch(() => null) : null
+  if (!run || !jobs) {
     return
   }
-  const jobs = await jobLines(run.id).catch(() => [])
   const outcome = runEvent({ jobs, label, limitSeconds: LIMIT_SECONDS, pr, repo: REPO, run, sha })
   if (outcome !== FOLLOW_NEWER) {
     await report(outcome, pr)
