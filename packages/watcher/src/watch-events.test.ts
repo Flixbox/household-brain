@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { FOLLOW_NEWER, type OpenPr, type Run, answerFirst, cancelledDeployEvent, decisionFrom, listsOpenPrs, mainRunEvent, newActivity, openPrLines, reminderLines, runEvent } from './watch-events'
+import { FOLLOW_NEWER, type OpenPr, type Run, answerFirst, cancelledDeployEvent, decisionFrom, listsOpenPrs, mainRunEvent, newActivity, openPrLines, reminderLines, runEvent, usageFrom } from './watch-events'
 
 const SHA = 'abcdef1234567890abcdef1234567890abcdef12'
 const run = (changes: Partial<Run> = {}): Run => ({ ageSeconds: 60, attempt: 1, conclusion: 'success', id: 7, status: 'completed', ...changes })
@@ -125,5 +125,21 @@ describe('reminders for branches that can\'t merge (#226)', () => {
   it('says so in the open-PR list, and leaves parked PRs and clean branches alone', () => {
     expect(openPrLines([pr({ mergeState: 'BEHIND', title: 'Triggers' })])).toEqual(['Open PRs:', '  #314 Triggers: approved, auto-merge on, CI green, behind main'])
     expect(reminderLines([pr({ mergeState: 'BEHIND', parked: true }), pr({})])).toEqual([])
+  })
+})
+
+describe('usageFrom (#233)', () => {
+  it('reads the five-hour and seven-day windows as whole percentages, with when each resets', () => {
+    const answer = {
+      five_hour: { resets_at: '2026-10-17T12:10:00.122917+00:00', utilization: 12.4 },
+      seven_day: { resets_at: '2026-10-19T19:00:00.122936+00:00', utilization: 66 },
+    }
+    expect(usageFrom(answer, 'Europe/Berlin')).toBe('Usage: session 12% (resets 2026-10-17 14:10), week 66% (resets 2026-10-19 21:00)')
+    expect(usageFrom({ five_hour: { resets_at: 'soon', utilization: 3 } }, 'UTC')).toBe('Usage: session 3%, week ?')
+  })
+
+  it('says unknown for anything else', () => {
+    expect(usageFrom(null)).toBe('Usage: unknown')
+    expect(usageFrom({ error: 'unauthorized' })).toBe('Usage: unknown')
   })
 })

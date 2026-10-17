@@ -7,37 +7,12 @@
  * printed, logged or stored. Anything missing or failing reads "unknown"; a window the answer lacks, "?".
  */
 import { ignoreFailure, isRecord } from './read'
+import { UNKNOWN_USAGE, usageFrom } from './watch-events'
 import { readLines, writeLines } from './watch-state'
 
 const CONFIG = process.env.CLAUDE_CONFIG_DIR ?? `${process.env.HOME ?? process.env.USERPROFILE ?? '.'}/.claude`
 const ENDPOINT = 'https://api.anthropic.com/api/oauth/usage'
-const UNKNOWN = 'Usage: unknown'
 const ONCE_A_MINUTE_MS = 60_000
-
-/** When a window resets, on this machine's clock (`2026-10-17 14:10`); null when it doesn't say. */
-const resetTime = (resetsAt: unknown, timeZone: string): string | null => {
-  try {
-    return typeof resetsAt === 'string' ? Temporal.Instant.from(resetsAt).toZonedDateTimeISO(timeZone).toPlainDateTime().toString({ smallestUnit: 'minute' }).replace('T', ' ') : null
-  } catch {
-    return null
-  }
-}
-
-/** A window's use as a whole percentage, and when it resets (the owner's request on #233). */
-const windowUse = (window: unknown, timeZone: string): string => {
-  if (!isRecord(window) || typeof window.utilization !== 'number') {
-    return '?'
-  }
-  const reset = resetTime(window.resets_at, timeZone)
-  const resets = reset === null ? '' : ` (resets ${reset})`
-  return `${Math.round(window.utilization)}%${resets}`
-}
-
-/** The usage line from the endpoint's answer; "unknown" for anything that isn't one. */
-export const usageFrom = (answer: unknown, timeZone = Temporal.Now.timeZoneId()): string =>
-  (isRecord(answer) && (isRecord(answer.five_hour) || isRecord(answer.seven_day))
-    ? `Usage: session ${windowUse(answer.five_hour, timeZone)}, week ${windowUse(answer.seven_day, timeZone)}`
-    : UNKNOWN)
 
 const accessToken = async (): Promise<string | null> => {
   const credentials: unknown = await Bun.file(`${CONFIG}/.credentials.json`).json().catch(() => null)
@@ -48,7 +23,7 @@ const accessToken = async (): Promise<string | null> => {
 const ask = async (): Promise<string> => {
   const token = await accessToken()
   if (token === null) {
-    return UNKNOWN
+    return UNKNOWN_USAGE
   }
   const answer: unknown = await fetch(ENDPOINT, {
     headers: { 'anthropic-beta': 'oauth-2025-04-20', 'authorization': `Bearer ${token}` },
@@ -60,7 +35,7 @@ const ask = async (): Promise<string> => {
 /** The current usage line, asked again only when the last answer, kept in the `usage` state file, is a minute old. */
 export const usageLine = async (): Promise<string> => {
   const now = Temporal.Now.instant().epochMilliseconds
-  const [askedAt = '', line = UNKNOWN] = await readLines('usage').catch(() => [])
+  const [askedAt = '', line = UNKNOWN_USAGE] = await readLines('usage').catch(() => [])
   if (now - Number(askedAt) < ONCE_A_MINUTE_MS) {
     return line
   }
