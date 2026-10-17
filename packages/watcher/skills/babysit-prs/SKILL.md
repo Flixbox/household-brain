@@ -33,6 +33,8 @@ SELF='<your login>' bun ${CLAUDE_PLUGIN_ROOT}/src/watch-project.ts --follow
   - `OWNER`: whose issue comments are news (the repository's owner by default).
   - `ACTIVITY_GH`: the `gh` that reads comments; plain `gh` by default, because only the owner's own
     login sees their pending (unsubmitted) review.
+  - `GH_TIMEOUT_SECONDS`: how long one `gh` call may take (30 by default); a slower one counts as a
+    failed read and is tried again next look, so one slow endpoint doesn't hold up the rest.
   - `SELF`: **set it to the login you comment as** (a bot's is `name[bot]`); without it your own
     comments, replies and issues are reported back to you as news. Your reviews still are.
 - It remembers what it reported (per repository, under `$XDG_STATE_HOME/watch-project`), and only

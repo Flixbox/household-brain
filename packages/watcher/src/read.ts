@@ -1,5 +1,5 @@
 // The watcher is installed as a Claude Code plugin, which copies only this package's folder: it can't
-// import the repository's own helpers (`@household-brain/core/lib/read`), so it keeps these copies.
+// import the repository's own helpers (`@household-brain/core/lib/read`, `ignore`), so it keeps these copies.
 
 /** An object read from untyped data (JSON): not null, not an array. */
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -10,3 +10,8 @@ export const hasText = (value: string | null | undefined): value is string => ty
 
 /** A string read from untyped data, or `fallback` when the value is anything else. */
 export const textOf = (value: unknown, fallback = ''): string => (typeof value === 'string' ? value : fallback)
+
+/** For a promise whose outcome no longer matters: an output abandoned after its call failed. */
+export const ignoreFailure = (): void => {
+  // Nothing to do, on purpose.
+}
