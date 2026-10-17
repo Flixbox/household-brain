@@ -1,30 +1,10 @@
 /** The project watcher's questions to GitHub, through the `gh` CLI, answered as plain data. */
 import { type Activity, type OpenPr, type Run, clockTime, decisionFrom } from './watch-events'
-import { hasText, ignoreFailure, isRecord, textOf } from './read'
+import { GH, ghText } from './watch-gh'
+import { hasText, isRecord, textOf } from './read'
 
-// Settings, all from the environment (#200), so the watcher works in any repository:
-// GH: the `gh` to ask with, e.g. a wrapper logged in as a bot (GH=agent-gh). Defaults to plain gh.
-const GH = process.env.GH ?? 'gh'
-// GH_TIMEOUT_SECONDS: how long one `gh` call may take (#228). A slow GitHub once held a whole look,
-// and every event behind it, for minutes: a call that runs out fails like any failed read (the caller
-// treats it as unknown and tries again next look), and the other calls' events still come out.
-const GH_TIMEOUT_MS = Number(process.env.GH_TIMEOUT_SECONDS ?? 30) * 1000
-
-/** What a `gh` call prints; it fails on a non-zero exit, or when it runs out of time. */
-const ghText = async (args: string[], cli = GH): Promise<string> => {
-  const call = Bun.spawn([cli, ...args], { killSignal: 'SIGKILL', stderr: 'ignore', stdout: 'pipe', timeout: GH_TIMEOUT_MS })
-  // Read while it runs (a full pipe would stall it), but don't wait for the end of the output once it
-  // failed: a wrapper script's child (`agent-gh` runs `gh`) can outlive it and hold the pipe open.
-  const output = new Response(call.stdout).text()
-  const exitCode = await call.exited
-  if (exitCode !== 0) {
-    output.catch(ignoreFailure)
-    const why = call.signalCode === 'SIGKILL' ? `timed out after ${GH_TIMEOUT_MS / 1000} s` : `exit ${exitCode}`
-    throw new Error(`${cli} ${args.join(' ')}: ${why}`)
-  }
-  return output
-}
-
+// Settings, all from the environment (#200), so the watcher works in any repository; GH,
+// GH_TIMEOUT_SECONDS and GH_PARALLEL are in watch-gh.ts.
 // REPO: `owner/name`; by default the repository `gh` finds in the current folder.
 const currentRepo = async (): Promise<string> => {
   const repo = await ghText(['repo', 'view', '--json', 'nameWithOwner', '-q', '.nameWithOwner']).then(text => text.trim(), (error: unknown) => {

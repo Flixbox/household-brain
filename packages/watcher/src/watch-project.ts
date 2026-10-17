@@ -1,4 +1,4 @@
-/* oxlint-disable eslint/no-await-in-loop -- the watcher's rounds run one after another, on purpose */
+/* oxlint-disable eslint/no-await-in-loop -- each poller's looks run one after another, on purpose */
 /**
  * Watches the whole project until something needs attention, then prints every event pending, the
  * ones someone waits for an answer to (ACTIVITY, APPROVED, …, new issues and comments) first (#222).
@@ -43,11 +43,16 @@
  * With `--follow` it keeps running instead (#196): each event is printed the moment it is found
  * (#240), ending with a `---` line, for a harness that wakes on new output (Claude Code's Monitor), so
  * one watcher lasts the whole session; the reminders and the usage close each look that found any.
+ * Following, two pollers run side by side (#240): one for what someone waits for an answer to (new
+ * issues, the owner's comments, every followed PR's comments and reviews), every 30 s; one for main
+ * and each PR's CI, reviews and deploy, every 60 s. The PRs are checked at once, with at most
+ * GH_PARALLEL `gh` calls running, so one slow call holds back only its own events.
  */
-import { type Activity, FOLLOW_NEWER, cancelledDeployEvent, mainRunEvent, newActivity, runEvent } from './watch-events'
-import { type PrState, REPO, activityOf, jobLines, mainAhead, mainHead, mergeCommand, newestMainRun, openPrs, prStates, recentlyMerged, reviewCommentLines, runOf } from './watch-github'
-import { appendLines, exists, lock, readLines, writeLines } from './watch-state'
-import { flush, queue, quiet, report } from './watch-output'
+import { FOLLOW_NEWER, cancelledDeployEvent, mainRunEvent, runEvent } from './watch-events'
+import { type PrState, REPO, jobLines, mainAhead, mainHead, mergeCommand, newestMainRun, openPrs, prStates, recentlyMerged, runOf } from './watch-github'
+import { FOLLOW, flush, queue, quiet, report } from './watch-output'
+import { addLine, lock, readLines, updateLines, writeLines } from './watch-state'
+import { checkActivity as checkPrActivity, checkTrackedActivity } from './watch-activity'
 import { checkIssueStates, checkIssues } from './watch-issues'
 import { hasText } from './read'
 
@@ -71,40 +76,11 @@ const inOrder = async <Item>(items: readonly Item[], each: (item: Item) => Promi
     await each(item)
   }, Promise.resolve())
 
-/** The comments of a PR already reported. On the very first round, the ones already there are old news. */
-const seenActivity = async (pr: number, items: Activity[]): Promise<Set<string>> => {
-  const seenFile = `pr-${pr}-seen`
-  // A PR that appears later is new, and so is everything on it, also what came between its NEW_PR
-  // and this look (#122).
-  if (!await exists(seenFile)) {
-    await writeLines(seenFile, await exists('initialized') ? [] : items.map(item => item.id))
-  }
-  return new Set(await readLines(seenFile))
-}
-
-/** Records the new comments and reviews as seen and keeps them for this round's events. */
-const queueActivity = async (pr: number, fresh: Activity[]): Promise<void> => {
-  // A review whose line comments couldn't be read stays unseen: the next look reports it with them.
-  const read = await Promise.all(fresh.map(async item => {
-    const comments = item.id.startsWith('review ') ? await reviewCommentLines(pr, item.id.split(' ')[1] ?? '').catch(() => null) : []
-    return { comments, item }
-  }))
-  await appendLines(`pr-${pr}-seen`, read.filter(entry => entry.comments !== null).map(entry => entry.item.id))
-  queue([`PR #${pr}: ACTIVITY:`, ...read.flatMap(({ comments, item }) => [item.line].concat(comments ?? ['  (its line comments couldn\'t be read yet: they come next look)']))])
-}
-
-/** New comments and reviews on a PR; false when GitHub couldn't be asked (tried again next round). */
+/** A PR's new comments and reviews; a PR whose comments couldn't be read leaves the round incomplete. */
 const checkActivity = async (pr: number): Promise<boolean> => {
-  const items = await activityOf(pr).catch(() => null)
-  if (!items) {
-    round.complete = false
-    return false
-  }
-  const fresh = newActivity(await seenActivity(pr, items), items)
-  if (fresh.length > 0) {
-    await queueActivity(pr, fresh)
-  }
-  return true
+  const read = await checkPrActivity(pr)
+  round.complete &&= read
+  return read
 }
 
 /** A finished or slow CI run of `sha`: a PR's head, or a merged PR's commit on main (`deploy`). */
@@ -149,7 +125,7 @@ const checkMoved = async (pr: number, head: string): Promise<void> => {
   await report(ahead > 0 ? { key: `pr-${pr} main-moved ${newest}`, lines: [`MAIN_MOVED: main is ${ahead} commit(s) ahead of the branch: rebase on main and run the checks again`] } : null, pr)
 }
 
-const untrack = async (pr: number) => writeLines('tracked', (await readLines('tracked')).filter(line => line !== String(pr)))
+const untrack = async (pr: number) => updateLines('tracked', lines => lines.filter(line => line !== String(pr)))
 const tracked = async (pr: number) => (await readLines('tracked')).includes(String(pr))
 
 /** A merged PR: its comments while followed (#129), then its deploy until that is reported. */
@@ -183,9 +159,7 @@ const checkReady = async (pr: number, state: PrState): Promise<void> => {
 }
 
 const checkOpen = async (pr: number, state: PrState): Promise<void> => {
-  if (!await tracked(pr)) {
-    await appendLines('tracked', [String(pr)])
-  }
+  await addLine('tracked', String(pr))
   await report({ key: `pr-${pr} opened`, lines: [`NEW_PR: ${state.title}`] }, pr)
   // Comments before the approval: an approval often comes with review comments, and reporting it
   // first meant auto-merge went on before they were read (#152). While the comments can't be read,
@@ -238,17 +212,23 @@ const checkPrs = async (): Promise<void> => {
     return
   }
   round.complete = true
-  await inOrder(prs, async pr => checkPr(pr, states.get(pr)))
+  // All at once (#240): a slow PR holds back only its own events; GH_PARALLEL caps the calls.
+  await Promise.all(prs.map(async pr => checkPr(pr, states.get(pr))))
   // From here on, a PR seen for the first time is a new one. Only after a round in which every PR
   // answered: one that failed must still get its comments recorded.
   await (roundComplete() ? writeLines('initialized', []) : Promise.resolve())
 }
 
-/** One look at everything; true when it printed events (following), so the next look comes at once. */
-const lookOnce = async (): Promise<boolean> => {
-  // The owner's issue comments first, the pull requests last: walking every PR can take minutes on a
-  // slow `gh`, and the owner's comments mustn't wait for it (#235).
-  await inOrder([checkIssues, checkIssueStates, checkMain, checkMainHead, checkPrs], async check => check())
+type Check = () => Promise<void>
+
+/** What someone waits for an answer to: issues, the owner's comments on them and on the PRs followed. */
+const ANSWER_CHECKS: Check[] = [checkIssues, checkIssueStates, checkTrackedActivity]
+/** The rest: main, and each PR's CI, reviews and deploy. */
+const PROJECT_CHECKS: Check[] = [checkMain, checkMainHead, checkPrs]
+
+/** One look; true when it printed events, so the next look comes at once. */
+const lookOnce = async (checks: readonly Check[]): Promise<boolean> => {
+  await inOrder(checks, async check => check())
   if (await flush()) {
     return true
   }
@@ -264,14 +244,21 @@ const lookOnce = async (): Promise<boolean> => {
  * A look that fails (a state file still locked after its retries, #231) is reported as an event, and
  * the watcher goes on with the next look instead of stopping: events would otherwise end unnoticed.
  */
-const lookSafely = async (): Promise<boolean> => lookOnce().catch(async (error: unknown) => {
+const lookSafely = async (checks: readonly Check[]): Promise<boolean> => lookOnce(checks).catch(async (error: unknown) => {
   queue([`WATCHER_ERROR: ${error instanceof Error ? error.message : 'the look failed'}; still watching`])
   await flush()
   return false
 })
 
-// A loop rather than a function awaiting itself: following, the watcher runs for a whole session.
-await lock()
-for (;;) {
-  await (await lookSafely() ? Promise.resolve() : Bun.sleep(60_000))
+/** Looks again and again, `pauseSeconds` apart after a look that found nothing. */
+const poll = async (checks: readonly Check[], pauseSeconds: number): Promise<never> => {
+  // A loop rather than a function awaiting itself: following, the watcher runs for a whole session.
+  for (;;) {
+    await (await lookSafely(checks) ? Promise.resolve() : Bun.sleep(pauseSeconds * 1000))
+  }
 }
+
+await lock()
+// Following, two pollers run side by side (#240): the answers every 30 s, never waiting for a slow
+// look at CI and deploys. Without `--follow`, one look at everything, the answers first (#235).
+await (FOLLOW ? Promise.all([poll(ANSWER_CHECKS, 30), poll(PROJECT_CHECKS, 60)]) : poll([...ANSWER_CHECKS, ...PROJECT_CHECKS], 60))

@@ -15,7 +15,7 @@
 import { $ } from 'bun'
 import { rename } from 'node:fs/promises'
 import { REPO } from './watch-github'
-import { hasText } from './read'
+import { hasText, ignoreFailure } from './read'
 
 const home = process.env.HOME ?? '.'
 const stateHome = process.env.XDG_STATE_HOME ?? `${home}/.local/state`
@@ -45,14 +45,43 @@ export const readLines = async (name: string): Promise<string[]> => retried(asyn
  * Written to a temporary file and renamed over the old one, so a write that fails halfway never leaves
  * a state file cut short. Bun.write creates the state directory on first use.
  */
-export const writeLines = async (name: string, lines: readonly string[]): Promise<void> => retried(async () => {
+const write = async (name: string, lines: readonly string[]): Promise<void> => retried(async () => {
   const draft = stateFile(`${name}.writing`)
   await Bun.write(draft, lines.length > 0 ? `${lines.join('\n')}\n` : '')
   await rename(draft, stateFile(name))
 })
 
-export const appendLines = async (name: string, lines: readonly string[]): Promise<void> =>
-  writeLines(name, [...await readLines(name), ...lines])
+/** The last piece of work queued for each name. */
+const queued = new Map<string, Promise<unknown>>()
+
+/**
+ * Work for the same name one piece after another (#240). The pollers and pull requests are checked at
+ * once, and two read-then-write changes of one state file that overlap lose one's lines.
+ */
+export const oneAtATime = async <Result>(name: string, work: () => Promise<Result>): Promise<Result> => {
+  const result = (queued.get(name) ?? Promise.resolve()).then(work)
+  // The next piece waits only for this one to end; its failure reaches the caller through `result`.
+  queued.set(name, result.catch(ignoreFailure))
+  return result
+}
+
+export const writeLines = async (name: string, lines: readonly string[]): Promise<void> => oneAtATime(name, async () => write(name, lines))
+
+/** Changes a state file's lines, with no other change to it in between. */
+export const updateLines = async (name: string, change: (lines: string[]) => readonly string[]): Promise<void> =>
+  oneAtATime(name, async () => write(name, change(await readLines(name))))
+
+export const appendLines = async (name: string, lines: readonly string[]): Promise<void> => updateLines(name, old => [...old, ...lines])
+
+/** Adds a line unless it is there already; true when it was added. */
+export const addLine = async (name: string, line: string): Promise<boolean> => oneAtATime(name, async () => {
+  const lines = await readLines(name)
+  if (lines.includes(line)) {
+    return false
+  }
+  await write(name, [...lines, line])
+  return true
+})
 
 const alive = (pid: number) => {
   try {
