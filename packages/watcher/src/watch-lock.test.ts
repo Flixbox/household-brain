@@ -54,6 +54,7 @@ describe('lock (#245)', () => {
     await first.exited
     const second = watcher(dir, 0)
     expect(await new Response(second.stdout).text()).toContain('locked')
+    expect(await second.exited).toBe(0)
   }, 30_000)
 
   it('refuses a port that would lock nothing', async () => {
