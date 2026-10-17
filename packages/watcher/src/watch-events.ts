@@ -1,4 +1,5 @@
 /** What the project watcher reports, decided from what GitHub answered (pure, so it is tested). */
+import { isRecord } from './read'
 
 export interface Event {
   /** Remembered once reported, so the same event is never reported twice. */
@@ -208,3 +209,31 @@ const ANSWER_FIRST = /^(?:PR #\d+: )?(?:ACTIVITY|APPROVED|READY_TO_MERGE|CONFLIC
  */
 export const answerFirst = (events: readonly (readonly string[])[]): (readonly string[])[] =>
   events.toSorted((first, second) => Number(!ANSWER_FIRST.test(first[0] ?? '')) - Number(!ANSWER_FIRST.test(second[0] ?? '')))
+
+/** The owner's Claude usage line when it can't be read (#233). */
+export const UNKNOWN_USAGE = 'Usage: unknown'
+
+/** When a window resets, on this machine's clock (`2026-10-17 14:10`); null when it doesn't say. */
+const resetTime = (resetsAt: unknown, timeZone: string): string | null => {
+  try {
+    return typeof resetsAt === 'string' ? Temporal.Instant.from(resetsAt).toZonedDateTimeISO(timeZone).toPlainDateTime().toString({ smallestUnit: 'minute' }).replace('T', ' ') : null
+  } catch {
+    return null
+  }
+}
+
+/** A window's use as a whole percentage, and when it resets (the owner's request on #233). */
+const windowUse = (window: unknown, timeZone: string): string => {
+  if (!isRecord(window) || typeof window.utilization !== 'number') {
+    return '?'
+  }
+  const reset = resetTime(window.resets_at, timeZone)
+  const resets = reset === null ? '' : ` (resets ${reset})`
+  return `${Math.round(window.utilization)}%${resets}`
+}
+
+/** The usage line from the endpoint's answer; "unknown" for anything that isn't one. */
+export const usageFrom = (answer: unknown, timeZone = Temporal.Now.timeZoneId()): string =>
+  (isRecord(answer) && (isRecord(answer.five_hour) || isRecord(answer.seven_day))
+    ? `Usage: session ${windowUse(answer.five_hour, timeZone)}, week ${windowUse(answer.seven_day, timeZone)}`
+    : UNKNOWN_USAGE)
