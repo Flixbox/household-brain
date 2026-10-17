@@ -51,7 +51,7 @@
 import { FOLLOW_NEWER, cancelledDeployEvent, mainRunEvent, runEvent } from './watch-events'
 import { type PrState, REPO, jobLines, mainAhead, mainHead, mergeCommand, newestMainRun, openPrs, prStates, recentlyMerged, runOf } from './watch-github'
 import { FOLLOW, flush, queue, quiet, report } from './watch-output'
-import { addLine, lock, readLines, updateLines, writeLines } from './watch-state'
+import { addLine, lock, ownsLock, readLines, updateLines, writeLines } from './watch-state'
 import { checkActivity as checkPrActivity, checkTrackedActivity } from './watch-activity'
 import { checkIssueStates, checkIssues } from './watch-issues'
 import { allSettled, hasText } from './read'
@@ -257,10 +257,21 @@ const lookSafely = async (poller: Poller): Promise<boolean> => lookOnce(poller).
   return false
 })
 
+/** A watcher that lost its lock to another (#245) stops, so the two don't report everything twice. */
+const stopUnlessLocked = async (): Promise<void> => {
+  if (await ownsLock()) {
+    return
+  }
+  queue(['WATCHER_ERROR: another watcher took over the lock; this one stops'])
+  await flush()
+  process.exit(75)
+}
+
 /** Looks again and again, `pauseSeconds` apart after a look that found nothing. */
 const poll = async (poller: Poller): Promise<never> => {
   // A loop rather than a function awaiting itself: following, the watcher runs for a whole session.
   for (;;) {
+    await stopUnlessLocked()
     await (await lookSafely(poller) ? Promise.resolve() : Bun.sleep(poller.pauseSeconds * 1000))
   }
 }
