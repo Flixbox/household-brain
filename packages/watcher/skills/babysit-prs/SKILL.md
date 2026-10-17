@@ -36,7 +36,8 @@ SELF='<your login>' bun ${CLAUDE_PLUGIN_ROOT}/src/watch-project.ts --follow
   - `GH_TIMEOUT_SECONDS`: how long one `gh` call may take (30 by default); a slower one counts as a
     failed read and is tried again next look, so one slow endpoint doesn't hold up the rest.
   - `CLAUDE_CONFIG_DIR`: where the Claude login lives (`~/.claude` by default). Every notification
-    ends with the owner's Claude usage (`Usage: session 12%, week 66%`, the windows `/usage` shows),
+    ends with the owner's Claude usage (`Usage: session 12% (resets 2026-10-17 14:10), week 66% (resets …)`,
+    the windows `/usage` shows, with when each resets),
     asked with that login's token at most once a minute; `Usage: unknown` when it can't be read.
   - `SELF`: **set it to the login you comment as** (a bot's is `name[bot]`); without it your own
     comments, replies and issues are reported back to you as news. Your reviews still are.
