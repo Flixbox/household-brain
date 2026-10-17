@@ -1,6 +1,16 @@
 {
   "name": "project-watcher",
   "description": "Watches a GitHub repository's pull requests, CI, deploys and issues, and reports each event as it happens, with the routine for acting on it.",
-  "version": "1.0.0",
-  "license": "Unlicense"
+  "author": { "name": "Flixbox" },
+  "license": "Unlicense",
+  "experimental": {
+    "monitors": [
+      {
+        "name": "project-watcher",
+        "command": "sh \"${CLAUDE_PLUGIN_ROOT}/monitor.sh\"",
+        "description": "Pull requests, CI, deploys and the owner's comments",
+        "when": "on-skill-invoke:babysit-prs"
+      }
+    ]
+  }
 }
