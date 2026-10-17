@@ -122,7 +122,14 @@ const checkMainHead = async (): Promise<void> => {
 /** Main has commits the PR's branch doesn't; asked only for a PR this look found open (a merged one's commit is its own merge). */
 const checkMoved = async (pr: number, head: string): Promise<void> => {
   const { ahead, newest } = await mainAhead(head).catch(() => ({ ahead: 0, newest: '-' }))
-  await report(ahead > 0 ? { key: `pr-${pr} main-moved ${newest}`, lines: [`MAIN_MOVED: main is ${ahead} commit(s) ahead of the branch: rebase on main and run the checks again`] } : null, pr)
+  // The PR's state was read at the start of the look. One that merged since counts as open, and its
+  // own merge is then a commit main has (#249): ask again, and say nothing unless it is still open. A
+  // failed read says nothing either: the next look asks again.
+  // Asked only while it is news: a branch left behind main isn't asked about on every look.
+  const key = `pr-${pr} main-moved ${newest}`
+  const news = ahead > 0 && !(await readLines('reported')).includes(key)
+  const stillOpen = news && await prStates([pr]).then(states => states.get(pr)?.state === 'OPEN', () => false)
+  await report(stillOpen ? { key, lines: [`MAIN_MOVED: main is ${ahead} commit(s) ahead of the branch: rebase on main and run the checks again`] } : null, pr)
 }
 
 const untrack = async (pr: number) => updateLines('tracked', lines => lines.filter(line => line !== String(pr)))
