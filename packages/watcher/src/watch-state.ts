@@ -1,7 +1,8 @@
 /* oxlint-disable import/no-nodejs-modules -- Bun has no rename of its own; node:fs/promises is built into Bun */
 /**
  * What the project watcher remembers between runs, in plain files (the same ones the earlier bash
- * watcher kept, so either can take over from the other):
+ * watcher kept, so either can take over from the other), and the lock that keeps a second watcher
+ * from racing on them:
  *
  *   reported       one line per event already reported
  *   tracked        pull requests followed until their deploy or closing is reported
@@ -10,12 +11,11 @@
  *   open-issues    the open issues seen last round
  *   pr-<n>-seen    the comments and reviews of a PR already reported
  *   initialized    set after the first complete round: from then on, a PR is new, and so is all on it
- *   lock           the running watcher's process id: two would race on these files
  */
 import { $ } from 'bun'
 import { rename } from 'node:fs/promises'
 import { REPO } from './watch-github'
-import { hasText, ignoreFailure } from './read'
+import { ignoreFailure } from './read'
 
 const home = process.env.HOME ?? '.'
 const stateHome = process.env.XDG_STATE_HOME ?? `${home}/.local/state`
@@ -83,32 +83,35 @@ export const addLine = async (name: string, line: string): Promise<boolean> => o
   return true
 })
 
-const alive = (pid: number) => {
-  try {
-    process.kill(pid, 0)
-    return true
-  } catch {
-    return false
-  }
+// LOCK_PORT: the local port the running watcher holds as its lock (#245); by default one from 20000
+// to 29999 picked from the state directory, so each repository has its own. Set it if another
+// program happens to listen on that port.
+const LOCK_PORT = Number(process.env.LOCK_PORT ?? 20_000 + (Bun.hash.crc32(DIR) % 10_000))
+// Port 0 would let the system pick any free port, so every watcher would get one: no lock at all.
+if (!Number.isInteger(LOCK_PORT) || LOCK_PORT < 1 || LOCK_PORT > 65_535) {
+  process.stderr.write('LOCK_PORT must be a port number from 1 to 65535\n')
+  process.exit(64)
 }
 
 /**
- * One watcher per state directory; exits 75 when another one runs. Creating a directory is atomic, so
- * of two watchers starting at once only one gets it. A lock left by a watcher that died is taken over.
+ * One watcher per state directory; exits 75 when another one runs. The lock is a listening port on
+ * this machine (#245): of watchers starting at once only one can open it, and the system frees it the
+ * moment its watcher ends, however it ends, so no lock is ever left behind or taken over. A lock in
+ * a file had both problems: a second watcher could slip in before the first wrote its id, and a dead
+ * watcher's lock had to be taken over without two doing so at once.
  */
 export const lock = async (): Promise<void> => {
   await $`mkdir -p ${DIR}`.quiet()
-  if ((await $`mkdir ${stateFile('lock.d')}`.quiet().nothrow()).exitCode !== 0) {
-    const [holder] = await readLines('lock.d/pid')
-    if (hasText(holder) && alive(Number(holder))) {
-      process.stderr.write(`another watcher already uses ${DIR}\n`)
-      process.exit(75)
-    }
+  try {
+    // Anyone connecting is hung up on at once: the port only marks that a watcher runs.
+    // Unref'd: the port never keeps the process alive by itself; the watcher's own loop does.
+    // Exclusive: without it, some systems let a second process open the same port.
+    Bun.listen({ exclusive: true, hostname: '127.0.0.1', port: LOCK_PORT, socket: { data: ignoreFailure, open: socket => { socket.end() } } }).unref()
+  } catch {
+    process.stderr.write(`another watcher already uses ${DIR} (it holds 127.0.0.1:${LOCK_PORT}; if another program does, set LOCK_PORT)\n`)
+    process.exit(75)
   }
-  await writeLines('lock.d/pid', [String(process.pid)])
-  // Synchronously: an exit handler can't wait for anything.
-  process.on('exit', () => { Bun.spawnSync(['rm', '-rf', stateFile('lock.d')]) })
-  // Stopped by a signal (a timeout, Ctrl-C): exit normally, so the lock above is released too.
+  // Stopped by a signal (a timeout, Ctrl-C): exit normally, so what a round found is still printed.
   process.on('SIGTERM', () => { process.exit(143) })
   process.on('SIGINT', () => { process.exit(130) })
 }

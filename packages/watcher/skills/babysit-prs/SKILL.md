@@ -49,6 +49,8 @@ default branch's CI, new issues, the owner's comments on issues, and issues clos
     login sees their pending (unsubmitted) review.
   - `GH_TIMEOUT_SECONDS`: how long one `gh` call may take (30 by default); a slower one counts as a
     failed read and is tried again next look, so one slow endpoint doesn't hold up the rest.
+  - `LOCK_PORT`: the local port a running watcher holds so that a second one exits (one from 20000
+    to 29999 picked per repository by default). Set it only if another program listens there.
   - `GH_PARALLEL`: how many `gh` calls run at once (4 by default); the pull requests are checked in
     parallel, and the cap keeps the bursts within GitHub's rate limits.
   - `CLAUDE_CONFIG_DIR`: where the Claude login lives (`~/.claude` by default). Every notification
