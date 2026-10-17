@@ -23,8 +23,11 @@ default branch's CI, new issues, the owner's comments on issues, and issues clos
   `Monitor` with `--follow`:
 
   ```sh
-  SELF='<your login>' bun ${CLAUDE_PLUGIN_ROOT}/src/watch-project.ts --follow
+  SELF='<your login>' bun --env-file=.claude/watcher.env "${CLAUDE_PLUGIN_ROOT}/src/watch-project.ts" --follow
   ```
+
+  `--env-file` reads the same settings file when there is one (Bun ignores a missing one), and the
+  environment still wins.
 
   A `Monitor` stops after 30 minutes at most: re-arm it when its expiry notice comes; the watcher
   remembers what it reported and picks up where it left off. Only one watcher runs per repository,
