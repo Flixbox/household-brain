@@ -20,6 +20,7 @@
  *   ISSUE_CLOSED / ISSUE_REOPENED    an issue was closed (by anyone) or reopened
  *   IDLE                             nothing happened for max-hours (with --follow: a heartbeat, then it goes on)
  *   WATCHER_ERROR                    a look failed (e.g. a state file stayed locked); it goes on with the next
+ *   Usage: session <n>%, week <n>%   last on every notification: the owner's Claude usage (#233)
  *   REMINDER: PR #<n> …              after every notification, each open PR that waits on the agent: a
  *                                    branch behind main or in conflict, or approved with CI finished
  *                                    (auto-merge to enable, or CI to fix)

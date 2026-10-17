@@ -7,6 +7,7 @@
 import { type Event, answerFirst, listsOpenPrs, openPrLines, reminderLines } from './watch-events'
 import { openPrs } from './watch-github'
 import { appendLines, readLines } from './watch-state'
+import { usageLine } from './watch-usage'
 
 const FOLLOW = process.argv.includes('--follow')
 
@@ -58,10 +59,9 @@ export const flush = async (): Promise<boolean> => {
   }
   // The events first: a slow listing must not hold them back.
   printFound()
-  const reminders = await openPrs().then(reminderLines, () => [])
-  if (reminders.length > 0) {
-    say(FOLLOW ? [...reminders, '---'] : reminders)
-  }
+  // Then the reminders, and the owner's Claude usage (#233) to close every notification.
+  const closing = [...await openPrs().then(reminderLines, () => []), await usageLine()]
+  say(FOLLOW ? [...closing, '---'] : closing)
   quiet.since = Temporal.Now.instant()
   if (!FOLLOW) {
     process.exit(0)
