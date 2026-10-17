@@ -197,9 +197,6 @@ export interface Activity {
 export const newActivity = (seen: ReadonlySet<string>, items: Activity[]): Activity[] =>
   items.filter((item, index) => !seen.has(item.id) && items.findIndex(other => other.id === item.id) === index)
 
-/** Issue events are remembered by their first 80 characters (a title or comment may change later). */
-export const issueKey = (line: string) => line.slice(0, 80)
-
 /** Events that ask the agent to answer someone: comments, reviews, approvals, conflicts, new issues. */
 const ANSWER_FIRST = /^(?:\[[^\]]*\] )?(?:PR #\d+: )?(?:ACTIVITY|APPROVED|READY_TO_MERGE|CONFLICT|NEW_ISSUE|ISSUE_COMMENT)\b/u
 

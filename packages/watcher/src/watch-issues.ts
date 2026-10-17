@@ -1,5 +1,4 @@
 /** The project watcher's issue checks (watch-project.ts): new issues, the owner's comments, closings. */
-import { issueKey } from './watch-events'
 import { issueEventLines, issueLine, openIssueNumbers } from './watch-github'
 import { queue } from './watch-output'
 import { appendLines, exists, readLines, writeLines } from './watch-state'
@@ -18,12 +17,14 @@ const firstRun = async (name: string, lines: string[]): Promise<boolean> => {
 /** Issues and the owner's comments on them not reported yet; the ones from before the first run aren't news. */
 export const checkIssues = async (): Promise<void> => {
   const lines = await issueEventLines().catch(() => null)
-  if (!lines || await firstRun('issues', lines.map(({ line }) => issueKey(line)))) {
+  // A new state file for the id keys (#247): on its first run what is there is old news, so nothing
+  // already reported under the old text keys (`issues`) comes back.
+  if (!lines || await firstRun('issue-events', lines.map(({ key }) => key))) {
     return
   }
-  const seen = new Set(await readLines('issues'))
-  const fresh = lines.filter(({ line }) => !seen.has(issueKey(line)))
-  await appendLines('issues', fresh.map(({ line }) => issueKey(line)))
+  const seen = new Set(await readLines('issue-events'))
+  const fresh = lines.filter(({ key }) => !seen.has(key))
+  await appendLines('issue-events', fresh.map(({ key }) => key))
   // Each its own event, with when it was written (#240): several comments are several answers.
   for (const { at, line } of fresh) {
     queue([line], at)
