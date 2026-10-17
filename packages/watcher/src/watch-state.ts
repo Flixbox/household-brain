@@ -1,4 +1,4 @@
-/* oxlint-disable import/no-nodejs-modules -- Bun has no rename of its own; node:fs/promises is built into Bun */
+/* oxlint-disable import/no-nodejs-modules -- Bun has no rename or atomic mkdir of its own; node:fs/promises is built into Bun */
 /**
  * What the project watcher remembers between runs, in plain files (the same ones the earlier bash
  * watcher kept, so either can take over from the other):
@@ -10,10 +10,11 @@
  *   open-issues    the open issues seen last round
  *   pr-<n>-seen    the comments and reviews of a PR already reported
  *   initialized    set after the first complete round: from then on, a PR is new, and so is all on it
- *   lock           the running watcher's process id: two would race on these files
+ *   lock.d/pid     the running watcher's process id: two would race on these files
+ *   lock.d/taking-over  made by the one watcher taking over a dead watcher's lock
  */
 import { $ } from 'bun'
-import { rename } from 'node:fs/promises'
+import { mkdir, rename, rm } from 'node:fs/promises'
 import { REPO } from './watch-github'
 import { hasText, ignoreFailure } from './read'
 
@@ -92,18 +93,67 @@ const alive = (pid: number) => {
   }
 }
 
+const LOCK = stateFile('lock.d')
+
+/** Makes a directory; false when it is there already. Atomic: of two at once, only one makes it. */
+const made = async (path: string): Promise<boolean> => mkdir(path).then(() => true, () => false)
+
+/**
+ * The lock holder's process id, or null. A watcher that has just made the lock writes its id a
+ * moment later (#245), so a missing one is read again for a while before it counts as missing.
+ */
+const holder = async (tries = 10): Promise<number | null> => {
+  const [pid] = await readLines('lock.d/pid').catch((): string[] => [])
+  if (hasText(pid) || tries <= 1) {
+    return hasText(pid) ? Number(pid) : null
+  }
+  await Bun.sleep(200)
+  return holder(tries - 1)
+}
+
+const liveHolder = async () => {
+  const pid = await holder()
+  return pid !== null && alive(pid)
+}
+
+/**
+ * A dead watcher's lock (#245): of several taking it over, only the one that makes `taking-over`
+ * inside it does. That one looks again first: the lock it holds may be a live watcher's new one.
+ */
+const takeOver = async (): Promise<void> => {
+  if (!await made(`${LOCK}/taking-over`)) {
+    // Another watcher is taking it over: wait, then look at the lock it leaves.
+    await Bun.sleep(200)
+    return
+  }
+  await rm(await liveHolder() ? `${LOCK}/taking-over` : LOCK, { force: true, recursive: true })
+}
+
+/** Takes the lock: 'taken', 'held' by a live watcher, or 'stuck' when it never got free. */
+const take = async (tries = 25): Promise<'taken' | 'held' | 'stuck'> => {
+  if (await made(LOCK)) {
+    return 'taken'
+  }
+  if (await liveHolder()) {
+    return 'held'
+  }
+  if (tries <= 1) {
+    return 'stuck'
+  }
+  await takeOver()
+  return take(tries - 1)
+}
+
 /**
  * One watcher per state directory; exits 75 when another one runs. Creating a directory is atomic, so
  * of two watchers starting at once only one gets it. A lock left by a watcher that died is taken over.
  */
 export const lock = async (): Promise<void> => {
   await $`mkdir -p ${DIR}`.quiet()
-  if ((await $`mkdir ${stateFile('lock.d')}`.quiet().nothrow()).exitCode !== 0) {
-    const [holder] = await readLines('lock.d/pid')
-    if (hasText(holder) && alive(Number(holder))) {
-      process.stderr.write(`another watcher already uses ${DIR}\n`)
-      process.exit(75)
-    }
+  const outcome = await take()
+  if (outcome !== 'taken') {
+    process.stderr.write(outcome === 'held' ? `another watcher already uses ${DIR}\n` : `the lock ${LOCK} stays taken: remove it if no watcher runs\n`)
+    process.exit(75)
   }
   await writeLines('lock.d/pid', [String(process.pid)])
   // Synchronously: an exit handler can't wait for anything.
