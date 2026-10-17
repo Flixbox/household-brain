@@ -42,7 +42,7 @@
  * one watcher lasts the whole session.
  */
 import { type Activity, FOLLOW_NEWER, cancelledDeployEvent, mainRunEvent, newActivity, runEvent } from './watch-events'
-import { type PrState, REPO, activityOf, jobLines, mainAhead, mainHead, mergeCommand, newestMainRun, openPrs, prState, recentlyMerged, reviewCommentLines, runOf } from './watch-github'
+import { type PrState, REPO, activityOf, jobLines, mainAhead, mainHead, mergeCommand, newestMainRun, openPrs, prStates, recentlyMerged, reviewCommentLines, runOf } from './watch-github'
 import { appendLines, exists, lock, readLines, writeLines } from './watch-state'
 import { flush, queue, quiet, report } from './watch-output'
 import { checkIssueStates, checkIssues } from './watch-issues'
@@ -140,11 +140,10 @@ const checkMainHead = async (): Promise<void> => {
   await report(moved ? { key: `main-head ${head.sha}`, lines: [`MAIN_ADVANCED: main is at ${short(head.sha)}: ${head.subject}`] } : null)
 }
 
-/** Main has commits the PR's branch doesn't. A PR merged meanwhile isn't moved: that commit is its own merge. */
+/** Main has commits the PR's branch doesn't; asked only for a PR this look found open (a merged one's commit is its own merge). */
 const checkMoved = async (pr: number, head: string): Promise<void> => {
   const { ahead, newest } = await mainAhead(head).catch(() => ({ ahead: 0, newest: '-' }))
-  const open = ahead > 0 && (await prState(pr).catch(() => null))?.state === 'OPEN'
-  await report(open ? { key: `pr-${pr} main-moved ${newest}`, lines: [`MAIN_MOVED: main is ${ahead} commit(s) ahead of the branch: rebase on main and run the checks again`] } : null, pr)
+  await report(ahead > 0 ? { key: `pr-${pr} main-moved ${newest}`, lines: [`MAIN_MOVED: main is ${ahead} commit(s) ahead of the branch: rebase on main and run the checks again`] } : null, pr)
 }
 
 const untrack = async (pr: number) => writeLines('tracked', (await readLines('tracked')).filter(line => line !== String(pr)))
@@ -196,8 +195,7 @@ const checkOpen = async (pr: number, state: PrState): Promise<void> => {
   await (reviewNews ? checkReady(pr, state).then(async () => checkMoved(pr, state.head)) : Promise.resolve())
 }
 
-const checkPr = async (pr: number): Promise<void> => {
-  const state = await prState(pr).catch(() => null)
+const checkPr = async (pr: number, state: PrState | undefined): Promise<void> => {
   if (!state) {
     round.complete = false
     return
@@ -232,11 +230,12 @@ const watchedPrs = async (): Promise<number[] | null> => {
 const checkPrs = async (): Promise<void> => {
   // A round with a failed listing is skipped rather than run with pull requests missing.
   const prs = await watchedPrs()
-  if (!prs) {
+  const states = prs ? await prStates(prs) : null
+  if (!prs || !states) {
     return
   }
   round.complete = true
-  await inOrder(prs, checkPr)
+  await inOrder(prs, async pr => checkPr(pr, states.get(pr)))
   // From here on, a PR seen for the first time is a new one. Only after a round in which every PR
   // answered: one that failed must still get its comments recorded.
   await (roundComplete() ? writeLines('initialized', []) : Promise.resolve())

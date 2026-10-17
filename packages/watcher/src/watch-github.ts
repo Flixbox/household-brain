@@ -150,18 +150,63 @@ export interface PrState {
   title: string
 }
 
-export const prState = async (pr: number): Promise<PrState> => {
-  const value = record(await gh(['pr', 'view', String(pr), '--repo', REPO, '--json', 'state,mergeable,headRefOid,mergeCommit,reviewDecision,autoMergeRequest,labels,title,author']))
+const PR_FIELDS = 'state mergeable headRefOid mergeCommit { oid } reviewDecision autoMergeRequest { enabledAt } title'
+  + ' labels(first: 100) { nodes { name } } author { login kind: __typename } reviews(last: 100) { nodes { state author { login kind: __typename } } }'
+const PRS_PER_QUERY = 50
+
+/** GraphQL names a bot `name`, the REST API (and `SELF`) `name[bot]`: the REST form, as everywhere else. */
+const actor = (value: unknown): string => {
+  const who = record(value)
+  return who.kind === 'Bot' ? `${textOf(who.login)}[bot]` : textOf(who.login)
+}
+
+const stateOf = (value: Json): PrState => {
+  const author = actor(value.author)
+  const reviews = records(record(value.reviews).nodes)
+    .map(review => ({ login: actor(review.author), state: textOf(review.state) }))
+    .filter(review => review.login !== author && review.login !== SELF)
   return {
-    autoMerge: Boolean(value.autoMergeRequest),
-    decision: await decisionOf(pr, value.reviewDecision, textOf(record(value.author).login)),
+    autoMerge: isRecord(value.autoMergeRequest),
+    // GitHub leaves `reviewDecision` empty under a ruleset: then the reviews decide (#197).
+    decision: textOf(value.reviewDecision) || decisionFrom(reviews),
     head: textOf(value.headRefOid),
     mergeSha: textOf(record(value.mergeCommit).oid),
     mergeable: textOf(value.mergeable),
-    parked: records(value.labels).some(label => label.name === 'parked'),
+    parked: records(record(value.labels).nodes).some(label => label.name === 'parked'),
     state: textOf(value.state),
-    title: `${textOf(value.title)} (by ${textOf(record(value.author).login)})`,
+    title: `${textOf(value.title)} (by ${author})`,
   }
+}
+
+const statesOf = async (prs: readonly number[]): Promise<[number, PrState][]> => {
+  const [owner = '', name = ''] = REPO.split('/')
+  const fields = prs.map(pr => `pr${pr}: pullRequest(number: ${pr}) { ${PR_FIELDS} }`).join(' ')
+  const answer = record(await gh(['api', 'graphql', '-f', `query={repository(owner:"${owner}",name:"${name}"){${fields}}}`]))
+  const repository = record(record(answer.data).repository)
+  return prs.flatMap((pr): [number, PrState][] => {
+    const value = repository[`pr${pr}`]
+    return isRecord(value) ? [[pr, stateOf(value)]] : []
+  })
+}
+
+/** Each PR on its own, so one GitHub won't answer for is the only one missing. */
+const oneByOne = async (prs: readonly number[]): Promise<[number, PrState][]> => {
+  const each = await Promise.all(prs.map(async pr => statesOf([pr]).catch((): [number, PrState][] => [])))
+  return each.flat()
+}
+
+/** A batch's states; if the batch fails (one PR GitHub won't answer for fails it all), each PR alone. */
+const batchStates = async (prs: readonly number[]): Promise<[number, PrState][]> =>
+  statesOf(prs).catch(async () => oneByOne(prs))
+
+/**
+ * The state of every PR asked about, in one GraphQL query per fifty (#235): one `pr view` each, plus
+ * their reviews, took seconds per PR on a slow `gh`, and a look waited for all of them. A PR whose
+ * state couldn't be read is missing from the answer; its caller tries again next look.
+ */
+export const prStates = async (prs: readonly number[]): Promise<Map<number, PrState>> => {
+  const chunks = Array.from({ length: Math.ceil(prs.length / PRS_PER_QUERY) }, (_chunk, index) => prs.slice(index * PRS_PER_QUERY, (index + 1) * PRS_PER_QUERY))
+  return new Map((await Promise.all(chunks.map(async chunk => batchStates(chunk)))).flat())
 }
 
 /** Pull requests merged in the last `hours`. */
