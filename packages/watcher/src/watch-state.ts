@@ -23,13 +23,26 @@ const stateFile = (name: string) => `${DIR}/${name}`
 
 export const exists = async (name: string): Promise<boolean> => Bun.file(stateFile(name)).exists()
 
-export const readLines = async (name: string): Promise<string[]> =>
-  ((await exists(name)) ? (await Bun.file(stateFile(name)).text()).split('\n').filter(Boolean) : [])
+/**
+ * Windows briefly locks a file just written (an antivirus scan, the search indexer: `EUNKNOWN` on
+ * open, #231), which stopped the whole watcher. A state read or write tries again a few times first.
+ */
+const retried = async <Result>(work: () => Promise<Result>, tries = 5): Promise<Result> =>
+  work().catch(async (error: unknown) => {
+    if (tries <= 1) {
+      throw error
+    }
+    await Bun.sleep(200)
+    return retried(work, tries - 1)
+  })
+
+export const readLines = async (name: string): Promise<string[]> => retried(async () =>
+  ((await exists(name)) ? (await Bun.file(stateFile(name)).text()).split('\n').filter(Boolean) : []))
 
 /** Bun.write creates the state directory on first use. */
-export const writeLines = async (name: string, lines: readonly string[]): Promise<void> => {
+export const writeLines = async (name: string, lines: readonly string[]): Promise<void> => retried(async () => {
   await Bun.write(stateFile(name), lines.length > 0 ? `${lines.join('\n')}\n` : '')
-}
+})
 
 export const appendLines = async (name: string, lines: readonly string[]): Promise<void> =>
   writeLines(name, [...await readLines(name), ...lines])

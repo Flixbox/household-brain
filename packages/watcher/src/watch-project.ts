@@ -19,6 +19,7 @@
  *   NEW_ISSUE / ISSUE_COMMENT        a new issue (not the agent's own), or the owner commented on one
  *   ISSUE_CLOSED / ISSUE_REOPENED    an issue was closed (by anyone) or reopened
  *   IDLE                             nothing happened for max-hours (with --follow: a heartbeat, then it goes on)
+ *   WATCHER_ERROR                    a look failed (e.g. a state file stayed locked); it goes on with the next
  *   REMINDER: PR #<n> …              after every notification, each open PR that waits on the agent: a
  *                                    branch behind main or in conflict, or approved with CI finished
  *                                    (auto-merge to enable, or CI to fix)
@@ -38,10 +39,11 @@
  * each ending with a `---` line, for a harness that wakes on new output (Claude Code's Monitor), so
  * one watcher lasts the whole session.
  */
-import { type Activity, FOLLOW_NEWER, cancelledDeployEvent, issueKey, mainRunEvent, newActivity, runEvent } from './watch-events'
-import { type PrState, REPO, activityOf, issueEventLines, issueLine, jobLines, mainAhead, mainHead, mergeCommand, newestMainRun, openIssueNumbers, openPrs, prState, recentlyMerged, reviewCommentLines, runOf } from './watch-github'
+import { type Activity, FOLLOW_NEWER, cancelledDeployEvent, mainRunEvent, newActivity, runEvent } from './watch-events'
+import { type PrState, REPO, activityOf, jobLines, mainAhead, mainHead, mergeCommand, newestMainRun, openPrs, prState, recentlyMerged, reviewCommentLines, runOf } from './watch-github'
 import { appendLines, exists, lock, readLines, writeLines } from './watch-state'
 import { flush, queue, quiet, report } from './watch-output'
+import { checkIssueStates, checkIssues } from './watch-issues'
 import { hasText } from './read'
 
 const [limitMinutes = '20', maxHours = '12'] = process.argv.slice(2).filter(arg => arg !== '--follow')
@@ -205,52 +207,6 @@ const checkPr = async (pr: number): Promise<void> => {
   await (state.state === 'CLOSED' ? checkClosed(pr) : checkOpen(pr, state))
 }
 
-/** On the very first run, a state file starts from what is there now: none of it is news. */
-const firstRun = async (name: string, lines: string[]): Promise<boolean> => {
-  if (await exists(name)) {
-    return false
-  }
-  await writeLines(name, lines)
-  return true
-}
-
-/** Issues and the owner's comments on them not reported yet; the ones from before the first run aren't news. */
-const checkIssues = async (): Promise<void> => {
-  const lines = await issueEventLines().catch(() => null)
-  if (!lines || await firstRun('issues', lines.map(item => issueKey(item)))) {
-    return
-  }
-  const seen = new Set(await readLines('issues'))
-  const fresh = lines.filter(line => !seen.has(issueKey(line)))
-  if (fresh.length > 0) {
-    await appendLines('issues', fresh.map(item => issueKey(item)))
-    queue(fresh)
-  }
-}
-
-/** Issue lines for what was closed or reopened between `before` and `now`; null when a lookup failed. */
-const issueChanges = async (before: string[], now: string[]): Promise<string[] | null> =>
-  Promise.all([
-    ...before.filter(issue => !now.includes(issue)).map(async issue => issueLine(Number(issue), 'closed')),
-    ...now.filter(issue => !before.includes(issue)).map(async issue => issueLine(Number(issue), 'reopened')),
-  ]).then(lines => lines.filter(line => line !== null), () => null)
-
-/** Issues closed or reopened since the last round. A failed lookup leaves the state as it was, so the next round tries again. */
-const checkIssueStates = async (): Promise<void> => {
-  const now = await openIssueNumbers().then(numbers => numbers.toSorted(byNumber).map(String), () => null)
-  if (!now || await firstRun('open-issues', now)) {
-    return
-  }
-  const lines = await issueChanges(await readLines('open-issues'), now)
-  if (!lines) {
-    return
-  }
-  await writeLines('open-issues', now)
-  if (lines.length > 0) {
-    queue(lines)
-  }
-}
-
 /** Open PRs, the ones followed until their deploy, and recently merged ones; null when a listing failed. */
 const watchedPrs = async (): Promise<number[] | null> => {
   const lists = await Promise.all([
@@ -288,8 +244,18 @@ const lookOnce = async (): Promise<boolean> => {
   return false
 }
 
+/**
+ * A look that fails (a state file still locked after its retries, #231) is reported as an event, and
+ * the watcher goes on with the next look instead of stopping: events would otherwise end unnoticed.
+ */
+const lookSafely = async (): Promise<boolean> => lookOnce().catch(async (error: unknown) => {
+  queue([`WATCHER_ERROR: ${error instanceof Error ? error.message : 'the look failed'}; still watching`])
+  await flush()
+  return false
+})
+
 // A loop rather than a function awaiting itself: following, the watcher runs for a whole session.
 await lock()
 for (;;) {
-  await (await lookOnce() ? Promise.resolve() : Bun.sleep(60_000))
+  await (await lookSafely() ? Promise.resolve() : Bun.sleep(60_000))
 }
