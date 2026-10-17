@@ -15,21 +15,29 @@ how merging works there, how to check a deploy.
 One watcher for the whole repository: every open pull request, merged ones until their deploy, the
 default branch's CI, new issues, the owner's comments on issues, and issues closed or reopened.
 
-```sh
-SELF='<your login>' bun ${CLAUDE_PLUGIN_ROOT}/src/watch-project.ts --follow
-```
+- **It runs by itself** once the project has a `.claude/watcher.env` with its settings (below, one
+  `NAME=value` per line, no secrets): this plugin starts it the first time this skill runs in a
+  session and keeps it running until the session ends, and every line it prints reaches you as a
+  notification. Nothing to start or re-arm. Without the file it prints one line saying so and stops.
+- **Without the file**, or outside an interactive session, run it yourself under Claude Code's
+  `Monitor` with `--follow`:
 
-- **Run it under Claude Code's `Monitor`** with `--follow`: it keeps running, prints each event the
-  moment it finds it, and ends each one with a `---` line. The owner's comments and new issues have
-  their own poller, every 30 s, so they never wait for CI and deploys. `IDLE` is a heartbeat, not an exit. A `Monitor`
-  stops after 30 minutes at most: re-arm it when its expiry notice comes; the watcher remembers what
-  it reported and picks up where it left off. Without `--follow` it exits after one look, with every
-  event that look found: start it again after handling them.
+  ```sh
+  SELF='<your login>' bun ${CLAUDE_PLUGIN_ROOT}/src/watch-project.ts --follow
+  ```
+
+  A `Monitor` stops after 30 minutes at most: re-arm it when its expiry notice comes; the watcher
+  remembers what it reported and picks up where it left off. Only one watcher runs per repository,
+  so a second one exits at once. Without `--follow` it exits after one look, with every event that
+  look found: start it again after handling them.
+- **Following**, it prints each event the moment it finds it and ends each one with a `---` line.
+  The owner's comments and new issues have their own poller, every 30 s, so they never wait for CI
+  and deploys. `IDLE` is a heartbeat, not an exit.
 - **Each event starts with when it was found**, and a comment or issue also with when it was
   written (`[12:27:03, written 12:09:20] ISSUE_COMMENT …`): the gap is how late it came. Without
   `--follow`, a look prints every pending event, the ones to answer first (comments, reviews,
   approvals, conflicts, new issues), then CI, deploys and the rest: handle the answers before anything else.
-- **Settings**, from the environment:
+- **Settings**, from the environment, or else from the project's `.claude/watcher.env`:
   - `GH`: the `gh` to ask with, e.g. a wrapper logged in as a bot. Plain `gh` by default.
   - `REPO`: `owner/name`. By default, the repository `gh` finds in the current folder.
   - `WORKFLOW`: the CI workflow file whose runs are followed (`ci.yml` by default).

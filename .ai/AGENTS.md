@@ -95,9 +95,10 @@ Every PR that changes the UI shows it in a GIF in its description (after the
 ### After every push
 
 - **Update the PR description** to what the branch does now.
-- **Keep the project watcher running** under a `Monitor`. It is this repository's Claude Code plugin
+- **Keep the project watcher running.** It is this repository's Claude Code plugin
   (`packages/watcher`, #200); its `babysit-prs` skill has the routine (what each event asks for).
-  Here, as the bot:
+  With the plugin installed, it starts by itself when that skill runs, as the bot
+  (`.claude/watcher.env`, #241). Without it, run it under a `Monitor` and re-arm it on expiry:
 
   ```sh
   GH=agent-gh SELF='flixbox-ai-agent[bot]' bun packages/watcher/src/watch-project.ts --follow
