@@ -1,3 +1,4 @@
+/* oxlint-disable import/no-nodejs-modules -- Bun has no rename of its own; node:fs/promises is built into Bun */
 /**
  * What the project watcher remembers between runs, in plain files (the same ones the earlier bash
  * watcher kept, so either can take over from the other):
@@ -12,6 +13,7 @@
  *   lock           the running watcher's process id: two would race on these files
  */
 import { $ } from 'bun'
+import { rename } from 'node:fs/promises'
 import { REPO } from './watch-github'
 import { hasText } from './read'
 
@@ -23,13 +25,31 @@ const stateFile = (name: string) => `${DIR}/${name}`
 
 export const exists = async (name: string): Promise<boolean> => Bun.file(stateFile(name)).exists()
 
-export const readLines = async (name: string): Promise<string[]> =>
-  ((await exists(name)) ? (await Bun.file(stateFile(name)).text()).split('\n').filter(Boolean) : [])
+/**
+ * Windows briefly locks a file just written (an antivirus scan, the search indexer: `EUNKNOWN` on
+ * open, #231), which stopped the whole watcher. A state read or write tries again a few times first.
+ */
+const retried = async <Result>(work: () => Promise<Result>, tries = 5): Promise<Result> =>
+  work().catch(async (error: unknown) => {
+    if (tries <= 1) {
+      throw error
+    }
+    await Bun.sleep(200)
+    return retried(work, tries - 1)
+  })
 
-/** Bun.write creates the state directory on first use. */
-export const writeLines = async (name: string, lines: readonly string[]): Promise<void> => {
-  await Bun.write(stateFile(name), lines.length > 0 ? `${lines.join('\n')}\n` : '')
-}
+export const readLines = async (name: string): Promise<string[]> => retried(async () =>
+  ((await exists(name)) ? (await Bun.file(stateFile(name)).text()).split('\n').filter(Boolean) : []))
+
+/**
+ * Written to a temporary file and renamed over the old one, so a write that fails halfway never leaves
+ * a state file cut short. Bun.write creates the state directory on first use.
+ */
+export const writeLines = async (name: string, lines: readonly string[]): Promise<void> => retried(async () => {
+  const draft = stateFile(`${name}.writing`)
+  await Bun.write(draft, lines.length > 0 ? `${lines.join('\n')}\n` : '')
+  await rename(draft, stateFile(name))
+})
 
 export const appendLines = async (name: string, lines: readonly string[]): Promise<void> =>
   writeLines(name, [...await readLines(name), ...lines])
