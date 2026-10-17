@@ -39,7 +39,7 @@
  * one watcher lasts the whole session.
  */
 import { type Activity, FOLLOW_NEWER, cancelledDeployEvent, issueKey, mainRunEvent, newActivity, runEvent } from './watch-events'
-import { type PrState, REPO, activityOf, issueEventLines, issueLine, jobLines, mainAhead, mainHead, newestMainRun, openIssueNumbers, openPrs, prState, recentlyMerged, reviewCommentLines, runOf } from './watch-github'
+import { type PrState, REPO, activityOf, issueEventLines, issueLine, jobLines, mainAhead, mainHead, mergeCommand, newestMainRun, openIssueNumbers, openPrs, prState, recentlyMerged, reviewCommentLines, runOf } from './watch-github'
 import { appendLines, exists, lock, readLines, writeLines } from './watch-state'
 import { flush, queue, quiet, report } from './watch-output'
 import { hasText } from './read'
@@ -162,8 +162,6 @@ const checkClosed = async (pr: number): Promise<void> => {
   await untrack(pr)
   await report({ key: `pr-${pr} closed`, lines: ['CLOSED without merging'] }, pr)
 }
-
-const mergeCommand = (pr: number) => `agent-gh pr merge ${pr} --auto --squash`
 
 /** Conflicts and approvals, which a parked PR (left open on purpose) doesn't report. */
 const checkReview = async (pr: number, state: PrState): Promise<void> => {

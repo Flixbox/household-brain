@@ -38,6 +38,20 @@ const currentRepo = async (): Promise<string> => {
   return repo
 }
 export const REPO = hasText(process.env.REPO) ? process.env.REPO : await currentRepo()
+/**
+ * Whether the default branch merges through a merge queue (#228). The queue then sets the merge
+ * strategy, and `gh pr merge --squash` says so on every call; without one, `gh` needs a strategy.
+ * Unknown (the question failed) counts as no queue, as before.
+ */
+const mergeQueued = async (): Promise<boolean> => {
+  const [owner = '', name = ''] = REPO.split('/')
+  const query = `query={repository(owner:"${owner}",name:"${name}"){mergeQueue{id}}}`
+  return ghText(['api', 'graphql', '-f', query, '-q', '.data.repository.mergeQueue.id']).then(text => hasText(text.trim()), () => false)
+}
+const MERGE_QUEUE = await mergeQueued()
+
+/** The command that enables auto-merge for a PR, as the events suggest it. */
+export const mergeCommand = (pr: number): string => `${GH} pr merge ${pr} --auto${MERGE_QUEUE ? '' : ' --squash'}`
 // WORKFLOW: the CI workflow file whose runs are followed (a PR's checks, main's deploy).
 const WORKFLOW = process.env.WORKFLOW ?? 'ci.yml'
 // ACTIVITY_GH: comments are read with the owner's login: a pending (unsubmitted) review is only
