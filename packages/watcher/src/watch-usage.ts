@@ -8,7 +8,7 @@
  */
 import { ignoreFailure, isRecord } from './read'
 import { UNKNOWN_USAGE, usageFrom } from './watch-events'
-import { readLines, writeLines } from './watch-state'
+import { oneAtATime, readLines, writeLines } from './watch-state'
 
 const CONFIG = process.env.CLAUDE_CONFIG_DIR ?? `${process.env.HOME ?? process.env.USERPROFILE ?? '.'}/.claude`
 const ENDPOINT = 'https://api.anthropic.com/api/oauth/usage'
@@ -32,8 +32,11 @@ const ask = async (): Promise<string> => {
   return usageFrom(answer)
 }
 
-/** The current usage line, asked again only when the last answer, kept in the `usage` state file, is a minute old. */
-export const usageLine = async (): Promise<string> => {
+/**
+ * The current usage line, asked again only when the last answer, kept in the `usage` state file, is a
+ * minute old. One at a time: both pollers close their looks with it (#240), and would both ask.
+ */
+export const usageLine = async (): Promise<string> => oneAtATime('usage line', async () => {
   const now = Temporal.Now.instant().epochMilliseconds
   const [askedAt = '', line = UNKNOWN_USAGE] = await readLines('usage').catch(() => [])
   if (now - Number(askedAt) < ONCE_A_MINUTE_MS) {
@@ -43,4 +46,4 @@ export const usageLine = async (): Promise<string> => {
   // Not kept: the next look just asks again.
   await writeLines('usage', [String(now), fresh]).catch(ignoreFailure)
   return fresh
-}
+})

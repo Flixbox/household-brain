@@ -54,7 +54,7 @@ import { FOLLOW, flush, queue, quiet, report } from './watch-output'
 import { addLine, lock, readLines, updateLines, writeLines } from './watch-state'
 import { checkActivity as checkPrActivity, checkTrackedActivity } from './watch-activity'
 import { checkIssueStates, checkIssues } from './watch-issues'
-import { hasText } from './read'
+import { allSettled, hasText } from './read'
 
 const [limitMinutes = '20', maxHours = '12'] = process.argv.slice(2).filter(arg => arg !== '--follow')
 if (!/^\d+$/u.test(limitMinutes) || !/^\d+$/u.test(maxHours)) {
@@ -213,7 +213,7 @@ const checkPrs = async (): Promise<void> => {
   }
   round.complete = true
   // All at once (#240): a slow PR holds back only its own events; GH_PARALLEL caps the calls.
-  await Promise.all(prs.map(async pr => checkPr(pr, states.get(pr))))
+  await allSettled(prs.map(async pr => checkPr(pr, states.get(pr))))
   // From here on, a PR seen for the first time is a new one. Only after a round in which every PR
   // answered: one that failed must still get its comments recorded.
   await (roundComplete() ? writeLines('initialized', []) : Promise.resolve())
@@ -226,14 +226,21 @@ const ANSWER_CHECKS: Check[] = [checkIssues, checkIssueStates, checkTrackedActiv
 /** The rest: main, and each PR's CI, reviews and deploy. */
 const PROJECT_CHECKS: Check[] = [checkMain, checkMainHead, checkPrs]
 
+interface Poller {
+  checks: readonly Check[]
+  /** Whether this poller prints the IDLE heartbeat: only one does, or both would. */
+  heartbeat: boolean
+  pauseSeconds: number
+}
+
 /** One look; true when it printed events, so the next look comes at once. */
-const lookOnce = async (checks: readonly Check[]): Promise<boolean> => {
+const lookOnce = async ({ checks, heartbeat }: Poller): Promise<boolean> => {
   await inOrder(checks, async check => check())
   if (await flush()) {
     return true
   }
   // After a heartbeat the next look waits like after an empty round.
-  if (Temporal.Instant.compare(Temporal.Now.instant(), quiet.since.add({ hours: Number(maxHours) })) > 0) {
+  if (heartbeat && Temporal.Instant.compare(Temporal.Now.instant(), quiet.since.add({ hours: Number(maxHours) })) > 0) {
     queue([`IDLE: nothing happened for ${maxHours} h`])
     await flush()
   }
@@ -244,21 +251,23 @@ const lookOnce = async (checks: readonly Check[]): Promise<boolean> => {
  * A look that fails (a state file still locked after its retries, #231) is reported as an event, and
  * the watcher goes on with the next look instead of stopping: events would otherwise end unnoticed.
  */
-const lookSafely = async (checks: readonly Check[]): Promise<boolean> => lookOnce(checks).catch(async (error: unknown) => {
+const lookSafely = async (poller: Poller): Promise<boolean> => lookOnce(poller).catch(async (error: unknown) => {
   queue([`WATCHER_ERROR: ${error instanceof Error ? error.message : 'the look failed'}; still watching`])
   await flush()
   return false
 })
 
 /** Looks again and again, `pauseSeconds` apart after a look that found nothing. */
-const poll = async (checks: readonly Check[], pauseSeconds: number): Promise<never> => {
+const poll = async (poller: Poller): Promise<never> => {
   // A loop rather than a function awaiting itself: following, the watcher runs for a whole session.
   for (;;) {
-    await (await lookSafely(checks) ? Promise.resolve() : Bun.sleep(pauseSeconds * 1000))
+    await (await lookSafely(poller) ? Promise.resolve() : Bun.sleep(poller.pauseSeconds * 1000))
   }
 }
 
 await lock()
 // Following, two pollers run side by side (#240): the answers every 30 s, never waiting for a slow
 // look at CI and deploys. Without `--follow`, one look at everything, the answers first (#235).
-await (FOLLOW ? Promise.all([poll(ANSWER_CHECKS, 30), poll(PROJECT_CHECKS, 60)]) : poll([...ANSWER_CHECKS, ...PROJECT_CHECKS], 60))
+await (FOLLOW
+  ? Promise.all([poll({ checks: ANSWER_CHECKS, heartbeat: false, pauseSeconds: 30 }), poll({ checks: PROJECT_CHECKS, heartbeat: true, pauseSeconds: 60 })])
+  : poll({ checks: [...ANSWER_CHECKS, ...PROJECT_CHECKS], heartbeat: true, pauseSeconds: 60 }))

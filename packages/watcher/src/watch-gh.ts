@@ -11,7 +11,12 @@ const GH_TIMEOUT_MS = Number(process.env.GH_TIMEOUT_SECONDS ?? 30) * 1000
 // GH_PARALLEL: how many `gh` calls run at once (#240), 4 by default. The pollers and pull requests
 // are checked in parallel, so one slow call holds back only its own check; the cap keeps the bursts
 // within GitHub's rate limits.
-const GH_PARALLEL = Math.max(1, Number(process.env.GH_PARALLEL ?? 4))
+const GH_PARALLEL = Number(process.env.GH_PARALLEL ?? 4)
+// Anything but a whole number from 1 would either never let a call through or never hold one back.
+if (!Number.isInteger(GH_PARALLEL) || GH_PARALLEL < 1) {
+  process.stderr.write('GH_PARALLEL must be a whole number from 1\n')
+  process.exit(64)
+}
 const slots = { free: GH_PARALLEL, waiting: new Array<() => void>() }
 
 /** Waits for one of the GH_PARALLEL places; `release` hands it to the next waiting call. */

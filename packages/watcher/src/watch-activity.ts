@@ -2,6 +2,7 @@
 import { type Activity, newActivity } from './watch-events'
 import { activityOf, reviewCommentLines } from './watch-github'
 import { appendLines, exists, oneAtATime, readLines, writeLines } from './watch-state'
+import { allSettled } from './read'
 import { queue } from './watch-output'
 
 /** The comments of a PR already reported. On the very first round, the ones already there are old news. */
@@ -45,5 +46,5 @@ export const checkActivity = async (pr: number): Promise<boolean> => oneAtATime(
 /** The comments on every PR followed, on their own: the owner's answers mustn't wait for CI and deploys (#240). */
 export const checkTrackedActivity = async (): Promise<void> => {
   const prs = (await readLines('tracked')).map(Number)
-  await Promise.all(prs.map(async pr => checkActivity(pr)))
+  await allSettled(prs.map(async pr => checkActivity(pr)))
 }
