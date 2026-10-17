@@ -128,14 +128,19 @@ describe('reminders for branches that can\'t merge (#226)', () => {
   })
 })
 
-describe('usageFrom (#233)', () => {
-  it('reads the five-hour and seven-day windows as whole percentages, with when each resets', () => {
+describe('usageFrom (#233, #238)', () => {
+  it('reads the five-hour and seven-day windows as whole percentages used and left, with when each resets', () => {
     const answer = {
       five_hour: { resets_at: '2026-10-17T12:10:00.122917+00:00', utilization: 12.4 },
       seven_day: { resets_at: '2026-10-19T19:00:00.122936+00:00', utilization: 66 },
     }
-    expect(usageFrom(answer, 'Europe/Berlin')).toBe('Usage: session 12% (resets 2026-10-17 14:10), week 66% (resets 2026-10-19 21:00)')
-    expect(usageFrom({ five_hour: { resets_at: 'soon', utilization: 3 } }, 'UTC')).toBe('Usage: session 3%, week ?')
+    expect(usageFrom(answer, 'Europe/Berlin')).toBe('Usage: session 12% used (88% left, resets 2026-10-17 14:10), week 66% used (34% left, resets 2026-10-19 21:00)')
+    expect(usageFrom({ five_hour: { resets_at: 'soon', utilization: 3 } }, 'UTC')).toBe('Usage: session 3% used (97% left), week ?')
+  })
+
+  it('rounds the use, keeps used and left adding up to 100, and keeps both within 0 to 100', () => {
+    expect(usageFrom({ five_hour: { utilization: 12.5 }, seven_day: { utilization: 101.2 } }, 'UTC')).toBe('Usage: session 13% used (87% left), week 100% used (0% left)')
+    expect(usageFrom({ five_hour: { utilization: -0.6 } }, 'UTC')).toBe('Usage: session 0% used (100% left), week ?')
   })
 
   it('says unknown for anything else', () => {
