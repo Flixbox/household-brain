@@ -1,10 +1,11 @@
 /**
- * How the project watcher (watch-project.ts) prints events: every event a round finds, together, the
- * ones someone waits for an answer to first (#222). Then it exits (the default, for a background
- * command whose exit is the notification) or, with `--follow`, ends each event with a `---` line and
- * goes on (#196).
+ * How the project watcher (watch-project.ts) prints events, each with the time it was found in front
+ * (#240). By default every event a round finds comes out together when the round ends, the ones
+ * someone waits for an answer to first (#222), and then it exits (for a background command whose exit
+ * is the notification). With `--follow`, each event comes out the moment it is found, ending with a
+ * `---` line, so one slow call never holds back an event found before it (#240), and it goes on (#196).
  */
-import { type Event, answerFirst, listsOpenPrs, openPrLines, reminderLines } from './watch-events'
+import { type Event, answerFirst, clockTime, listsOpenPrs, openPrLines, reminderLines, stamped } from './watch-events'
 import { openPrs } from './watch-github'
 import { appendLines, readLines } from './watch-state'
 import { usageLine } from './watch-usage'
@@ -15,8 +16,10 @@ const FOLLOW = process.argv.includes('--follow')
 export const quiet = { since: Temporal.Now.instant() }
 const say = (lines: readonly string[]) => process.stdout.write(`${lines.join('\n')}\n`)
 
-/** The events found so far in this round, printed together by `flush`. */
+/** The events found so far in this round, printed together by `flush` (not following). */
 const found: (readonly string[])[] = []
+/** Whether this round printed an event already (following), so `flush` closes it. */
+const printed = { any: false }
 
 /**
  * An event is recorded as reported when it is found, before the round prints it. So a round that
@@ -31,9 +34,18 @@ const printFound = () => {
 }
 process.on('exit', printFound)
 
-/** Keeps an event's lines for this round's `flush`. */
-export const queue = (lines: readonly string[]): void => {
-  found.push(lines)
+/**
+ * Prints an event at once when following, or keeps it for this round's `flush`. `written` is when
+ * GitHub says it happened, for a comment or an issue.
+ */
+export const queue = (lines: readonly string[], written: unknown = null): void => {
+  const event = stamped(lines, clockTime(Temporal.Now.instant()) ?? '?', clockTime(written))
+  if (FOLLOW) {
+    say([...event, '---'])
+    printed.any = true
+    return
+  }
+  found.push(event)
 }
 
 /** Keeps the event for this round's `flush`, unless there is none or it was reported before. */
@@ -49,16 +61,17 @@ export const report = async (event: Event | null, pr: number | null = null): Pro
 }
 
 /**
- * Prints the round's events, answers first, and after them a reminder for each open PR waiting on
- * the agent (#224, #226); then exits, or when following, ends each with `---` and returns whether
- * anything was printed, so the next round can start at once.
+ * Ends a round that found events: prints the ones kept (not following), answers first, and after them
+ * a reminder for each open PR waiting on the agent (#224, #226); then exits, or when following, ends
+ * with `---` and returns whether anything was printed, so the next round can start at once.
  */
 export const flush = async (): Promise<boolean> => {
-  if (found.length === 0) {
+  if (found.length === 0 && !printed.any) {
     return false
   }
   // The events first: a slow listing must not hold them back.
   printFound()
+  printed.any = false
   // Then the reminders, and the owner's Claude usage (#233) to close every notification.
   const closing = [...await openPrs().then(reminderLines, () => []), await usageLine()]
   say(FOLLOW ? [...closing, '---'] : closing)

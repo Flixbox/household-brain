@@ -201,7 +201,29 @@ export const newActivity = (seen: ReadonlySet<string>, items: Activity[]): Activ
 export const issueKey = (line: string) => line.slice(0, 80)
 
 /** Events that ask the agent to answer someone: comments, reviews, approvals, conflicts, new issues. */
-const ANSWER_FIRST = /^(?:PR #\d+: )?(?:ACTIVITY|APPROVED|READY_TO_MERGE|CONFLICT|NEW_ISSUE|ISSUE_COMMENT)\b/u
+const ANSWER_FIRST = /^(?:\[[^\]]*\] )?(?:PR #\d+: )?(?:ACTIVITY|APPROVED|READY_TO_MERGE|CONFLICT|NEW_ISSUE|ISSUE_COMMENT)\b/u
+
+/** A time of day on this machine's clock (`12:09:20`), from an instant or GitHub's timestamp; null when it isn't one. */
+export const clockTime = (at: unknown, timeZone = Temporal.Now.timeZoneId()): string | null => {
+  try {
+    if (typeof at !== 'string' && !(at instanceof Temporal.Instant)) {
+      return null
+    }
+    return Temporal.Instant.from(at).toZonedDateTimeISO(timeZone).toPlainTime().toString({ smallestUnit: 'second' })
+  } catch {
+    return null
+  }
+}
+
+/**
+ * An event's lines with when the watcher found it in front (#240), and when it was written, for a
+ * comment or an issue: `[12:27:03, written 12:09:20] ISSUE_COMMENT …`. The gap between them is the delay.
+ */
+export const stamped = (lines: readonly string[], found: string, written: string | null = null): string[] => {
+  const [first = '', ...rest] = lines
+  const when = written === null ? found : `${found}, written ${written}`
+  return [`[${when}] ${first}`, ...rest]
+}
 
 /**
  * A round's events in the order to print them (#222): what someone waits for an answer to first, then

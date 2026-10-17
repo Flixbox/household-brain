@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { FOLLOW_NEWER, type OpenPr, type Run, answerFirst, cancelledDeployEvent, decisionFrom, listsOpenPrs, mainRunEvent, newActivity, openPrLines, reminderLines, runEvent, usageFrom } from './watch-events'
+import { FOLLOW_NEWER, type OpenPr, type Run, answerFirst, cancelledDeployEvent, clockTime, decisionFrom, listsOpenPrs, mainRunEvent, newActivity, openPrLines, reminderLines, runEvent, stamped, usageFrom } from './watch-events'
 
 const SHA = 'abcdef1234567890abcdef1234567890abcdef12'
 const run = (changes: Partial<Run> = {}): Run => ({ ageSeconds: 60, attempt: 1, conclusion: 'success', id: 7, status: 'completed', ...changes })
@@ -146,5 +146,27 @@ describe('usageFrom (#233, #238)', () => {
   it('says unknown for anything else', () => {
     expect(usageFrom(null)).toBe('Usage: unknown')
     expect(usageFrom({ error: 'unauthorized' })).toBe('Usage: unknown')
+  })
+})
+
+describe('stamped (#240)', () => {
+  it('puts when the event was found in front, and when it was written for a comment or issue', () => {
+    expect(stamped(['ISSUE_COMMENT 9 #3: hi', '  more'], '12:27:03', '12:09:20')).toEqual(['[12:27:03, written 12:09:20] ISSUE_COMMENT 9 #3: hi', '  more'])
+    expect(stamped(['MAIN_ADVANCED: main is at abc'], '12:27:03')).toEqual(['[12:27:03] MAIN_ADVANCED: main is at abc'])
+  })
+
+  it('still sorts stamped answers first', () => {
+    const deployed = stamped(['PR #4: DEPLOYED: live'], '12:00:00')
+    const comment = stamped(['ISSUE_COMMENT 9 #3: hi'], '12:00:01', '11:59:00')
+    expect(answerFirst([deployed, comment])).toEqual([comment, deployed])
+  })
+})
+
+describe('clockTime (#240)', () => {
+  it("reads GitHub's timestamps and instants on the given clock, and nothing else", () => {
+    expect(clockTime('2026-10-17T12:09:20Z', 'Europe/Berlin')).toBe('14:09:20')
+    expect(clockTime(Temporal.Instant.from('2026-10-17T12:09:20.7Z'), 'UTC')).toBe('12:09:20')
+    expect(clockTime('soon', 'UTC')).toBeNull()
+    expect(clockTime(null, 'UTC')).toBeNull()
   })
 })
