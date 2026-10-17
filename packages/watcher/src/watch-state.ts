@@ -6,7 +6,8 @@
  *
  *   reported       one line per event already reported
  *   tracked        pull requests followed until their deploy or closing is reported
- *   issues         the first 80 characters of each issue line already reported
+ *   issue-events   the new issues and issue comments already reported, by id (`issue #12`,
+ *                  `issue-comment 345`); `issues`, keyed by their text, is no longer read (#247)
  *   main           the newest commit on main already reported
  *   open-issues    the open issues seen last round
  *   pr-<n>-seen    the comments and reviews of a PR already reported

@@ -234,17 +234,20 @@ export const mainHead = async (): Promise<{ sha: string, subject: string }> => {
   return { sha: textOf(value.sha), subject: textOf(record(value.commit).message).split('\n')[0] ?? '' }
 }
 
-/** New issues (not the agent's own) and the owner's comments on issues, newest first, with when each was written. */
-export const issueEventLines = async (): Promise<{ at: unknown, line: string }[]> => {
+/**
+ * New issues (not the agent's own) and the owner's comments on issues, newest first, each with when
+ * it was written and the key it is remembered by: its id, never its text (#247).
+ */
+export const issueEventLines = async (): Promise<{ at: unknown, key: string, line: string }[]> => {
   const [issues, comments] = await Promise.all([
     gh(['api', `repos/${REPO}/issues?state=all&per_page=50&sort=created&direction=desc`]),
     gh(['api', `repos/${REPO}/issues/comments?per_page=50&sort=created&direction=desc`]),
   ])
   return [
     ...records(issues).filter(issue => (issue.pull_request ?? null) === null && textOf(record(issue.user).login) !== SELF)
-      .map(issue => ({ at: issue.created_at, line: `NEW_ISSUE #${count(issue.number)} ${textOf(issue.title)}` })),
+      .map(issue => ({ at: issue.created_at, key: `issue #${count(issue.number)}`, line: `NEW_ISSUE #${count(issue.number)} ${oneLine(issue.title, 200)}` })),
     ...records(comments).filter(comment => textOf(record(comment.user).login) === OWNER && textOf(comment.html_url).includes('/issues/'))
-      .map(comment => ({ at: comment.created_at, line: `ISSUE_COMMENT ${count(comment.id)} #${textOf(comment.issue_url).split('/').at(-1) ?? ''}: ${oneLine(comment.body, 300)}` })),
+      .map(comment => ({ at: comment.created_at, key: `issue-comment ${count(comment.id)}`, line: `ISSUE_COMMENT ${count(comment.id)} #${textOf(comment.issue_url).split('/').at(-1) ?? ''}: ${oneLine(comment.body, 300)}` })),
   ]
 }
 
@@ -254,8 +257,8 @@ export const openIssueNumbers = async (): Promise<number[]> =>
 export const issueLine = async (issue: number, change: 'closed' | 'reopened'): Promise<string | null> => {
   const value = record(await gh(['api', `repos/${REPO}/issues/${issue}`]))
   if (change === 'closed') {
-    return `ISSUE_CLOSED #${issue} ${textOf(value.title)} (${textOf(value.state_reason) || 'closed'}, by ${textOf(record(value.closed_by).login) || '?'})`
+    return `ISSUE_CLOSED #${issue} ${oneLine(value.title, 200)} (${textOf(value.state_reason) || 'closed'}, by ${textOf(record(value.closed_by).login) || '?'})`
   }
   // A brand-new issue is NEW_ISSUE's; only one that was closed before is reopened.
-  return value.closed_at !== null || value.state_reason === 'reopened' ? `ISSUE_REOPENED #${issue} ${textOf(value.title)}` : null
+  return value.closed_at !== null || value.state_reason === 'reopened' ? `ISSUE_REOPENED #${issue} ${oneLine(value.title, 200)}` : null
 }
