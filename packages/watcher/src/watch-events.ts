@@ -222,14 +222,15 @@ const resetTime = (resetsAt: unknown, timeZone: string): string | null => {
   }
 }
 
-/** A window's use as a whole percentage, and when it resets (the owner's request on #233). */
+/** A window's use and what is left as whole percentages (#238), and when it resets (#233). */
 const windowUse = (window: unknown, timeZone: string): string => {
   if (!isRecord(window) || typeof window.utilization !== 'number') {
     return '?'
   }
+  const used = Math.round(window.utilization)
   const reset = resetTime(window.resets_at, timeZone)
-  const resets = reset === null ? '' : ` (resets ${reset})`
-  return `${Math.round(window.utilization)}%${resets}`
+  const resets = reset === null ? '' : `, resets ${reset}`
+  return `${used}% used (${Math.max(0, 100 - used)}% left${resets})`
 }
 
 /** The usage line from the endpoint's answer; "unknown" for anything that isn't one. */
