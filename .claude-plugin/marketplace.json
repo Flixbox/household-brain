@@ -6,6 +6,11 @@
       "name": "project-watcher",
       "source": "./packages/watcher",
       "description": "Watches a GitHub repository's pull requests, CI, deploys and issues, and reports each event as it happens (#200)."
+    },
+    {
+      "name": "issue-links",
+      "source": "./packages/issue-links",
+      "description": "Marks GitHub issues as blocked by other issues, refusing a link that would close a cycle (#256)."
     }
   ]
 }

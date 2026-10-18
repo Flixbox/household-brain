@@ -1,0 +1,15 @@
+{
+  "name": "@household-brain/issue-links",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "license": "Unlicense",
+  "bin": {
+    "issue-links": "./src/cli.ts",
+    "issue-links-mcp": "./src/mcp.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc",
+    "test": "bun test"
+  }
+}
