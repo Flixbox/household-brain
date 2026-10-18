@@ -1,8 +1,9 @@
 /** The project watcher's questions to GitHub, through the `gh` CLI, answered as plain data. */
-import { type Activity, type OpenPr, type Run, clockTime, decisionFrom } from './watch-events'
+import { type OpenPr, type Run, decisionFrom } from './watch-events'
 import type { QueueEntry } from './watch-queue-events'
 import { GH, ghText } from './watch-gh'
 import { hasText, isRecord, textOf } from './read'
+import { type Json, count, oneLine, record, records } from './watch-text'
 
 // Settings, all from the environment (#200), so the watcher works in any repository; GH,
 // GH_TIMEOUT_SECONDS and GH_PARALLEL are in watch-gh.ts.
@@ -37,29 +38,19 @@ export const mergeCommand = (pr: number): string => `${GH} pr merge ${pr} --auto
 const WORKFLOW = process.env.WORKFLOW ?? 'ci.yml'
 // ACTIVITY_GH: comments are read with the owner's login: a pending (unsubmitted) review is only
 // visible to its author, and the owner leaves those.
-const ACTIVITY_GH = process.env.ACTIVITY_GH ?? 'gh'
+export const ACTIVITY_GH = process.env.ACTIVITY_GH ?? 'gh'
 // OWNER: whose issue comments are news; by default the repository's owner.
-const OWNER = process.env.OWNER ?? REPO.split('/')[0] ?? ''
+export const OWNER = process.env.OWNER ?? REPO.split('/')[0] ?? ''
 // SELF: the agent's own login. Its comments and replies in review threads are not news to it; its
 // reviews (a reviewer agent posting as the same login) still are. None by default.
-const SELF = process.env.SELF ?? ''
+export const SELF = process.env.SELF ?? ''
 // Nx Cloud's status comment on every push needs no answer.
-const IGNORED = new Set([SELF, 'nx-cloud[bot]'])
+export const IGNORED = new Set([SELF, 'nx-cloud[bot]'])
 
-type Json = Record<string, unknown>
-
-const records = (value: unknown): Json[] => (Array.isArray(value) ? value.filter(item => isRecord(item)) : [])
-
-/** The line a review comment is on; one on an outdated diff only has its original line. */
-const lineOf = (item: Record<string, unknown>) => [item.line, item.original_line].find((value): value is number => typeof value === 'number')
-const count = (value: unknown) => (typeof value === 'number' ? value : 0)
-const record = (value: unknown): Json => (isRecord(value) ? value : {})
-const oneLine = (value: unknown, length: number) => textOf(value).replaceAll(/\s+/gu, ' ').slice(0, length)
-
-const gh = async (args: string[], cli = GH): Promise<unknown> => JSON.parse(await ghText(args, cli))
+export const gh = async (args: string[], cli = GH): Promise<unknown> => JSON.parse(await ghText(args, cli))
 
 /** Every item of a paged list, all pages in one array (`--slurp` wraps each page). */
-const allPages = async (path: string, cli = GH): Promise<Json[]> => {
+export const allPages = async (path: string, cli = GH): Promise<Json[]> => {
   const pages = await gh(['api', '--paginate', '--slurp', path], cli)
   return Array.isArray(pages) ? pages.flatMap(item => records(item)) : []
 }
@@ -232,31 +223,7 @@ export const recentlyMerged = async (hours: number): Promise<number[]> => {
 }
 
 /** Who wrote a comment or review, and when (#240): `Flixbox at 12:09:20`. */
-const login = (item: Json) => textOf(record(item.user).login)
-const byline = (item: Json) => `${login(item)} at ${clockTime(item.created_at ?? item.submitted_at) ?? '?'}`
-
-/** Comments, reviews (not plain approvals) and review comments on a PR, the agent's own left out. */
-export const activityOf = async (pr: number): Promise<Activity[]> => {
-  const [comments, reviews, reviewComments] = await Promise.all([
-    allPages(`repos/${REPO}/issues/${pr}/comments`, ACTIVITY_GH),
-    allPages(`repos/${REPO}/pulls/${pr}/reviews`, ACTIVITY_GH),
-    allPages(`repos/${REPO}/pulls/${pr}/comments`, ACTIVITY_GH),
-  ])
-  return [
-    ...comments.filter(item => !IGNORED.has(login(item)))
-      .map(item => ({ id: `comment ${count(item.id)}`, line: `comment ${count(item.id)} ${byline(item)}: ${oneLine(item.body, 200)}` })),
-    ...reviews.filter(item => (item.state !== 'APPROVED' || textOf(item.body) !== '') && (login(item) !== SELF || textOf(item.body) !== ''))
-      .map(item => ({ id: `review ${count(item.id)}`, line: `review ${count(item.id)} ${byline(item)} ${textOf(item.state)}: ${oneLine(item.body, 200)}` })),
-    ...reviewComments.filter(item => login(item) !== SELF || (item.in_reply_to_id ?? null) === null)
-      .map(item => ({ id: `review-comment ${count(item.id)}`, line: `review-comment ${count(item.id)} ${byline(item)} ${textOf(item.path)}: ${oneLine(item.body, 200)}` })),
-  ]
-}
-
-/** A review's own comments; a pending review's are only visible to its author (the owner's login). */
-export const reviewCommentLines = async (pr: number, review: string): Promise<string[]> =>
-  records(await gh(['api', `repos/${REPO}/pulls/${pr}/reviews/${review}/comments`], ACTIVITY_GH))
-    .map(item => `  ${textOf(item.path)}:${lineOf(item) ?? 'file'}: ${oneLine(item.body, 400)}`)
-
+export const login = (item: Json) => textOf(record(item.user).login)
 /** Commits main has that `head` doesn't, and the newest of them. */
 export const mainAhead = async (head: string): Promise<{ ahead: number, newest: string }> => {
   const value = record(await gh(['api', `repos/${REPO}/compare/${head}...main`]))
@@ -266,23 +233,6 @@ export const mainAhead = async (head: string): Promise<{ ahead: number, newest: 
 export const mainHead = async (): Promise<{ sha: string, subject: string }> => {
   const value = record(await gh(['api', `repos/${REPO}/commits/main`]))
   return { sha: textOf(value.sha), subject: textOf(record(value.commit).message).split('\n')[0] ?? '' }
-}
-
-/**
- * New issues (not the agent's own) and the owner's comments on issues, newest first, each with when
- * it was written and the key it is remembered by: its id, never its text (#247).
- */
-export const issueEventLines = async (): Promise<{ at: unknown, key: string, line: string }[]> => {
-  const [issues, comments] = await Promise.all([
-    gh(['api', `repos/${REPO}/issues?state=all&per_page=50&sort=created&direction=desc`]),
-    gh(['api', `repos/${REPO}/issues/comments?per_page=50&sort=created&direction=desc`]),
-  ])
-  return [
-    ...records(issues).filter(issue => (issue.pull_request ?? null) === null && textOf(record(issue.user).login) !== SELF)
-      .map(issue => ({ at: issue.created_at, key: `issue #${count(issue.number)}`, line: `NEW_ISSUE #${count(issue.number)} ${oneLine(issue.title, 200)}` })),
-    ...records(comments).filter(comment => textOf(record(comment.user).login) === OWNER && textOf(comment.html_url).includes('/issues/'))
-      .map(comment => ({ at: comment.created_at, key: `issue-comment ${count(comment.id)}`, line: `ISSUE_COMMENT ${count(comment.id)} #${textOf(comment.issue_url).split('/').at(-1) ?? ''}: ${oneLine(comment.body, 300)}` })),
-  ]
 }
 
 export const openIssueNumbers = async (): Promise<number[]> =>

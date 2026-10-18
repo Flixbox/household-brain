@@ -200,7 +200,8 @@ export const listsOpenPrs = (key: string) => /ci-passed|ci-failed|deployed|deplo
 export interface Activity {
   /** `comment`, `review` or `review-comment`, with its id: what is remembered as seen. */
   id: string
-  line: string
+  /** Its first line, then its text (#255). */
+  lines: string[]
 }
 
 /** Activity not seen before, in the order GitHub gave it. */

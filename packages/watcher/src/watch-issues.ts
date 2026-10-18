@@ -1,5 +1,6 @@
 /** The project watcher's issue checks (watch-project.ts): new issues, the owner's comments, closings. */
-import { issueEventLines, issueLine, openIssueNumbers } from './watch-github'
+import { issueLine, openIssueNumbers } from './watch-github'
+import { issueEventLines } from './watch-comments'
 import { queue } from './watch-output'
 import { appendLines, exists, readLines, writeLines } from './watch-state'
 
@@ -26,8 +27,8 @@ export const checkIssues = async (): Promise<void> => {
   const fresh = lines.filter(({ key }) => !seen.has(key))
   await appendLines('issue-events', fresh.map(({ key }) => key))
   // Each its own event, with when it was written (#240): several comments are several answers.
-  for (const { at, line } of fresh) {
-    queue([line], at)
+  for (const { at, lines: event } of fresh) {
+    queue(event, at)
   }
 }
 
