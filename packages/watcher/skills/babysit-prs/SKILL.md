@@ -70,7 +70,7 @@ default branch's CI, new issues, the owner's comments on issues, and issues clos
 
 Events come prefixed with their pull request (`PR #12: CI_PASSED …`). **Every CI result** ends with
 the list of open pull requests (approved or not, auto-merge on or off, CI state): act on every
-approved one whose auto-merge is still off, not only on the one the event names.
+approved one whose auto-merge is still off and that isn't in the merge queue, not only on the one the event names.
 
 | Event | What to do |
 | --- | --- |
@@ -94,7 +94,7 @@ approved one whose auto-merge is still off, not only on the one the event names.
 | `ISSUE_CLOSED` / `ISSUE_REOPENED` | Drop or resume any work on it. |
 | `CLOSED` | Closed without merging: stop working on it. |
 | `WATCHER_ERROR` | A look failed (for example a state file another program held locked); the watcher carries on with the next look. Repeated, it needs a look: tell the owner. |
-| `REMINDER` | Comes after every notification while a PR waits on you: its branch is behind main or in conflict (rebase it, run the checks, push once), or it is approved with CI green and auto-merge off (enable it, after reading its comments) or with CI failed (fix it). It repeats until that is done. |
+| `REMINDER` | Comes after every notification while a PR waits on you: its branch is behind main or in conflict (rebase it, run the checks, push once), or it is approved with CI green and auto-merge off (enable it, after reading its comments) or with CI failed (fix it). None comes for a PR in the merge queue: there, `DEQUEUED` says when it needs you. It repeats until that is done. |
 
 ## Before enabling auto-merge
 

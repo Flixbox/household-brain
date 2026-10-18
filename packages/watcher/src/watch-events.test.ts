@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { FOLLOW_NEWER, type OpenPr, type Run, answerFirst, cancelledDeployEvent, clockTime, decisionFrom, dequeuedEvent, listsOpenPrs, mainRunEvent, newActivity, openPrLines, queuedEvent, reminderLines, runEvent, stamped, usageFrom } from './watch-events'
+import { FOLLOW_NEWER, type OpenPr, type Run, answerFirst, cancelledDeployEvent, clockTime, decisionFrom, listsOpenPrs, mainRunEvent, newActivity, openPrLines, reminderLines, runEvent, stamped, usageFrom } from './watch-events'
 
 const SHA = 'abcdef1234567890abcdef1234567890abcdef12'
 const run = (changes: Partial<Run> = {}): Run => ({ ageSeconds: 60, attempt: 1, conclusion: 'success', id: 7, status: 'completed', ...changes })
@@ -173,16 +173,5 @@ describe('clockTime (#240)', () => {
     expect(clockTime(Temporal.Instant.from('2026-10-17T12:09:20.7Z'), 'UTC')).toBe('12:09:20')
     expect(clockTime('soon', 'UTC')).toBeNull()
     expect(clockTime(null, 'UTC')).toBeNull()
-  })
-})
-
-describe('merge queue events (#251)', () => {
-  it('reports a PR entering the queue, keyed by when it entered so a second time is news again', () => {
-    expect(queuedEvent(7, { enqueuedAt: '2026-10-18T09:00:00Z', position: 2 })).toEqual({ key: 'pr-7 queued 2026-10-18T09:00:00Z', lines: ['QUEUED: in the merge queue at position 2'] })
-  })
-
-  it('reports a PR that fell off, with the reason when GitHub gives one', () => {
-    expect(dequeuedEvent(7, '2026-10-18T09:00:00Z', 'Merge conflict').lines[0]).toContain('(Merge conflict)')
-    expect(dequeuedEvent(7, '2026-10-18T09:00:00Z', '')).toMatchObject({ key: 'pr-7 dequeued 2026-10-18T09:00:00Z', lines: [expect.stringContaining('GitHub gives no reason')] })
   })
 })

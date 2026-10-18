@@ -157,7 +157,9 @@ const checkClosed = async (pr: number): Promise<void> => {
 /** Conflicts and approvals, which a parked PR (left open on purpose) doesn't report. */
 const checkReview = async (pr: number, state: PrState): Promise<void> => {
   await report(state.mergeable === 'CONFLICTING' ? { key: `pr-${pr} conflict ${state.head}`, lines: [`CONFLICT at ${short(state.head)}: rebase on main`] } : null, pr)
-  await report(state.decision === 'APPROVED' ? { key: `pr-${pr} approved`, lines: [`APPROVED by the owner. Once it is well reviewed, enable auto-merge: ${mergeCommand(pr)}`] } : null, pr)
+  // Already in the merge queue, there is no auto-merge to enable (#251).
+  const next = state.queued ? 'It is in the merge queue already.' : `Once it is well reviewed, enable auto-merge: ${mergeCommand(pr)}`
+  await report(state.decision === 'APPROVED' ? { key: `pr-${pr} approved`, lines: [`APPROVED by the owner. ${next}`] } : null, pr)
 }
 
 /** Approved and green for the current head, but auto-merge is still off. */

@@ -1,5 +1,6 @@
 /** The project watcher's questions to GitHub, through the `gh` CLI, answered as plain data. */
-import { type Activity, type OpenPr, type QueueEntry, type Run, clockTime, decisionFrom } from './watch-events'
+import { type Activity, type OpenPr, type Run, clockTime, decisionFrom } from './watch-events'
+import type { QueueEntry } from './watch-queue-events'
 import { GH, ghText } from './watch-gh'
 import { hasText, isRecord, textOf } from './read'
 
@@ -121,7 +122,9 @@ export const queueEntries = async (): Promise<Map<number, QueueEntry>> => {
     return new Map()
   }
   const entries = records(at(await graphql('mergeQueue{entries(first:100){nodes{position enqueuedAt pullRequest{number}}}}'), 'mergeQueue', 'entries', 'nodes'))
-  return new Map(entries.map(entry => [count(record(entry.pullRequest).number), { enqueuedAt: textOf(entry.enqueuedAt), position: count(entry.position) }]))
+  // GitHub may leave an entry without its PR: such an entry isn't one of ours to report.
+  return new Map(entries.filter(entry => isRecord(entry.pullRequest))
+    .map(entry => [count(record(entry.pullRequest).number), { enqueuedAt: textOf(entry.enqueuedAt), position: count(entry.position) }]))
 }
 
 /** Why a PR last left the merge queue, as GitHub puts it; '' when it doesn't say. */
@@ -134,7 +137,9 @@ export const dequeueReason = async (pr: number): Promise<string> => {
 export const openPrs = async (): Promise<OpenPr[]> => {
   const [listed, queue] = await Promise.all([
     gh(['pr', 'list', '--repo', REPO, '--state', 'open', '--limit', '100', '--json', 'number,title,reviewDecision,autoMergeRequest,labels,statusCheckRollup,author,mergeStateStatus']),
-    queueEntries(),
+    // A queue that can't be read just now leaves the PRs listed as not queued, as before #251, rather
+    // than leaving out the list, and every reminder with it.
+    queueEntries().catch((): Map<number, QueueEntry> => new Map()),
   ])
   return Promise.all(records(listed)
     .map(async pr => ({
