@@ -36,6 +36,9 @@ describe('the MCP answers (#256)', () => {
   it('refuses a request that is not JSON-RPC 2.0', async () => {
     expect(await answer({ id: 8, jsonrpc: '1.0', method: 'ping' }, all)).toMatchObject({ error: { code: -32_600 }, id: 8 })
     expect(await answer({ id: 9, jsonrpc: '2.0' }, all)).toMatchObject({ error: { code: -32_600 }, id: 9 })
+    expect(await answer({ jsonrpc: '2.0' }, all)).toMatchObject({ error: { code: -32_600 }, id: null })
+    expect(await answer({ id: { not: 'an id' }, jsonrpc: '2.0', method: 'ping' }, all)).toMatchObject({ error: { code: -32_600 }, id: null })
+    expect(await answer({ id: 10, jsonrpc: '2.0', method: 'tools/call', params: 'block_issue' }, all)).toMatchObject({ error: { code: -32_602 }, id: 10 })
   })
 
   it('answers no notification, and an unknown method with an error', async () => {

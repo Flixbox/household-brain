@@ -76,14 +76,22 @@ const byMethod = async ({ id, method, params }: Request, all: Tool[]) => {
   }
 }
 
+const validId = (id: unknown) => typeof id === 'string' || typeof id === 'number' || id === null
+
 /** The answer to one message; null for a notification, which gets none. */
 export const answer = async (message: unknown, all: Tool[]): Promise<Record<string, unknown> | null> => {
-  // A notification gets no answer, nor does anything that isn't even a request to answer.
-  if (!isRecord(message) || !('id' in message)) {
+  const fields = isRecord(message) ? message : {}
+  const { id, method, params } = fields
+  const request = fields.jsonrpc === '2.0' && typeof method === 'string'
+  if (request && !('id' in fields)) {
     return null
   }
-  if (message.jsonrpc !== '2.0' || typeof message.method !== 'string') {
-    return failure(message.id, -32_600, 'not a JSON-RPC 2.0 request')
+  if (!request || !validId(id)) {
+    // Not a request to answer by its id: the answer has none (JSON-RPC 2.0).
+    return failure(validId(id) ? id : null, -32_600, 'not a JSON-RPC 2.0 request')
   }
-  return byMethod({ id: message.id, method: message.method, params: isRecord(message.params) ? message.params : {} }, all)
+  if ('params' in fields && !isRecord(params)) {
+    return failure(id, -32_602, 'params must be an object')
+  }
+  return byMethod({ id, method, params: isRecord(params) ? params : {} }, all)
 }
