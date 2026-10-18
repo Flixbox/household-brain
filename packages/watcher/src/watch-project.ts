@@ -24,6 +24,8 @@
  *   ISSUE_CLOSED / ISSUE_REOPENED    an issue was closed (by anyone) or reopened
  *   IDLE                             nothing happened for max-hours (with --follow: a heartbeat, then it goes on)
  *   WATCHER_ERROR                    a look failed (e.g. a state file stayed locked); it goes on with the next
+ *   LOOKUPS_FAILING / LOOKUPS_RECOVERED  no `gh` call has succeeded for minutes (on every look while it
+ *                                    lasts), or they succeed again (#253)
  *   Usage: session <n>% used (<m>% left, resets …), week <n>% used (<m>% left, resets …)
  *                                    last on every notification: the owner's Claude usage (#233)
  *   REMINDER: PR #<n> …              after every notification, each open PR that waits on the agent: a
@@ -51,7 +53,7 @@
  */
 import { FOLLOW_NEWER, cancelledDeployEvent, mainRunEvent, runEvent } from './watch-events'
 import { type PrState, REPO, jobLines, mainAhead, mainHead, mergeCommand, newestMainRun, openPrs, prStates, recentlyMerged, runOf } from './watch-github'
-import { FOLLOW, flush, queue, quiet, report } from './watch-output'
+import { FOLLOW, flush, queue, quiet, report, reportLookups } from './watch-output'
 import { addLine, lock, readLines, updateLines, writeLines } from './watch-state'
 import { checkActivity as checkPrActivity, checkTrackedActivity } from './watch-activity'
 import { checkQueue } from './watch-queue'
@@ -251,6 +253,9 @@ const lookOnce = async ({ checks, heartbeat }: Poller): Promise<boolean> => {
   if (await flush()) {
     return true
   }
+  // Once a look, after its checks, by one poller; then the usual pause, so a call that fails at once
+  // doesn't print it every moment.
+  await (heartbeat ? reportLookups() : Promise.resolve())
   // After a heartbeat the next look waits like after an empty round.
   if (heartbeat && Temporal.Instant.compare(Temporal.Now.instant(), quiet.since.add({ hours: Number(maxHours) })) > 0) {
     queue([`IDLE: nothing happened for ${maxHours} h`])

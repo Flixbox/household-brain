@@ -48,7 +48,9 @@ default branch's CI, new issues, the owner's comments on issues, and issues clos
   - `ACTIVITY_GH`: the `gh` that reads comments; plain `gh` by default, because only the owner's own
     login sees their pending (unsubmitted) review.
   - `GH_TIMEOUT_SECONDS`: how long one `gh` call may take (30 by default); a slower one counts as a
-    failed read and is tried again next look, so one slow endpoint doesn't hold up the rest.
+    failed read and is tried again next look, so one slow endpoint doesn't hold up the rest. A `GH`
+    wrapper has to answer within it too, also when it first makes a token: one that never does
+    never gets a token cached, and every call fails (`LOOKUPS_FAILING`).
   - `LOCK_PORT`: the local port a running watcher holds so that a second one exits (one from 20000
     to 29999 picked per repository by default). Set it only if another program listens there.
   - `GH_PARALLEL`: how many `gh` calls run at once (4 by default); the pull requests are checked in
@@ -93,6 +95,8 @@ approved one whose auto-merge is still off and that isn't in the merge queue, no
 | `NEW_ISSUE` / `ISSUE_COMMENT` | Read it, take the work in turn, answer the owner's comment. |
 | `ISSUE_CLOSED` / `ISSUE_REOPENED` | Drop or resume any work on it. |
 | `CLOSED` | Closed without merging: stop working on it. |
+| `LOOKUPS_FAILING` | No `gh` call has succeeded for minutes, with the latest failure (a timeout, an exit code): the watcher can't see anything, so its silence means nothing. Comes on every look while it lasts. Check `gh` (logged in, its token, a slow `GH` wrapper) and tell the owner. |
+| `LOOKUPS_RECOVERED` | Calls succeed again; the events held back come next. |
 | `WATCHER_ERROR` | A look failed (for example a state file another program held locked); the watcher carries on with the next look. Repeated, it needs a look: tell the owner. |
 | `REMINDER` | Comes after every notification while a PR waits on you: its branch is behind main or in conflict (rebase it, run the checks, push once), or it is approved with CI green and auto-merge off (enable it, after reading its comments) or with CI failed (fix it). None comes for a PR in the merge queue: there, `DEQUEUED` says when it needs you. It repeats until that is done. |
 
