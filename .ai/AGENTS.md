@@ -62,6 +62,10 @@ repository), never with the owner's account.
   debt, refactors, tooling and bugs before features. Ask only for what is the owner's to decide. The
   work isn't done while issues remain open.
 - **Stuck? File an issue** for what blocks you, assigned to the owner, and carry on with other work.
+- **"Blocked by" links between issues go through `issue-links`** (owner's rule, #256): the plugin's
+  `block_issue` / `unblock_issue` / `issue_links` tools, or
+  `sh packages/issue-links/run.sh cli block <issue> <blocked-by>` (also `unblock`, `links`), never raw
+  API calls. It refuses a link that would close a cycle, and prints the cycle.
 - **Long things run in the background** (tests, builds, CI, watchers, reviewers); do the next thing
   meanwhile.
 

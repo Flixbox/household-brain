@@ -1,0 +1,70 @@
+/**
+ * The MCP server's answers (#256), apart from its input and output so they are tested. MCP over stdio
+ * is JSON-RPC 2.0, one message per line; this plugin is a folder copied on its own, without installed
+ * packages, so it can't use the MCP SDK and answers the four methods a tool server needs itself.
+ */
+import { isRecord, textOf } from './read'
+
+type Command = (...texts: string[]) => Promise<string>
+
+const ISSUE = 'An issue: 12, #12 (in the repository Claude Code runs in, or REPO) or owner/repo#12.'
+
+/** The tools, each with the command it runs and the arguments it passes, in order. */
+export const tools = (commands: Record<'block' | 'links' | 'unblock', Command>) => [
+  {
+    arguments: ['issue', 'blocked_by'],
+    command: commands.block,
+    description: 'Mark an issue as blocked by another, in any repository gh can reach. Refused, with the cycle, when the other issue is already blocked by it, directly or through others.',
+    name: 'block_issue',
+  },
+  { arguments: ['issue', 'blocked_by'], command: commands.unblock, description: 'Remove the link that marks an issue as blocked by another.', name: 'unblock_issue' },
+  { arguments: ['issue'], command: commands.links, description: 'What an issue is blocked by, and what it blocks.', name: 'issue_links' },
+]
+
+type Tool = ReturnType<typeof tools>[number]
+
+const schema = (tool: Tool) => ({
+  properties: Object.fromEntries(tool.arguments.map(name => [name, { description: name === 'issue' ? ISSUE : `The blocking issue. ${ISSUE}`, type: 'string' }])),
+  required: tool.arguments,
+  type: 'object',
+})
+
+const result = (id: unknown, value: unknown) => ({ id, jsonrpc: '2.0', result: value })
+
+/** A tool call's answer; a refusal or failure comes back as the tool's error text, not a protocol error. */
+const call = async (all: Tool[], params: Record<string, unknown>) => {
+  const tool = all.find(known => known.name === params.name)
+  const given = isRecord(params.arguments) ? params.arguments : {}
+  if (!tool) {
+    return { content: [{ text: `no tool named ${textOf(params.name)}`, type: 'text' }], isError: true }
+  }
+  return tool.command(...tool.arguments.map(name => textOf(given[name]))).then(
+    text => ({ content: [{ text, type: 'text' }] }),
+    (error: unknown) => ({ content: [{ text: error instanceof Error ? error.message : 'failed', type: 'text' }], isError: true }),
+  )
+}
+
+/** The answer to one message; null for a notification, which gets none. */
+export const answer = async (message: unknown, all: Tool[]): Promise<Record<string, unknown> | null> => {
+  if (!isRecord(message) || !('id' in message)) {
+    return null
+  }
+  const params = isRecord(message.params) ? message.params : {}
+  switch (message.method) {
+    case 'initialize': {
+      return result(message.id, { capabilities: { tools: {} }, protocolVersion: textOf(params.protocolVersion, '2025-06-18'), serverInfo: { name: 'issue-links', version: '1.0.0' } })
+    }
+    case 'ping': {
+      return result(message.id, {})
+    }
+    case 'tools/list': {
+      return result(message.id, { tools: all.map(tool => ({ description: tool.description, inputSchema: schema(tool), name: tool.name })) })
+    }
+    case 'tools/call': {
+      return result(message.id, await call(all, params))
+    }
+    default: {
+      return { error: { code: -32_601, message: `no method ${textOf(message.method)}` }, id: message.id, jsonrpc: '2.0' }
+    }
+  }
+}

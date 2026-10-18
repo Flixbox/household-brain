@@ -76,6 +76,13 @@
         "nanostores": "1.5.5",
       },
     },
+    "packages/issue-links": {
+      "name": "@household-brain/issue-links",
+      "version": "0.0.0",
+      "bin": {
+        "issue-links": "./src/cli.ts",
+      },
+    },
     "packages/pwa": {
       "name": "@household-brain/pwa",
       "version": "0.0.0",
@@ -498,6 +505,8 @@
     "@household-brain/entries": ["@household-brain/entries@workspace:packages/entries"],
 
     "@household-brain/firebase": ["@household-brain/firebase@workspace:packages/firebase"],
+
+    "@household-brain/issue-links": ["@household-brain/issue-links@workspace:packages/issue-links"],
 
     "@household-brain/pwa": ["@household-brain/pwa@workspace:packages/pwa"],
 

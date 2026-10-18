@@ -1,0 +1,12 @@
+{
+  "name": "issue-links",
+  "description": "Marks GitHub issues as blocked by other issues, refusing a link that would close a cycle; as MCP tools and a command line.",
+  "author": { "name": "Flixbox" },
+  "license": "Unlicense",
+  "mcpServers": {
+    "issue-links": {
+      "command": "sh",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/run.sh", "mcp"]
+    }
+  }
+}
