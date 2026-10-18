@@ -89,9 +89,10 @@ export const flush = async (): Promise<boolean> => {
  */
 export const reportLookups = async (): Promise<void> => {
   const { failing, line } = lookupNews(lookups, Temporal.Now.instant(), clockTime(lookups.lastSuccess) ?? '?')
-  lookups.failing = failing
   if (line !== null) {
     queue([line])
     await flush()
   }
+  // Only once the line is out: if printing failed, the next look says it again, LOOKUPS_RECOVERED too.
+  lookups.failing = failing
 }

@@ -28,6 +28,7 @@ describe('ghText keeping track of the calls (#253)', () => {
     expect(Temporal.Instant.compare(lookups.lastSuccess, before)).toBeGreaterThanOrEqual(0)
     await expect(ghText([], 'false')).rejects.toThrow('exit 1')
     expect(lookups.lastFailure).toBe('exit 1')
+    // The failure is what is tested here, through `lookups`; the error itself is not.
     await ghText([], 'no-such-gh-anywhere').catch(ignoreFailure)
     expect(lookups.lastFailure).toBe("no-such-gh-anywhere couldn't be started")
   })
