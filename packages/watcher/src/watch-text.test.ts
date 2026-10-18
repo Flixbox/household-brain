@@ -17,6 +17,9 @@ describe('bodyLines (#255)', () => {
     const [line = ''] = bodyLines('x'.repeat(350), { url: URL, whole: false })
     expect(line).toBe(`    ${'x'.repeat(300)} … [50 more characters: ${URL}]`)
     expect(bodyLines('short\nreply', { url: URL, whole: false })).toEqual(['    short reply'])
+    // Exactly at the cut nothing is left out; one character more is.
+    expect(bodyLines('y'.repeat(300), { url: URL, whole: false })).toEqual([`    ${'y'.repeat(300)}`])
+    expect(bodyLines('y'.repeat(301), { url: URL, whole: false })[0]).toContain('… [1 more characters:')
   })
 
   it('gives nothing for an empty body, and indents as asked', () => {
