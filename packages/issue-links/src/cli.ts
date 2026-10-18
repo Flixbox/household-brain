@@ -17,11 +17,12 @@ class UsageError extends Error {
   public override name = 'UsageError'
 }
 
-const run = async ([command = '', first = '', second = '']: string[]): Promise<string> => {
-  if ((command === 'block' || command === 'unblock') && first !== '' && second !== '') {
+const run = async (args: string[]): Promise<string> => {
+  const [command = '', first = '', second = ''] = args
+  if ((command === 'block' || command === 'unblock') && args.length === 3) {
     return commands[command](first, second)
   }
-  if (command === 'links' && first !== '') {
+  if (command === 'links' && args.length === 2) {
     return commands.links(first)
   }
   throw new UsageError(USAGE)

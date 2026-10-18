@@ -30,6 +30,10 @@ const schema = (tool: Tool) => ({
 })
 
 const result = (id: unknown, value: unknown) => ({ id, jsonrpc: '2.0', result: value })
+const failure = (id: unknown, code: number, message: string) => ({ error: { code, message }, id, jsonrpc: '2.0' })
+
+/** The protocol versions these answers follow, newest first: the client's when it is one of them. */
+const VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05']
 
 /** A tool call's answer; a refusal or failure comes back as the tool's error text, not a protocol error. */
 const call = async (all: Tool[], params: Record<string, unknown>) => {
@@ -44,27 +48,42 @@ const call = async (all: Tool[], params: Record<string, unknown>) => {
   )
 }
 
+interface Request {
+  id: unknown
+  method: string
+  params: Record<string, unknown>
+}
+
+/** The answer to a request by its method. */
+const byMethod = async ({ id, method, params }: Request, all: Tool[]) => {
+  switch (method) {
+    case 'initialize': {
+      const asked = textOf(params.protocolVersion)
+      return result(id, { capabilities: { tools: {} }, protocolVersion: VERSIONS.includes(asked) ? asked : VERSIONS[0], serverInfo: { name: 'issue-links', version: '1.0.0' } })
+    }
+    case 'ping': {
+      return result(id, {})
+    }
+    case 'tools/list': {
+      return result(id, { tools: all.map(tool => ({ description: tool.description, inputSchema: schema(tool), name: tool.name })) })
+    }
+    case 'tools/call': {
+      return result(id, await call(all, params))
+    }
+    default: {
+      return failure(id, -32_601, `no method ${method}`)
+    }
+  }
+}
+
 /** The answer to one message; null for a notification, which gets none. */
 export const answer = async (message: unknown, all: Tool[]): Promise<Record<string, unknown> | null> => {
+  // A notification gets no answer, nor does anything that isn't even a request to answer.
   if (!isRecord(message) || !('id' in message)) {
     return null
   }
-  const params = isRecord(message.params) ? message.params : {}
-  switch (message.method) {
-    case 'initialize': {
-      return result(message.id, { capabilities: { tools: {} }, protocolVersion: textOf(params.protocolVersion, '2025-06-18'), serverInfo: { name: 'issue-links', version: '1.0.0' } })
-    }
-    case 'ping': {
-      return result(message.id, {})
-    }
-    case 'tools/list': {
-      return result(message.id, { tools: all.map(tool => ({ description: tool.description, inputSchema: schema(tool), name: tool.name })) })
-    }
-    case 'tools/call': {
-      return result(message.id, await call(all, params))
-    }
-    default: {
-      return { error: { code: -32_601, message: `no method ${textOf(message.method)}` }, id: message.id, jsonrpc: '2.0' }
-    }
+  if (message.jsonrpc !== '2.0' || typeof message.method !== 'string') {
+    return failure(message.id, -32_600, 'not a JSON-RPC 2.0 request')
   }
+  return byMethod({ id: message.id, method: message.method, params: isRecord(message.params) ? message.params : {} }, all)
 }

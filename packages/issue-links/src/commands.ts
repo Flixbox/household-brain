@@ -9,7 +9,8 @@ const defaultRepo = async (): Promise<string> => {
   if (given !== '') {
     return given
   }
-  const answer = await ghJson(['repo', 'view', '--json', 'nameWithOwner']).catch(() => null)
+  // A failure comes with gh's own message (not logged in, not a repository folder).
+  const answer = await ghJson(['repo', 'view', '--json', 'nameWithOwner'])
   return typeof answer === 'object' && answer !== null && 'nameWithOwner' in answer && typeof answer.nameWithOwner === 'string' ? answer.nameWithOwner : ''
 }
 

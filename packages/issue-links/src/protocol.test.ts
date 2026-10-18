@@ -28,6 +28,16 @@ describe('the MCP answers (#256)', () => {
       .toMatchObject({ result: { content: [{ text: 'refused: would close a cycle' }], isError: true } })
   })
 
+  it('agrees on a version it follows, and on its newest for any other', async () => {
+    expect(await answer({ id: 6, jsonrpc: '2.0', method: 'initialize', params: { protocolVersion: '1999-01-01' } }, all)).toMatchObject({ result: { protocolVersion: '2025-06-18' } })
+    expect(await answer({ id: 7, jsonrpc: '2.0', method: 'initialize', params: { protocolVersion: '2024-11-05' } }, all)).toMatchObject({ result: { protocolVersion: '2024-11-05' } })
+  })
+
+  it('refuses a request that is not JSON-RPC 2.0', async () => {
+    expect(await answer({ id: 8, jsonrpc: '1.0', method: 'ping' }, all)).toMatchObject({ error: { code: -32_600 }, id: 8 })
+    expect(await answer({ id: 9, jsonrpc: '2.0' }, all)).toMatchObject({ error: { code: -32_600 }, id: 9 })
+  })
+
   it('answers no notification, and an unknown method with an error', async () => {
     expect(await answer({ jsonrpc: '2.0', method: 'notifications/initialized' }, all)).toBeNull()
     expect(await answer({ id: 5, jsonrpc: '2.0', method: 'resources/list' }, all)).toMatchObject({ error: { code: -32_601 }, id: 5 })

@@ -3,7 +3,7 @@
  * repository the `gh` in use can reach. The MCP tools (mcp.ts) and the command line (cli.ts) both use
  * these, so agents set the links one way, with the deadlock check, never through raw API calls.
  */
-import { type IssueRef, refOf, refText } from './refs'
+import { type IssueRef, refKey, refOf, refText } from './refs'
 import { isRecord } from './read'
 import { blockingPath } from './cycle'
 import { ghJson } from './gh'
@@ -32,24 +32,27 @@ const blockersOf = async (issue: IssueRef): Promise<IssueRef[]> => issuesIn(awai
 /** The issues `issue` blocks. */
 const blockedIssuesOf = async (issue: IssueRef): Promise<IssueRef[]> => issuesIn(await ghJson(['api', '--paginate', '--slurp', `${path(issue)}/dependencies/blocking`]))
 
-const fromText = (text: string): IssueRef => {
-  const [repo = '', number = ''] = text.split('#')
+/** An issue back from its key (`owner/name#n`); GitHub takes the name in any case. */
+const fromKey = (key: string): IssueRef => {
+  const [repo = '', number = ''] = key.split('#')
   return { number: Number(number), repo }
 }
+
+const has = (refs: IssueRef[], wanted: IssueRef) => refs.some(known => refKey(known) === refKey(wanted))
 
 /**
  * Marks `issue` as blocked by `blocker`. Refused, with the cycle, when `blocker` is already blocked by
  * `issue`, however indirectly: the two could then never be closed. Returns what was done.
  */
 export const block = async (issue: IssueRef, blocker: IssueRef): Promise<string> => {
-  if (refText(issue) === refText(blocker)) {
+  if (refKey(issue) === refKey(blocker)) {
     throw new Error(`${refText(issue)} can't be blocked by itself`)
   }
-  const cycle = await blockingPath(refText(blocker), refText(issue), async ref => (await blockersOf(fromText(ref))).map(known => refText(known)))
+  const cycle = await blockingPath(refKey(blocker), refKey(issue), async key => (await blockersOf(fromKey(key))).map(known => refKey(known)))
   if (cycle) {
-    throw new Error(`refused: ${refText(issue)} blocked by ${refText(blocker)} would close a cycle: ${[refText(issue), ...cycle].join(' → ')}`)
+    throw new Error(`refused: ${refText(issue)} blocked by ${refText(blocker)} would close a cycle: ${[refKey(issue), ...cycle].join(' → ')}`)
   }
-  if ((await blockersOf(issue)).some(known => refText(known) === refText(blocker))) {
+  if (has(await blockersOf(issue), blocker)) {
     return `${refText(issue)} is already blocked by ${refText(blocker)}`
   }
   await ghJson(['api', '--method', 'POST', `${path(issue)}/dependencies/blocked_by`, '-F', `issue_id=${await idOf(blocker)}`])
@@ -58,7 +61,7 @@ export const block = async (issue: IssueRef, blocker: IssueRef): Promise<string>
 
 /** Removes the link that marks `issue` as blocked by `blocker`. */
 export const unblock = async (issue: IssueRef, blocker: IssueRef): Promise<string> => {
-  if (!(await blockersOf(issue)).some(known => refText(known) === refText(blocker))) {
+  if (!has(await blockersOf(issue), blocker)) {
     return `${refText(issue)} isn't blocked by ${refText(blocker)}`
   }
   await ghJson(['api', '--method', 'DELETE', `${path(issue)}/dependencies/blocked_by/${await idOf(blocker)}`])
