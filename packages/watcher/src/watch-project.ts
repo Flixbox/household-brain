@@ -16,6 +16,7 @@
  *   PR #<n>: ACTIVITY                new comments, reviews (also a pending review's comments), review comments
  *   PR #<n>: DEPLOYED / DEPLOY_FAILED  merged, and the deploy run on main finished
  *   PR #<n>: CLOSED                  closed without merging
+ *   PR #<n>: QUEUED / DEQUEUED       entered the merge queue, or left it without merging (#251)
  *   MAIN_ADVANCED                    main got a new commit (a merge, whoever made it)
  *   MAIN_PASSED / MAIN_FAILED        the newest CI run on main passed, or failed whichever PR caused it
  *   MAIN_SLOW                        the newest CI run on main hangs
@@ -53,6 +54,7 @@ import { type PrState, REPO, jobLines, mainAhead, mainHead, mergeCommand, newest
 import { FOLLOW, flush, queue, quiet, report } from './watch-output'
 import { addLine, lock, readLines, updateLines, writeLines } from './watch-state'
 import { checkActivity as checkPrActivity, checkTrackedActivity } from './watch-activity'
+import { checkQueue } from './watch-queue'
 import { checkIssueStates, checkIssues } from './watch-issues'
 import { allSettled, hasText } from './read'
 
@@ -155,13 +157,16 @@ const checkClosed = async (pr: number): Promise<void> => {
 /** Conflicts and approvals, which a parked PR (left open on purpose) doesn't report. */
 const checkReview = async (pr: number, state: PrState): Promise<void> => {
   await report(state.mergeable === 'CONFLICTING' ? { key: `pr-${pr} conflict ${state.head}`, lines: [`CONFLICT at ${short(state.head)}: rebase on main`] } : null, pr)
-  await report(state.decision === 'APPROVED' ? { key: `pr-${pr} approved`, lines: [`APPROVED by the owner. Once it is well reviewed, enable auto-merge: ${mergeCommand(pr)}`] } : null, pr)
+  // Already in the merge queue, there is no auto-merge to enable (#251).
+  const next = state.queued ? 'It is in the merge queue already.' : `Once it is well reviewed, enable auto-merge: ${mergeCommand(pr)}`
+  await report(state.decision === 'APPROVED' ? { key: `pr-${pr} approved`, lines: [`APPROVED by the owner. ${next}`] } : null, pr)
 }
 
 /** Approved and green for the current head, but auto-merge is still off. */
 const checkReady = async (pr: number, state: PrState): Promise<void> => {
   const green = (await readLines('reported')).includes(`pr-${pr} ci-passed ${state.head}`)
-  const ready = state.decision === 'APPROVED' && !state.autoMerge && green
+  // A PR in the merge queue shows auto-merge as off: it waits on the queue, not on the agent (#251).
+  const ready = state.decision === 'APPROVED' && !state.autoMerge && !state.queued && green
   await report(ready ? { key: `pr-${pr} ready ${state.head}`, lines: [`READY_TO_MERGE: approved and CI is green at ${short(state.head)}, but auto-merge is off. Enable it: ${mergeCommand(pr)}`] } : null, pr)
 }
 
@@ -230,8 +235,8 @@ type Check = () => Promise<void>
 
 /** What someone waits for an answer to: issues, the owner's comments on them and on the PRs followed. */
 const ANSWER_CHECKS: Check[] = [checkIssues, checkIssueStates, checkTrackedActivity]
-/** The rest: main, and each PR's CI, reviews and deploy. */
-const PROJECT_CHECKS: Check[] = [checkMain, checkMainHead, checkPrs]
+/** The rest: main, the merge queue, and each PR's CI, reviews and deploy. */
+const PROJECT_CHECKS: Check[] = [checkMain, checkMainHead, checkQueue, checkPrs]
 
 interface Poller {
   checks: readonly Check[]

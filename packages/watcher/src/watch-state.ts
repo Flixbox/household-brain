@@ -10,6 +10,7 @@
  *                  `issue-comment 345`); `issues`, keyed by their text, is no longer read (#247)
  *   main           the newest commit on main already reported
  *   open-issues    the open issues seen last round
+ *   queued         the PRs in the merge queue, each with when it entered (#251)
  *   pr-<n>-seen    the comments and reviews of a PR already reported
  *   initialized    set after the first complete round: from then on, a PR is new, and so is all on it
  */
