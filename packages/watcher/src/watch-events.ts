@@ -103,6 +103,8 @@ export interface OpenPr {
   checks: string[]
   /** GitHub's `mergeStateStatus`: `BEHIND` (out of date with the base branch), `DIRTY` (conflicts), … */
   mergeState: string
+  /** In the merge queue (#251): auto-merge shows as off there, and enabling it only says "already queued". */
+  queued: boolean
 }
 
 const FAILED = new Set(['FAILURE', 'ERROR', 'TIMED_OUT', 'CANCELLED', 'STARTUP_FAILURE', 'ACTION_REQUIRED'])
@@ -125,7 +127,8 @@ const branchProblem = (pr: OpenPr): string | null => {
 
 /** An approved PR whose CI has finished and that waits on the agent (#224). */
 const approvalProblem = (pr: OpenPr): string | null => {
-  if (pr.reviewDecision !== 'APPROVED') {
+  // A queued PR waits on the queue, not on the agent: what goes wrong there comes as DEQUEUED (#251).
+  if (pr.reviewDecision !== 'APPROVED' || pr.queued) {
     return null
   }
   // No checks at all means CI hasn't reported yet, not that it passed.
@@ -179,10 +182,35 @@ const branchState = (mergeState: string) => {
   return mergeState === 'BEHIND' ? ', behind main' : ''
 }
 
+const mergeWay = (pr: OpenPr) => {
+  if (pr.queued) {
+    return 'in the merge queue'
+  }
+  return `auto-merge ${pr.autoMerge ? 'on' : 'off'}`
+}
+
 export const openPrLines = (prs: OpenPr[]): string[] => [
   'Open PRs:',
-  ...prs.map(pr => `  #${pr.number} ${pr.title.slice(0, 60)}: ${pr.parked ? 'parked, ' : ''}${review(pr.reviewDecision)}, auto-merge ${pr.autoMerge ? 'on' : 'off'}, CI ${ciState(pr.checks)}${branchState(pr.mergeState)}`),
+  ...prs.map(pr => `  #${pr.number} ${pr.title.slice(0, 60)}: ${pr.parked ? 'parked, ' : ''}${review(pr.reviewDecision)}, ${mergeWay(pr)}, CI ${ciState(pr.checks)}${branchState(pr.mergeState)}`),
 ]
+
+/** A PR's place in the merge queue (#251). */
+export interface QueueEntry {
+  position: number
+  /** When it entered: a PR that leaves and enters again is news again. */
+  enqueuedAt: string
+}
+
+export const queuedEvent = (pr: number, entry: QueueEntry): Event => ({
+  key: `pr-${pr} queued ${entry.enqueuedAt}`,
+  lines: [`QUEUED: in the merge queue at position ${entry.position}`],
+})
+
+/** A PR that left the merge queue still open: the one queue event that needs the agent (#251). */
+export const dequeuedEvent = (pr: number, enqueuedAt: string, reason: string): Event => ({
+  key: `pr-${pr} dequeued ${enqueuedAt}`,
+  lines: [`DEQUEUED: left the merge queue without merging (${reason || 'GitHub gives no reason'}): fix what it says, then queue it again`],
+})
 
 /** Event keys after which the open PRs are listed. */
 export const listsOpenPrs = (key: string) => /ci-passed|ci-failed|deployed|deploy-failed|main-passed|main-failed/u.test(key)

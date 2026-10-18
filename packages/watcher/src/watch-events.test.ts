@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { FOLLOW_NEWER, type OpenPr, type Run, answerFirst, cancelledDeployEvent, clockTime, decisionFrom, listsOpenPrs, mainRunEvent, newActivity, openPrLines, reminderLines, runEvent, stamped, usageFrom } from './watch-events'
+import { FOLLOW_NEWER, type OpenPr, type Run, answerFirst, cancelledDeployEvent, clockTime, decisionFrom, dequeuedEvent, listsOpenPrs, mainRunEvent, newActivity, openPrLines, queuedEvent, reminderLines, runEvent, stamped, usageFrom } from './watch-events'
 
 const SHA = 'abcdef1234567890abcdef1234567890abcdef12'
 const run = (changes: Partial<Run> = {}): Run => ({ ageSeconds: 60, attempt: 1, conclusion: 'success', id: 7, status: 'completed', ...changes })
@@ -55,14 +55,16 @@ describe('mainRunEvent', () => {
 describe('openPrLines', () => {
   it('says where each PR stands', () => {
     expect(openPrLines([
-      { autoMerge: false, checks: ['SUCCESS', 'SKIPPED'], mergeState: 'CLEAN', number: 3, parked: true, reviewDecision: '', title: 'Bump a tool' },
-      { autoMerge: true, checks: ['SUCCESS', 'IN_PROGRESS'], mergeState: 'CLEAN', number: 4, parked: false, reviewDecision: 'APPROVED', title: 'Add a page' },
-      { autoMerge: false, checks: ['FAILURE'], mergeState: 'CLEAN', number: 5, parked: false, reviewDecision: 'CHANGES_REQUESTED', title: 'Fix a bug' },
+      { autoMerge: false, checks: ['SUCCESS', 'SKIPPED'], mergeState: 'CLEAN', number: 3, parked: true, queued: false, reviewDecision: '', title: 'Bump a tool' },
+      { autoMerge: true, checks: ['SUCCESS', 'IN_PROGRESS'], mergeState: 'CLEAN', number: 4, parked: false, queued: false, reviewDecision: 'APPROVED', title: 'Add a page' },
+      { autoMerge: false, checks: ['FAILURE'], mergeState: 'CLEAN', number: 5, parked: false, queued: false, reviewDecision: 'CHANGES_REQUESTED', title: 'Fix a bug' },
+      { autoMerge: false, checks: ['SUCCESS'], mergeState: 'CLEAN', number: 6, parked: false, queued: true, reviewDecision: 'APPROVED', title: 'Ship it' },
     ])).toEqual([
       'Open PRs:',
       '  #3 Bump a tool: parked, awaiting approval, auto-merge off, CI green',
       '  #4 Add a page: approved, auto-merge on, CI running',
       '  #5 Fix a bug: changes requested, auto-merge off, CI failed',
+      '  #6 Ship it: approved, in the merge queue, CI green',
     ])
   })
 
@@ -92,7 +94,7 @@ describe('answerFirst (#222)', () => {
 })
 
 describe('reminderLines (#224)', () => {
-  const pr = (changes: Partial<OpenPr>): OpenPr => ({ autoMerge: false, checks: ['SUCCESS'], mergeState: 'CLEAN', number: 1, parked: false, reviewDecision: 'APPROVED', title: 'x', ...changes })
+  const pr = (changes: Partial<OpenPr>): OpenPr => ({ autoMerge: false, checks: ['SUCCESS'], mergeState: 'CLEAN', number: 1, parked: false, queued: false, reviewDecision: 'APPROVED', title: 'x', ...changes })
 
   it('reminds of an approved PR with green CI and auto-merge off, and of one whose CI failed', () => {
     expect(reminderLines([pr({ number: 284 }), pr({ checks: ['SUCCESS', 'FAILURE'], number: 290 })])).toEqual([
@@ -108,12 +110,15 @@ describe('reminderLines (#224)', () => {
       pr({ parked: true }),
       pr({ reviewDecision: 'REVIEW_REQUIRED' }),
       pr({ checks: [] }),
+      // In the merge queue: auto-merge shows as off there, and the queue does the merging (#251).
+      pr({ queued: true }),
+      pr({ checks: ['FAILURE'], queued: true }),
     ])).toEqual([])
   })
 })
 
 describe('reminders for branches that can\'t merge (#226)', () => {
-  const pr = (changes: Partial<OpenPr>): OpenPr => ({ autoMerge: true, checks: ['SUCCESS'], mergeState: 'CLEAN', number: 314, parked: false, reviewDecision: 'APPROVED', title: 'x', ...changes })
+  const pr = (changes: Partial<OpenPr>): OpenPr => ({ autoMerge: true, checks: ['SUCCESS'], mergeState: 'CLEAN', number: 314, parked: false, queued: false, reviewDecision: 'APPROVED', title: 'x', ...changes })
 
   it('reminds of a branch behind main or in conflict, approved or not', () => {
     expect(reminderLines([pr({ mergeState: 'BEHIND' }), pr({ mergeState: 'DIRTY', number: 9, reviewDecision: '' })])).toEqual([
@@ -168,5 +173,16 @@ describe('clockTime (#240)', () => {
     expect(clockTime(Temporal.Instant.from('2026-10-17T12:09:20.7Z'), 'UTC')).toBe('12:09:20')
     expect(clockTime('soon', 'UTC')).toBeNull()
     expect(clockTime(null, 'UTC')).toBeNull()
+  })
+})
+
+describe('merge queue events (#251)', () => {
+  it('reports a PR entering the queue, keyed by when it entered so a second time is news again', () => {
+    expect(queuedEvent(7, { enqueuedAt: '2026-10-18T09:00:00Z', position: 2 })).toEqual({ key: 'pr-7 queued 2026-10-18T09:00:00Z', lines: ['QUEUED: in the merge queue at position 2'] })
+  })
+
+  it('reports a PR that fell off, with the reason when GitHub gives one', () => {
+    expect(dequeuedEvent(7, '2026-10-18T09:00:00Z', 'Merge conflict').lines[0]).toContain('(Merge conflict)')
+    expect(dequeuedEvent(7, '2026-10-18T09:00:00Z', '')).toMatchObject({ key: 'pr-7 dequeued 2026-10-18T09:00:00Z', lines: [expect.stringContaining('GitHub gives no reason')] })
   })
 })

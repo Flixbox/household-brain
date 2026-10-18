@@ -81,7 +81,9 @@ approved one whose auto-merge is still off, not only on the one the event names.
 | `CONFLICT` | Rebase on the default branch, run the checks, push once, reply on the pull request. |
 | `MAIN_MOVED` | The default branch moved under the pull request. Rebase, run the checks, push once, so what gets merged is what was tested. |
 | `APPROVED` | The owner approved. If the review's findings are fixed, read the pull request for unanswered comments, then enable auto-merge with the command the event names (`--squash` unless the branch merges through a merge queue), or as the repository's notes say). A plain approval comes only as this; one with text also comes as `ACTIVITY`: answer it first. |
-| `READY_TO_MERGE` | Approved and green, auto-merge still off: enable it the same way, unless review findings are still open. |
+| `READY_TO_MERGE` | Approved and green, auto-merge still off: enable it the same way, unless review findings are still open. Not reported for a PR in the merge queue. |
+| `QUEUED` | The PR entered the merge queue (with its position). Nothing to do; no auto-merge reminders come for it while it is there. |
+| `DEQUEUED` | The PR left the merge queue without merging, with GitHub's reason (failed checks, a conflict, removed by hand). Fix what it says, then queue it again. |
 | `ACTIVITY` | Answer every comment **from the owner**, including those of a pending review: fix what is asked in one push, then reply in the thread and resolve it once settled. A comment that needs the owner's decision stays open. Don't answer anyone else (a maintainer, a bot, a passer-by): tell the owner and leave the reply to them, or the agent becomes a proxy speaking for the owner. |
 | `DEPLOYED` | Check the deployed app as the repository's notes say. |
 | `DEPLOY_FAILED` | Fix it in a follow-up pull request. A deploy a newer merge cancelled isn't a failure: the watcher follows the newer run. |

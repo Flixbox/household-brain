@@ -1,5 +1,5 @@
 /** The project watcher's questions to GitHub, through the `gh` CLI, answered as plain data. */
-import { type Activity, type OpenPr, type Run, clockTime, decisionFrom } from './watch-events'
+import { type Activity, type OpenPr, type QueueEntry, type Run, clockTime, decisionFrom } from './watch-events'
 import { GH, ghText } from './watch-gh'
 import { hasText, isRecord, textOf } from './read'
 
@@ -107,17 +107,47 @@ const decisionOf = async (pr: number, reviewDecision: unknown, author: string): 
     .filter(review => review.login !== author && review.login !== SELF))
 }
 
-export const openPrs = async (): Promise<OpenPr[]> =>
-  Promise.all(records(await gh(['pr', 'list', '--repo', REPO, '--state', 'open', '--limit', '100', '--json', 'number,title,reviewDecision,autoMergeRequest,labels,statusCheckRollup,author,mergeStateStatus']))
+const graphql = async (fields: string): Promise<Json> => {
+  const [owner = '', name = ''] = REPO.split('/')
+  return record(record(record(await gh(['api', 'graphql', '-f', `query={repository(owner:"${owner}",name:"${name}"){${fields}}}`])).data).repository)
+}
+
+/** What is at `keys` inside a GraphQL answer; an empty object where something on the way is missing. */
+const at = (value: unknown, ...keys: string[]): unknown => keys.reduce((inside: unknown, key) => record(inside)[key], value)
+
+/** Every PR in the merge queue, by number (#251); none where the default branch has no queue. */
+export const queueEntries = async (): Promise<Map<number, QueueEntry>> => {
+  if (!MERGE_QUEUE) {
+    return new Map()
+  }
+  const entries = records(at(await graphql('mergeQueue{entries(first:100){nodes{position enqueuedAt pullRequest{number}}}}'), 'mergeQueue', 'entries', 'nodes'))
+  return new Map(entries.map(entry => [count(record(entry.pullRequest).number), { enqueuedAt: textOf(entry.enqueuedAt), position: count(entry.position) }]))
+}
+
+/** Why a PR last left the merge queue, as GitHub puts it; '' when it doesn't say. */
+export const dequeueReason = async (pr: number): Promise<string> => {
+  const query = `pullRequest(number:${pr}){timelineItems(last:1,itemTypes:[REMOVED_FROM_MERGE_QUEUE_EVENT]){nodes{...on RemovedFromMergeQueueEvent{reason}}}}`
+  const removal = records(at(await graphql(query), 'pullRequest', 'timelineItems', 'nodes'))
+  return oneLine(removal.at(-1)?.reason, 200)
+}
+
+export const openPrs = async (): Promise<OpenPr[]> => {
+  const [listed, queue] = await Promise.all([
+    gh(['pr', 'list', '--repo', REPO, '--state', 'open', '--limit', '100', '--json', 'number,title,reviewDecision,autoMergeRequest,labels,statusCheckRollup,author,mergeStateStatus']),
+    queueEntries(),
+  ])
+  return Promise.all(records(listed)
     .map(async pr => ({
       autoMerge: Boolean(pr.autoMergeRequest),
       checks: records(pr.statusCheckRollup).map(check => textOf(check.conclusion) || textOf(check.state) || 'pending'),
       mergeState: textOf(pr.mergeStateStatus),
       number: count(pr.number),
       parked: records(pr.labels).some(label => label.name === 'parked'),
+      queued: queue.has(count(pr.number)),
       reviewDecision: await decisionOf(count(pr.number), pr.reviewDecision, textOf(record(pr.author).login)),
       title: textOf(pr.title),
     })))
+}
 
 export interface PrState {
   state: string
@@ -127,10 +157,11 @@ export interface PrState {
   decision: string
   autoMerge: boolean
   parked: boolean
+  queued: boolean
   title: string
 }
 
-const PR_FIELDS = 'state mergeable headRefOid mergeCommit { oid } reviewDecision autoMergeRequest { enabledAt } title'
+const PR_FIELDS = 'isInMergeQueue state mergeable headRefOid mergeCommit { oid } reviewDecision autoMergeRequest { enabledAt } title'
   + ' labels(first: 100) { nodes { name } } author { login kind: __typename } reviews(last: 100) { nodes { state author { login kind: __typename } } }'
 const PRS_PER_QUERY = 50
 
@@ -153,16 +184,14 @@ const stateOf = (value: Json): PrState => {
     mergeSha: textOf(record(value.mergeCommit).oid),
     mergeable: textOf(value.mergeable),
     parked: records(record(value.labels).nodes).some(label => label.name === 'parked'),
+    queued: value.isInMergeQueue === true,
     state: textOf(value.state),
     title: `${textOf(value.title)} (by ${author})`,
   }
 }
 
 const statesOf = async (prs: readonly number[]): Promise<[number, PrState][]> => {
-  const [owner = '', name = ''] = REPO.split('/')
-  const fields = prs.map(pr => `pr${pr}: pullRequest(number: ${pr}) { ${PR_FIELDS} }`).join(' ')
-  const answer = record(await gh(['api', 'graphql', '-f', `query={repository(owner:"${owner}",name:"${name}"){${fields}}}`]))
-  const repository = record(record(answer.data).repository)
+  const repository = await graphql(prs.map(pr => `pr${pr}: pullRequest(number: ${pr}) { ${PR_FIELDS} }`).join(' '))
   return prs.flatMap((pr): [number, PrState][] => {
     const value = repository[`pr${pr}`]
     return isRecord(value) ? [[pr, stateOf(value)]] : []
