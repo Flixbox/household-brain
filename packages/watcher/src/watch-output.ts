@@ -6,6 +6,7 @@
  * `---` line, so one slow call never holds back an event found before it (#240), and it goes on (#196).
  */
 import { type Event, answerFirst, clockTime, listsOpenPrs, openPrLines, reminderLines, stamped } from './watch-events'
+import { lookupNews, lookups } from './watch-gh'
 import { openPrs } from './watch-github'
 import { addLine } from './watch-state'
 import { usageLine } from './watch-usage'
@@ -80,4 +81,18 @@ export const flush = async (): Promise<boolean> => {
     process.exit(0)
   }
   return true
+}
+
+/**
+ * Says so when no `gh` call has succeeded for a while (#253): every check treats a failed call as
+ * "try again next look", so a watcher whose calls all fail would otherwise look like a quiet repository.
+ */
+export const reportLookups = async (): Promise<void> => {
+  const { failing, line } = lookupNews(lookups, Temporal.Now.instant(), clockTime(lookups.lastSuccess) ?? '?')
+  if (line !== null) {
+    queue([line])
+    await flush()
+  }
+  // Only once the line is out: if printing failed, the next look says it again, LOOKUPS_RECOVERED too.
+  lookups.failing = failing
 }

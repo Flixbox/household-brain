@@ -36,9 +36,41 @@ const release = () => {
   slots.free += 1
 }
 
+/**
+ * How the `gh` calls have gone (#253): when one last succeeded (the start counts as one), why the
+ * latest failed, and whether LOOKUPS_FAILING was printed. Every caller treats a failed call as
+ * "try again next look", so without this a watcher whose calls all fail would just go quiet.
+ */
+export const lookups = { failing: false, lastFailure: '', lastSuccess: Temporal.Now.instant() }
+
+/** After this long without a single call succeeding, the watcher says so. */
+const FAILING_AFTER = Temporal.Duration.from({ minutes: 5 })
+
+/**
+ * The line to print about the calls this look, or null, and whether they count as failing now:
+ * LOOKUPS_FAILING on every look while none has succeeded for a while, LOOKUPS_RECOVERED once.
+ */
+export const lookupNews = (health: Readonly<typeof lookups>, now: Temporal.Instant, since: string): { failing: boolean, line: string | null } => {
+  const failing = Temporal.Instant.compare(now, health.lastSuccess.add(FAILING_AFTER)) > 0
+  if (failing) {
+    return { failing, line: `LOOKUPS_FAILING: no gh call has succeeded since ${since} (the latest: ${health.lastFailure || 'no answer'}); nothing can be reported until one does` }
+  }
+  return { failing, line: health.failing ? 'LOOKUPS_RECOVERED: gh calls succeed again' : null }
+}
+
 /** What a `gh` call prints; it fails on a non-zero exit, or when it runs out of time. */
+/** Starts a call; one that can't even start (no such program) counts as a failed call too. */
+const started = (args: string[], cli: string) => {
+  try {
+    return Bun.spawn([cli, ...args], { killSignal: 'SIGKILL', stderr: 'ignore', stdout: 'pipe', timeout: GH_TIMEOUT_MS })
+  } catch (error) {
+    lookups.lastFailure = `${cli} couldn't be started`
+    throw error
+  }
+}
+
 const ghCall = async (args: string[], cli: string): Promise<string> => {
-  const call = Bun.spawn([cli, ...args], { killSignal: 'SIGKILL', stderr: 'ignore', stdout: 'pipe', timeout: GH_TIMEOUT_MS })
+  const call = started(args, cli)
   // Read while it runs (a full pipe would stall it), but don't wait for the end of the output once it
   // failed: a wrapper script's child (`agent-gh` runs `gh`) can outlive it and hold the pipe open.
   const output = new Response(call.stdout).text()
@@ -46,8 +78,10 @@ const ghCall = async (args: string[], cli: string): Promise<string> => {
   if (exitCode !== 0) {
     output.catch(ignoreFailure)
     const why = call.signalCode === 'SIGKILL' ? `timed out after ${GH_TIMEOUT_MS / 1000} s` : `exit ${exitCode}`
+    lookups.lastFailure = why
     throw new Error(`${cli} ${args.join(' ')}: ${why}`)
   }
+  lookups.lastSuccess = Temporal.Now.instant()
   return output
 }
 

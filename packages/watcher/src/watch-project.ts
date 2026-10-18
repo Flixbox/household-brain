@@ -24,6 +24,8 @@
  *   ISSUE_CLOSED / ISSUE_REOPENED    an issue was closed (by anyone) or reopened
  *   IDLE                             nothing happened for max-hours (with --follow: a heartbeat, then it goes on)
  *   WATCHER_ERROR                    a look failed (e.g. a state file stayed locked); it goes on with the next
+ *   LOOKUPS_FAILING / LOOKUPS_RECOVERED  no `gh` call has succeeded for minutes (on every look while it
+ *                                    lasts), or they succeed again (#253)
  *   Usage: session <n>% used (<m>% left, resets …), week <n>% used (<m>% left, resets …)
  *                                    last on every notification: the owner's Claude usage (#233)
  *   REMINDER: PR #<n> …              after every notification, each open PR that waits on the agent: a
@@ -51,12 +53,12 @@
  */
 import { FOLLOW_NEWER, cancelledDeployEvent, mainRunEvent, runEvent } from './watch-events'
 import { type PrState, REPO, jobLines, mainAhead, mainHead, mergeCommand, newestMainRun, openPrs, prStates, recentlyMerged, runOf } from './watch-github'
-import { FOLLOW, flush, queue, quiet, report } from './watch-output'
+import { FOLLOW, flush, queue, quiet, report, reportLookups } from './watch-output'
 import { addLine, lock, readLines, updateLines, writeLines } from './watch-state'
 import { checkActivity as checkPrActivity, checkTrackedActivity } from './watch-activity'
 import { checkQueue } from './watch-queue'
 import { checkIssueStates, checkIssues } from './watch-issues'
-import { allSettled, hasText } from './read'
+import { allSettled, hasText, ignoreFailure } from './read'
 
 const [limitMinutes = '20', maxHours = '12'] = process.argv.slice(2).filter(arg => arg !== '--follow')
 if (!/^\d+$/u.test(limitMinutes) || !/^\d+$/u.test(maxHours)) {
@@ -273,7 +275,11 @@ const lookSafely = async (poller: Poller): Promise<boolean> => lookOnce(poller).
 const poll = async (poller: Poller): Promise<never> => {
   // A loop rather than a function awaiting itself: following, the watcher runs for a whole session.
   for (;;) {
-    await (await lookSafely(poller) ? Promise.resolve() : Bun.sleep(poller.pauseSeconds * 1000))
+    const busy = await lookSafely(poller)
+    // After every look of one poller, whatever it found (#253). If the line can't be printed, the
+    // next look tries again.
+    await (poller.heartbeat ? reportLookups().catch(ignoreFailure) : Promise.resolve())
+    await (busy ? Promise.resolve() : Bun.sleep(poller.pauseSeconds * 1000))
   }
 }
 
