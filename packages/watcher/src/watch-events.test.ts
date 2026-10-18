@@ -77,8 +77,8 @@ describe('openPrLines', () => {
 
 describe('newActivity', () => {
   it('keeps what was not seen, once', () => {
-    const items = [{ id: 'comment 1', line: 'a' }, { id: 'comment 2', line: 'b' }, { id: 'comment 2', line: 'b' }]
-    expect(newActivity(new Set(['comment 1']), items)).toEqual([{ id: 'comment 2', line: 'b' }])
+    const items = [{ id: 'comment 1', lines: ['a'] }, { id: 'comment 2', lines: ['b'] }, { id: 'comment 2', lines: ['b'] }]
+    expect(newActivity(new Set(['comment 1']), items)).toEqual([{ id: 'comment 2', lines: ['b'] }])
   })
 })
 

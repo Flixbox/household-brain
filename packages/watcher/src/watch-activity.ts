@@ -1,6 +1,6 @@
 /** The project watcher's look at a pull request's comments and reviews (watch-project.ts). */
 import { type Activity, newActivity } from './watch-events'
-import { activityOf, reviewCommentLines } from './watch-github'
+import { activityOf, reviewCommentLines } from './watch-comments'
 import { appendLines, exists, oneAtATime, readLines, writeLines } from './watch-state'
 import { allSettled } from './read'
 import { queue } from './watch-output'
@@ -24,7 +24,7 @@ const queueActivity = async (pr: number, fresh: Activity[]): Promise<void> => {
     return { comments, item }
   }))
   await appendLines(`pr-${pr}-seen`, read.filter(entry => entry.comments !== null).map(entry => entry.item.id))
-  queue([`PR #${pr}: ACTIVITY:`, ...read.flatMap(({ comments, item }) => [item.line].concat(comments ?? ['  (its line comments couldn\'t be read yet: they come next look)']))])
+  queue([`PR #${pr}: ACTIVITY:`, ...read.flatMap(({ comments, item }) => item.lines.concat(comments ?? ['  (its line comments couldn\'t be read yet: they come next look)']))])
 }
 
 /**
