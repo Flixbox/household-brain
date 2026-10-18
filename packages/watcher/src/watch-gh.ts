@@ -59,8 +59,18 @@ export const lookupNews = (health: Readonly<typeof lookups>, now: Temporal.Insta
 }
 
 /** What a `gh` call prints; it fails on a non-zero exit, or when it runs out of time. */
+/** Starts a call; one that can't even start (no such program) counts as a failed call too. */
+const started = (args: string[], cli: string) => {
+  try {
+    return Bun.spawn([cli, ...args], { killSignal: 'SIGKILL', stderr: 'ignore', stdout: 'pipe', timeout: GH_TIMEOUT_MS })
+  } catch (error) {
+    lookups.lastFailure = `${cli} couldn't be started`
+    throw error
+  }
+}
+
 const ghCall = async (args: string[], cli: string): Promise<string> => {
-  const call = Bun.spawn([cli, ...args], { killSignal: 'SIGKILL', stderr: 'ignore', stdout: 'pipe', timeout: GH_TIMEOUT_MS })
+  const call = started(args, cli)
   // Read while it runs (a full pipe would stall it), but don't wait for the end of the output once it
   // failed: a wrapper script's child (`agent-gh` runs `gh`) can outlive it and hold the pipe open.
   const output = new Response(call.stdout).text()

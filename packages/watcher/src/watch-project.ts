@@ -58,7 +58,7 @@ import { addLine, lock, readLines, updateLines, writeLines } from './watch-state
 import { checkActivity as checkPrActivity, checkTrackedActivity } from './watch-activity'
 import { checkQueue } from './watch-queue'
 import { checkIssueStates, checkIssues } from './watch-issues'
-import { allSettled, hasText } from './read'
+import { allSettled, hasText, ignoreFailure } from './read'
 
 const [limitMinutes = '20', maxHours = '12'] = process.argv.slice(2).filter(arg => arg !== '--follow')
 if (!/^\d+$/u.test(limitMinutes) || !/^\d+$/u.test(maxHours)) {
@@ -253,9 +253,6 @@ const lookOnce = async ({ checks, heartbeat }: Poller): Promise<boolean> => {
   if (await flush()) {
     return true
   }
-  // Once a look, after its checks, by one poller; then the usual pause, so a call that fails at once
-  // doesn't print it every moment.
-  await (heartbeat ? reportLookups() : Promise.resolve())
   // After a heartbeat the next look waits like after an empty round.
   if (heartbeat && Temporal.Instant.compare(Temporal.Now.instant(), quiet.since.add({ hours: Number(maxHours) })) > 0) {
     queue([`IDLE: nothing happened for ${maxHours} h`])
@@ -278,7 +275,11 @@ const lookSafely = async (poller: Poller): Promise<boolean> => lookOnce(poller).
 const poll = async (poller: Poller): Promise<never> => {
   // A loop rather than a function awaiting itself: following, the watcher runs for a whole session.
   for (;;) {
-    await (await lookSafely(poller) ? Promise.resolve() : Bun.sleep(poller.pauseSeconds * 1000))
+    const busy = await lookSafely(poller)
+    // After every look of one poller, whatever it found (#253). If the line can't be printed, the
+    // next look tries again.
+    await (poller.heartbeat ? reportLookups().catch(ignoreFailure) : Promise.resolve())
+    await (busy ? Promise.resolve() : Bun.sleep(poller.pauseSeconds * 1000))
   }
 }
 
