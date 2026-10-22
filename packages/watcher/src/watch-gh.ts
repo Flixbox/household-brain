@@ -92,6 +92,17 @@ const statusOf = (answer: string): number | null => {
 export const failedStatus = (error: unknown): number | null =>
   error instanceof Error && isRecord(error.cause) && typeof error.cause.status === 'number' ? error.cause.status : null
 
+/** The error for a failed call, with the HTTP status GitHub refused it with, if it answered. */
+const failure = async (command: string, call: ReturnType<typeof started>, output: Promise<string>): Promise<Error> => {
+  const timedOut = call.signalCode === 'SIGKILL'
+  // A refused call's answer says why (#263): `gh api` prints GitHub's error, with its HTTP status.
+  const answer = timedOut ? '' : await Promise.race([output, Bun.sleep(ANSWER_WAIT_MS).then(() => '')])
+  output.catch(ignoreFailure)
+  const why = timedOut ? `timed out after ${GH_TIMEOUT_MS / 1000} s` : `exit ${call.exitCode}`
+  lookups.lastFailure = why
+  return new Error(`${command}: ${why}`, { cause: { status: statusOf(answer) } })
+}
+
 /** What a `gh` call prints; it fails on a non-zero exit, or when it runs out of time. */
 const ghCall = async (args: string[], cli: string): Promise<string> => {
   const call = started(args, cli)
@@ -100,13 +111,7 @@ const ghCall = async (args: string[], cli: string): Promise<string> => {
   const output = new Response(call.stdout).text()
   const exitCode = await call.exited
   if (exitCode !== 0) {
-    const timedOut = call.signalCode === 'SIGKILL'
-    // A refused call's answer says why (#263): `gh api` prints GitHub's error, with its HTTP status.
-    const answer = timedOut ? '' : await Promise.race([output, Bun.sleep(ANSWER_WAIT_MS).then(() => '')])
-    output.catch(ignoreFailure)
-    const why = timedOut ? `timed out after ${GH_TIMEOUT_MS / 1000} s` : `exit ${exitCode}`
-    lookups.lastFailure = why
-    throw new Error(`${cli} ${args.join(' ')}: ${why}`, { cause: { status: statusOf(answer) } })
+    throw await failure(`${cli} ${args.join(' ')}`, call, output)
   }
   lookups.lastSuccess = Temporal.Now.instant()
   return output
