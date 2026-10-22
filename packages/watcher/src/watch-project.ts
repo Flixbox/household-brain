@@ -40,6 +40,8 @@
  * closing) is reported; merged ones from the last few hours too, for a fresh state. Each follows its
  * PR's *current* head commit, so a push needs no restart. It remembers what it reported
  * (watch-state.ts), so start it again after handling the events and it continues with the next ones.
+ * Any number of watchers can watch the same repository at once, and each reports every event (#264):
+ * each remembers on its own (WATCHER_ID), and they share `gh`'s answers for a moment (watch-gh.ts).
  * Run it in the background: its exit is the notification. Bun reads the whole file before running
  * it, so editing the checkout meanwhile is harmless.
  *
@@ -54,7 +56,7 @@
 import { FOLLOW_NEWER, cancelledDeployEvent, mainRunEvent, runEvent } from './watch-events'
 import { type PrState, REPO, jobLines, mainAhead, mainHead, mergeCommand, newestMainRun, openPrs, prStates, recentlyMerged, runOf } from './watch-github'
 import { FOLLOW, flush, queue, quiet, report, reportLookups } from './watch-output'
-import { addLine, lock, readLines, updateLines, writeLines } from './watch-state'
+import { addLine, readLines, start, updateLines, writeLines } from './watch-state'
 import { checkActivity as checkPrActivity, checkTrackedActivity } from './watch-activity'
 import { checkQueue } from './watch-queue'
 import { checkIssueStates, checkIssues } from './watch-issues'
@@ -127,12 +129,13 @@ const checkMainHead = async (): Promise<void> => {
 const checkMoved = async (pr: number, head: string): Promise<void> => {
   const { ahead, newest } = await mainAhead(head).catch(() => ({ ahead: 0, newest: '-' }))
   // The PR's state was read at the start of the look. One that merged since counts as open, and its
-  // own merge is then a commit main has (#249): ask again, and say nothing unless it is still open. A
-  // failed read says nothing either: the next look asks again.
+  // own merge is then a commit main has (#249): ask GitHub again, not for an answer shared seconds
+  // ago (#264), and say nothing unless it is still open. A failed read says nothing either: the next
+  // look asks again.
   // Asked only while it is news: a branch left behind main isn't asked about on every look.
   const key = `pr-${pr} main-moved ${newest}`
   const news = ahead > 0 && !(await readLines('reported')).includes(key)
-  const stillOpen = news && await prStates([pr]).then(states => states.get(pr)?.state === 'OPEN', () => false)
+  const stillOpen = news && await prStates([pr], true).then(states => states.get(pr)?.state === 'OPEN', () => false)
   await report(stillOpen ? { key, lines: [`MAIN_MOVED: main is ${ahead} commit(s) ahead of the branch: rebase on main and run the checks again`] } : null, pr)
 }
 
@@ -283,7 +286,7 @@ const poll = async (poller: Poller): Promise<never> => {
   }
 }
 
-await lock()
+await start()
 // Following, two pollers run side by side (#240): the answers every 30 s, never waiting for a slow
 // look at CI and deploys. Without `--follow`, one look at everything, the answers first (#235).
 await (FOLLOW

@@ -1,8 +1,6 @@
-/* oxlint-disable import/no-nodejs-modules -- Bun has no rename of its own; node:fs/promises is built into Bun */
 /**
- * What the project watcher remembers between runs, in plain files (the same ones the earlier bash
- * watcher kept, so either can take over from the other), and the lock that keeps a second watcher
- * from racing on them:
+ * What a project watcher remembers between runs, in plain files (the same ones the earlier bash
+ * watcher kept, so either can take over from the other):
  *
  *   reported       one line per event already reported
  *   tracked        pull requests followed until their deploy or closing is reported
@@ -13,15 +11,23 @@
  *   queued         the PRs in the merge queue, each with when it entered (#251)
  *   pr-<n>-seen    the comments and reviews of a PR already reported
  *   initialized    set after the first complete round: from then on, a PR is new, and so is all on it
+ *
+ * Any number of watchers can watch one repository at once, and each reports every event (#264): each
+ * remembers in a folder of its own, by its WATCHER_ID.
  */
-import { $ } from 'bun'
-import { rename } from 'node:fs/promises'
 import { REPO } from './watch-github'
-import { ignoreFailure } from './read'
+import { WATCHERS_DIR, removeOlder, writeWhole } from './watch-files'
+import { hasText, ignoreFailure } from './read'
 
-const home = process.env.HOME ?? '.'
-const stateHome = process.env.XDG_STATE_HOME ?? `${home}/.local/state`
-const DIR = process.env.STATE_DIR ?? `${stateHome}/watch-project/${REPO.replace('/', '_')}`
+// WATCHER_ID: which watcher this is (#264); by default the Claude Code session's id, so a watcher
+// started again in the same session (a re-armed Monitor) goes on where the last one stopped, and one
+// in another session keeps a record of its own. Without either, the repository's own folder, shared
+// by every watcher without an id: those would split the events between them. STATE_DIR names the
+// folder outright.
+const WATCHER_ID = [process.env.WATCHER_ID, process.env.CLAUDE_CODE_SESSION_ID].find(hasText)
+const REPO_DIR = `${WATCHERS_DIR}/${REPO.replace('/', '_')}`
+const SESSIONS_DIR = `${REPO_DIR}/sessions`
+const DIR = [process.env.STATE_DIR, WATCHER_ID && `${SESSIONS_DIR}/${WATCHER_ID.replaceAll(/[^\w.-]/gu, '_')}`].find(hasText) ?? REPO_DIR
 
 const stateFile = (name: string) => `${DIR}/${name}`
 
@@ -43,15 +49,8 @@ const retried = async <Result>(work: () => Promise<Result>, tries = 5): Promise<
 export const readLines = async (name: string): Promise<string[]> => retried(async () =>
   ((await exists(name)) ? (await Bun.file(stateFile(name)).text()).split('\n').filter(Boolean) : []))
 
-/**
- * Written to a temporary file and renamed over the old one, so a write that fails halfway never leaves
- * a state file cut short. Bun.write creates the state directory on first use.
- */
-const write = async (name: string, lines: readonly string[]): Promise<void> => retried(async () => {
-  const draft = stateFile(`${name}.writing`)
-  await Bun.write(draft, lines.length > 0 ? `${lines.join('\n')}\n` : '')
-  await rename(draft, stateFile(name))
-})
+const write = async (name: string, lines: readonly string[]): Promise<void> =>
+  retried(async () => writeWhole(stateFile(name), lines.length > 0 ? `${lines.join('\n')}\n` : ''))
 
 /** The last piece of work queued for each name. */
 const queued = new Map<string, Promise<unknown>>()
@@ -85,35 +84,13 @@ export const addLine = async (name: string, line: string): Promise<boolean> => o
   return true
 })
 
-// LOCK_PORT: the local port the running watcher holds as its lock (#245); by default one from 20000
-// to 29999 picked from the state directory, so each repository has its own. Set it if another
-// program happens to listen on that port.
-const LOCK_PORT = Number(process.env.LOCK_PORT ?? 20_000 + (Bun.hash.crc32(DIR) % 10_000))
-// Port 0 would let the system pick any free port, so every watcher would get one: no lock at all.
-if (!Number.isInteger(LOCK_PORT) || LOCK_PORT < 1 || LOCK_PORT > 65_535) {
-  process.stderr.write('LOCK_PORT must be a port number from 1 to 65535\n')
-  process.exit(64)
-}
-
 /**
- * One watcher per state directory; exits 75 when another one runs. The lock is a listening port on
- * this machine (#245): of watchers starting at once only one can open it, and the system frees it the
- * moment its watcher ends, however it ends, so no lock is ever left behind or taken over. A lock in
- * a file had both problems: a second watcher could slip in before the first wrote its id, and a dead
- * watcher's lock had to be taken over without two doing so at once.
+ * Gets this watcher going: the record of a session that ended long ago is removed (#264), and a stop
+ * signal (a timeout, Ctrl-C) ends it normally, so what a round found is still printed.
  */
-export const lock = async (): Promise<void> => {
-  await $`mkdir -p ${DIR}`.quiet()
-  try {
-    // Anyone connecting is hung up on at once: the port only marks that a watcher runs.
-    // Unref'd: the port never keeps the process alive by itself; the watcher's own loop does.
-    // Exclusive: without it, some systems let a second process open the same port.
-    Bun.listen({ exclusive: true, hostname: '127.0.0.1', port: LOCK_PORT, socket: { data: ignoreFailure, open: socket => { socket.end() } } }).unref()
-  } catch {
-    process.stderr.write(`another watcher already uses ${DIR} (it holds 127.0.0.1:${LOCK_PORT}; if another program does, set LOCK_PORT)\n`)
-    process.exit(75)
-  }
-  // Stopped by a signal (a timeout, Ctrl-C): exit normally, so what a round found is still printed.
+export const start = async (): Promise<void> => {
+  // A session that came back after this long starts afresh: it hears where each PR stands again.
+  await removeOlder(SESSIONS_DIR, Temporal.Duration.from({ hours: 24 * 14 }))
   process.on('SIGTERM', () => { process.exit(143) })
   process.on('SIGINT', () => { process.exit(130) })
 }

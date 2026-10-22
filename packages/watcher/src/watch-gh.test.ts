@@ -24,12 +24,13 @@ describe('lookupNews (#253)', () => {
 describe('ghText keeping track of the calls (#253)', () => {
   it('records a success, a failed call and one that could not start', async () => {
     const before = lookups.lastSuccess
-    await ghText([], 'true')
+    // Fresh: a shared answer would be kept with the real watchers' (#264), and needs no call.
+    await ghText([], 'true', true)
     expect(Temporal.Instant.compare(lookups.lastSuccess, before)).toBeGreaterThanOrEqual(0)
-    await expect(ghText([], 'false')).rejects.toThrow('exit 1')
+    await expect(ghText([], 'false', true)).rejects.toThrow('exit 1')
     expect(lookups.lastFailure).toBe('exit 1')
     // The failure is what is tested here, through `lookups`; the error itself is not.
-    await ghText([], 'no-such-gh-anywhere').catch(ignoreFailure)
+    await ghText([], 'no-such-gh-anywhere', true).catch(ignoreFailure)
     expect(lookups.lastFailure).toBe("no-such-gh-anywhere couldn't be started")
   })
 })
