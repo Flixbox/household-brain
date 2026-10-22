@@ -109,6 +109,7 @@ approved one whose auto-merge is still off and that isn't in the merge queue, no
 | `LOOKUPS_FAILING` | No `gh` call has succeeded for minutes, with the latest failure (a timeout, an exit code): the watcher can't see anything, so its silence means nothing. Comes on every look while it lasts. Check `gh` (logged in, its token, a slow `GH` wrapper) and tell the owner. |
 | `LOOKUPS_RECOVERED` | Calls succeed again; the events held back come next. |
 | `WATCHER_ERROR` | A look failed (for example a state file another program held locked); the watcher carries on with the next look. Repeated, it needs a look: tell the owner. |
+| `WATCHER_OUTDATED` | The watcher's checkout moved to other watcher code after it started (a pull, or a restart that raced another one's pull), so it exits: start it again right away, alone, so its pull finishes before it starts. |
 | `REMINDER` | Comes after every notification while a PR waits on you: its branch is behind main or in conflict (rebase it, run the checks, push once), or it is approved with CI green and auto-merge off (enable it, after reading its comments) or with CI failed (fix it). None comes for a PR in the merge queue: there, `DEQUEUED` says when it needs you. It repeats until that is done. |
 
 ## Before enabling auto-merge

@@ -10,6 +10,7 @@ import { type Event, answerFirst, clockTime, listsOpenPrs, openPrLines, reminder
 import { lookupNews, lookups } from './watch-gh'
 import { openPrs } from './watch-github'
 import { addLine } from './watch-state'
+import { codeVersion, outdatedLine, startedOn } from './watch-version'
 
 export const FOLLOW = process.argv.includes('--follow')
 
@@ -95,4 +96,14 @@ export const reportLookups = async (): Promise<void> => {
   }
   // Only once the line is out: if printing failed, the next look says it again, LOOKUPS_RECOVERED too.
   lookups.failing = failing
+}
+
+/** Stops the watcher once its checkout holds other code than it started on (#265), so it is started again on the new code. */
+export const checkCode = async (): Promise<void> => {
+  const line = outdatedLine(startedOn(), await codeVersion())
+  if (line !== null) {
+    queue([line])
+    await flush()
+    process.exit(0)
+  }
 }
