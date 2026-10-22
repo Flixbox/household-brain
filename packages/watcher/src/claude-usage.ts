@@ -71,8 +71,10 @@ export const nextAskAt = (usage: Usage): number => Math.max(usage.askedAt + MINU
 export const backoffMs = (failures: number): number => Math.min(MINUTE_MS * 2 ** Math.max(0, failures - 1), LONGEST_BACKOFF_MS)
 
 /** `Retry-After` in milliseconds; null when missing or a date (only the backoff applies then). */
-const retryAfterMs = (header: string | null): number | null =>
-  (header !== null && /^\d+$/v.test(header.trim()) ? Number(header.trim()) * 1000 : null)
+const retryAfterMs = (header: string | null): number | null => {
+  const seconds = header === null || header.trim() === '' ? Number.NaN : Number(header)
+  return Number.isInteger(seconds) && seconds >= 0 ? seconds * 1000 : null
+}
 
 /** The cache after an ask at `now`: the new answer, or the old one kept with the next wait. */
 export const afterAsking = (usage: Usage, asked: Asked, now: number): Usage => {
