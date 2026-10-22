@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { FOLLOW_NEWER, type OpenPr, type Run, answerFirst, cancelledDeployEvent, clockTime, decisionFrom, listsOpenPrs, mainRunEvent, newActivity, openPrLines, reminderLines, runEvent, stamped, usageFrom } from './watch-events'
+import { FOLLOW_NEWER, type OpenPr, type Run, answerFirst, cancelledDeployEvent, clockTime, decisionFrom, listsOpenPrs, mainRunEvent, newActivity, openPrLines, reminderLines, replacementCandidates, runEvent, stamped, usageFrom } from './watch-events'
 
 const SHA = 'abcdef1234567890abcdef1234567890abcdef12'
 const run = (changes: Partial<Run> = {}): Run => ({ ageSeconds: 60, attempt: 1, conclusion: 'success', id: 7, status: 'completed', ...changes })
@@ -26,6 +26,27 @@ describe('runEvent', () => {
     expect(runEvent({ ...context, label: 'deploy', run: run({ conclusion: 'failure' }) })).toMatchObject({ key: `pr-12 deploy-failed ${SHA} 1` })
     expect(runEvent({ ...context, label: 'deploy', run: run({ conclusion: 'cancelled' }) })).toBe(FOLLOW_NEWER)
     expect(cancelledDeployEvent({ ...context, run: run({ conclusion: 'cancelled' }) }).lines[0]).toContain('no newer run replaces it')
+  })
+})
+
+describe('replacementCandidates', () => {
+  it('tries the newer main runs that passed or still run first, newest first, then the other newer ones (#270)', () => {
+    const cancelled = run({ conclusion: 'cancelled', id: 10 })
+    const main = (id: number, changes: Partial<Run> = {}) => ({ run: run({ id, ...changes }), sha: `sha-${id}` })
+    const candidates = replacementCandidates(cancelled, SHA, [
+      main(14, { conclusion: 'cancelled' }),
+      main(13, { conclusion: '', status: 'in_progress' }),
+      main(12),
+      main(11, { conclusion: 'failure' }),
+      main(10, { conclusion: 'cancelled' }),
+      main(9),
+    ])
+    expect(candidates.map(candidate => candidate.run.id)).toEqual([13, 12, 14, 11])
+  })
+
+  it('leaves out runs of the cancelled commit itself, and has none when no newer run exists', () => {
+    expect(replacementCandidates(run({ conclusion: 'cancelled', id: 10 }), SHA, [{ run: run({ id: 11 }), sha: SHA }])).toEqual([])
+    expect(replacementCandidates(run({ conclusion: 'cancelled', id: 10 }), SHA, [{ run: run({ id: 9 }), sha: 'older' }])).toEqual([])
   })
 })
 
