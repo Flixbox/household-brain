@@ -47,7 +47,7 @@ describe('afterAsking (#260)', () => {
   })
 
   it('backs off 1, 2, 4 … minutes, up to half an hour, also when Retry-After is shorter', () => {
-    expect([1, 2, 3, 4, 5, 6, 10].map(backoffMs)).toEqual([1, 2, 4, 8, 16, 30, 30].map(minutes => minutes * MINUTE))
+    expect([1, 2, 3, 4, 5, 6, 10].map(failures => backoffMs(failures))).toEqual([1, 2, 4, 8, 16, 30, 30].map(minutes => minutes * MINUTE))
     const twice = afterAsking(afterAsking(NEVER_READ, LIMITED, NOON), null, NOON + MINUTE)
     expect(twice.failures).toBe(2)
     expect(twice.retryAt).toBe(NOON + 3 * MINUTE)

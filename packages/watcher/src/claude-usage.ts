@@ -25,7 +25,8 @@ import { UNKNOWN_USAGE, usageFrom } from './watch-events'
 
 const home = process.env.HOME ?? process.env.USERPROFILE ?? '.'
 const CONFIG = process.env.CLAUDE_CONFIG_DIR ?? `${home}/.claude`
-const CACHE_FILE = process.env.CLAUDE_USAGE_CACHE ?? `${process.env.XDG_STATE_HOME ?? `${home}/.local/state`}/claude-usage.json`
+const stateHome = process.env.XDG_STATE_HOME ?? `${home}/.local/state`
+const CACHE_FILE = process.env.CLAUDE_USAGE_CACHE ?? `${stateHome}/claude-usage.json`
 const ENDPOINT = 'https://api.anthropic.com/api/oauth/usage'
 const MINUTE_MS = 60_000
 const LONGEST_BACKOFF_MS = 30 * MINUTE_MS
@@ -34,7 +35,7 @@ const LONGEST_WAIT_MS = 20_000
 const WAIT_STEP_MS = 250
 
 /** What the cache keeps: the last answer read and when, and when to ask next. Times in epoch milliseconds. */
-export type Usage = {
+export interface Usage {
   answer: unknown
   answeredAt: number | null
   askedAt: number
@@ -50,15 +51,18 @@ const NEVER_READ: Usage = { answer: null, answeredAt: null, askedAt: 0, failures
 const numberOr = (value: unknown, fallback: number): number => (typeof value === 'number' && Number.isFinite(value) ? value : fallback)
 
 /** The cache from its file's JSON; anything unreadable counts as never read. */
-export const cacheFrom = (value: unknown): Usage => (isRecord(value)
-  ? {
-      answer: value.answer ?? null,
-      answeredAt: typeof value.answeredAt === 'number' ? value.answeredAt : null,
-      askedAt: numberOr(value.askedAt, 0),
-      failures: numberOr(value.failures, 0),
-      retryAt: numberOr(value.retryAt, 0),
-    }
-  : NEVER_READ)
+export const cacheFrom = (value: unknown): Usage => {
+  if (!isRecord(value)) {
+    return NEVER_READ
+  }
+  return {
+    answer: value.answer ?? null,
+    answeredAt: typeof value.answeredAt === 'number' ? value.answeredAt : null,
+    askedAt: numberOr(value.askedAt, 0),
+    failures: numberOr(value.failures, 0),
+    retryAt: numberOr(value.retryAt, 0),
+  }
+}
 
 /** When the endpoint may be asked again: a minute after the last ask, and not before the backoff ends. */
 export const nextAskAt = (usage: Usage): number => Math.max(usage.askedAt + MINUTE_MS, usage.retryAt)
@@ -72,7 +76,7 @@ const retryAfterMs = (header: string | null): number | null =>
 
 /** The cache after an ask at `now`: the new answer, or the old one kept with the next wait. */
 export const afterAsking = (usage: Usage, asked: Asked, now: number): Usage => {
-  if (asked !== null && asked.status === 200 && isRecord(asked.body)) {
+  if (asked?.status === 200 && isRecord(asked.body)) {
     return { answer: asked.body, answeredAt: now, askedAt: now, failures: 0, retryAt: 0 }
   }
   const failures = usage.failures + 1
@@ -91,14 +95,17 @@ const askEndpoint = async (): Promise<Asked> => {
   if (token === null) {
     return null
   }
-  return fetch(ENDPOINT, {
-    headers: { 'anthropic-beta': 'oauth-2025-04-20', 'authorization': `Bearer ${token}` },
-    signal: AbortSignal.timeout(10_000),
-  }).then(async (response): Promise<Asked> => ({
-    body: response.ok ? await response.json().catch(() => null) : null,
-    retryAfter: response.headers.get('retry-after'),
-    status: response.status,
-  })).catch(() => null)
+  try {
+    const response = await fetch(ENDPOINT, {
+      headers: { 'anthropic-beta': 'oauth-2025-04-20', 'authorization': `Bearer ${token}` },
+      signal: AbortSignal.timeout(10_000),
+    })
+    const body: unknown = response.ok ? await response.json() : null
+    return { body, retryAfter: response.headers.get('retry-after'), status: response.status }
+  } catch {
+    // Unreachable, timed out, or not JSON: a failure like any other, backed off.
+    return null
+  }
 }
 
 const readCache = async (file: string): Promise<Usage> => cacheFrom(await Bun.file(file).json().catch(() => null))
@@ -123,7 +130,27 @@ const takeLock = (port: number): (() => void) | null => {
 
 const now = (): number => Temporal.Now.instant().epochMilliseconds
 
-type Options = { ask?: () => Promise<Asked>, file?: string }
+interface Options {
+  ask?: () => Promise<Asked>
+  file?: string
+}
+
+/** Asks the endpoint, holding the lock, unless the caller before has answered since; keeps the outcome. */
+const askHolding = async (release: () => void, ask: () => Promise<Asked>, file: string): Promise<Usage> => {
+  try {
+    // The caller before may have answered between the caller's first read and the lock.
+    const current = await readCache(file)
+    if (now() < nextAskAt(current)) {
+      return current
+    }
+    const next = afterAsking(current, await ask(), now())
+    // Not kept: the next caller asks again, which is all a lost write costs.
+    await writeCache(file, next).catch(ignoreFailure)
+    return next
+  } finally {
+    release()
+  }
+}
 
 /**
  * The usage, asked again only when the cache allows it. Never fails: anything going wrong leaves the
@@ -136,24 +163,12 @@ export const readUsage = async ({ ask = askEndpoint, file = CACHE_FILE }: Option
   }
   // CLAUDE_USAGE_LOCK_PORT: set it only if another program listens on the port picked from the cache's path.
   const release = takeLock(Number(process.env.CLAUDE_USAGE_LOCK_PORT ?? 10_000 + (Bun.hash.crc32(file) % 10_000)))
-  if (release === null) {
-    // Another caller is asking: wait for its answer instead of asking too.
-    await Bun.sleep(WAIT_STEP_MS)
-    return readUsage({ ask, file }, waitedMs + WAIT_STEP_MS)
+  if (release !== null) {
+    return askHolding(release, ask, file)
   }
-  try {
-    // The caller before may have answered between the read above and the lock.
-    const current = await readCache(file)
-    if (now() < nextAskAt(current)) {
-      return current
-    }
-    const next = afterAsking(current, await ask(), now())
-    // Not kept: the next caller asks again, which is all a lost write costs.
-    await writeCache(file, next).catch(ignoreFailure)
-    return next
-  } finally {
-    release()
-  }
+  // Another caller is asking: wait for its answer instead of asking too.
+  await Bun.sleep(WAIT_STEP_MS)
+  return readUsage({ ask, file }, waitedMs + WAIT_STEP_MS)
 }
 
 /** When the numbers were read: the time today, else the date and time, on this machine's clock. */
