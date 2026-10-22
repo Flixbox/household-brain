@@ -70,7 +70,25 @@ export const runEvent = (context: RunContext): Event | typeof FOLLOW_NEWER | nul
     : null
 }
 
-/** A cancelled deploy that no newer run replaces is a failure: someone has to re-run it. */
+/** A CI run on main, and its commit. */
+export interface MainRun {
+  run: Run
+  sha: string
+}
+
+/**
+ * The runs on main that may replace a cancelled deploy of `sha` (#270), in the order to try them: the
+ * newer ones that passed or still run first (they deploy the commit, or will), then the other newer
+ * ones, each group newest first. Runs of the same commit don't count: following one would come back
+ * to the cancelled run. Whether a run's commit contains `sha` is for the caller to ask.
+ */
+export const replacementCandidates = (cancelled: Run, sha: string, runs: readonly MainRun[]): MainRun[] => {
+  const newer = runs.filter(main => main.run.id > cancelled.id && main.sha !== sha).toSorted((first, second) => second.run.id - first.run.id)
+  const live = (main: MainRun) => main.run.status !== 'completed' || main.run.conclusion === 'success'
+  return [...newer.filter(main => live(main)), ...newer.filter(main => !live(main))]
+}
+
+/** A cancelled deploy that no newer run on main replaces is a failure: someone has to re-run it. */
 export const cancelledDeployEvent = ({ pr, sha, run, jobs }: Pick<RunContext, 'pr' | 'sha' | 'run' | 'jobs'>): Event => ({
   key: `pr-${pr} deploy-failed ${sha} ${run.attempt}`,
   lines: [`DEPLOY_FAILED: run ${run.id} on main was cancelled, and no newer run replaces it: re-run it`, ...jobs],

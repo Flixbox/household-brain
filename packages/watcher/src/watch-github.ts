@@ -1,5 +1,5 @@
 /** The project watcher's questions to GitHub, through the `gh` CLI, answered as plain data. */
-import { type OpenPr, type Run, decisionFrom } from './watch-events'
+import { type MainRun, type OpenPr, type Run, decisionFrom } from './watch-events'
 import type { QueueEntry } from './watch-queue-events'
 import { allIssueNumbers, goneIssueLine, isGone, isMoved, issueEventLine, issuePage } from './watch-issue-events'
 import { GH, failedStatus, ghText } from './watch-gh'
@@ -72,11 +72,22 @@ export const runOf = async (sha: string): Promise<Run | null> => {
   return run ? runFrom(run) : null
 }
 
-/** The newest CI run on main, and its commit. */
-export const newestMainRun = async (): Promise<{ run: Run, sha: string } | null> => {
-  const [run] = records(await gh(['run', 'list', '--repo', REPO, '--workflow', WORKFLOW, '--branch', 'main', '--event', 'push', '--limit', '1', '--json', `${RUN_FIELDS},headSha`]))
-  return run ? { run: runFrom(run), sha: textOf(run.headSha) } : null
+/**
+ * The newest CI runs on main, newest first, with their commits. A hundred, one page of GitHub's list
+ * (#270): enough newer runs for a cancelled deploy that some of them passed or contain its commit.
+ */
+export const mainRuns = async (limit = 100): Promise<MainRun[]> =>
+  records(await gh(['run', 'list', '--repo', REPO, '--workflow', WORKFLOW, '--branch', 'main', '--event', 'push', '--limit', String(limit), '--json', `${RUN_FIELDS},headSha`]))
+    .map(run => ({ run: runFrom(run), sha: textOf(run.headSha) }))
+
+/** Whether commit `newer` contains commit `older`: it is the same commit, or `older` is one of its ancestors. */
+export const containsCommit = async (newer: string, older: string): Promise<boolean> => {
+  const status = textOf(record(await gh(['api', `repos/${REPO}/compare/${older}...${newer}?per_page=1`])).status)
+  return status === 'ahead' || status === 'identical'
 }
+
+/** The newest CI run on main, and its commit. */
+export const newestMainRun = async (): Promise<MainRun | null> => (await mainRuns(1))[0] ?? null
 
 export const jobLines = async (run: number): Promise<string[]> =>
   records(record(await gh(['run', 'view', String(run), '--repo', REPO, '--json', 'jobs'])).jobs)
