@@ -5,6 +5,7 @@
   "type": "module",
   "license": "Unlicense",
   "bin": {
+    "claude-usage": "./src/claude-usage.ts",
     "watch-project": "./src/watch-project.ts"
   },
   "scripts": {
