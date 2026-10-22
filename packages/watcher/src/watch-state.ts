@@ -27,8 +27,8 @@ import { hasText, ignoreFailure } from './read'
 const WATCHER_ID = [process.env.WATCHER_ID, process.env.CLAUDE_CODE_SESSION_ID].find(id => hasText(id))
 const REPO_DIR = `${WATCHERS_DIR}/${REPO.replace('/', '_')}`
 const SESSIONS_DIR = `${REPO_DIR}/sessions`
-/** A folder name for an id: the id itself when it is a plain name (a session's is), else a hash of it, marked so the two never meet. */
-const folderOf = (id: string) => (/^[\w-]+$/u.test(id) ? id : `id.${Bun.hash(id).toString(36)}`)
+/** A folder name for an id: a hash, so no two ids meet, also where case doesn't count (Windows). */
+const folderOf = (id: string) => Bun.hash(id).toString(36)
 const watcherDir = hasText(WATCHER_ID) ? `${SESSIONS_DIR}/${folderOf(WATCHER_ID)}` : REPO_DIR
 const DIR = hasText(process.env.STATE_DIR) ? process.env.STATE_DIR : watcherDir
 

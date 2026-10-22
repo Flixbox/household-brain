@@ -89,19 +89,19 @@ const ghCall = async (args: string[], cli: string): Promise<string> => {
   return output
 }
 
-// GH_SHARE_SECONDS: how long an answer is shared (#264), 20 by default; 0 shares none. Any number of
+// GH_SHARE_SECONDS: how long an answer is shared (#264), 20 by default, at most 3600; 0 shares none. Any number of
 // watchers can watch one repository, and each asks the same questions: within this time, a question
 // another watcher (or this one) just asked takes its answer instead of asking GitHub again, so
 // several watchers cost GitHub hardly more than one. Under the time the answers poller pauses, so
 // each look still sees a newer answer than the last.
 const SHARE_MS = Number(process.env.GH_SHARE_SECONDS ?? 20) * 1000
-if (!Number.isFinite(SHARE_MS) || SHARE_MS < 0) {
-  process.stderr.write('GH_SHARE_SECONDS must be a number from 0\n')
+if (!Number.isFinite(SHARE_MS) || SHARE_MS < 0 || SHARE_MS > 3_600_000) {
+  process.stderr.write('GH_SHARE_SECONDS must be a number from 0 to 3600\n')
   process.exit(64)
 }
 const ANSWERS_DIR = `${WATCHERS_DIR}/gh-answers`
-// Answers no longer shared are only taking up room; an hour old, or older than shared, they go.
-await removeOlder(ANSWERS_DIR, Temporal.Duration.from({ milliseconds: Math.round(Math.max(SHARE_MS, 3_600_000)) }))
+// Answers no longer shared (none is shared for longer than an hour) are only taking up room.
+await removeOlder(ANSWERS_DIR, Temporal.Duration.from({ hours: 1 }))
 
 /** Where an answer is kept: by the `gh` that answered and every argument, so no two questions meet. */
 const answerFile = (args: readonly string[], cli: string) => `${ANSWERS_DIR}/${Bun.hash(JSON.stringify([cli, ...args])).toString(36)}`

@@ -38,7 +38,7 @@ const run = async (script: string, home: string, env: Record<string, string>) =>
 describe('many watchers on one repository (#264)', () => {
   it('each report every event, and one started again in its session goes on where it stopped', async () => {
     const home = await stateHome()
-    const [one, other] = await Promise.all(['session-a', 'session-b'].map(async id => run(REPORTER, home, { CLAUDE_CODE_SESSION_ID: id })))
+    const [one, other] = await Promise.all([run(REPORTER, home, { CLAUDE_CODE_SESSION_ID: 'session-a' }), run(REPORTER, home, { CLAUDE_CODE_SESSION_ID: 'session-b' })])
     expect([one.code, other.code]).toEqual([0, 0])
     expect(one.output).toContain('MAIN_ADVANCED: main is at 1234567')
     expect(other.output).toContain('MAIN_ADVANCED: main is at 1234567')

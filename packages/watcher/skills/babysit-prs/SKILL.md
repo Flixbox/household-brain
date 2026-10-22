@@ -58,7 +58,7 @@ default branch's CI, new issues, the owner's comments on issues, and issues clos
     default; a watcher started again with the same id goes on where the last one stopped). Without
     either, every watcher of the repository shares one record and they split the events.
   - `GH_SHARE_SECONDS`: how long a `gh` answer is shared with the other watchers on this machine (20
-    by default; 0 shares none): watchers asking the same question within it ask GitHub once, so
+    by default, at most 3600; 0 shares none): watchers asking the same question within it ask GitHub once, so
     several watchers cost hardly more than one.
   - `GH_PARALLEL`: how many `gh` calls run at once (4 by default); the pull requests are checked in
     parallel, and the cap keeps the bursts within GitHub's rate limits.
@@ -69,7 +69,7 @@ default branch's CI, new issues, the owner's comments on issues, and issues clos
   - `SELF`: **set it to the login you comment as** (a bot's is `name[bot]`); without it your own
     comments, replies and issues are reported back to you as news. Your reviews still are.
 - It remembers what it reported under `$XDG_STATE_HOME/watch-project`, per repository and watcher
-  (`<owner>_<repo>/sessions/<id>/`, or `<owner>_<repo>/` without an id); a session's record is
+  (`<owner>_<repo>/sessions/<hash of the id>/`, or `<owner>_<repo>/` without an id); a session's record is
   removed once it has been left untouched for two weeks.
 - It follows each pull request's **current** head commit, so a push needs no restart, and stays armed
   through the merge to report the deploy. Don't poll by hand alongside it.
