@@ -16,7 +16,7 @@ export const issuePage = (connection: unknown): IssuePage => {
   const { nodes, pageInfo } = record(connection)
   const info = record(pageInfo)
   if (!Array.isArray(nodes) || typeof info.hasNextPage !== 'boolean') {
-    throw new Error('GitHub answered no page of open issues')
+    throw new TypeError('GitHub answered no page of open issues')
   }
   const next = textOf(info.endCursor)
   if (info.hasNextPage && next === '') {
