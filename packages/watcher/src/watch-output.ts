@@ -5,11 +5,11 @@
  * is the notification). With `--follow`, each event comes out the moment it is found, ending with a
  * `---` line, so one slow call never holds back an event found before it (#240), and it goes on (#196).
  */
+import { usageLine } from './claude-usage'
 import { type Event, answerFirst, clockTime, listsOpenPrs, openPrLines, reminderLines, stamped } from './watch-events'
 import { lookupNews, lookups } from './watch-gh'
 import { openPrs } from './watch-github'
 import { addLine } from './watch-state'
-import { usageLine } from './watch-usage'
 
 export const FOLLOW = process.argv.includes('--follow')
 

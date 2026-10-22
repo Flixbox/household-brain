@@ -100,4 +100,13 @@ The Firebase project is a Google Cloud project; everything below happens in it.
   never use the `pull_request_target` or `workflow_run` triggers; never add self-hosted runners.
 - Manual fallback: `bun run firebase deploy --only hosting,firestore:rules,firestore:indexes`.
 
+**The `claude-usage` command, for agents on a machine** (#260)
+- It shares its cache with the watcher. Install it as a wrapper around this repository's copy, e.g.
+  the watcher plugin's clone (which the watcher's run command keeps pulled):
+
+  ```sh
+  printf '#!/usr/bin/env bash\nexec bun "$HOME/.claude/plugins/marketplaces/household-brain/packages/watcher/src/claude-usage.ts" "$@"\n' > ~/.local/bin/claude-usage
+  chmod +x ~/.local/bin/claude-usage
+  ```
+
 Licence: Unlicense.
