@@ -72,8 +72,11 @@ export const runOf = async (sha: string): Promise<Run | null> => {
   return run ? runFrom(run) : null
 }
 
-/** The newest CI runs on main, newest first, with their commits. */
-export const mainRuns = async (limit = 20): Promise<MainRun[]> =>
+/**
+ * The newest CI runs on main, newest first, with their commits. A hundred, one page of GitHub's list
+ * (#270): enough newer runs for a cancelled deploy that some of them passed or contain its commit.
+ */
+export const mainRuns = async (limit = 100): Promise<MainRun[]> =>
   records(await gh(['run', 'list', '--repo', REPO, '--workflow', WORKFLOW, '--branch', 'main', '--event', 'push', '--limit', String(limit), '--json', `${RUN_FIELDS},headSha`]))
     .map(run => ({ run: runFrom(run), sha: textOf(run.headSha) }))
 
