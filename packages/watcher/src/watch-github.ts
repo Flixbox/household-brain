@@ -1,8 +1,8 @@
 /** The project watcher's questions to GitHub, through the `gh` CLI, answered as plain data. */
 import { type OpenPr, type Run, decisionFrom } from './watch-events'
 import type { QueueEntry } from './watch-queue-events'
-import { allIssueNumbers, issueEventLine, issuePage } from './watch-issue-events'
-import { GH, ghText } from './watch-gh'
+import { allIssueNumbers, goneIssueLine, isGone, isMoved, issueEventLine, issuePage } from './watch-issue-events'
+import { GH, failedStatus, ghText } from './watch-gh'
 import { hasText, isRecord, textOf } from './read'
 import { type Json, count, oneLine, record, records } from './watch-text'
 
@@ -241,5 +241,17 @@ export const mainHead = async (): Promise<{ sha: string, subject: string }> => {
 export const openIssueNumbers = async (): Promise<number[]> => allIssueNumbers(async cursor =>
   issuePage(at(await graphql(`issues(states:OPEN,first:100,after:${JSON.stringify(cursor)}){nodes{number} pageInfo{hasNextPage endCursor}}`), 'issues')))
 
-export const issueLine = async (issue: number, change: 'closed' | 'reopened'): Promise<string | null> =>
-  issueEventLine(issue, record(await gh(['api', `repos/${REPO}/issues/${issue}`])), change)
+/**
+ * The line for an issue that left or joined the open list. An issue that is gone (deleted or
+ * transferred) is an answer too (#263): failing on it would hold back every later round's changes.
+ * Any other failure fails, and the round is tried again.
+ */
+export const issueLine = async (issue: number, change: 'closed' | 'reopened'): Promise<string | null> => {
+  const value = await gh(['api', `repos/${REPO}/issues/${issue}`]).then(record, (error: unknown) => {
+    if (isGone(failedStatus(error))) {
+      return null
+    }
+    throw error
+  })
+  return value === null || isMoved(value, REPO) ? goneIssueLine(issue, change) : issueEventLine(issue, value, change)
+}

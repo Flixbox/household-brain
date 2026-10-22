@@ -32,7 +32,10 @@ export const checkIssues = async (): Promise<void> => {
   }
 }
 
-/** Issue lines for what was closed or reopened between `before` and `now`; null when a lookup failed. */
+/**
+ * Issue lines for what was closed or reopened between `before` and `now`; null when a lookup failed.
+ * An issue that is gone (deleted or transferred) doesn't fail it (#263): it would fail every round.
+ */
 const issueChanges = async (before: string[], now: string[]): Promise<string[] | null> =>
   Promise.all([
     ...before.filter(issue => !now.includes(issue)).map(async issue => issueLine(Number(issue), 'closed')),
@@ -41,7 +44,7 @@ const issueChanges = async (before: string[], now: string[]): Promise<string[] |
 
 /**
  * Issues closed or reopened since the last round. A failed lookup leaves the state as it was, so the
- * next round tries again. An empty list counts as a failed one, and an empty stored list as none
+ * next round tries again; a gone issue isn't a failed lookup (#263). An empty list counts as a failed one, and an empty stored list as none
  * (#261): compared with either, every issue would look closed or reopened.
  */
 export const checkIssueStates = async (): Promise<void> => {

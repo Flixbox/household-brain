@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { ghText, lookupNews, lookups } from './watch-gh'
+import { failedStatus, ghText, lookupNews, lookups } from './watch-gh'
 import { ignoreFailure } from './read'
 
 const NOW = Temporal.Instant.from('2026-10-18T07:31:00Z')
@@ -32,5 +32,19 @@ describe('ghText keeping track of the calls (#253)', () => {
     // The failure is what is tested here, through `lookups`; the error itself is not.
     await ghText([], 'no-such-gh-anywhere', true).catch(ignoreFailure)
     expect(lookups.lastFailure).toBe("no-such-gh-anywhere couldn't be started")
+  })
+})
+
+describe('failedStatus (#263)', () => {
+  const failure = async (args: string[], cli: string): Promise<unknown> => ghText(args, cli).then(() => null, (error: unknown) => error)
+
+  it('reads the HTTP status GitHub refused a call with', async () => {
+    expect(failedStatus(await failure(['-c', 'printf \'{"message":"Not Found","status":"404"}\'; exit 1'], 'sh'))).toBe(404)
+  })
+
+  it('has none for a call that failed without an answer', async () => {
+    expect(failedStatus(await failure([], 'false'))).toBeNull()
+    expect(failedStatus(await failure(['-c', 'echo oops; exit 1'], 'sh'))).toBeNull()
+    expect(failedStatus(new Error('not a call'))).toBeNull()
   })
 })

@@ -101,7 +101,7 @@ approved one whose auto-merge is still off and that isn't in the merge queue, no
 | `MAIN_PASSED` | The newest run on the default branch passed; read the open pull requests that come with it. |
 | `MAIN_ADVANCED` | The default branch got a new commit. If it was your own pull request, open the next one now; otherwise check whether it touches your work. |
 | `NEW_ISSUE` / `ISSUE_COMMENT` | Read it, take the work in turn, answer the owner's comment. |
-| `ISSUE_CLOSED` / `ISSUE_REOPENED` | Drop or resume any work on it. |
+| `ISSUE_CLOSED` / `ISSUE_REOPENED` | Drop or resume any work on it. An issue deleted or transferred to another repository comes as closed, `(deleted or transferred)`. |
 | `CLOSED` | Closed without merging: stop working on it. |
 | `LOOKUPS_FAILING` | No `gh` call has succeeded for minutes, with the latest failure (a timeout, an exit code): the watcher can't see anything, so its silence means nothing. Comes on every look while it lasts. Check `gh` (logged in, its token, a slow `GH` wrapper) and tell the owner. |
 | `LOOKUPS_RECOVERED` | Calls succeed again; the events held back come next. |
