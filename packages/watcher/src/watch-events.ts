@@ -85,7 +85,7 @@ export interface MainRun {
 export const replacementCandidates = (cancelled: Run, sha: string, runs: readonly MainRun[]): MainRun[] => {
   const newer = runs.filter(main => main.run.id > cancelled.id && main.sha !== sha).toSorted((first, second) => second.run.id - first.run.id)
   const live = (main: MainRun) => main.run.status !== 'completed' || main.run.conclusion === 'success'
-  return [...newer.filter(live), ...newer.filter(main => !live(main))]
+  return [...newer.filter(main => live(main)), ...newer.filter(main => !live(main))]
 }
 
 /** A cancelled deploy that no newer run on main replaces is a failure: someone has to re-run it. */

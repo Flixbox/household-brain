@@ -1,6 +1,6 @@
 /* oxlint-disable eslint/no-await-in-loop -- each poller's looks run one after another, on purpose */
 /** The project watcher's looks, started by watch-project.ts once it has read which code it runs (#265). */
-import { FOLLOW_NEWER, type Run, cancelledDeployEvent, mainRunEvent, replacementCandidates, runEvent } from './watch-events'
+import { FOLLOW_NEWER, type MainRun, type Run, cancelledDeployEvent, mainRunEvent, replacementCandidates, runEvent } from './watch-events'
 import { type PrState, REPO, containsCommit, jobLines, mainAhead, mainHead, mainRuns, mergeCommand, newestMainRun, openPrs, prStates, recentlyMerged, runOf } from './watch-github'
 import { FOLLOW, checkCode, flush, queue, quiet, report, reportLookups } from './watch-output'
 import { addLine, readLines, start, updateLines, writeLines } from './watch-state'
@@ -49,7 +49,7 @@ const checkRun = async (pr: number, sha: string, label: 'pr' | 'deploy'): Promis
     await report(outcome, pr)
     return
   }
-  await followNewer(pr, sha, run, jobs)
+  await followNewer({ jobs, pr, run, sha })
 }
 
 /**
@@ -58,22 +58,27 @@ const checkRun = async (pr: number, sha: string, label: 'pr' | 'deploy'): Promis
  * one, one that passed or still runs before any other (#270); without one, it is a failure. A question
  * that fails reports nothing: the next look asks again.
  */
-const followNewer = async (pr: number, sha: string, run: Run, jobs: string[]): Promise<void> => {
+const followNewer = async ({ jobs, pr, run, sha }: { jobs: string[], pr: number, run: Run, sha: string }): Promise<void> => {
   const runs = await mainRuns().catch(() => null)
-  if (!runs) {
+  const replacement = runs ? await firstContaining(replacementCandidates(run, sha, runs), sha) : UNKNOWN
+  if (replacement === UNKNOWN) {
     return
   }
-  for (const candidate of replacementCandidates(run, sha, runs)) {
-    const contains = await containsCommit(candidate.sha, sha).catch(() => null)
-    if (contains === null) {
-      return
-    }
-    if (contains) {
-      await checkRun(pr, candidate.sha, 'deploy')
-      return
+  await (replacement ? checkRun(pr, replacement.sha, 'deploy') : report(cancelledDeployEvent({ jobs, pr, run, sha }), pr))
+}
+
+/** A question to GitHub that failed: the next look asks again. */
+const UNKNOWN = 'unknown'
+
+/** The first of the runs whose commit contains `sha`: null when none does. */
+const firstContaining = async (candidates: readonly MainRun[], sha: string): Promise<MainRun | null | typeof UNKNOWN> => {
+  for (const candidate of candidates) {
+    const contains = await containsCommit(candidate.sha, sha).catch(() => UNKNOWN)
+    if (contains !== false) {
+      return contains === UNKNOWN ? UNKNOWN : candidate
     }
   }
-  await report(cancelledDeployEvent({ jobs, pr, run, sha }), pr)
+  return null
 }
 
 const checkMain = async (): Promise<void> => {
