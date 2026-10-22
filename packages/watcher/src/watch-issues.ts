@@ -39,13 +39,18 @@ const issueChanges = async (before: string[], now: string[]): Promise<string[] |
     ...now.filter(issue => !before.includes(issue)).map(async issue => issueLine(Number(issue), 'reopened')),
   ]).then(lines => lines.filter(line => line !== null), () => null)
 
-/** Issues closed or reopened since the last round. A failed lookup leaves the state as it was, so the next round tries again. */
+/**
+ * Issues closed or reopened since the last round. A failed lookup leaves the state as it was, so the
+ * next round tries again. An empty list counts as a failed one, and an empty stored list as none
+ * (#261): compared with either, every issue would look closed or reopened.
+ */
 export const checkIssueStates = async (): Promise<void> => {
   const now = await openIssueNumbers().then(numbers => numbers.toSorted(byNumber).map(String), () => null)
-  if (!now || await firstRun('open-issues', now)) {
+  if (!now || now.length === 0 || await firstRun('open-issues', now)) {
     return
   }
-  const lines = await issueChanges(await readLines('open-issues'), now)
+  const before = await readLines('open-issues')
+  const lines = before.length === 0 ? [] : await issueChanges(before, now)
   if (!lines) {
     return
   }

@@ -1,6 +1,7 @@
 /** The project watcher's questions to GitHub, through the `gh` CLI, answered as plain data. */
 import { type OpenPr, type Run, decisionFrom } from './watch-events'
 import type { QueueEntry } from './watch-queue-events'
+import { allIssueNumbers, issueEventLine, issuePage } from './watch-issue-events'
 import { GH, ghText } from './watch-gh'
 import { hasText, isRecord, textOf } from './read'
 import { type Json, count, oneLine, record, records } from './watch-text'
@@ -235,14 +236,9 @@ export const mainHead = async (): Promise<{ sha: string, subject: string }> => {
   return { sha: textOf(value.sha), subject: textOf(record(value.commit).message).split('\n')[0] ?? '' }
 }
 
-export const openIssueNumbers = async (): Promise<number[]> =>
-  (await allPages(`repos/${REPO}/issues?state=open&per_page=100`)).filter(issue => (issue.pull_request ?? null) === null).map(issue => count(issue.number))
+/** Every open issue's number (#261), through GraphQL: the REST list stops after its first hundred. */
+export const openIssueNumbers = async (): Promise<number[]> => allIssueNumbers(async cursor =>
+  issuePage(at(await graphql(`issues(states:OPEN,first:100,after:${JSON.stringify(cursor)}){nodes{number} pageInfo{hasNextPage endCursor}}`), 'issues')))
 
-export const issueLine = async (issue: number, change: 'closed' | 'reopened'): Promise<string | null> => {
-  const value = record(await gh(['api', `repos/${REPO}/issues/${issue}`]))
-  if (change === 'closed') {
-    return `ISSUE_CLOSED #${issue} ${oneLine(value.title, 200)} (${textOf(value.state_reason) || 'closed'}, by ${textOf(record(value.closed_by).login) || '?'})`
-  }
-  // A brand-new issue is NEW_ISSUE's; only one that was closed before is reopened.
-  return value.closed_at !== null || value.state_reason === 'reopened' ? `ISSUE_REOPENED #${issue} ${oneLine(value.title, 200)}` : null
-}
+export const issueLine = async (issue: number, change: 'closed' | 'reopened'): Promise<string | null> =>
+  issueEventLine(issue, record(await gh(['api', `repos/${REPO}/issues/${issue}`])), change)
