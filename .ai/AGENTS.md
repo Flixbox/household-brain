@@ -108,6 +108,8 @@ Every PR that changes the UI shows it in a GIF in its description (after the
   GH=agent-gh SELF='flixbox-ai-agent[bot]' bun packages/watcher/src/watch-project.ts --follow
   ```
 
+  Any number of sessions can watch at once, each getting every event (#264); a subagent running its
+  own beside its session's sets `WATCHER_ID` (e.g. its branch), as it shares the session's id.
   It reads comments with the owner's login, the only one that sees the owner's pending reviews. It
   follows a merged PR through `main`'s deploy: `DEPLOYED` asks for the live check below,
   `DEPLOY_FAILED` for a follow-up PR.

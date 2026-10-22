@@ -10,7 +10,7 @@ import { type Json, count, oneLine, record, records } from './watch-text'
 // GH_TIMEOUT_SECONDS and GH_PARALLEL are in watch-gh.ts.
 // REPO: `owner/name`; by default the repository `gh` finds in the current folder.
 const currentRepo = async (): Promise<string> => {
-  const repo = await ghText(['repo', 'view', '--json', 'nameWithOwner', '-q', '.nameWithOwner']).then(text => text.trim(), (error: unknown) => {
+  const repo = await ghText(['repo', 'view', '--json', 'nameWithOwner', '-q', '.nameWithOwner'], GH, true).then(text => text.trim(), (error: unknown) => {
     process.stderr.write(`${error instanceof Error ? error.message : ''}\n`)
     return ''
   })
@@ -48,7 +48,7 @@ export const SELF = process.env.SELF ?? ''
 // Nx Cloud's status comment on every push needs no answer.
 export const IGNORED = new Set([SELF, 'nx-cloud[bot]'])
 
-export const gh = async (args: string[], cli = GH): Promise<unknown> => JSON.parse(await ghText(args, cli))
+export const gh = async (args: string[], cli = GH, fresh = false): Promise<unknown> => JSON.parse(await ghText(args, cli, fresh))
 
 /** Every item of a paged list, all pages in one array (`--slurp` wraps each page). */
 export const allPages = async (path: string, cli = GH): Promise<Json[]> => {
@@ -100,9 +100,9 @@ const decisionOf = async (pr: number, reviewDecision: unknown, author: string): 
     .filter(review => review.login !== author && review.login !== SELF))
 }
 
-const graphql = async (fields: string): Promise<Json> => {
+const graphql = async (fields: string, fresh = false): Promise<Json> => {
   const [owner = '', name = ''] = REPO.split('/')
-  return record(record(record(await gh(['api', 'graphql', '-f', `query={repository(owner:"${owner}",name:"${name}"){${fields}}}`])).data).repository)
+  return record(record(record(await gh(['api', 'graphql', '-f', `query={repository(owner:"${owner}",name:"${name}"){${fields}}}`], GH, fresh)).data).repository)
 }
 
 /** What is at `keys` inside a GraphQL answer; an empty object where something on the way is missing. */
@@ -187,8 +187,8 @@ const stateOf = (value: Json): PrState => {
   }
 }
 
-const statesOf = async (prs: readonly number[]): Promise<[number, PrState][]> => {
-  const repository = await graphql(prs.map(pr => `pr${pr}: pullRequest(number: ${pr}) { ${PR_FIELDS} }`).join(' '))
+const statesOf = async (prs: readonly number[], fresh: boolean): Promise<[number, PrState][]> => {
+  const repository = await graphql(prs.map(pr => `pr${pr}: pullRequest(number: ${pr}) { ${PR_FIELDS} }`).join(' '), fresh)
   return prs.flatMap((pr): [number, PrState][] => {
     const value = repository[`pr${pr}`]
     return isRecord(value) ? [[pr, stateOf(value)]] : []
@@ -196,23 +196,24 @@ const statesOf = async (prs: readonly number[]): Promise<[number, PrState][]> =>
 }
 
 /** Each PR on its own, so one GitHub won't answer for is the only one missing. */
-const oneByOne = async (prs: readonly number[]): Promise<[number, PrState][]> => {
-  const each = await Promise.all(prs.map(async pr => statesOf([pr]).catch((): [number, PrState][] => [])))
+const oneByOne = async (prs: readonly number[], fresh: boolean): Promise<[number, PrState][]> => {
+  const each = await Promise.all(prs.map(async pr => statesOf([pr], fresh).catch((): [number, PrState][] => [])))
   return each.flat()
 }
 
 /** A batch's states; if the batch fails (one PR GitHub won't answer for fails it all), each PR alone. */
-const batchStates = async (prs: readonly number[]): Promise<[number, PrState][]> =>
-  statesOf(prs).catch(async () => oneByOne(prs))
+const batchStates = async (prs: readonly number[], fresh: boolean): Promise<[number, PrState][]> =>
+  statesOf(prs, fresh).catch(async () => oneByOne(prs, fresh))
 
 /**
  * The state of every PR asked about, in one GraphQL query per fifty (#235): one `pr view` each, plus
  * their reviews, took seconds per PR on a slow `gh`, and a look waited for all of them. A PR whose
- * state couldn't be read is missing from the answer; its caller tries again next look.
+ * state couldn't be read is missing from the answer; its caller tries again next look. `fresh` asks
+ * GitHub even when another watcher just did (#264).
  */
-export const prStates = async (prs: readonly number[]): Promise<Map<number, PrState>> => {
+export const prStates = async (prs: readonly number[], fresh = false): Promise<Map<number, PrState>> => {
   const chunks = Array.from({ length: Math.ceil(prs.length / PRS_PER_QUERY) }, (_chunk, index) => prs.slice(index * PRS_PER_QUERY, (index + 1) * PRS_PER_QUERY))
-  return new Map((await Promise.all(chunks.map(async chunk => batchStates(chunk)))).flat())
+  return new Map((await Promise.all(chunks.map(async chunk => batchStates(chunk, fresh)))).flat())
 }
 
 /** Pull requests merged in the last `hours`. */

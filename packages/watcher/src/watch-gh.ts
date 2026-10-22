@@ -1,4 +1,8 @@
-/** How the project watcher runs `gh` (watch-github.ts asks it everything): with a time limit, and only so many at once. */
+/**
+ * How the project watcher runs `gh` (watch-github.ts asks it everything): with a time limit, only so
+ * many at once, and sharing each answer with the other watchers on this machine for a moment.
+ */
+import { WATCHERS_DIR, removeOlder, writeWhole } from './watch-files'
 import { ignoreFailure } from './read'
 
 // GH: the `gh` to ask with, e.g. a wrapper logged in as a bot (GH=agent-gh). Defaults to plain gh.
@@ -85,11 +89,56 @@ const ghCall = async (args: string[], cli: string): Promise<string> => {
   return output
 }
 
-export const ghText = async (args: string[], cli = GH): Promise<string> => {
+// GH_SHARE_SECONDS: how long an answer is shared (#264), 20 by default, at most 3600; 0 shares none. Any number of
+// watchers can watch one repository, and each asks the same questions: within this time, a question
+// another watcher (or this one) just asked takes its answer instead of asking GitHub again, so
+// several watchers cost GitHub hardly more than one. Under the time the answers poller pauses, so
+// each look still sees a newer answer than the last.
+const SHARE_MS = Number(process.env.GH_SHARE_SECONDS ?? 20) * 1000
+if (!Number.isFinite(SHARE_MS) || SHARE_MS < 0 || SHARE_MS > 3_600_000) {
+  process.stderr.write('GH_SHARE_SECONDS must be a number from 0 to 3600\n')
+  process.exit(64)
+}
+const ANSWERS_DIR = `${WATCHERS_DIR}/gh-answers`
+// Answers no longer shared (none is shared for longer than an hour) are only taking up room.
+await removeOlder(ANSWERS_DIR, Temporal.Duration.from({ hours: 1 }))
+
+/** Where an answer is kept: by the `gh` that answered and every argument, so no two questions meet. */
+const answerFile = (args: readonly string[], cli: string) => `${ANSWERS_DIR}/${Bun.hash(JSON.stringify([cli, ...args])).toString(36)}`
+
+/** An answer given within GH_SHARE_SECONDS; null when there is none (a missing file counts as old). */
+const sharedAnswer = async (path: string): Promise<string | null> => {
+  const file = Bun.file(path)
+  const age = Temporal.Now.instant().epochMilliseconds - file.lastModified
+  return age >= 0 && age < SHARE_MS ? file.text().catch(() => null) : null
+}
+
+const asked = async (args: string[], cli: string): Promise<string> => {
   await take()
   try {
     return await ghCall(args, cli)
   } finally {
     release()
   }
+}
+
+/**
+ * What `gh` answers to `args`. Every question names its repository (all but the one that finds the
+ * repository from the folder, which passes `fresh`), so a shared answer is never another's. `fresh`
+ * also asks GitHub again for what has to be known now, not some seconds ago.
+ */
+export const ghText = async (args: string[], cli = GH, fresh = false): Promise<string> => {
+  if (fresh || SHARE_MS === 0) {
+    return asked(args, cli)
+  }
+  const path = answerFile(args, cli)
+  const shared = await sharedAnswer(path)
+  if (shared !== null) {
+    lookups.lastSuccess = Temporal.Now.instant()
+    return shared
+  }
+  const answer = await asked(args, cli)
+  // Sharing is only a saving: an answer that can't be kept is asked for again next time.
+  await writeWhole(path, answer).catch(ignoreFailure)
+  return answer
 }

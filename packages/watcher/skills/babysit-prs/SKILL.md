@@ -30,9 +30,12 @@ default branch's CI, new issues, the owner's comments on issues, and issues clos
   environment still wins.
 
   A `Monitor` stops after 30 minutes at most: re-arm it when its expiry notice comes; the watcher
-  remembers what it reported and picks up where it left off. Only one watcher runs per repository,
-  so a second one exits at once. Without `--follow` it exits after one look, with every event that
-  look found: start it again after handling them.
+  remembers what it reported and picks up where it left off. Without `--follow` it exits after one
+  look, with every event that look found: start it again after handling them.
+- **Any number of watchers can watch the same repository at once**, one per Claude Code session, and
+  each gets every event: each remembers what it reported on its own, under the session's id. **A
+  subagent shares its session's id**: when it runs a watcher of its own beside its session's, it
+  sets `WATCHER_ID` (below), or the two split the events between them.
 - **Following**, it prints each event the moment it finds it and ends each one with a `---` line.
   The owner's comments and new issues have their own poller, every 30 s, so they never wait for CI
   and deploys. `IDLE` is a heartbeat, not an exit.
@@ -51,8 +54,12 @@ default branch's CI, new issues, the owner's comments on issues, and issues clos
     failed read and is tried again next look, so one slow endpoint doesn't hold up the rest. A `GH`
     wrapper has to answer within it too, also when it first makes a token: one that never does
     never gets a token cached, and every call fails (`LOOKUPS_FAILING`).
-  - `LOCK_PORT`: the local port a running watcher holds so that a second one exits (one from 20000
-    to 29999 picked per repository by default). Set it only if another program listens there.
+  - `WATCHER_ID`: which watcher this is, so it remembers on its own (the Claude Code session's id by
+    default; a watcher started again with the same id goes on where the last one stopped). Without
+    either, every watcher of the repository shares one record and they split the events.
+  - `GH_SHARE_SECONDS`: how long a `gh` answer is shared with the other watchers on this machine (20
+    by default, at most 3600; 0 shares none): watchers asking the same question within it ask GitHub once, so
+    several watchers cost hardly more than one.
   - `GH_PARALLEL`: how many `gh` calls run at once (4 by default); the pull requests are checked in
     parallel, and the cap keeps the bursts within GitHub's rate limits.
   - `CLAUDE_CONFIG_DIR`: where the Claude login lives (`~/.claude` by default). Every notification
@@ -61,8 +68,9 @@ default branch's CI, new issues, the owner's comments on issues, and issues clos
     asked with that login's token at most once a minute; `Usage: unknown` when it can't be read.
   - `SELF`: **set it to the login you comment as** (a bot's is `name[bot]`); without it your own
     comments, replies and issues are reported back to you as news. Your reviews still are.
-- It remembers what it reported (per repository, under `$XDG_STATE_HOME/watch-project`), and only
-  one runs per repository at a time.
+- It remembers what it reported under `$XDG_STATE_HOME/watch-project`, per repository and watcher
+  (`<owner>_<repo>/sessions/<hash of the id>/`, or `<owner>_<repo>/` without an id); a session's record is
+  removed once it has been left untouched for two weeks.
 - It follows each pull request's **current** head commit, so a push needs no restart, and stays armed
   through the merge to report the deploy. Don't poll by hand alongside it.
 - A pull request labelled **`parked`** (left open on purpose) only reports its CI and comments.
