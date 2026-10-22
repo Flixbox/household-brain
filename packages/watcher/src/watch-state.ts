@@ -24,10 +24,13 @@ import { hasText, ignoreFailure } from './read'
 // in another session keeps a record of its own. Without either, the repository's own folder, shared
 // by every watcher without an id: those would split the events between them. STATE_DIR names the
 // folder outright.
-const WATCHER_ID = [process.env.WATCHER_ID, process.env.CLAUDE_CODE_SESSION_ID].find(hasText)
+const WATCHER_ID = [process.env.WATCHER_ID, process.env.CLAUDE_CODE_SESSION_ID].find(id => hasText(id))
 const REPO_DIR = `${WATCHERS_DIR}/${REPO.replace('/', '_')}`
 const SESSIONS_DIR = `${REPO_DIR}/sessions`
-const DIR = [process.env.STATE_DIR, WATCHER_ID && `${SESSIONS_DIR}/${WATCHER_ID.replaceAll(/[^\w.-]/gu, '_')}`].find(hasText) ?? REPO_DIR
+/** A folder name for an id: the id itself when it is a plain name (a session's is), else a hash of it, marked so the two never meet. */
+const folderOf = (id: string) => (/^[\w-]+$/u.test(id) ? id : `id.${Bun.hash(id).toString(36)}`)
+const watcherDir = hasText(WATCHER_ID) ? `${SESSIONS_DIR}/${folderOf(WATCHER_ID)}` : REPO_DIR
+const DIR = hasText(process.env.STATE_DIR) ? process.env.STATE_DIR : watcherDir
 
 const stateFile = (name: string) => `${DIR}/${name}`
 

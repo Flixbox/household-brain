@@ -100,8 +100,8 @@ if (!Number.isFinite(SHARE_MS) || SHARE_MS < 0) {
   process.exit(64)
 }
 const ANSWERS_DIR = `${WATCHERS_DIR}/gh-answers`
-// Answers no longer shared are only taking up room.
-await removeOlder(ANSWERS_DIR, Temporal.Duration.from({ hours: 1 }))
+// Answers no longer shared are only taking up room; an hour old, or older than shared, they go.
+await removeOlder(ANSWERS_DIR, Temporal.Duration.from({ milliseconds: Math.round(Math.max(SHARE_MS, 3_600_000)) }))
 
 /** Where an answer is kept: by the `gh` that answered and every argument, so no two questions meet. */
 const answerFile = (args: readonly string[], cli: string) => `${ANSWERS_DIR}/${Bun.hash(JSON.stringify([cli, ...args])).toString(36)}`

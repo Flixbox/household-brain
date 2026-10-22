@@ -3,17 +3,21 @@
 import { readdir, rename, rm, stat } from 'node:fs/promises'
 import { ignoreFailure } from './read'
 
-const home = process.env.HOME ?? '.'
+const stateHome = process.env.XDG_STATE_HOME ?? `${process.env.HOME ?? '.'}/.local/state`
 /** Every watcher's files, each repository's in a folder of its own (`owner_name`). */
-export const WATCHERS_DIR = `${process.env.XDG_STATE_HOME ?? `${home}/.local/state`}/watch-project`
+export const WATCHERS_DIR = `${stateHome}/watch-project`
+
+/** How many writes this process has started: each gets a temporary file of its own. */
+const writes = { started: 0 }
 
 /**
  * Written to a temporary file and renamed over the old one, so a write that fails halfway never leaves
- * a file cut short. The temporary file is this process's own: two watchers writing the same file at
- * once each rename a whole one (#264). Bun.write creates the folder on first use.
+ * a file cut short. The temporary file is this write's own: two writes of the same file at once (two
+ * watchers, or two looks of one) each rename a whole one (#264). Bun.write creates the folder on first use.
  */
 export const writeWhole = async (path: string, text: string): Promise<void> => {
-  const draft = `${path}.${process.pid}.writing`
+  writes.started += 1
+  const draft = `${path}.${process.pid}-${writes.started}.writing`
   await Bun.write(draft, text)
   await rename(draft, path)
 }

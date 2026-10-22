@@ -39,8 +39,9 @@ describe('many watchers on one repository (#264)', () => {
   it('each report every event, and one started again in its session goes on where it stopped', async () => {
     const home = await stateHome()
     const [one, other] = await Promise.all(['session-a', 'session-b'].map(async id => run(REPORTER, home, { CLAUDE_CODE_SESSION_ID: id })))
-    expect(one).toEqual({ code: 0, output: expect.stringContaining('MAIN_ADVANCED: main is at 1234567') })
-    expect(other).toEqual({ code: 0, output: expect.stringContaining('MAIN_ADVANCED: main is at 1234567') })
+    expect([one.code, other.code]).toEqual([0, 0])
+    expect(one.output).toContain('MAIN_ADVANCED: main is at 1234567')
+    expect(other.output).toContain('MAIN_ADVANCED: main is at 1234567')
     // Started again in the same session, it doesn't report it again; under its own WATCHER_ID, it does.
     expect((await run(REPORTER, home, { CLAUDE_CODE_SESSION_ID: 'session-a' })).output).not.toContain('MAIN_ADVANCED')
     expect((await run(REPORTER, home, { CLAUDE_CODE_SESSION_ID: 'session-a', WATCHER_ID: 'subagent' })).output).toContain('MAIN_ADVANCED')

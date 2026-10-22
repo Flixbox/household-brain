@@ -65,8 +65,7 @@ default branch's CI, new issues, the owner's comments on issues, and issues clos
   - `CLAUDE_CONFIG_DIR`: where the Claude login lives (`~/.claude` by default). Every notification
     ends with the owner's Claude usage (`Usage: session 12% used (88% left, resets 2026-10-17 14:10), week 66% used (34% left, resets …)`,
     the windows `/usage` shows: how much is used and left, and when each resets),
-    asked with that login's token at most once a minute by all watchers together; `Usage: unknown`
-    when it can't be read.
+    asked with that login's token at most once a minute; `Usage: unknown` when it can't be read.
   - `SELF`: **set it to the login you comment as** (a bot's is `name[bot]`); without it your own
     comments, replies and issues are reported back to you as news. Your reviews still are.
 - It remembers what it reported under `$XDG_STATE_HOME/watch-project`, per repository and watcher
