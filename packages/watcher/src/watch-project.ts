@@ -21,7 +21,8 @@
  *   MAIN_PASSED / MAIN_FAILED        the newest CI run on main passed, or failed whichever PR caused it
  *   MAIN_SLOW                        the newest CI run on main hangs
  *   NEW_ISSUE / ISSUE_COMMENT        a new issue (not the agent's own), or the owner commented on one
- *   ISSUE_CLOSED / ISSUE_REOPENED    an issue was closed (by anyone) or reopened
+ *   ISSUE_CLOSED / ISSUE_REOPENED    an issue was closed (by anyone; also deleted or transferred, #263)
+ *                                    or reopened
  *   IDLE                             nothing happened for max-hours (with --follow: a heartbeat, then it goes on)
  *   WATCHER_ERROR                    a look failed (e.g. a state file stayed locked); it goes on with the next
  *   LOOKUPS_FAILING / LOOKUPS_RECOVERED  no `gh` call has succeeded for minutes (on every look while it

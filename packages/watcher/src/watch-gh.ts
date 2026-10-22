@@ -3,7 +3,7 @@
  * many at once, and sharing each answer with the other watchers on this machine for a moment.
  */
 import { WATCHERS_DIR, removeOlder, writeWhole } from './watch-files'
-import { ignoreFailure } from './read'
+import { ignoreFailure, isRecord } from './read'
 
 // GH: the `gh` to ask with, e.g. a wrapper logged in as a bot (GH=agent-gh). Defaults to plain gh.
 export const GH = process.env.GH ?? 'gh'
@@ -21,6 +21,8 @@ if (!Number.isInteger(GH_PARALLEL) || GH_PARALLEL < 1) {
   process.stderr.write('GH_PARALLEL must be a whole number from 1\n')
   process.exit(64)
 }
+// How long a failed call's answer is waited for, once the call has ended.
+const ANSWER_WAIT_MS = 1000
 const slots = { free: GH_PARALLEL, waiting: new Array<() => void>() }
 
 /** Waits for one of the GH_PARALLEL places; `release` hands it to the next waiting call. */
@@ -62,7 +64,6 @@ export const lookupNews = (health: Readonly<typeof lookups>, now: Temporal.Insta
   return { failing, line: health.failing ? 'LOOKUPS_RECOVERED: gh calls succeed again' : null }
 }
 
-/** What a `gh` call prints; it fails on a non-zero exit, or when it runs out of time. */
 /** Starts a call; one that can't even start (no such program) counts as a failed call too. */
 const started = (args: string[], cli: string) => {
   try {
@@ -73,17 +74,44 @@ const started = (args: string[], cli: string) => {
   }
 }
 
+/** The HTTP status in GitHub's answer to a refused call, as `gh api` prints it (`"status":"404"`); null without one. */
+const statusOf = (answer: string): number | null => {
+  try {
+    const value: unknown = JSON.parse(answer)
+    const status = isRecord(value) ? Number(value.status) : Number.NaN
+    return Number.isInteger(status) && status > 0 ? status : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * The HTTP status GitHub refused a failed call with (#263), e.g. 404 for an issue that is gone; null
+ * for a call that failed without an answer (it ran out of time, or `gh` itself failed).
+ */
+export const failedStatus = (error: unknown): number | null =>
+  error instanceof Error && isRecord(error.cause) && typeof error.cause.status === 'number' ? error.cause.status : null
+
+/** The error for a failed call, with the HTTP status GitHub refused it with, if it answered. */
+const failure = async (command: string, call: ReturnType<typeof started>, output: Promise<string>): Promise<Error> => {
+  const timedOut = call.signalCode === 'SIGKILL'
+  // A refused call's answer says why (#263): `gh api` prints GitHub's error, with its HTTP status.
+  const answer = timedOut ? '' : await Promise.race([output, Bun.sleep(ANSWER_WAIT_MS).then(() => '')])
+  output.catch(ignoreFailure)
+  const why = timedOut ? `timed out after ${GH_TIMEOUT_MS / 1000} s` : `exit ${call.exitCode}`
+  lookups.lastFailure = why
+  return new Error(`${command}: ${why}`, { cause: { status: statusOf(answer) } })
+}
+
+/** What a `gh` call prints; it fails on a non-zero exit, or when it runs out of time. */
 const ghCall = async (args: string[], cli: string): Promise<string> => {
   const call = started(args, cli)
-  // Read while it runs (a full pipe would stall it), but don't wait for the end of the output once it
-  // failed: a wrapper script's child (`agent-gh` runs `gh`) can outlive it and hold the pipe open.
+  // Read while it runs (a full pipe would stall it), but don't wait long for the end of the output
+  // once it failed: a wrapper script's child (`agent-gh` runs `gh`) can outlive it and hold the pipe open.
   const output = new Response(call.stdout).text()
   const exitCode = await call.exited
   if (exitCode !== 0) {
-    output.catch(ignoreFailure)
-    const why = call.signalCode === 'SIGKILL' ? `timed out after ${GH_TIMEOUT_MS / 1000} s` : `exit ${exitCode}`
-    lookups.lastFailure = why
-    throw new Error(`${cli} ${args.join(' ')}: ${why}`)
+    throw await failure(`${cli} ${args.join(' ')}`, call, output)
   }
   lookups.lastSuccess = Temporal.Now.instant()
   return output

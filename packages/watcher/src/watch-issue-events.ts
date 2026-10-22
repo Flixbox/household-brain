@@ -48,3 +48,23 @@ export const issueEventLine = (issue: number, value: Json, change: 'closed' | 'r
   // A brand-new issue is NEW_ISSUE's; only one that was closed before is reopened.
   return value.closed_at !== null || value.state_reason === 'reopened' ? `ISSUE_REOPENED #${issue} ${oneLine(value.title, 200)}` : null
 }
+
+/**
+ * Whether a lookup GitHub refused with `status` means the issue is gone (#263): deleted (410), or not
+ * there (404: deleted, or moved to a repository this login can't see). Any other failure passes.
+ */
+export const isGone = (status: number | null): boolean => status === 404 || status === 410
+
+/**
+ * Whether GitHub answered the issue from another repository (#263): it was moved there, and GitHub
+ * followed the move.
+ */
+export const isMoved = (value: Json, repo: string): boolean =>
+  !textOf(value.repository_url).toLowerCase().endsWith(`/repos/${repo.toLowerCase()}`)
+
+/**
+ * The line for an issue that is gone (#263): one that left the open list is closed as far as the work
+ * on it goes; one that joined it and is already gone again isn't news.
+ */
+export const goneIssueLine = (issue: number, change: 'closed' | 'reopened'): string | null =>
+  change === 'closed' ? `ISSUE_CLOSED #${issue} (deleted or transferred)` : null
