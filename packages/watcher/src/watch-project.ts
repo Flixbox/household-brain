@@ -17,6 +17,10 @@
  *                                    once settled), and each change request left on an older commit (the
  *                                    owner dismisses it; GitHub's decision stays CHANGES_REQUESTED until
  *                                    then, #286)
+ *   PR #<n>: REVIEW_DISMISSED        with DISMISS_STALE_BOT_REVIEWS=1 (off by default, #285): the owner approved,
+ *                                    no review thread is open, and the watcher dismissed a bot's change
+ *                                    request left on an older commit, with its `GH` token.
+ *                                    REVIEW_DISMISS_FAILED: it couldn't (it tries again on every look)
  *   PR #<n>: THREAD_RESOLVED         the watcher resolved a review thread whose last comment, from anyone,
  *                                    starts `Resolved: <reason>` (#279), with its `GH` token; agents never
  *                                    resolve threads themselves. THREAD_RESOLVE_FAILED: it couldn't (it

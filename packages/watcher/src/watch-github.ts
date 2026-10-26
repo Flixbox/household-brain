@@ -243,12 +243,12 @@ export const prStates = async (prs: readonly number[], fresh = false): Promise<M
   return new Map((await Promise.all(chunks.map(async chunk => batchStates(chunk, fresh)))).flat())
 }
 
-/** A PR's review threads (see `THREAD_FIELDS`), and its reviews with the commit each was left on (#278). */
+/** A PR's review threads (see `THREAD_FIELDS`), and its reviews with the commit each was left on (#278) and its id (#285). */
 export const reviewBlockers = async (pr: number): Promise<{ reviews: Review[], threads: ReviewThread[] }> => {
-  const value = record(at(await graphql(`pullRequest(number:${pr}){${THREAD_FIELDS} reviews(last:100){nodes{state commit{oid} author{login kind:__typename}}}}`), 'pullRequest'))
+  const value = record(at(await graphql(`pullRequest(number:${pr}){${THREAD_FIELDS} reviews(last:100){nodes{databaseId state commit{oid} author{login kind:__typename}}}}`), 'pullRequest'))
   return {
     reviews: records(at(value, 'reviews', 'nodes'))
-      .map(review => ({ commit: textOf(record(review.commit).oid), login: actor(review.author), state: textOf(review.state) })),
+      .map(review => ({ commit: textOf(record(review.commit).oid), id: count(review.databaseId), login: actor(review.author), state: textOf(review.state) })),
     threads: threadsFrom(value),
   }
 }

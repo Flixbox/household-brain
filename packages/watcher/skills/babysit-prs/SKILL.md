@@ -62,6 +62,10 @@ default branch's CI, new issues, the owner's comments on issues, and issues clos
     several watchers cost hardly more than one.
   - `GH_PARALLEL`: how many `gh` calls run at once (4 by default); the pull requests are checked in
     parallel, and the cap keeps the bursts within GitHub's rate limits.
+  - `DISMISS_STALE_BOT_REVIEWS`: `1` lets the watcher dismiss a bot's (`…[bot]`) change request left
+    on an older commit, once the owner approved and no review thread is open (#285); off by default,
+    when `BLOCKED_BY_REVIEW` names it for the owner to dismiss. A person's change request is never
+    dismissed. The `GH` token must be allowed to write pull requests.
   - `CLAUDE_CONFIG_DIR`: where the Claude login lives (`~/.claude` by default). Every notification
     ends with the owner's Claude usage (`Usage: session 12% used (88% left, resets 2026-10-17 14:10), week 66% used (34% left, resets …)`,
     the windows `/usage` shows: how much is used and left, and when each resets),
@@ -97,6 +101,8 @@ approved one whose auto-merge is still off and that isn't in the merge queue, no
 | `READY_TO_MERGE` | Approved and green, auto-merge still off: enable it the same way, unless review findings are still open. Not reported for a PR in the merge queue. |
 | `BLOCKED_BY_REVIEW` | The owner approved and CI is green (even while GitHub still says changes requested), but GitHub won't merge it, and the reviews are why. For each thread it names (answered by the agent, still open): check the answer settles it, then reply `Resolved: <reason>` in it (the watcher resolves it), or ask the owner. For each change request it names (left on an older commit, still counted until dismissed): check its points are dealt with, then ask the owner on the PR to dismiss it. |
 | `THREAD_RESOLVED` | The watcher resolved a review thread on a `Resolved: <reason>` reply (anyone's, #279). Nothing to do. |
+| `REVIEW_DISMISSED` | With `DISMISS_STALE_BOT_REVIEWS=1`, the watcher dismissed a bot's change request left on an older commit (the owner approved, no thread open, #285). Nothing to do. |
+| `REVIEW_DISMISS_FAILED` | The watcher couldn't dismiss such a change request; it tries again on every look. Repeated, its `GH` token likely can't write pull requests: tell the owner. |
 | `THREAD_RESOLVE_FAILED` | The watcher couldn't resolve such a thread; it tries again on every look. Repeated, its `GH` token likely can't write pull requests: tell the owner. |
 | `QUEUED` | The PR entered the merge queue (with its position). Nothing to do; no auto-merge reminders come for it while it is there. |
 | `DEQUEUED` | The PR left the merge queue without merging, with GitHub's reason (failed checks, a conflict, removed by hand). Fix what it says, then queue it again. |
