@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@household-brain/core": "workspace:*",
-    "firebase": "13.0.0",
+    "firebase": "13.1.0",
     "nanostores": "1.5.5"
   }
 }
