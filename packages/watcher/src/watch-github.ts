@@ -171,6 +171,7 @@ export interface PrState {
   parked: boolean
   queued: boolean
   title: string
+  toResolve: ReviewThread[]
 }
 
 /** GraphQL names a bot `name`, the REST API (and `SELF`) `name[bot]`: the REST form, as everywhere else. */
@@ -181,12 +182,10 @@ const actor = (value: unknown): string => {
 
 /** A PR's review threads, each with its last comment: the first hundred, more is beyond a PR the agent babysits. */
 const THREAD_FIELDS = 'reviewThreads(first:100){nodes{id isResolved comments(last:1){nodes{body url author{login kind:__typename}}}}}'
-
 const threadsFrom = (value: unknown): ReviewThread[] => records(at(value, 'reviewThreads', 'nodes')).map(thread => {
   const last = records(at(thread, 'comments', 'nodes')).at(-1) ?? {}
   return { id: textOf(thread.id), lastAuthor: actor(last.author), lastBody: textOf(last.body), resolved: thread.isResolved === true, url: textOf(last.url) }
 })
-
 const PR_FIELDS = 'isInMergeQueue state mergeable mergeStateStatus headRefOid mergeCommit { oid } reviewDecision autoMergeRequest { enabledAt } title'
   + ' labels(first: 100) { nodes { name } } author { login kind: __typename } reviews(last: 100) { nodes { state author { login kind: __typename } } }'
   + ` ${THREAD_FIELDS}`
@@ -253,10 +252,7 @@ export const reviewBlockers = async (pr: number): Promise<{ reviews: Review[], t
   }
 }
 
-/**
- * Resolves a review thread with the `GH` token (#279): the watcher does it on a `Resolved:` reply, so
- * agents never need the mutation. Never a shared answer: each call must reach GitHub.
- */
+/** Resolves a review thread with the `GH` token, on a `Resolved:` reply (#279); never a shared answer. */
 export const resolveThread = async (id: string): Promise<boolean> => {
   const answer = await gh(['api', 'graphql', '-f', `query=mutation{resolveReviewThread(input:{threadId:${JSON.stringify(id)}}){thread{isResolved}}}`], GH, true)
   return at(answer, 'data', 'resolveReviewThread', 'thread', 'isResolved') === true

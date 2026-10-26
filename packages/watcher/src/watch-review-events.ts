@@ -15,7 +15,7 @@ export interface ReviewThread {
 }
 
 /** A reply starting `Resolved: <reason>`, with a reason, asks for its thread to be resolved (#279). */
-const RESOLVED_REPLY = /^\s*Resolved:\s*\S/u
+const asksToResolve = (thread: ReviewThread) => /^\s*Resolved:\s*\S/u.test(thread.lastBody)
 
 /**
  * The open threads whose last comment asks for them to be resolved, whoever wrote it (the agent, the
@@ -23,7 +23,7 @@ const RESOLVED_REPLY = /^\s*Resolved:\s*\S/u
  * token, so agents never need the mutation, and the reason stays on record in the thread.
  */
 export const threadsToResolve = (threads: readonly ReviewThread[]): ReviewThread[] =>
-  threads.filter(thread => !thread.resolved && RESOLVED_REPLY.test(thread.lastBody))
+  threads.filter(thread => !thread.resolved && asksToResolve(thread))
 
 /** The event for a thread the watcher resolved, or failed to: reported once per thread. */
 export const resolvedThreadEvent = (pr: number, thread: ReviewThread, resolved: boolean): Event => resolved
@@ -52,8 +52,7 @@ export const blockedByReviewEvent = ({ head, pr, reviews, self, threads }: {
   self: string
   threads: readonly ReviewThread[]
 }): Event | null => {
-  const asked = new Set(threadsToResolve(threads))
-  const answered = threads.filter(thread => !thread.resolved && !asked.has(thread) && self !== '' && thread.lastAuthor === self)
+  const answered = threads.filter(thread => !thread.resolved && !asksToResolve(thread) && self !== '' && thread.lastAuthor === self)
   const latest = new Map<string, Review>()
   for (const review of reviews) {
     if (review.state === 'APPROVED' || review.state === 'CHANGES_REQUESTED' || review.state === 'DISMISSED') {
