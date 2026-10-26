@@ -12,6 +12,9 @@
  *   PR #<n>: MAIN_MOVED              main got commits the PR doesn't have yet: rebase and test again
  *   PR #<n>: APPROVED                the owner approved (enable auto-merge once it is well reviewed)
  *   PR #<n>: READY_TO_MERGE          approved, CI green for the current head, auto-merge still off
+ *   PR #<n>: BLOCKED_BY_REVIEW       approved, CI green, but GitHub blocks the merge (#278): names each open
+ *                                    thread the agent answered last (resolve it), and each change request
+ *                                    left on an older commit (the owner dismisses it)
  *   PR #<n>: ACTIVITY                new comments, reviews (also a pending review's comments), review comments
  *   PR #<n>: DEPLOYED / DEPLOY_FAILED  merged, and the deploy run on main finished
  *   PR #<n>: CLOSED                  closed without merging
