@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'bun:test'
-import { type Review, type ReviewThread, blockedByReviewEvent, resolvedThreadEvent, threadsToResolve } from './watch-review-events'
+import { type Review, type ReviewThread, blockedByReviewEvent, dismissedReviewEvent, resolvedThreadEvent, reviewsToDismiss, threadsToResolve } from './watch-review-events'
 
 const HEAD = 'abcdef1234567890abcdef1234567890abcdef12'
 const OLD = '1234567890abcdef1234567890abcdef12345678'
 const SELF = 'agent[bot]'
 const thread = (id: string, changes: Partial<ReviewThread> = {}): ReviewThread =>
   ({ id, lastAuthor: SELF, lastBody: 'Fixed in the next push.', resolved: false, url: `https://github.test/pr/1#${id}`, ...changes })
-const review = (login: string, state: string, commit = HEAD): Review => ({ commit, login, state })
+const review = (login: string, state: string, commit = HEAD, id = 1): Review => ({ commit, id, login, state })
 const event = (threads: ReviewThread[], reviews: Review[] = []) => blockedByReviewEvent({ head: HEAD, pr: 7, reviews, self: SELF, threads })
 
 describe('blockedByReviewEvent', () => {
@@ -64,5 +64,37 @@ describe('resolvedThreadEvent', () => {
       lines: ['THREAD_RESOLVED: resolved on its `Resolved:` reply: https://github.test/pr/1#T1'],
     })
     expect(resolvedThreadEvent(7, thread('T1'), false).key).toBe('pr-7 thread-resolve-failed T1')
+  })
+})
+
+describe('reviewsToDismiss', () => {
+  const dismiss = (reviews: Review[], threads: ReviewThread[] = []) => reviewsToDismiss({ head: HEAD, reviews, threads }).map(each => each.id)
+
+  it('takes every change request on an older commit from a bot whose latest counting review is one', () => {
+    expect(dismiss([
+      review('reviewer[bot]', 'CHANGES_REQUESTED', OLD, 1),
+      review('reviewer[bot]', 'CHANGES_REQUESTED', OLD, 2),
+      review('reviewer[bot]', 'COMMENTED', HEAD, 3),
+      review('person', 'CHANGES_REQUESTED', OLD, 4),
+      review('fixed[bot]', 'CHANGES_REQUESTED', OLD, 5),
+      review('fixed[bot]', 'APPROVED', HEAD, 6),
+      review('current[bot]', 'CHANGES_REQUESTED', HEAD, 7),
+      review('owner', 'APPROVED', HEAD, 8),
+    ])).toEqual([1, 2])
+  })
+
+  it('takes none while a review thread is open', () => {
+    expect(dismiss([review('reviewer[bot]', 'CHANGES_REQUESTED', OLD)], [thread('T1', { resolved: true }), thread('T2')])).toEqual([])
+    expect(dismiss([review('reviewer[bot]', 'CHANGES_REQUESTED', OLD)], [thread('T1', { resolved: true })])).toEqual([1])
+  })
+})
+
+describe('dismissedReviewEvent', () => {
+  it('reports a dismissed change request, and a failed attempt under its own key', () => {
+    expect(dismissedReviewEvent(7, review('reviewer[bot]', 'CHANGES_REQUESTED', OLD, 42), true)).toEqual({
+      key: 'pr-7 review-dismissed 42',
+      lines: ["REVIEW_DISMISSED: dismissed reviewer[bot]'s change request on an older commit (1234567): the owner approved, and no review thread is open"],
+    })
+    expect(dismissedReviewEvent(7, review('reviewer[bot]', 'CHANGES_REQUESTED', OLD, 42), false).key).toBe('pr-7 review-dismiss-failed 42')
   })
 })

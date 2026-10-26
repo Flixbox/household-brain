@@ -3,6 +3,7 @@
 import { FOLLOW_NEWER, type MainRun, type Run, cancelledDeployEvent, mainRunEvent, replacementCandidates, runEvent } from './watch-events'
 import { type PrState, REPO, SELF, containsCommit, jobLines, mainAhead, mainHead, mainRuns, mergeCommand, newestMainRun, openPrs, prStates, recentlyMerged, resolveThread, reviewBlockers, runOf } from './watch-github'
 import { blockedByReviewEvent, resolvedThreadEvent } from './watch-review-events'
+import { dismissStale } from './watch-dismiss'
 import { FOLLOW, checkCode, flush, queue, quiet, report, reportLookups } from './watch-output'
 import { addLine, readLines, start, updateLines, writeLines } from './watch-state'
 import { checkActivity as checkPrActivity, checkTrackedActivity } from './watch-activity'
@@ -142,11 +143,12 @@ const checkReview = async (pr: number, state: PrState): Promise<void> => {
 }
 
 /**
- * Approved and green, yet GitHub won't merge it (#278): what in the reviews blocks it. Asked only
- * while GitHub says it is blocked; a lookup that fails says nothing, and the next look asks again.
+ * Approved and green, yet GitHub won't merge it (#278): what in the reviews blocks it, after dismissing
+ * a stale bot change request where the repository opts in (#285). Asked only while GitHub says it is
+ * blocked; a lookup that fails says nothing, and the next look asks again.
  */
 const checkBlocked = async (pr: number, head: string): Promise<void> => {
-  const blockers = await reviewBlockers(pr).catch(() => null)
+  const blockers = await reviewBlockers(pr).then(async found => dismissStale({ ...found, head, pr })).catch(() => null)
   await report(blockers && blockedByReviewEvent({ ...blockers, head, pr, self: SELF }), pr)
 }
 
