@@ -1,7 +1,7 @@
 /** The project watcher's questions to GitHub, through the `gh` CLI, answered as plain data. */
 import { type MainRun, type OpenPr, type Run, approvedBy, decisionFrom } from './watch-events'
 import type { QueueEntry } from './watch-queue-events'
-import { type Review, type ReviewThread, threadsToResolve } from './watch-review-events'
+import { type PrComment, type Review, type ReviewThread, threadsToResolve } from './watch-review-events'
 import { allIssueNumbers, goneIssueLine, isGone, isMoved, issueEventLine, issuePage } from './watch-issue-events'
 import { GH, failedStatus, ghText } from './watch-gh'
 import { hasText, isRecord, textOf } from './read'
@@ -183,9 +183,12 @@ const actor = (value: unknown): string => {
 
 /** A PR's review threads, each with its last comment: the first hundred, more is beyond a PR the agent babysits. */
 const THREAD_FIELDS = 'reviewThreads(first:100){nodes{id isResolved comments(last:1){nodes{body url author{login kind:__typename}}}}}'
+/** The same, with the review that opened each thread (its first comment's), which the dismissal needs (#290). */
+const THREAD_REVIEW_FIELDS = 'reviewThreads(first:100){nodes{id isResolved comments(last:1){nodes{body url author{login kind:__typename}}} first:comments(first:1){nodes{pullRequestReview{databaseId}}}}}'
 const threadsFrom = (value: unknown): ReviewThread[] => records(at(value, 'reviewThreads', 'nodes')).map(thread => {
   const last = records(at(thread, 'comments', 'nodes')).at(-1) ?? {}
-  return { id: textOf(thread.id), lastAuthor: actor(last.author), lastBody: textOf(last.body), resolved: thread.isResolved === true, url: textOf(last.url) }
+  const review = count(at(records(at(thread, 'first', 'nodes'))[0], 'pullRequestReview', 'databaseId'))
+  return { id: textOf(thread.id), lastAuthor: actor(last.author), lastBody: textOf(last.body), resolved: thread.isResolved === true, review, url: textOf(last.url) }
 })
 const PR_FIELDS = 'isInMergeQueue state mergeable mergeStateStatus headRefOid mergeCommit { oid } reviewDecision autoMergeRequest { enabledAt } title'
   + ` labels(first: 100) { nodes { name } } author { login kind: __typename } reviews(last: 100) { nodes { state author { login kind: __typename } } } ${THREAD_FIELDS}`
@@ -243,12 +246,25 @@ export const prStates = async (prs: readonly number[], fresh = false): Promise<M
   return new Map((await Promise.all(chunks.map(async chunk => batchStates(chunk, fresh)))).flat())
 }
 
-/** A PR's review threads (see `THREAD_FIELDS`), and its reviews with the commit each was left on (#278) and its id (#285). */
-export const reviewBlockers = async (pr: number): Promise<{ reviews: Review[], threads: ReviewThread[] }> => {
-  const value = record(at(await graphql(`pullRequest(number:${pr}){${THREAD_FIELDS} reviews(last:100){nodes{databaseId state commit{oid} author{login kind:__typename}}}}`), 'pullRequest'))
+/**
+ * A PR's review threads (see `THREAD_REVIEW_FIELDS`), its reviews with the commit each was left on
+ * (#278), its id (#285) and when, and its last hundred PR comments, where a review without threads is
+ * settled (#290).
+ */
+export const reviewBlockers = async (pr: number): Promise<{ comments: PrComment[], reviews: Review[], threads: ReviewThread[] }> => {
+  const fields = `${THREAD_REVIEW_FIELDS} reviews(last:100){nodes{databaseId state submittedAt commit{oid} author{login kind:__typename}}}`
+    + ' comments(last:100){nodes{body url createdAt author{login kind:__typename}}}'
+  const value = record(at(await graphql(`pullRequest(number:${pr}){${fields}}`), 'pullRequest'))
   return {
-    reviews: records(at(value, 'reviews', 'nodes'))
-      .map(review => ({ commit: textOf(record(review.commit).oid), id: count(review.databaseId), login: actor(review.author), state: textOf(review.state) })),
+    comments: records(at(value, 'comments', 'nodes'))
+      .map(comment => ({ author: actor(comment.author), body: textOf(comment.body), createdAt: textOf(comment.createdAt), url: textOf(comment.url) })),
+    reviews: records(at(value, 'reviews', 'nodes')).map(review => ({
+      commit: textOf(record(review.commit).oid),
+      id: count(review.databaseId),
+      login: actor(review.author),
+      state: textOf(review.state),
+      submittedAt: textOf(review.submittedAt),
+    })),
     threads: threadsFrom(value),
   }
 }

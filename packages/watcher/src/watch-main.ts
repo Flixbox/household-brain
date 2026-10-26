@@ -144,7 +144,7 @@ const checkReview = async (pr: number, state: PrState): Promise<void> => {
 
 /**
  * Approved and green, yet GitHub won't merge it (#278): what in the reviews blocks it, after dismissing
- * a stale bot change request where the repository opts in (#285). Asked only while GitHub says it is
+ * a settled bot change request where the repository opts in (#285, #290). Asked only while GitHub says it is
  * blocked; a lookup that fails says nothing, and the next look asks again.
  */
 const checkBlocked = async (pr: number, head: string): Promise<void> => {
