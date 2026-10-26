@@ -93,9 +93,9 @@ jobs:
     # so nothing is installed per run (installing them was slow and once hung).
     # Its version must equal @playwright/test in package.json; the first step checks that.
     container:
-      image: mcr.microsoft.com/playwright:v1.64.0-noble@sha256:06a9939e57531807f8d5fd76ce44b53165ffb7d7501d87ab10e285c20b1e971f
+      image: mcr.microsoft.com/playwright:v1.64.1-noble@sha256:47b510dd9230bf0b9bfc9b20102241e577ea7a99334ab4c3ca19f19770e9b8ea
     env:
-      PLAYWRIGHT_IMAGE_VERSION: 1.64.0
+      PLAYWRIGHT_IMAGE_VERSION: 1.64.1
       NX_CLOUD_ACCESS_TOKEN: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.NX_CLOUD_ACCESS_TOKEN || secrets.NX_CLOUD_READ_TOKEN }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
