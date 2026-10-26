@@ -229,8 +229,9 @@ in the next PR (first, if the app is unusable). Report what it showed.
   the type check in Nx.
 - **Review the e2e task's Nx inputs** when the tests come to depend on something new outside the app
   and packages (#71), or a cached green hides a broken journey.
-- **The e2e job's Playwright image must match `@playwright/test`**: when Dependabot bumps it, update
-  the image tag, digest and `PLAYWRIGHT_IMAGE_VERSION` in `ci.yml`.
+- **The e2e job's Playwright image must match `@playwright/test`**: when Dependabot bumps it, the
+  agent pushes the image bump (tag, digest and `PLAYWRIGHT_IMAGE_VERSION` in `ci.yml`) onto that
+  Dependabot PR itself, not a separate one (#276).
 - **Change hosting headers, CSP and rewrites in `firebase.json` only**; the e2e config is generated
   from it (#150).
 - Pushing under `.github/workflows/` needs the `workflow` scope on the token.

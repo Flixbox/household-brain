@@ -52,15 +52,27 @@ describe('replacementCandidates', () => {
 
 describe('decisionFrom', () => {
   it('takes each reviewer\'s latest approval, change request or dismissal; comments don\'t count', () => {
-    expect(decisionFrom([{ login: 'owner', state: 'APPROVED' }, { login: 'owner', state: 'COMMENTED' }])).toBe('APPROVED')
-    expect(decisionFrom([{ login: 'owner', state: 'CHANGES_REQUESTED' }, { login: 'owner', state: 'APPROVED' }])).toBe('APPROVED')
-    expect(decisionFrom([{ login: 'owner', state: 'APPROVED' }, { login: 'owner', state: 'DISMISSED' }])).toBe('')
+    expect(decisionFrom('', [{ login: 'owner', state: 'APPROVED' }, { login: 'owner', state: 'COMMENTED' }], 'owner')).toBe('APPROVED')
+    expect(decisionFrom('', [{ login: 'owner', state: 'CHANGES_REQUESTED' }, { login: 'owner', state: 'APPROVED' }], 'owner')).toBe('APPROVED')
+    expect(decisionFrom('', [{ login: 'owner', state: 'APPROVED' }, { login: 'owner', state: 'DISMISSED' }], 'owner')).toBe('')
   })
 
   it('lets one reviewer\'s change request outweigh another\'s approval, and is empty without reviews', () => {
-    expect(decisionFrom([{ login: 'owner', state: 'APPROVED' }, { login: 'bot', state: 'CHANGES_REQUESTED' }])).toBe('CHANGES_REQUESTED')
-    expect(decisionFrom([{ login: 'owner', state: 'COMMENTED' }])).toBe('')
-    expect(decisionFrom([])).toBe('')
+    expect(decisionFrom('', [{ login: 'owner', state: 'APPROVED' }, { login: 'bot', state: 'CHANGES_REQUESTED' }], 'owner')).toBe('CHANGES_REQUESTED')
+    expect(decisionFrom('', [{ login: 'owner', state: 'COMMENTED' }], 'owner')).toBe('')
+    expect(decisionFrom('', [], 'owner')).toBe('')
+  })
+
+  it('counts an approval only from the owner, also when GitHub calls the PR approved (#277)', () => {
+    const botApproved = [{ login: 'reviewer[bot]', state: 'APPROVED' }]
+    expect(decisionFrom('', botApproved, 'owner')).toBe('')
+    expect(decisionFrom('APPROVED', botApproved, 'owner')).toBe('')
+    expect(decisionFrom('APPROVED', [...botApproved, { login: 'Owner', state: 'APPROVED' }], 'owner')).toBe('APPROVED')
+  })
+
+  it('keeps GitHub\'s decision when it isn\'t an approval', () => {
+    expect(decisionFrom('CHANGES_REQUESTED', [{ login: 'owner', state: 'APPROVED' }], 'owner')).toBe('CHANGES_REQUESTED')
+    expect(decisionFrom('REVIEW_REQUIRED', [], 'owner')).toBe('REVIEW_REQUIRED')
   })
 })
 
