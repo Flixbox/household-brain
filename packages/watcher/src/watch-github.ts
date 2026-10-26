@@ -1,6 +1,7 @@
 /** The project watcher's questions to GitHub, through the `gh` CLI, answered as plain data. */
 import { type MainRun, type OpenPr, type Run, decisionFrom } from './watch-events'
 import type { QueueEntry } from './watch-queue-events'
+import type { Review, ReviewThread } from './watch-review-events'
 import { allIssueNumbers, goneIssueLine, isGone, isMoved, issueEventLine, issuePage } from './watch-issue-events'
 import { GH, failedStatus, ghText } from './watch-gh'
 import { hasText, isRecord, textOf } from './read'
@@ -161,6 +162,8 @@ export const openPrs = async (): Promise<OpenPr[]> => {
 export interface PrState {
   state: string
   mergeable: string
+  /** GitHub's `mergeStateStatus`: `BLOCKED` while a rule (a review, an open thread) holds it back. */
+  mergeState: string
   head: string
   mergeSha: string
   decision: string
@@ -170,7 +173,7 @@ export interface PrState {
   title: string
 }
 
-const PR_FIELDS = 'isInMergeQueue state mergeable headRefOid mergeCommit { oid } reviewDecision autoMergeRequest { enabledAt } title'
+const PR_FIELDS = 'isInMergeQueue state mergeable mergeStateStatus headRefOid mergeCommit { oid } reviewDecision autoMergeRequest { enabledAt } title'
   + ' labels(first: 100) { nodes { name } } author { login kind: __typename } reviews(last: 100) { nodes { state author { login kind: __typename } } }'
 const PRS_PER_QUERY = 50
 
@@ -192,6 +195,7 @@ const stateOf = (value: Json): PrState => {
     decision: decisionFrom(textOf(value.reviewDecision), reviews, OWNER),
     head: textOf(value.headRefOid),
     mergeSha: textOf(record(value.mergeCommit).oid),
+    mergeState: textOf(value.mergeStateStatus),
     mergeable: textOf(value.mergeable),
     parked: records(record(value.labels).nodes).some(label => label.name === 'parked'),
     queued: value.isInMergeQueue === true,
@@ -227,6 +231,24 @@ const batchStates = async (prs: readonly number[], fresh: boolean): Promise<[num
 export const prStates = async (prs: readonly number[], fresh = false): Promise<Map<number, PrState>> => {
   const chunks = Array.from({ length: Math.ceil(prs.length / PRS_PER_QUERY) }, (_chunk, index) => prs.slice(index * PRS_PER_QUERY, (index + 1) * PRS_PER_QUERY))
   return new Map((await Promise.all(chunks.map(async chunk => batchStates(chunk, fresh)))).flat())
+}
+
+/**
+ * A PR's review threads, each with its last comment's author and link, and its reviews with the
+ * commit each was left on (#278). The first hundred of each: more is beyond a PR the agent babysits.
+ */
+export const reviewBlockers = async (pr: number): Promise<{ reviews: Review[], threads: ReviewThread[] }> => {
+  const value = record(at(await graphql(`pullRequest(number:${pr}){`
+    + 'reviewThreads(first:100){nodes{id isResolved comments(last:1){nodes{url author{login kind:__typename}}}}}'
+    + ' reviews(last:100){nodes{state commit{oid} author{login kind:__typename}}}}'), 'pullRequest'))
+  return {
+    reviews: records(at(value, 'reviews', 'nodes'))
+      .map(review => ({ commit: textOf(record(review.commit).oid), login: actor(review.author), state: textOf(review.state) })),
+    threads: records(at(value, 'reviewThreads', 'nodes')).map(thread => {
+      const last = records(at(thread, 'comments', 'nodes')).at(-1) ?? {}
+      return { id: textOf(thread.id), lastAuthor: actor(last.author), resolved: thread.isResolved === true, url: textOf(last.url) }
+    }),
+  }
 }
 
 /** Pull requests merged in the last `hours`. */
