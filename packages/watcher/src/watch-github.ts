@@ -1,5 +1,5 @@
 /** The project watcher's questions to GitHub, through the `gh` CLI, answered as plain data. */
-import { type MainRun, type OpenPr, type Run, decisionFrom } from './watch-events'
+import { type MainRun, type OpenPr, type Run, approvedBy, decisionFrom } from './watch-events'
 import type { QueueEntry } from './watch-queue-events'
 import { type Review, type ReviewThread, threadsToResolve } from './watch-review-events'
 import { allIssueNumbers, goneIssueLine, isGone, isMoved, issueEventLine, issuePage } from './watch-issue-events'
@@ -167,6 +167,11 @@ export interface PrState {
   head: string
   mergeSha: string
   decision: string
+  /**
+   * The owner's own latest review approves, even where `decision` says otherwise: a change request
+   * left on an older commit keeps GitHub's decision at CHANGES_REQUESTED until it is dismissed (#286).
+   */
+  ownerApproved: boolean
   autoMerge: boolean
   parked: boolean
   queued: boolean
@@ -205,6 +210,7 @@ const stateOf = (value: Json): PrState => {
     mergeSha: textOf(record(value.mergeCommit).oid),
     mergeState: textOf(value.mergeStateStatus),
     mergeable: textOf(value.mergeable),
+    ownerApproved: approvedBy(reviews, OWNER),
     parked: records(record(value.labels).nodes).some(label => label.name === 'parked'),
     queued: value.isInMergeQueue === true,
     state: textOf(value.state),

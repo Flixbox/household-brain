@@ -166,29 +166,40 @@ export const reminderLines = (prs: readonly OpenPr[]): string[] => prs
   .filter(pr => !pr.parked)
   .flatMap(pr => [branchProblem(pr), approvalProblem(pr)].filter(line => line !== null))
 
-/**
- * The review decision, with an approval counted only from `approver`, the owner (#277): a bot's or
- * anyone else's approval must not read as the owner's. GitHub's own decision (`given`) stands when it
- * isn't an approval; when it is, the approver's own latest review must say so. Where GitHub leaves it
- * empty (it only fills it in under classic branch protection, not under a ruleset, #197), the reviews
- * decide: each reviewer's latest that counts (a comment doesn't undo an approval, a dismissal does),
- * anyone's change request outweighing the approval.
- */
-export const decisionFrom = (given: string, reviews: readonly { login: string, state: string }[], approver: string): string => {
-  if (given !== '' && given !== 'APPROVED') {
-    return given
-  }
+/** Each reviewer's latest review that counts, by login in lower case (logins are case-insensitive): a comment doesn't undo an approval, a dismissal does. */
+const latestReviews = (reviews: readonly { login: string, state: string }[]): Map<string, string> => {
   const latest = new Map<string, string>()
   for (const { login, state } of reviews) {
     if (state === 'APPROVED' || state === 'CHANGES_REQUESTED' || state === 'DISMISSED') {
       latest.set(login.toLowerCase(), state)
     }
   }
-  if (given === '' && [...latest.values()].includes('CHANGES_REQUESTED')) {
+  return latest
+}
+
+/**
+ * Whether `approver`'s own latest review that counts is an approval, whatever anyone else's says:
+ * a change request left on an older commit keeps GitHub's decision at CHANGES_REQUESTED, and yet the
+ * owner has approved (#286).
+ */
+export const approvedBy = (reviews: readonly { login: string, state: string }[], approver: string): boolean =>
+  latestReviews(reviews).get(approver.toLowerCase()) === 'APPROVED'
+
+/**
+ * The review decision, with an approval counted only from `approver`, the owner (#277): a bot's or
+ * anyone else's approval must not read as the owner's. GitHub's own decision (`given`) stands when it
+ * isn't an approval; when it is, the approver's own latest review must say so. Where GitHub leaves it
+ * empty (it only fills it in under classic branch protection, not under a ruleset, #197), the reviews
+ * decide: each reviewer's latest that counts, anyone's change request outweighing the approval.
+ */
+export const decisionFrom = (given: string, reviews: readonly { login: string, state: string }[], approver: string): string => {
+  if (given !== '' && given !== 'APPROVED') {
+    return given
+  }
+  if (given === '' && [...latestReviews(reviews).values()].includes('CHANGES_REQUESTED')) {
     return 'CHANGES_REQUESTED'
   }
-  // Logins are case-insensitive: `OWNER` may be spelled differently from GitHub's answer.
-  return latest.get(approver.toLowerCase()) === 'APPROVED' ? 'APPROVED' : ''
+  return approvedBy(reviews, approver) ? 'APPROVED' : ''
 }
 
 const review = (decision: string) => {
