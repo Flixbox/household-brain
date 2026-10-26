@@ -167,10 +167,6 @@ export interface PrState {
   head: string
   mergeSha: string
   decision: string
-  /**
-   * The owner's own latest review approves, even where `decision` says otherwise: a change request
-   * left on an older commit keeps GitHub's decision at CHANGES_REQUESTED until it is dismissed (#286).
-   */
   ownerApproved: boolean
   autoMerge: boolean
   parked: boolean
@@ -192,8 +188,7 @@ const threadsFrom = (value: unknown): ReviewThread[] => records(at(value, 'revie
   return { id: textOf(thread.id), lastAuthor: actor(last.author), lastBody: textOf(last.body), resolved: thread.isResolved === true, url: textOf(last.url) }
 })
 const PR_FIELDS = 'isInMergeQueue state mergeable mergeStateStatus headRefOid mergeCommit { oid } reviewDecision autoMergeRequest { enabledAt } title'
-  + ' labels(first: 100) { nodes { name } } author { login kind: __typename } reviews(last: 100) { nodes { state author { login kind: __typename } } }'
-  + ` ${THREAD_FIELDS}`
+  + ` labels(first: 100) { nodes { name } } author { login kind: __typename } reviews(last: 100) { nodes { state author { login kind: __typename } } } ${THREAD_FIELDS}`
 const PRS_PER_QUERY = 50
 
 const stateOf = (value: Json): PrState => {

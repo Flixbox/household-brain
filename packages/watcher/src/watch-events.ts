@@ -166,22 +166,12 @@ export const reminderLines = (prs: readonly OpenPr[]): string[] => prs
   .filter(pr => !pr.parked)
   .flatMap(pr => [branchProblem(pr), approvalProblem(pr)].filter(line => line !== null))
 
-/** Each reviewer's latest review that counts, by login in lower case (logins are case-insensitive): a comment doesn't undo an approval, a dismissal does. */
-const latestReviews = (reviews: readonly { login: string, state: string }[]): Map<string, string> => {
-  const latest = new Map<string, string>()
-  for (const { login, state } of reviews) {
-    if (state === 'APPROVED' || state === 'CHANGES_REQUESTED' || state === 'DISMISSED') {
-      latest.set(login.toLowerCase(), state)
-    }
-  }
-  return latest
-}
+/** Each reviewer's latest review that counts (a comment doesn't undo an approval, a dismissal does), by login in lower case. */
+const latestReviews = (reviews: readonly { login: string, state: string }[]): Map<string, string> => new Map(reviews
+  .filter(({ state }) => state === 'APPROVED' || state === 'CHANGES_REQUESTED' || state === 'DISMISSED')
+  .map(({ login, state }): [string, string] => [login.toLowerCase(), state]))
 
-/**
- * Whether `approver`'s own latest review that counts is an approval, whatever anyone else's says:
- * a change request left on an older commit keeps GitHub's decision at CHANGES_REQUESTED, and yet the
- * owner has approved (#286).
- */
+/** Whether `approver`'s own latest counting review approves, whatever others' say: a stale change request keeps GitHub's decision at CHANGES_REQUESTED (#286). */
 export const approvedBy = (reviews: readonly { login: string, state: string }[], approver: string): boolean =>
   latestReviews(reviews).get(approver.toLowerCase()) === 'APPROVED'
 
