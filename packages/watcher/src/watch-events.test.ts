@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { FOLLOW_NEWER, type OpenPr, type Run, answerFirst, cancelledDeployEvent, clockTime, decisionFrom, listsOpenPrs, mainRunEvent, newActivity, openPrLines, reminderLines, replacementCandidates, runEvent, stamped, usageFrom } from './watch-events'
+import { FOLLOW_NEWER, type OpenPr, type Run, answerFirst, approvedBy, cancelledDeployEvent, clockTime, decisionFrom, listsOpenPrs, mainRunEvent, newActivity, openPrLines, reminderLines, replacementCandidates, runEvent, stamped, usageFrom } from './watch-events'
 
 const SHA = 'abcdef1234567890abcdef1234567890abcdef12'
 const run = (changes: Partial<Run> = {}): Run => ({ ageSeconds: 60, attempt: 1, conclusion: 'success', id: 7, status: 'completed', ...changes })
@@ -73,6 +73,21 @@ describe('decisionFrom', () => {
   it('keeps GitHub\'s decision when it isn\'t an approval', () => {
     expect(decisionFrom('CHANGES_REQUESTED', [{ login: 'owner', state: 'APPROVED' }], 'owner')).toBe('CHANGES_REQUESTED')
     expect(decisionFrom('REVIEW_REQUIRED', [], 'owner')).toBe('REVIEW_REQUIRED')
+  })
+})
+
+describe('approvedBy (#286)', () => {
+  it('sees the owner\'s approval where a stale bot change request keeps GitHub\'s decision at CHANGES_REQUESTED', () => {
+    const reviews = [{ login: 'reviewer[bot]', state: 'CHANGES_REQUESTED' }, { login: 'Owner', state: 'APPROVED' }]
+    expect(decisionFrom('CHANGES_REQUESTED', reviews, 'owner')).toBe('CHANGES_REQUESTED')
+    expect(approvedBy(reviews, 'owner')).toBe(true)
+  })
+
+  it('takes only the owner\'s own latest counting review', () => {
+    expect(approvedBy([{ login: 'owner', state: 'APPROVED' }, { login: 'owner', state: 'COMMENTED' }], 'owner')).toBe(true)
+    expect(approvedBy([{ login: 'owner', state: 'APPROVED' }, { login: 'owner', state: 'DISMISSED' }], 'owner')).toBe(false)
+    expect(approvedBy([{ login: 'owner', state: 'APPROVED' }, { login: 'owner', state: 'CHANGES_REQUESTED' }], 'owner')).toBe(false)
+    expect(approvedBy([{ login: 'reviewer[bot]', state: 'APPROVED' }], 'owner')).toBe(false)
   })
 })
 

@@ -1,5 +1,5 @@
 /** The project watcher's questions to GitHub, through the `gh` CLI, answered as plain data. */
-import { type MainRun, type OpenPr, type Run, decisionFrom } from './watch-events'
+import { type MainRun, type OpenPr, type Run, approvedBy, decisionFrom } from './watch-events'
 import type { QueueEntry } from './watch-queue-events'
 import { type Review, type ReviewThread, threadsToResolve } from './watch-review-events'
 import { allIssueNumbers, goneIssueLine, isGone, isMoved, issueEventLine, issuePage } from './watch-issue-events'
@@ -167,6 +167,7 @@ export interface PrState {
   head: string
   mergeSha: string
   decision: string
+  ownerApproved: boolean
   autoMerge: boolean
   parked: boolean
   queued: boolean
@@ -187,8 +188,7 @@ const threadsFrom = (value: unknown): ReviewThread[] => records(at(value, 'revie
   return { id: textOf(thread.id), lastAuthor: actor(last.author), lastBody: textOf(last.body), resolved: thread.isResolved === true, url: textOf(last.url) }
 })
 const PR_FIELDS = 'isInMergeQueue state mergeable mergeStateStatus headRefOid mergeCommit { oid } reviewDecision autoMergeRequest { enabledAt } title'
-  + ' labels(first: 100) { nodes { name } } author { login kind: __typename } reviews(last: 100) { nodes { state author { login kind: __typename } } }'
-  + ` ${THREAD_FIELDS}`
+  + ` labels(first: 100) { nodes { name } } author { login kind: __typename } reviews(last: 100) { nodes { state author { login kind: __typename } } } ${THREAD_FIELDS}`
 const PRS_PER_QUERY = 50
 
 const stateOf = (value: Json): PrState => {
@@ -205,6 +205,7 @@ const stateOf = (value: Json): PrState => {
     mergeSha: textOf(record(value.mergeCommit).oid),
     mergeState: textOf(value.mergeStateStatus),
     mergeable: textOf(value.mergeable),
+    ownerApproved: approvedBy(reviews, OWNER),
     parked: records(record(value.labels).nodes).some(label => label.name === 'parked'),
     queued: value.isInMergeQueue === true,
     state: textOf(value.state),

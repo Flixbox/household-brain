@@ -12,9 +12,11 @@
  *   PR #<n>: MAIN_MOVED              main got commits the PR doesn't have yet: rebase and test again
  *   PR #<n>: APPROVED                the owner approved (enable auto-merge once it is well reviewed)
  *   PR #<n>: READY_TO_MERGE          approved, CI green for the current head, auto-merge still off
- *   PR #<n>: BLOCKED_BY_REVIEW       approved, CI green, but GitHub blocks the merge (#278): names each open
- *                                    thread the agent answered last (reply `Resolved: <reason>` once settled),
- *                                    and each change request left on an older commit (the owner dismisses it)
+ *   PR #<n>: BLOCKED_BY_REVIEW       the owner approved, CI green, but GitHub blocks the merge (#278): names
+ *                                    each open thread the agent answered last (reply `Resolved: <reason>`
+ *                                    once settled), and each change request left on an older commit (the
+ *                                    owner dismisses it; GitHub's decision stays CHANGES_REQUESTED until
+ *                                    then, #286)
  *   PR #<n>: THREAD_RESOLVED         the watcher resolved a review thread whose last comment, from anyone,
  *                                    starts `Resolved: <reason>` (#279), with its `GH` token; agents never
  *                                    resolve threads themselves. THREAD_RESOLVE_FAILED: it couldn't (it
