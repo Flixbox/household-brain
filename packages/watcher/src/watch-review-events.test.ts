@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'bun:test'
-import { type Review, type ReviewThread, blockedByReviewEvent } from './watch-review-events'
+import { type Review, type ReviewThread, blockedByReviewEvent, resolvedThreadEvent, threadsToResolve } from './watch-review-events'
 
 const HEAD = 'abcdef1234567890abcdef1234567890abcdef12'
 const OLD = '1234567890abcdef1234567890abcdef12345678'
 const SELF = 'agent[bot]'
 const thread = (id: string, changes: Partial<ReviewThread> = {}): ReviewThread =>
-  ({ id, lastAuthor: SELF, resolved: false, url: `https://github.test/pr/1#${id}`, ...changes })
+  ({ id, lastAuthor: SELF, lastBody: 'Fixed in the next push.', resolved: false, url: `https://github.test/pr/1#${id}`, ...changes })
 const review = (login: string, state: string, commit = HEAD): Review => ({ commit, login, state })
 const event = (threads: ReviewThread[], reviews: Review[] = []) => blockedByReviewEvent({ head: HEAD, pr: 7, reviews, self: SELF, threads })
 
@@ -15,10 +15,14 @@ describe('blockedByReviewEvent', () => {
       key: `pr-7 blocked-by-review ${HEAD} T1 T2`,
       lines: [
         'BLOCKED_BY_REVIEW: approved and CI is green at abcdef1, but review blocks the merge:',
-        '  answered, not resolved: https://github.test/pr/1#T2',
-        '  answered, not resolved: https://github.test/pr/1#T1',
+        '  answered, not resolved: https://github.test/pr/1#T2 (if settled, reply `Resolved: <reason>`)',
+        '  answered, not resolved: https://github.test/pr/1#T1 (if settled, reply `Resolved: <reason>`)',
       ],
     })
+  })
+
+  it('leaves out a thread that already asks to be resolved: the watcher resolves it', () => {
+    expect(event([thread('T1', { lastBody: 'Resolved: fixed in abc1234' })])).toBeNull()
   })
 
   it('names each reviewer whose latest counting review requests changes on an older commit', () => {
@@ -36,5 +40,29 @@ describe('blockedByReviewEvent', () => {
   it('is null when neither blocks it, and without SELF no thread counts as answered', () => {
     expect(event([thread('T1', { resolved: true })], [review('owner', 'APPROVED')])).toBeNull()
     expect(blockedByReviewEvent({ head: HEAD, pr: 7, reviews: [], self: '', threads: [thread('T1', { lastAuthor: '' })] })).toBeNull()
+  })
+})
+
+describe('threadsToResolve', () => {
+  it('takes each open thread whose last comment is a `Resolved: <reason>` reply, from anyone', () => {
+    const threads = [
+      thread('T1', { lastBody: 'Resolved: fixed in abc1234' }),
+      thread('T2', { lastAuthor: 'owner', lastBody: '  Resolved:done' }),
+      thread('T3', { lastBody: 'Resolved: fixed', resolved: true }),
+      thread('T4', { lastBody: 'Resolved:' }),
+      thread('T5', { lastBody: 'resolved: lower case is no request' }),
+      thread('T6', { lastBody: 'Not yet. Resolved: later' }),
+    ]
+    expect(threadsToResolve(threads).map(each => each.id)).toEqual(['T1', 'T2'])
+  })
+})
+
+describe('resolvedThreadEvent', () => {
+  it('reports a resolved thread, and a failed attempt under its own key', () => {
+    expect(resolvedThreadEvent(7, thread('T1'), true)).toEqual({
+      key: 'pr-7 thread-resolved T1',
+      lines: ['THREAD_RESOLVED: resolved on its `Resolved:` reply: https://github.test/pr/1#T1'],
+    })
+    expect(resolvedThreadEvent(7, thread('T1'), false).key).toBe('pr-7 thread-resolve-failed T1')
   })
 })

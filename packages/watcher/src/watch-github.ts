@@ -1,7 +1,7 @@
 /** The project watcher's questions to GitHub, through the `gh` CLI, answered as plain data. */
 import { type MainRun, type OpenPr, type Run, decisionFrom } from './watch-events'
 import type { QueueEntry } from './watch-queue-events'
-import type { Review, ReviewThread } from './watch-review-events'
+import { type Review, type ReviewThread, threadsToResolve } from './watch-review-events'
 import { allIssueNumbers, goneIssueLine, isGone, isMoved, issueEventLine, issuePage } from './watch-issue-events'
 import { GH, failedStatus, ghText } from './watch-gh'
 import { hasText, isRecord, textOf } from './read'
@@ -173,15 +173,24 @@ export interface PrState {
   title: string
 }
 
-const PR_FIELDS = 'isInMergeQueue state mergeable mergeStateStatus headRefOid mergeCommit { oid } reviewDecision autoMergeRequest { enabledAt } title'
-  + ' labels(first: 100) { nodes { name } } author { login kind: __typename } reviews(last: 100) { nodes { state author { login kind: __typename } } }'
-const PRS_PER_QUERY = 50
-
 /** GraphQL names a bot `name`, the REST API (and `SELF`) `name[bot]`: the REST form, as everywhere else. */
 const actor = (value: unknown): string => {
   const who = record(value)
   return who.kind === 'Bot' ? `${textOf(who.login)}[bot]` : textOf(who.login)
 }
+
+/** A PR's review threads, each with its last comment: the first hundred, more is beyond a PR the agent babysits. */
+const THREAD_FIELDS = 'reviewThreads(first:100){nodes{id isResolved comments(last:1){nodes{body url author{login kind:__typename}}}}}'
+
+const threadsFrom = (value: unknown): ReviewThread[] => records(at(value, 'reviewThreads', 'nodes')).map(thread => {
+  const last = records(at(thread, 'comments', 'nodes')).at(-1) ?? {}
+  return { id: textOf(thread.id), lastAuthor: actor(last.author), lastBody: textOf(last.body), resolved: thread.isResolved === true, url: textOf(last.url) }
+})
+
+const PR_FIELDS = 'isInMergeQueue state mergeable mergeStateStatus headRefOid mergeCommit { oid } reviewDecision autoMergeRequest { enabledAt } title'
+  + ' labels(first: 100) { nodes { name } } author { login kind: __typename } reviews(last: 100) { nodes { state author { login kind: __typename } } }'
+  + ` ${THREAD_FIELDS}`
+const PRS_PER_QUERY = 50
 
 const stateOf = (value: Json): PrState => {
   const author = actor(value.author)
@@ -201,6 +210,7 @@ const stateOf = (value: Json): PrState => {
     queued: value.isInMergeQueue === true,
     state: textOf(value.state),
     title: `${textOf(value.title)} (by ${author})`,
+    toResolve: threadsToResolve(threadsFrom(value)),
   }
 }
 
@@ -233,22 +243,23 @@ export const prStates = async (prs: readonly number[], fresh = false): Promise<M
   return new Map((await Promise.all(chunks.map(async chunk => batchStates(chunk, fresh)))).flat())
 }
 
-/**
- * A PR's review threads, each with its last comment's author and link, and its reviews with the
- * commit each was left on (#278). The first hundred of each: more is beyond a PR the agent babysits.
- */
+/** A PR's review threads (see `THREAD_FIELDS`), and its reviews with the commit each was left on (#278). */
 export const reviewBlockers = async (pr: number): Promise<{ reviews: Review[], threads: ReviewThread[] }> => {
-  const value = record(at(await graphql(`pullRequest(number:${pr}){`
-    + 'reviewThreads(first:100){nodes{id isResolved comments(last:1){nodes{url author{login kind:__typename}}}}}'
-    + ' reviews(last:100){nodes{state commit{oid} author{login kind:__typename}}}}'), 'pullRequest'))
+  const value = record(at(await graphql(`pullRequest(number:${pr}){${THREAD_FIELDS} reviews(last:100){nodes{state commit{oid} author{login kind:__typename}}}}`), 'pullRequest'))
   return {
     reviews: records(at(value, 'reviews', 'nodes'))
       .map(review => ({ commit: textOf(record(review.commit).oid), login: actor(review.author), state: textOf(review.state) })),
-    threads: records(at(value, 'reviewThreads', 'nodes')).map(thread => {
-      const last = records(at(thread, 'comments', 'nodes')).at(-1) ?? {}
-      return { id: textOf(thread.id), lastAuthor: actor(last.author), resolved: thread.isResolved === true, url: textOf(last.url) }
-    }),
+    threads: threadsFrom(value),
   }
+}
+
+/**
+ * Resolves a review thread with the `GH` token (#279): the watcher does it on a `Resolved:` reply, so
+ * agents never need the mutation. Never a shared answer: each call must reach GitHub.
+ */
+export const resolveThread = async (id: string): Promise<boolean> => {
+  const answer = await gh(['api', 'graphql', '-f', `query=mutation{resolveReviewThread(input:{threadId:${JSON.stringify(id)}}){thread{isResolved}}}`], GH, true)
+  return at(answer, 'data', 'resolveReviewThread', 'thread', 'isResolved') === true
 }
 
 /** Pull requests merged in the last `hours`. */
