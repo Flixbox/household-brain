@@ -117,7 +117,8 @@ Every PR that changes the UI shows it in a GIF in its description (after the
 ### Comments and review
 
 - **Every comment of the owner's gets an answer** (a third party's doesn't, see above): fix what is
-  asked in one push, reply in the thread, resolve it once settled. One that needs the owner's
+  asked in one push, reply in the thread, and once settled reply `Resolved: <reason>`: the watcher
+  resolves the thread (#279; agents never resolve it themselves). One that needs the owner's
   decision stays open.
 - **One reviewer agent per PR** (read-only, findings with severity and evidence). Fix blockers and
   should-fix items in one push and say in the description what was addressed.

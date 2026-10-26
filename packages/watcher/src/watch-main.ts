@@ -1,8 +1,8 @@
 /* oxlint-disable eslint/no-await-in-loop -- each poller's looks run one after another, on purpose */
 /** The project watcher's looks, started by watch-project.ts once it has read which code it runs (#265). */
 import { FOLLOW_NEWER, type MainRun, type Run, cancelledDeployEvent, mainRunEvent, replacementCandidates, runEvent } from './watch-events'
-import { type PrState, REPO, SELF, containsCommit, jobLines, mainAhead, mainHead, mainRuns, mergeCommand, newestMainRun, openPrs, prStates, recentlyMerged, reviewBlockers, runOf } from './watch-github'
-import { blockedByReviewEvent } from './watch-review-events'
+import { type PrState, REPO, SELF, containsCommit, jobLines, mainAhead, mainHead, mainRuns, mergeCommand, newestMainRun, openPrs, prStates, recentlyMerged, resolveThread, reviewBlockers, runOf } from './watch-github'
+import { blockedByReviewEvent, resolvedThreadEvent } from './watch-review-events'
 import { FOLLOW, checkCode, flush, queue, quiet, report, reportLookups } from './watch-output'
 import { addLine, readLines, start, updateLines, writeLines } from './watch-state'
 import { checkActivity as checkPrActivity, checkTrackedActivity } from './watch-activity'
@@ -150,6 +150,17 @@ const checkBlocked = async (pr: number, head: string): Promise<void> => {
   await report(blockers && blockedByReviewEvent({ ...blockers, head, pr, self: SELF }), pr)
 }
 
+/**
+ * Resolves each open thread whose last comment is a `Resolved: <reason>` reply (#279), and says so. A
+ * failed attempt is reported once; the thread is tried again on every look until it is resolved.
+ */
+const resolveAsked = async (pr: number, state: PrState): Promise<void> => {
+  await allSettled(state.toResolve.map(async thread => {
+    const resolved = await resolveThread(thread.id).catch(() => false)
+    await report(resolvedThreadEvent(pr, thread, resolved), pr)
+  }))
+}
+
 /** Approved and green for the current head, but auto-merge is still off, or GitHub blocks the merge (#278). */
 const checkReady = async (pr: number, state: PrState): Promise<void> => {
   const green = (await readLines('reported')).includes(`pr-${pr} ci-passed ${state.head}`)
@@ -168,6 +179,8 @@ const checkOpen = async (pr: number, state: PrState): Promise<void> => {
   const commentsRead = await checkActivity(pr)
   // A PR labelled `parked` is left open on purpose: only its CI and comments are news.
   const reviewNews = commentsRead && !state.parked
+  // Before the merge checks, so a thread resolved now no longer blocks the merge.
+  await resolveAsked(pr, state)
   await (reviewNews ? checkReview(pr, state) : Promise.resolve())
   await checkRun(pr, state.head, 'pr')
   await (reviewNews ? checkReady(pr, state).then(async () => checkMoved(pr, state.head)) : Promise.resolve())
