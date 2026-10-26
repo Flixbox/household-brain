@@ -10,12 +10,14 @@ import { type Review, type ReviewThread, dismissedReviewEvent, reviewsToDismiss 
 import { REPO, gh } from './watch-github'
 import { GH } from './watch-gh'
 import { report } from './watch-output'
-import { allSettled } from './read'
-import { record, textOf } from './watch-text'
+import { allSettled, textOf } from './read'
+import { record } from './watch-text'
 
 const DISMISS_STALE_BOT_REVIEWS = process.env.DISMISS_STALE_BOT_REVIEWS === '1'
 
 const MESSAGE = 'Dismissed by the project watcher: the owner approved a newer commit, and no review thread is open (DISMISS_STALE_BOT_REVIEWS).'
+
+const isDismissed = (value: unknown) => textOf(record(value).state) === 'DISMISSED'
 
 const reviewPath = (pr: number, id: number) => `repos/${REPO}/pulls/${pr}/reviews/${id}`
 
@@ -24,9 +26,8 @@ const reviewPath = (pr: number, id: number) => `repos/${REPO}/pulls/${pr}/review
  * is dismissed by now: another watcher of the repository (#264) may have been first.
  */
 const dismiss = async (pr: number, id: number): Promise<boolean> => {
-  const dismissed = (value: unknown) => textOf(record(value).state) === 'DISMISSED'
-  return gh(['api', '-X', 'PUT', `${reviewPath(pr, id)}/dismissals`, '-f', `message=${MESSAGE}`, '-f', 'event=DISMISS'], GH, true)
-    .then(dismissed, async () => gh(['api', reviewPath(pr, id)], GH, true).then(dismissed, () => false))
+  const done = await gh(['api', '-X', 'PUT', `${reviewPath(pr, id)}/dismissals`, '-f', `message=${MESSAGE}`, '-f', 'event=DISMISS'], GH, true).then(isDismissed, () => false)
+  return done || gh(['api', reviewPath(pr, id)], GH, true).then(isDismissed, () => false)
 }
 
 /**
