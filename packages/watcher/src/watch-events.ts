@@ -167,22 +167,28 @@ export const reminderLines = (prs: readonly OpenPr[]): string[] => prs
   .flatMap(pr => [branchProblem(pr), approvalProblem(pr)].filter(line => line !== null))
 
 /**
- * The review decision from the reviews themselves, each reviewer's latest that counts (a comment
- * doesn't undo an approval, a dismissal does), for when GitHub leaves `reviewDecision` empty: it only
- * fills it in under classic branch protection, not under a ruleset (#197).
+ * The review decision, with an approval counted only from `approver`, the owner (#277): a bot's or
+ * anyone else's approval must not read as the owner's. GitHub's own decision (`given`) stands when it
+ * isn't an approval; when it is, the approver's own latest review must say so. Where GitHub leaves it
+ * empty (it only fills it in under classic branch protection, not under a ruleset, #197), the reviews
+ * decide: each reviewer's latest that counts (a comment doesn't undo an approval, a dismissal does),
+ * anyone's change request outweighing the approval.
  */
-export const decisionFrom = (reviews: readonly { login: string, state: string }[]): string => {
+export const decisionFrom = (given: string, reviews: readonly { login: string, state: string }[], approver: string): string => {
+  if (given !== '' && given !== 'APPROVED') {
+    return given
+  }
   const latest = new Map<string, string>()
   for (const { login, state } of reviews) {
     if (state === 'APPROVED' || state === 'CHANGES_REQUESTED' || state === 'DISMISSED') {
-      latest.set(login, state)
+      latest.set(login.toLowerCase(), state)
     }
   }
-  const states = new Set(latest.values())
-  if (states.has('CHANGES_REQUESTED')) {
+  if (given === '' && [...latest.values()].includes('CHANGES_REQUESTED')) {
     return 'CHANGES_REQUESTED'
   }
-  return states.has('APPROVED') ? 'APPROVED' : ''
+  // Logins are case-insensitive: `OWNER` may be spelled differently from GitHub's answer.
+  return latest.get(approver.toLowerCase()) === 'APPROVED' ? 'APPROVED' : ''
 }
 
 const review = (decision: string) => {

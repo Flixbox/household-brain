@@ -40,7 +40,8 @@ const WORKFLOW = process.env.WORKFLOW ?? 'ci.yml'
 // ACTIVITY_GH: comments are read with the owner's login: a pending (unsubmitted) review is only
 // visible to its author, and the owner leaves those.
 export const ACTIVITY_GH = process.env.ACTIVITY_GH ?? 'gh'
-// OWNER: whose issue comments are news; by default the repository's owner.
+// OWNER: whose issue comments are news, and whose approval counts as one (#277); by default the
+// repository's owner.
 export const OWNER = process.env.OWNER ?? REPO.split('/')[0] ?? ''
 // SELF: the agent's own login. Its comments and replies in review threads are not news to it; its
 // reviews (a reviewer agent posting as the same login) still are. None by default.
@@ -94,21 +95,21 @@ export const jobLines = async (run: number): Promise<string[]> =>
     .map(job => `  ${textOf(job.name)}: ${textOf(job.status)} ${textOf(job.conclusion)}`)
 
 /**
- * GitHub's review decision, or, where it leaves that empty (a ruleset instead of branch protection),
- * the one the reviews add up to. The PR's author and the agent itself don't count (the reviewer agent
- * posts as the same bot that opens the PRs), and one approval counts as approved: GitHub's own merge
- * still enforces how many a ruleset requires. Unknown (empty) when the reviews can't be read: the PR
- * is then simply not approved yet this round, rather than the whole listing failing.
+ * The review decision (see `decisionFrom`): GitHub's, unless it is empty or an approval, which the
+ * reviews then decide, an approval counting only from `OWNER` (#277). The PR's author and the agent
+ * itself don't count (the reviewer agent posts as the same bot that opens the PRs). Unknown (empty)
+ * when the reviews can't be read: the PR is then simply not approved yet this round, rather than the
+ * whole listing failing.
  */
 const decisionOf = async (pr: number, reviewDecision: unknown, author: string): Promise<string> => {
   const given = textOf(reviewDecision)
-  if (given !== '') {
+  if (given !== '' && given !== 'APPROVED') {
     return given
   }
   const reviews = await allPages(`repos/${REPO}/pulls/${pr}/reviews`).catch(() => [])
-  return decisionFrom(reviews
+  return decisionFrom(given, reviews
     .map(item => ({ login: login(item), state: textOf(item.state) }))
-    .filter(review => review.login !== author && review.login !== SELF))
+    .filter(review => review.login !== author && review.login !== SELF), OWNER)
 }
 
 const graphql = async (fields: string, fresh = false): Promise<Json> => {
@@ -186,8 +187,9 @@ const stateOf = (value: Json): PrState => {
     .filter(review => review.login !== author && review.login !== SELF)
   return {
     autoMerge: isRecord(value.autoMergeRequest),
-    // GitHub leaves `reviewDecision` empty under a ruleset: then the reviews decide (#197).
-    decision: textOf(value.reviewDecision) || decisionFrom(reviews),
+    // GitHub leaves `reviewDecision` empty under a ruleset (#197), and counts anyone's approval: the
+    // reviews decide, an approval counting only from the owner (#277).
+    decision: decisionFrom(textOf(value.reviewDecision), reviews, OWNER),
     head: textOf(value.headRefOid),
     mergeSha: textOf(record(value.mergeCommit).oid),
     mergeable: textOf(value.mergeable),
