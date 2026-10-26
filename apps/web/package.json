@@ -17,7 +17,7 @@
     "@household-brain/pwa": "workspace:*",
     "@household-brain/shell": "workspace:*",
     "@nanostores/react": "2.0.1",
-    "firebase": "13.0.0",
+    "firebase": "13.1.0",
     "nanostores": "1.5.5",
     "react": "19.3.1",
     "react-dom": "19.3.1",
