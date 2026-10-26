@@ -77,7 +77,7 @@ describe('resolvedThreadEvent', () => {
 describe('reviewsToDismiss', () => {
   const settlers = [SELF, 'Owner']
   const dismiss = (reviews: Review[], threads: ReviewThread[] = [], comments: PrComment[] = []) =>
-    reviewsToDismiss({ comments, head: HEAD, reviews, settlers, threads }).map(each => each.review.id)
+    reviewsToDismiss({ comments, complete: true, head: HEAD, reviews, settlers, threads }).map(each => each.review.id)
   const settled = (id: string, changes: Partial<ReviewThread> = {}) => thread(id, { lastBody: `Resolved: fixed (${id})`, resolved: true, review: 9, ...changes })
   const onHead = review('coderabbit[bot]', 'CHANGES_REQUESTED', { id: 9 })
 
@@ -99,8 +99,18 @@ describe('reviewsToDismiss', () => {
     expect(dismiss([review('reviewer[bot]', 'CHANGES_REQUESTED', { commit: OLD })], [thread('T1', { resolved: true })])).toEqual([1])
   })
 
+  it('takes none when not every thread could be read', () => {
+    expect(reviewsToDismiss({ comments: [], complete: false, head: HEAD, reviews: [review('reviewer[bot]', 'CHANGES_REQUESTED', { commit: OLD })], settlers, threads: [] })).toEqual([])
+  })
+
+  it('takes a bot\'s older change requests with its latest, but one on the head only when settled itself', () => {
+    const older = review('coderabbit[bot]', 'CHANGES_REQUESTED', { commit: OLD, id: 8 })
+    expect(dismiss([older, review('coderabbit[bot]', 'CHANGES_REQUESTED', { id: 9 }), review('coderabbit[bot]', 'CHANGES_REQUESTED', { commit: OLD, id: 10 })])).toEqual([8, 10])
+    expect(dismiss([older, onHead, review('coderabbit[bot]', 'CHANGES_REQUESTED', { id: 10, submittedAt: '2026-10-26T12:00:00Z' })], [settled('T2', { review: 10 })])).toEqual([8, 10])
+  })
+
   it('takes a bot\'s change request on the head once each of its threads ends in a `Resolved:` reply, quoting them', () => {
-    const dismissals = reviewsToDismiss({ comments: [], head: HEAD, reviews: [onHead], settlers, threads: [settled('T1'), settled('T2', { lastAuthor: 'owner', resolved: false }), thread('T3', { resolved: true })] })
+    const dismissals = reviewsToDismiss({ comments: [], complete: true, head: HEAD, reviews: [onHead], settlers, threads: [settled('T1'), settled('T2', { lastAuthor: 'owner', resolved: false }), thread('T3', { resolved: true })] })
     expect(dismissals).toEqual([{ replies: [{ body: 'Resolved: fixed (T1)', url: 'https://github.test/pr/1#T1' }, { body: 'Resolved: fixed (T2)', url: 'https://github.test/pr/1#T2' }], review: onHead }])
   })
 
@@ -143,12 +153,12 @@ describe('dismissalMessage', () => {
 describe('dismissedReviewEvent', () => {
   it('reports a dismissed change request, and a failed attempt under its own key', () => {
     const old = review('reviewer[bot]', 'CHANGES_REQUESTED', { commit: OLD, id: 42 })
-    expect(dismissedReviewEvent(7, HEAD, { replies: [], review: old }, true)).toEqual({
+    expect(dismissedReviewEvent({ dismissal: { replies: [], review: old }, dismissed: true, head: HEAD, pr: 7 })).toEqual({
       key: 'pr-7 review-dismissed 42',
       lines: ["REVIEW_DISMISSED: dismissed reviewer[bot]'s change request on an older commit (1234567): the owner approved, and no review thread is open"],
     })
-    expect(dismissedReviewEvent(7, HEAD, { replies: [], review: old }, false).key).toBe('pr-7 review-dismiss-failed 42')
-    expect(dismissedReviewEvent(7, HEAD, { replies: [{ body: 'Resolved: x', url: '' }], review: review('reviewer[bot]', 'CHANGES_REQUESTED', { id: 43 }) }, true).lines).toEqual([
+    expect(dismissedReviewEvent({ dismissal: { replies: [], review: old }, dismissed: false, head: HEAD, pr: 7 }).key).toBe('pr-7 review-dismiss-failed 42')
+    expect(dismissedReviewEvent({ dismissal: { replies: [{ body: 'Resolved: x', url: '' }], review: review('reviewer[bot]', 'CHANGES_REQUESTED', { id: 43 }) }, dismissed: true, head: HEAD, pr: 7 }).lines).toEqual([
       "REVIEW_DISMISSED: dismissed reviewer[bot]'s change request on the head (abcdef1): the owner approved, and `Resolved:` replies settled it",
     ])
   })
