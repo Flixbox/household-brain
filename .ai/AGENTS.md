@@ -79,12 +79,13 @@ repository), never with the owner's account.
   the package-file lint's) and is fine to run.
 - **Write code that passes oxlint the first time;** these traps cost PRs a CI round (#307, #310):
   - object keys sorted (`eslint/sort-keys`), and members of an import (`eslint/sort-imports`);
-  - no `undefined` at all (`eslint/no-undefined`): no `x === undefined`, no `undefined` argument;
-    use `null` for "nothing", `typeof x === 'undefined'` or `Object.hasOwn`;
+  - never write the identifier `undefined` (`eslint/no-undefined`): no `x === undefined`, no
+    `undefined` argument or value. Use `null` for "nothing", `typeof x === 'undefined'` to test a
+    value, and `Object.hasOwn` to test whether a property is there at all;
   - small functions (`eslint/max-lines-per-function`, `eslint/max-statements`,
     `sonarjs/cognitive-complexity`): split a long helper into named steps up front;
   - shallow nesting (`eslint/max-depth`, `sonarjs/no-nested-functions`,
-    `sonarjs/no-nested-conditional` for nested ternaries, `unicorn/max-nested-calls` beyond 4).
+    `sonarjs/no-nested-conditional` for nested ternaries, `unicorn/max-nested-calls`, set to 4 deep here).
 - **One push per batch of changes:** each push cancels the branch's running CI.
 - **Never pipe a command whose exit code matters** (`bun run lint | tail` succeeded on a failing
   lint once); use `set -o pipefail` or `${PIPESTATUS[0]}`.
