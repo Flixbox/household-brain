@@ -37,6 +37,8 @@ const MERGE_QUEUE = await mergeQueued()
 
 /** The command that enables auto-merge for a PR, as the events suggest it. */
 export const mergeCommand = (pr: number): string => `${GH} pr merge ${pr} --auto${MERGE_QUEUE ? '' : ' --squash'}`
+/** The command that marks a draft PR ready for review (#298). */
+export const readyCommand = (pr: number): string => `${GH} pr ready ${pr}`
 // WORKFLOW: the CI workflow file whose runs are followed (a PR's checks, main's deploy).
 const WORKFLOW = process.env.WORKFLOW ?? 'ci.yml'
 // ACTIVITY_GH: comments are read with the owner's login: a pending (unsubmitted) review is only
@@ -142,7 +144,7 @@ export const dequeueReason = async (pr: number): Promise<string> => {
 
 export const openPrs = async (): Promise<OpenPr[]> => {
   const [listed, queue] = await Promise.all([
-    gh(['pr', 'list', '--repo', REPO, '--state', 'open', '--limit', '100', '--json', 'number,title,reviewDecision,autoMergeRequest,labels,statusCheckRollup,author,mergeStateStatus']),
+    gh(['pr', 'list', '--repo', REPO, '--state', 'open', '--limit', '100', '--json', 'number,title,isDraft,reviewDecision,autoMergeRequest,labels,statusCheckRollup,author,mergeStateStatus']),
     // A queue that can't be read just now leaves the PRs listed as not queued, as before #251, rather
     // than leaving out the list, and every reminder with it.
     queueEntries().catch((): Map<number, QueueEntry> => new Map()),
@@ -151,6 +153,7 @@ export const openPrs = async (): Promise<OpenPr[]> => {
     .map(async pr => ({
       autoMerge: Boolean(pr.autoMergeRequest),
       checks: records(pr.statusCheckRollup).map(check => textOf(check.conclusion) || textOf(check.state) || 'pending'),
+      draft: pr.isDraft === true,
       mergeState: textOf(pr.mergeStateStatus),
       number: count(pr.number),
       parked: records(pr.labels).some(label => label.name === 'parked'),
@@ -170,6 +173,7 @@ export interface PrState {
   decision: string
   ownerApproved: boolean
   autoMerge: boolean
+  draft: boolean
   parked: boolean
   queued: boolean
   title: string
@@ -189,7 +193,7 @@ export const threadsFrom = (value: unknown): ReviewThread[] => records(at(value,
   const review = count(at(records(at(thread, 'first', 'nodes'))[0], 'pullRequestReview', 'databaseId'))
   return { id: textOf(thread.id), lastAuthor: actor(last.author), lastBody: textOf(last.body), resolved: thread.isResolved === true, review, url: textOf(last.url) }
 })
-const PR_FIELDS = 'isInMergeQueue state mergeable mergeStateStatus headRefOid mergeCommit { oid } reviewDecision autoMergeRequest { enabledAt } title'
+const PR_FIELDS = 'isDraft isInMergeQueue state mergeable mergeStateStatus headRefOid mergeCommit { oid } reviewDecision autoMergeRequest { enabledAt } title'
   + ` labels(first: 100) { nodes { name } } author { login kind: __typename } reviews(last: 100) { nodes { state author { login kind: __typename } } } ${THREAD_FIELDS}`
 const PRS_PER_QUERY = 50
 
@@ -203,6 +207,7 @@ const stateOf = (value: Json): PrState => {
     // GitHub leaves `reviewDecision` empty under a ruleset (#197), and counts anyone's approval: the
     // reviews decide, an approval counting only from the owner (#277).
     decision: decisionFrom(textOf(value.reviewDecision), reviews, OWNER),
+    draft: value.isDraft === true,
     head: textOf(value.headRefOid),
     mergeSha: textOf(record(value.mergeCommit).oid),
     mergeState: textOf(value.mergeStateStatus),

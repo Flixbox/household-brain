@@ -1,8 +1,8 @@
 /**
  * What a PR's review threads and reviews ask of the watcher (pure, so it is tested): the threads a
  * `Resolved: <reason>` reply asks to resolve (#279), why an approved, green PR still can't merge (#278),
- * and the bot change requests it may dismiss where the repository opts in: on an older commit (#285), or
- * on the head once `Resolved:` replies settled them (#290).
+ * the bot change requests it may dismiss where the repository opts in: on an older commit (#285), or
+ * on the head once `Resolved:` replies settled them (#290), and what an approval asks for (#298).
  */
 import type { Event } from './watch-events'
 import { oneLine } from './watch-text'
@@ -178,4 +178,17 @@ export const blockedByReviewEvent = ({ dismiss, head, pr, reviews, self, threads
       ...stale.map(review => `  ${review.login} requested changes on ${where(review, head)}: ${dismiss && review.commit === head && isBot(review.login) ? SETTLE : 'ask the owner to dismiss it'}`),
     ],
   }
+}
+
+/**
+ * What an approved PR (`OWNER`'s decision) with auto-merge off asks for. With CI green at `head`, it
+ * is READY_TO_MERGE with `merge`, the command that enables auto-merge. A draft is APPROVED_DRAFT
+ * instead (#298), whatever CI says: it can't be queued and a review bot skips drafts, so it is marked
+ * ready (`ready`, the command) first; marking drafts ready stays the agent's step. Once per head.
+ */
+export const approvedEvent = ({ draft, green, head, merge, pr, ready }: { draft: boolean, green: boolean, head: string, merge: string, pr: number, ready: string }): Event | null => {
+  if (draft) {
+    return { key: `pr-${pr} approved-draft ${head}`, lines: [`APPROVED_DRAFT: approved by the owner but still a draft: mark it ready (${ready}), wait for the bot review, then queue`] }
+  }
+  return green ? { key: `pr-${pr} ready ${head}`, lines: [`READY_TO_MERGE: approved and CI is green at ${head.slice(0, 7)}, but auto-merge is off. Enable it: ${merge}`] } : null
 }

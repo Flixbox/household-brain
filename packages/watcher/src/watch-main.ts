@@ -1,8 +1,8 @@
 /* oxlint-disable eslint/no-await-in-loop -- each poller's looks run one after another, on purpose */
 /** The project watcher's looks, started by watch-project.ts once it has read which code it runs (#265). */
 import { FOLLOW_NEWER, type MainRun, type Run, cancelledDeployEvent, mainRunEvent, replacementCandidates, runEvent } from './watch-events'
-import { type PrState, REPO, SELF, containsCommit, jobLines, mainAhead, mainHead, mainRuns, mergeCommand, newestMainRun, openPrs, prStates, recentlyMerged, resolveThread, runOf } from './watch-github'
-import { blockedByReviewEvent, resolvedThreadEvent } from './watch-review-events'
+import { type PrState, REPO, SELF, containsCommit, jobLines, mainAhead, mainHead, mainRuns, mergeCommand, newestMainRun, openPrs, prStates, readyCommand, recentlyMerged, resolveThread, runOf } from './watch-github'
+import { approvedEvent, blockedByReviewEvent, resolvedThreadEvent } from './watch-review-events'
 import { DISMISS_STALE_BOT_REVIEWS, dismissStale, reviewBlockers } from './watch-dismiss'
 import { FOLLOW, checkCode, flush, queue, quiet, report, reportLookups } from './watch-output'
 import { addLine, readLines, start, updateLines, writeLines } from './watch-state'
@@ -138,7 +138,8 @@ const checkClosed = async (pr: number): Promise<void> => {
 const checkReview = async (pr: number, state: PrState): Promise<void> => {
   await report(state.mergeable === 'CONFLICTING' ? { key: `pr-${pr} conflict ${state.head}`, lines: [`CONFLICT at ${short(state.head)}: rebase on main`] } : null, pr)
   // Already in the merge queue, there is no auto-merge to enable (#251).
-  const next = state.queued ? 'It is in the merge queue already.' : `Once it is well reviewed, enable auto-merge: ${mergeCommand(pr)}`
+  const after = state.queued ? 'It is in the merge queue already.' : `Once it is well reviewed, enable auto-merge: ${mergeCommand(pr)}`
+  const next = state.draft ? 'It is a draft: mark it ready first (see APPROVED_DRAFT).' : after
   await report(state.decision === 'APPROVED' ? { key: `pr-${pr} approved`, lines: [`APPROVED by the owner. ${next}`] } : null, pr)
 }
 
@@ -163,12 +164,12 @@ const resolveAsked = async (pr: number, state: PrState): Promise<void> => {
   }))
 }
 
-/** Approved and green for the current head, but auto-merge is still off, or GitHub blocks the merge (#278, #286). */
+/** Approved and green for the current head, but auto-merge is still off or it is a draft (#298), or GitHub blocks the merge (#278, #286). */
 const checkReady = async (pr: number, state: PrState): Promise<void> => {
   const green = (await readLines('reported')).includes(`pr-${pr} ci-passed ${state.head}`)
   // A PR in the merge queue shows auto-merge as off: it waits on the queue, not on the agent (#251).
-  const ready = state.decision === 'APPROVED' && !state.autoMerge && !state.queued && green
-  await report(ready ? { key: `pr-${pr} ready ${state.head}`, lines: [`READY_TO_MERGE: approved and CI is green at ${short(state.head)}, but auto-merge is off. Enable it: ${mergeCommand(pr)}`] } : null, pr)
+  const waits = state.decision === 'APPROVED' && !state.autoMerge && !state.queued
+  await report(waits ? approvedEvent({ draft: state.draft, green, head: state.head, merge: mergeCommand(pr), pr, ready: readyCommand(pr) }) : null, pr)
   // The owner's own approval, not the decision: a stale change request, one of the causes it names,
   // keeps GitHub's decision at CHANGES_REQUESTED (#286).
   await (state.ownerApproved && green && state.mergeState === 'BLOCKED' ? checkBlocked(pr, state.head) : Promise.resolve())

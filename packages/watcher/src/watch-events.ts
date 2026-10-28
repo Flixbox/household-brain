@@ -117,6 +117,8 @@ export interface OpenPr {
   title: string
   reviewDecision: string
   autoMerge: boolean
+  /** A draft: approved, it is marked ready before it is queued (#298). */
+  draft: boolean
   parked: boolean
   checks: string[]
   /** GitHub's `mergeStateStatus`: `BEHIND` (out of date with the base branch), `DIRTY` (conflicts), … */
@@ -154,7 +156,7 @@ const approvalProblem = (pr: OpenPr): string | null => {
   if (ci === 'failed') {
     return `REMINDER: PR #${pr.number} is approved and CI failed: fix it.`
   }
-  return ci === 'green' && !pr.autoMerge ? `REMINDER: PR #${pr.number} is approved and CI is green, but auto-merge is off: enable it.` : null
+  return ci === 'green' && !pr.autoMerge && !pr.draft ? `REMINDER: PR #${pr.number} is approved and CI is green, but auto-merge is off: enable it.` : null
 }
 
 /**
@@ -216,7 +218,7 @@ const mergeWay = (pr: OpenPr) => {
 
 export const openPrLines = (prs: OpenPr[]): string[] => [
   'Open PRs:',
-  ...prs.map(pr => `  #${pr.number} ${pr.title.slice(0, 60)}: ${pr.parked ? 'parked, ' : ''}${review(pr.reviewDecision)}, ${mergeWay(pr)}, CI ${ciState(pr.checks)}${branchState(pr.mergeState)}`),
+  ...prs.map(pr => `  #${pr.number} ${pr.title.slice(0, 60)}: ${pr.parked ? 'parked, ' : ''}${pr.draft ? 'draft, ' : ''}${review(pr.reviewDecision)}, ${mergeWay(pr)}, CI ${ciState(pr.checks)}${branchState(pr.mergeState)}`),
 ]
 
 /** Event keys after which the open PRs are listed. */
@@ -234,7 +236,7 @@ export const newActivity = (seen: ReadonlySet<string>, items: Activity[]): Activ
   items.filter((item, index) => !seen.has(item.id) && items.findIndex(other => other.id === item.id) === index)
 
 /** Events that ask the agent to answer someone: comments, reviews, approvals, conflicts, new issues. */
-const ANSWER_FIRST = /^(?:\[[^\]]*\] )?(?:PR #\d+: )?(?:ACTIVITY|APPROVED|READY_TO_MERGE|CONFLICT|NEW_ISSUE|ISSUE_COMMENT)\b/u
+const ANSWER_FIRST = /^(?:\[[^\]]*\] )?(?:PR #\d+: )?(?:ACTIVITY|APPROVED(?:_DRAFT)?|READY_TO_MERGE|CONFLICT|NEW_ISSUE|ISSUE_COMMENT)\b/u
 
 /** A time of day on this machine's clock (`12:09:20`), from an instant or GitHub's timestamp; null when it isn't one. */
 export const clockTime = (at: unknown, timeZone = Temporal.Now.timeZoneId()): string | null => {
