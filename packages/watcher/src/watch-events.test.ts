@@ -103,15 +103,17 @@ describe('mainRunEvent', () => {
 describe('openPrLines', () => {
   it('says where each PR stands', () => {
     expect(openPrLines([
-      { autoMerge: false, checks: ['SUCCESS', 'SKIPPED'], mergeState: 'CLEAN', number: 3, parked: true, queued: false, reviewDecision: '', title: 'Bump a tool' },
-      { autoMerge: true, checks: ['SUCCESS', 'IN_PROGRESS'], mergeState: 'CLEAN', number: 4, parked: false, queued: false, reviewDecision: 'APPROVED', title: 'Add a page' },
-      { autoMerge: false, checks: ['FAILURE'], mergeState: 'CLEAN', number: 5, parked: false, queued: false, reviewDecision: 'CHANGES_REQUESTED', title: 'Fix a bug' },
-      { autoMerge: false, checks: ['SUCCESS'], mergeState: 'CLEAN', number: 6, parked: false, queued: true, reviewDecision: 'APPROVED', title: 'Ship it' },
+      { autoMerge: false, checks: ['SUCCESS', 'SKIPPED'], draft: false, mergeState: 'CLEAN', number: 3, parked: true, queued: false, reviewDecision: '', title: 'Bump a tool' },
+      { autoMerge: true, checks: ['SUCCESS', 'IN_PROGRESS'], draft: false, mergeState: 'CLEAN', number: 4, parked: false, queued: false, reviewDecision: 'APPROVED', title: 'Add a page' },
+      { autoMerge: false, checks: ['FAILURE'], draft: false, mergeState: 'CLEAN', number: 5, parked: false, queued: false, reviewDecision: 'CHANGES_REQUESTED', title: 'Fix a bug' },
+      { autoMerge: false, checks: ['SUCCESS'], draft: true, mergeState: 'CLEAN', number: 7, parked: false, queued: false, reviewDecision: 'APPROVED', title: 'Show a model' },
+      { autoMerge: false, checks: ['SUCCESS'], draft: false, mergeState: 'CLEAN', number: 6, parked: false, queued: true, reviewDecision: 'APPROVED', title: 'Ship it' },
     ])).toEqual([
       'Open PRs:',
       '  #3 Bump a tool: parked, awaiting approval, auto-merge off, CI green',
       '  #4 Add a page: approved, auto-merge on, CI running',
       '  #5 Fix a bug: changes requested, auto-merge off, CI failed',
+      '  #7 Show a model: draft, approved, auto-merge off, CI green',
       '  #6 Ship it: approved, in the merge queue, CI green',
     ])
   })
@@ -142,7 +144,7 @@ describe('answerFirst (#222)', () => {
 })
 
 describe('reminderLines (#224)', () => {
-  const pr = (changes: Partial<OpenPr>): OpenPr => ({ autoMerge: false, checks: ['SUCCESS'], mergeState: 'CLEAN', number: 1, parked: false, queued: false, reviewDecision: 'APPROVED', title: 'x', ...changes })
+  const pr = (changes: Partial<OpenPr>): OpenPr => ({ autoMerge: false, checks: ['SUCCESS'], draft: false, mergeState: 'CLEAN', number: 1, parked: false, queued: false, reviewDecision: 'APPROVED', title: 'x', ...changes })
 
   it('reminds of an approved PR with green CI and auto-merge off, and of one whose CI failed', () => {
     expect(reminderLines([pr({ number: 284 }), pr({ checks: ['SUCCESS', 'FAILURE'], number: 290 })])).toEqual([
@@ -161,12 +163,14 @@ describe('reminderLines (#224)', () => {
       // In the merge queue: auto-merge shows as off there, and the queue does the merging (#251).
       pr({ queued: true }),
       pr({ checks: ['FAILURE'], queued: true }),
+      // A draft is marked ready first, which APPROVED_DRAFT asks for (#298).
+      pr({ draft: true }),
     ])).toEqual([])
   })
 })
 
 describe('reminders for branches that can\'t merge (#226)', () => {
-  const pr = (changes: Partial<OpenPr>): OpenPr => ({ autoMerge: true, checks: ['SUCCESS'], mergeState: 'CLEAN', number: 314, parked: false, queued: false, reviewDecision: 'APPROVED', title: 'x', ...changes })
+  const pr = (changes: Partial<OpenPr>): OpenPr => ({ autoMerge: true, checks: ['SUCCESS'], draft: false, mergeState: 'CLEAN', number: 314, parked: false, queued: false, reviewDecision: 'APPROVED', title: 'x', ...changes })
 
   it('reminds of a branch behind main or in conflict, approved or not', () => {
     expect(reminderLines([pr({ mergeState: 'BEHIND' }), pr({ mergeState: 'DIRTY', number: 9, reviewDecision: '' })])).toEqual([

@@ -12,6 +12,7 @@
  *   PR #<n>: MAIN_MOVED              main got commits the PR doesn't have yet: rebase and test again
  *   PR #<n>: APPROVED                the owner approved (enable auto-merge once it is well reviewed)
  *   PR #<n>: READY_TO_MERGE          approved, CI green for the current head, auto-merge still off
+ *   PR #<n>: APPROVED_DRAFT          approved but still a draft (#298): mark it ready, wait for the bot review, queue
  *   PR #<n>: BLOCKED_BY_REVIEW       the owner approved, CI green, but GitHub blocks the merge (#278): names
  *                                    each open thread the agent answered last (reply `Resolved: <reason>`
  *                                    once settled), and each change request still counted, on an older

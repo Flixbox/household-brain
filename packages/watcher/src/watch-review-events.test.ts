@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { type PrComment, type Review, type ReviewThread, blockedByReviewEvent, dismissalMessage, dismissedReviewEvent, resolvedThreadEvent, reviewsToDismiss, threadsToResolve } from './watch-review-events'
+import { type PrComment, type Review, type ReviewThread, approvedEvent, blockedByReviewEvent, dismissalMessage, dismissedReviewEvent, resolvedThreadEvent, reviewsToDismiss, threadsToResolve } from './watch-review-events'
 
 const HEAD = 'abcdef1234567890abcdef1234567890abcdef12'
 const OLD = '1234567890abcdef1234567890abcdef12345678'
@@ -167,5 +167,24 @@ describe('dismissedReviewEvent', () => {
     expect(dismissedReviewEvent({ dismissal: { replies: [{ body: 'Resolved: x', url: '' }], review: review('reviewer[bot]', 'CHANGES_REQUESTED', { id: 43 }) }, dismissed: true, head: HEAD, pr: 7 }).lines).toEqual([
       "REVIEW_DISMISSED: dismissed reviewer[bot]'s change request on the head (abcdef1): the owner approved, and `Resolved:` replies settled it",
     ])
+  })
+})
+
+describe('approvedEvent (#298)', () => {
+  const approved = { draft: false, green: true, head: HEAD, merge: 'gh pr merge 7 --auto', pr: 7, ready: 'gh pr ready 7', wasDraft: false }
+
+  it('asks to enable auto-merge once CI is green', () => {
+    expect(approvedEvent(approved)).toEqual({ key: `pr-7 ready ${HEAD}`, lines: ['READY_TO_MERGE: approved and CI is green at abcdef1, but auto-merge is off. Enable it: gh pr merge 7 --auto'] })
+    expect(approvedEvent({ ...approved, green: false })).toBeNull()
+  })
+
+  it('asks to mark a draft ready instead, once per head, green or not', () => {
+    const draftEvent = { key: `pr-7 approved-draft ${HEAD}`, lines: ['APPROVED_DRAFT: approved by the owner but still a draft: mark it ready (gh pr ready 7), wait for the bot review, then queue'] }
+    expect(approvedEvent({ ...approved, draft: true })).toEqual(draftEvent)
+    expect(approvedEvent({ ...approved, draft: true, green: false })).toEqual(draftEvent)
+  })
+
+  it('once a draft is marked ready, asks to wait for the bot review before enabling auto-merge', () => {
+    expect(approvedEvent({ ...approved, wasDraft: true })?.lines[0]).toContain('Once the bot has reviewed it since it was marked ready')
   })
 })
