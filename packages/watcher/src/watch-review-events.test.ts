@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { type PrComment, type Review, type ReviewThread, approvedEvent, blockedByReviewEvent, dismissalMessage, dismissedReviewEvent, resolvedThreadEvent, reviewsToDismiss, threadsToResolve } from './watch-review-events'
+import { type PrComment, type Review, type ReviewThread, approvedEvent, awaitsBotReview, blockedByReviewEvent, botNames, botReviewed, dismissalMessage, dismissedReviewEvent, resolvedThreadEvent, reviewsToDismiss, threadsToResolve } from './watch-review-events'
 
 const HEAD = 'abcdef1234567890abcdef1234567890abcdef12'
 const OLD = '1234567890abcdef1234567890abcdef12345678'
@@ -185,6 +185,37 @@ describe('approvedEvent (#298)', () => {
   })
 
   it('once a draft is marked ready, asks to wait for the bot review before enabling auto-merge', () => {
-    expect(approvedEvent({ ...approved, wasDraft: true })?.lines[0]).toContain('Once the bot has reviewed it since it was marked ready')
+    expect(approvedEvent({ ...approved, wasDraft: true })?.lines[0]).toContain('Once a review bot has reviewed this head')
+  })
+})
+const botReview = (login: string, oid = HEAD) => ({ author: { login }, commit: { oid }, state: 'COMMENTED' })
+
+describe('botNames', () => {
+  it('reads a comma-separated setting, with or without `[bot]`, in lower case', () => {
+    expect(botNames(' CodeRabbitAI[bot], other ,')).toEqual(['coderabbitai', 'other'])
+    expect(botNames('')).toEqual([])
+  })
+})
+
+describe('botReviewed (#299)', () => {
+  it("counts only a named bot's review of the head", () => {
+    expect(botReviewed(['coderabbitai'], [botReview('coderabbitai')], HEAD)).toBe(true)
+    expect(botReviewed(['coderabbitai'], [botReview('coderabbitai[bot]')], HEAD)).toBe(true)
+    expect(botReviewed(['coderabbitai'], [botReview('coderabbitai', 'older')], HEAD)).toBe(false)
+    expect(botReviewed(['coderabbitai'], [botReview('someone')], HEAD)).toBe(false)
+  })
+})
+
+describe('awaitsBotReview (#299)', () => {
+  const waiting = { bots: ['coderabbitai'], pr: 7, reported: ['pr-7 approved-draft 1234567'], reviewed: false }
+
+  it('waits for a PR approved as a draft, at any later head, until a bot reviewed its head', () => {
+    expect(awaitsBotReview(waiting)).toBe(true)
+    expect(awaitsBotReview({ ...waiting, reviewed: true })).toBe(false)
+  })
+
+  it('never waits without bots named, or for a PR not approved as a draft', () => {
+    expect(awaitsBotReview({ ...waiting, bots: [] })).toBe(false)
+    expect(awaitsBotReview({ ...waiting, reported: ['pr-70 approved-draft 1234567', 'pr-7 ready 1234567'] })).toBe(false)
   })
 })

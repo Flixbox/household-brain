@@ -2,7 +2,7 @@
 /** The project watcher's looks, started by watch-project.ts once it has read which code it runs (#265). */
 import { FOLLOW_NEWER, type MainRun, type Run, cancelledDeployEvent, mainRunEvent, replacementCandidates, runEvent } from './watch-events'
 import { type PrState, REPO, SELF, containsCommit, jobLines, mainAhead, mainHead, mainRuns, mergeCommand, newestMainRun, openPrs, prStates, readyCommand, recentlyMerged, resolveThread, runOf } from './watch-github'
-import { approvedEvent, blockedByReviewEvent, resolvedThreadEvent } from './watch-review-events'
+import { REVIEW_BOTS, approvedEvent, awaitsBotReview, blockedByReviewEvent, resolvedThreadEvent } from './watch-review-events'
 import { DISMISS_STALE_BOT_REVIEWS, dismissStale, reviewBlockers } from './watch-dismiss'
 import { FOLLOW, checkCode, flush, queue, quiet, report, reportLookups } from './watch-output'
 import { addLine, readLines, start, updateLines, writeLines } from './watch-state'
@@ -169,7 +169,9 @@ const checkReady = async (pr: number, state: PrState): Promise<void> => {
   const reported = await readLines('reported')
   const green = reported.includes(`pr-${pr} ci-passed ${state.head}`)
   // A PR in the merge queue shows auto-merge as off: it waits on the queue, not on the agent (#251).
-  const waits = state.decision === 'APPROVED' && !state.autoMerge && !state.queued
+  // Out of draft, READY_TO_MERGE waits for a review bot's review where REVIEW_BOTS names one (#299).
+  const held = !state.draft && awaitsBotReview({ bots: REVIEW_BOTS, pr, reported, reviewed: state.botReviewed })
+  const waits = state.decision === 'APPROVED' && !state.autoMerge && !state.queued && !held
   await report(waits ? approvedEvent({ draft: state.draft, green, head: state.head, merge: mergeCommand(pr), pr, ready: readyCommand(pr), wasDraft: reported.includes(`pr-${pr} approved-draft ${state.head}`) }) : null, pr)
   // The owner's own approval, not the decision: a stale change request, one of the causes it names,
   // keeps GitHub's decision at CHANGES_REQUESTED (#286).
