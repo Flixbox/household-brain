@@ -33,7 +33,7 @@ const mergeQueued = async (): Promise<boolean> => {
   const query = `query={repository(owner:"${owner}",name:"${name}"){mergeQueue{id}}}`
   return ghText(['api', 'graphql', '-f', query, '-q', '.data.repository.mergeQueue.id']).then(text => hasText(text.trim()), () => false)
 }
-const MERGE_QUEUE = await mergeQueued()
+export const MERGE_QUEUE = await mergeQueued()
 
 /** The command that enables auto-merge for a PR, as the events suggest it. */
 export const mergeCommand = (pr: number): string => `${GH} pr merge ${pr} --auto${MERGE_QUEUE ? '' : ' --squash'}`

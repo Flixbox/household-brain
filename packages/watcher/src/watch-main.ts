@@ -7,7 +7,7 @@ import { DISMISS_STALE_BOT_REVIEWS, askBotsToResolve, dismissStale, reviewBlocke
 import { FOLLOW, checkCode, flush, queue, quiet, report, reportLookups } from './watch-output'
 import { addLine, readLines, start, updateLines, writeLines } from './watch-state'
 import { checkActivity as checkPrActivity, checkTrackedActivity } from './watch-activity'
-import { checkQueue } from './watch-queue'
+import { checkNotQueued, checkQueue } from './watch-queue'
 import { checkIssueStates, checkIssues } from './watch-issues'
 import { allSettled, hasText, ignoreFailure } from './read'
 
@@ -199,6 +199,7 @@ const checkPr = async (pr: number, state: PrState | undefined): Promise<void> =>
     round.complete = false
     return
   }
+  await checkNotQueued(pr, state)
   if (state.state === 'MERGED') {
     await checkMerged(pr, state.mergeSha)
     return

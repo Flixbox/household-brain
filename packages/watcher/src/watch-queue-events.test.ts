@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { dequeuedEvent, queueChanges, queuedEvent } from './watch-queue-events'
+import { NOT_QUEUED_MINUTES, dequeuedEvent, notQueuedEvent, queueChanges, queuedEvent, unqueuedLines } from './watch-queue-events'
 
 describe('merge queue events (#251)', () => {
   it('reports a PR entering the queue, keyed by when it entered so a second time is news again', () => {
@@ -16,5 +16,35 @@ describe('merge queue events (#251)', () => {
   it('reports a PR that fell off, with the reason when GitHub gives one', () => {
     expect(dequeuedEvent(7, '2026-10-18T09:00:00Z', 'Merge conflict').lines[0]).toContain('(Merge conflict)')
     expect(dequeuedEvent(7, '2026-10-18T09:00:00Z', '')).toMatchObject({ key: 'pr-7 dequeued 2026-10-18T09:00:00Z', lines: [expect.stringContaining('GitHub gives no reason')] })
+  })
+})
+
+describe('a PR that never joins the merge queue (#305)', () => {
+  const start = Temporal.Instant.from('2026-10-28T12:00:00Z')
+  const later = (minutes: number) => start.add({ minutes })
+
+  it('starts timing a waiting PR on the first look, and is overdue only after the wait', () => {
+    const first = unqueuedLines({ head: 'abc', lines: ['8 def t0 t0'], now: start, pr: 7, waiting: true })
+    expect(first).toEqual({ lines: ['8 def t0 t0', `7 abc ${start.toString()} ${start.toString()}`], overdue: false })
+    const second = unqueuedLines({ head: 'abc', lines: first.lines, now: later(NOT_QUEUED_MINUTES - 1), pr: 7, waiting: true })
+    expect(second).toEqual({ lines: ['8 def t0 t0', `7 abc ${start.toString()} ${later(NOT_QUEUED_MINUTES - 1).toString()}`], overdue: false })
+    expect(unqueuedLines({ head: 'abc', lines: second.lines, now: later(NOT_QUEUED_MINUTES), pr: 7, waiting: true }).overdue).toBe(true)
+  })
+
+  it('starts again on a new head, or after no look saw it for the wait, and forgets a PR that no longer waits', () => {
+    const lines = [`7 abc ${start.toString()} ${start.toString()}`, '8 def t0 t0']
+    expect(unqueuedLines({ head: 'new', lines, now: later(1), pr: 7, waiting: true })).toEqual({ lines: ['8 def t0 t0', `7 new ${later(1).toString()} ${later(1).toString()}`], overdue: false })
+    // The watcher was stopped for a while: the PR may have been queued and dequeued meanwhile.
+    expect(unqueuedLines({ head: 'abc', lines, now: later(30), pr: 7, waiting: true })).toEqual({ lines: ['8 def t0 t0', `7 abc ${later(30).toString()} ${later(30).toString()}`], overdue: false })
+    expect(unqueuedLines({ head: 'abc', lines, now: later(1), pr: 7, waiting: false })).toEqual({ lines: ['8 def t0 t0'], overdue: false })
+    // A PR number that starts another's (7 and 70) is a different PR.
+    expect(unqueuedLines({ head: 'x', lines: ['70 x t0 t0'], now: start, pr: 7, waiting: false }).lines).toEqual(['70 x t0 t0'])
+  })
+
+  it('names the enqueuePullRequest mutation with the PR\'s node id, once per head', () => {
+    const event = notQueuedEvent({ gh: 'agent-gh', head: 'abcdef1234', id: 'PR_kw1', pr: 7 })
+    expect(event.key).toBe('pr-7 not-queued abcdef1234')
+    expect(event.lines[0]).toStartWith('NOT_QUEUED: ')
+    expect(event.lines[0]).toContain('agent-gh api graphql -f query=\'mutation{enqueuePullRequest(input:{pullRequestId:"PR_kw1"}){mergeQueueEntry{position}}}\'')
   })
 })

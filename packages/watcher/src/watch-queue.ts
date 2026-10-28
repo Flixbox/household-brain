@@ -1,8 +1,14 @@
-/** The project watcher's look at the merge queue (watch-project.ts, #251): who entered it, who fell off. */
-import { dequeueReason, prStates, queueEntries } from './watch-github'
-import { type QueueEntry, dequeuedEvent, queueChanges, queueLine, queuedEvent } from './watch-queue-events'
+/**
+ * The project watcher's look at the merge queue (watch-project.ts, #251): who entered it, who fell off,
+ * and who should be in it but never joined (#305).
+ */
+import { MERGE_QUEUE, type PrState, at, dequeueReason, graphql, prStates, queueEntries } from './watch-github'
+import { type QueueEntry, dequeuedEvent, notQueuedEvent, queueChanges, queueLine, queuedEvent, unqueuedLines } from './watch-queue-events'
 import { exists, readLines, updateLines, writeLines } from './watch-state'
+import { GH } from './watch-gh'
 import { report } from './watch-output'
+import { isRecord, textOf } from './read'
+import { record, records } from './watch-text'
 
 /** A PR that left the queue: nothing to say when it merged; still open, it fell off. */
 const checkLeft = async (lines: string[]): Promise<void> => {
@@ -34,4 +40,40 @@ export const checkQueue = async (): Promise<void> => {
   const now = [...entries].map(([pr, entry]) => queueLine(pr, entry))
   // On the first look, the PRs already queued aren't news.
   await (await exists('queued') ? checkChanges(entries, now) : writeLines('queued', now))
+}
+
+/** Whether a PR waits for the merge queue to take it (#305); never where the branch has no queue. */
+const waitsForQueue = (state: PrState): boolean => MERGE_QUEUE && state.state === 'OPEN' && !state.draft && !state.parked
+  && !state.queued && state.ownerApproved && state.autoMerge && state.mergeState === 'CLEAN'
+
+const FRESH_FIELDS = 'id state isDraft isInMergeQueue mergeStateStatus headRefOid autoMergeRequest{enabledAt} commits(last:1){nodes{commit{statusCheckRollup{state}}}}'
+
+/**
+ * The PR's node id if, asked fresh, it still waits at `head` with every check passed, as GitHub sums
+ * them up now (a re-run that failed undoes an earlier pass); null otherwise.
+ */
+const stillWaiting = async (pr: number, head: string): Promise<string | null> => {
+  const value = record(at(await graphql(`pullRequest(number:${pr}){${FRESH_FIELDS}}`, true), 'pullRequest'))
+  const checks = at(records(at(value, 'commits', 'nodes')).at(-1), 'commit', 'statusCheckRollup', 'state')
+  const waits = value.state === 'OPEN' && value.isDraft !== true && value.isInMergeQueue !== true && value.mergeStateStatus === 'CLEAN'
+    && isRecord(value.autoMergeRequest) && textOf(value.headRefOid) === head && checks === 'SUCCESS'
+  return waits ? textOf(value.id) : null
+}
+
+/**
+ * A PR that should be in the merge queue but isn't (#305): open, not a draft or parked, approved by the
+ * owner, merge state CLEAN and auto-merge on. Timed in the `unqueued` state file from the first look
+ * that saw it so; once it has waited NOT_QUEUED_MINUTES, GitHub is asked once more, fresh, so a PR that
+ * has just entered the queue, or whose checks no longer pass, isn't reported.
+ */
+export const checkNotQueued = async (pr: number, state: PrState): Promise<void> => {
+  const found = { overdue: false }
+  await updateLines('unqueued', lines => {
+    const after = unqueuedLines({ head: state.head, lines, now: Temporal.Now.instant(), pr, waiting: waitsForQueue(state) })
+    found.overdue = after.overdue
+    return after.lines
+  })
+  // A fresh state that can't be read reports nothing: the next look asks again.
+  const id = found.overdue ? await stillWaiting(pr, state.head).catch(() => null) : null
+  await report(id === null ? null : notQueuedEvent({ gh: GH, head: state.head, id, pr }), pr)
 }
