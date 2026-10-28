@@ -78,21 +78,23 @@ describe('an issue that is gone (#263)', () => {
 describe('new issues and the owner\'s issue comments (#314)', () => {
   const people = { owner: 'someone', self: 'helper[bot]' }
   const author = (login: string) => (login.endsWith('[bot]') ? { kind: 'Bot', login: login.replaceAll('[bot]', '') } : { kind: 'User', login })
-  const issue = (number: number, login: string) => ({ author: author(login), createdAt: `2026-10-0${number % 10}T09:00:00Z`, number, title: `Issue  ${number}` })
+  const issue = (number: number, login: string) => ({ author: author(login), createdAt: `2026-10-0${number}T09:00:00Z`, number, title: `Issue  ${number}` })
   const comment = (databaseId: number, login: string, createdAt: string) =>
     ({ author: author(login), body: 'Do it.\nThen this.', createdAt, databaseId, url: `https://github.test/o/r/issues/1#issuecomment-${databaseId}` })
   const answer = (parts: Record<string, unknown[]>) =>
-    ({ created: { nodes: parts.created ?? [] }, newestPr: { nodes: parts.newestPr ?? [] }, updated: { nodes: parts.updated ?? [] }, updatedPrs: { nodes: parts.updatedPrs ?? [] } })
+    ({ created: { nodes: parts.created ?? [] }, createdPrs: { nodes: parts.createdPrs ?? [] }, updated: { nodes: parts.updated ?? [] }, updatedPrs: { nodes: parts.updatedPrs ?? [] } })
   const later = (count: number) => Array.from({ length: count }, (_item, index) => ({ createdAt: `2026-10-06T09:${String(index).padStart(2, '0')}:00Z` }))
 
   it('reports new issues, not the agent\'s own, keyed by number', () => {
     expect(issueEventsFrom(answer({ created: [issue(2, 'someone'), issue(1, 'helper[bot]')] }), people))
       .toEqual([{ at: '2026-10-02T09:00:00Z', key: 'issue #2', lines: ['NEW_ISSUE #2 Issue 2'] }])
+    // A PR among the newest is never a new issue, also without SELF.
+    expect(issueEventsFrom(answer({ created: [issue(2, 'someone')], createdPrs: later(1) }), { owner: 'someone', self: '' })).toHaveLength(1)
   })
 
   it('leaves out an issue older than the fifty newest issues and PRs', () => {
-    expect(issueEventsFrom(answer({ created: [issue(9, 'someone')], newestPr: [{ number: 59 }] }), people)).toEqual([])
-    expect(issueEventsFrom(answer({ created: [issue(9, 'someone')], newestPr: [{ number: 58 }] }), people)).toHaveLength(1)
+    expect(issueEventsFrom(answer({ created: [issue(2, 'someone')], createdPrs: later(50) }), people)).toEqual([])
+    expect(issueEventsFrom(answer({ created: [issue(2, 'someone')], createdPrs: later(49) }), people)).toHaveLength(1)
   })
 
   it('reports the owner\'s comments whole, with their issue, keyed by id', () => {

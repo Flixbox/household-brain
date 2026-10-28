@@ -83,13 +83,15 @@ const UPDATED = 'orderBy:{field:UPDATED_AT,direction:DESC}'
 /**
  * New issues and issue comments, as GraphQL names them (#314), in one query instead of two
  * repository-wide REST lists, sparing the REST quota agents share (#306): the fifty newest issues and
- * the newest PR's number, and the last twenty comments on each of the fifty issues and PRs updated
- * last (a new comment updates its issue), only their times for a PR's.
+ * the times of the fifty newest PRs, and the comments on the fifty issues and PRs updated last (a new
+ * comment updates its issue): an issue's last twenty, and only the times of a PR's last fifty, so
+ * that one busy PR can't hide where the fifty newest comments start. Issues and PRs come in every
+ * state: GraphQL's connections filter by state only when asked to.
  */
 export const ISSUE_EVENT_FIELDS = `created: issues(first:50,${NEWEST}){nodes{number title createdAt ${AUTHOR}}}`
-  + ` newestPr: pullRequests(first:1,${NEWEST}){nodes{number}}`
+  + ` createdPrs: pullRequests(first:50,${NEWEST}){nodes{createdAt}}`
   + ` updated: issues(first:50,${UPDATED}){nodes{number comments(last:20){nodes{databaseId body url createdAt ${AUTHOR}}}}}`
-  + ` updatedPrs: pullRequests(first:50,${UPDATED}){nodes{comments(last:20){nodes{createdAt}}}}`
+  + ` updatedPrs: pullRequests(first:50,${UPDATED}){nodes{comments(last:50){nodes{createdAt}}}}`
 
 /**
  * How far back news goes: the fifty newest issues and PRs, and the fifty newest comments on either,
@@ -101,35 +103,29 @@ const WINDOW = 50
 /** Newest first; GitHub's timestamps all have one format, so their text sorts by time. */
 const byNewest = (first: Json, second: Json) => textOf(second.createdAt).localeCompare(textOf(first.createdAt))
 
-/** The numbers of the nodes of a connection in the answer. */
-const numbers = (repository: Json, connection: string) => records(at(repository, connection, 'nodes')).map(node => count(node.number))
+/** The fifty newest issues or comments, each marked with whether it is on an issue (not a PR's). */
+const newest = (onIssues: Json[], onPrs: Json[]): Json[] =>
+  [...onIssues.map(item => ({ ...item, onIssue: true })), ...onPrs].toSorted(byNewest).slice(0, WINDOW)
 
-/** The newest issues among the fifty newest issues and PRs (they share their numbers), not the agent's own. */
-const newIssues = (repository: Json, self: string): IssueEvent[] => {
-  const oldest = Math.max(0, ...numbers(repository, 'created'), ...numbers(repository, 'newestPr')) - WINDOW
-  return records(at(repository, 'created', 'nodes')).filter(issue => count(issue.number) > oldest && actor(issue.author) !== self)
+/** The newest issues among the fifty newest issues and PRs, not the agent's own. */
+const newIssues = (repository: Json, self: string): IssueEvent[] =>
+  newest(records(at(repository, 'created', 'nodes')), records(at(repository, 'createdPrs', 'nodes')))
+    .filter(issue => issue.onIssue === true && actor(issue.author) !== self)
     .map(issue => ({ at: issue.createdAt, key: `issue #${count(issue.number)}`, lines: [`NEW_ISSUE #${count(issue.number)} ${oneLine(issue.title, 200)}`] }))
-}
 
 /** Each comment on the issues or PRs read, with its issue's number. */
 const commentsOn = (repository: Json, connection: string): Json[] =>
   records(at(repository, connection, 'nodes')).flatMap(issue => records(at(issue, 'comments', 'nodes')).map(comment => ({ ...comment, issue: count(issue.number) })))
 
-/** When the oldest of the fifty newest comments on issues and PRs was written; '' with fewer than fifty. */
-const windowStart = (repository: Json): string =>
-  textOf([...commentsOn(repository, 'updated'), ...commentsOn(repository, 'updatedPrs')].toSorted(byNewest).at(WINDOW - 1)?.createdAt)
-
 /** The owner's comments on issues, among the fifty newest comments on issues and PRs. */
-const ownerComments = (repository: Json, owner: string): IssueEvent[] => {
-  const start = windowStart(repository)
-  return commentsOn(repository, 'updated').filter(comment => actor(comment.author) === owner && textOf(comment.createdAt) >= start)
-    .toSorted(byNewest)
+const ownerComments = (repository: Json, owner: string): IssueEvent[] =>
+  newest(commentsOn(repository, 'updated'), commentsOn(repository, 'updatedPrs'))
+    .filter(comment => comment.onIssue === true && actor(comment.author) === owner)
     .map(comment => ({
       at: comment.createdAt,
       key: `issue-comment ${count(comment.databaseId)}`,
       lines: [`ISSUE_COMMENT ${count(comment.databaseId)} #${count(comment.issue)}:`, ...commentText(comment, { author: owner, owner })],
     }))
-}
 
 /**
  * New issues (not the agent's own) and the owner's comments on issues, newest first, from
