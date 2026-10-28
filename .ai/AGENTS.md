@@ -112,7 +112,7 @@ Every PR that changes the UI shows it in a GIF in its description (after the
   own beside its session's sets `WATCHER_ID` (e.g. its branch), as it shares the session's id.
   `.claude/watcher.env` holds the settings (the bot's `GH` and `SELF`, and `DISMISS_STALE_BOT_REVIEWS`:
   it dismisses CodeRabbit's change request left on an older commit once the owner approved and every
-  thread is resolved, #292).
+  thread is resolved, #292, or on the head once `Resolved:` replies settled it, #290).
   It reads comments with the owner's login, the only one that sees the owner's pending reviews. It
   follows a merged PR through `main`'s deploy: `DEPLOYED` asks for the live check below,
   `DEPLOY_FAILED` for a follow-up PR.
