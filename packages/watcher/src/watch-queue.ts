@@ -2,13 +2,13 @@
  * The project watcher's look at the merge queue (watch-project.ts, #251): who entered it, who fell off,
  * and who should be in it but never joined (#305).
  */
-import { MERGE_QUEUE, type PrState, at, dequeueReason, graphql, prStates, queueEntries } from './watch-github'
+import { MERGE_QUEUE, type PrState, dequeueReason, graphql, prStates, queueEntries } from './watch-github'
 import { type QueueEntry, dequeuedEvent, notQueuedEvent, queueChanges, queueLine, queuedEvent, unqueuedLines } from './watch-queue-events'
 import { exists, readLines, updateLines, writeLines } from './watch-state'
 import { GH } from './watch-gh'
 import { report } from './watch-output'
 import { isRecord, textOf } from './read'
-import { record, records } from './watch-text'
+import { at, record, records } from './watch-text'
 
 /** A PR that left the queue: nothing to say when it merged; still open, it fell off. */
 const checkLeft = async (lines: string[]): Promise<void> => {
