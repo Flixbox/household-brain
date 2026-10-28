@@ -3,7 +3,7 @@
 import { FOLLOW_NEWER, type MainRun, type Run, cancelledDeployEvent, mainRunEvent, replacementCandidates, runEvent } from './watch-events'
 import { type PrState, REPO, SELF, containsCommit, jobLines, mainAhead, mainHead, mainRuns, mergeCommand, newestMainRun, openPrs, prStates, recentlyMerged, resolveThread, runOf } from './watch-github'
 import { blockedByReviewEvent, resolvedThreadEvent } from './watch-review-events'
-import { dismissStale, reviewBlockers } from './watch-dismiss'
+import { DISMISS_STALE_BOT_REVIEWS, dismissStale, reviewBlockers } from './watch-dismiss'
 import { FOLLOW, checkCode, flush, queue, quiet, report, reportLookups } from './watch-output'
 import { addLine, readLines, start, updateLines, writeLines } from './watch-state'
 import { checkActivity as checkPrActivity, checkTrackedActivity } from './watch-activity'
@@ -149,7 +149,7 @@ const checkReview = async (pr: number, state: PrState): Promise<void> => {
  */
 const checkBlocked = async (pr: number, head: string): Promise<void> => {
   const blockers = await reviewBlockers(pr).then(async found => dismissStale({ ...found, head, pr })).catch(() => null)
-  await report(blockers && blockedByReviewEvent({ ...blockers, head, pr, self: SELF }), pr)
+  await report(blockers && blockedByReviewEvent({ ...blockers, dismiss: DISMISS_STALE_BOT_REVIEWS, head, pr, self: SELF }), pr)
 }
 
 /**

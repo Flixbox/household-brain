@@ -82,7 +82,7 @@ const after = (later: string, earlier: string) =>
 /**
  * The `Resolved: <reason>` replies that settle a change request on the head (#290), or null while it
  * isn't settled: the last comment of each of its threads, or, when it has none (an outside-diff or
- * summary-only review), the newest PR comment since the review. Only `settlers`' replies count (the
+ * summary-only review), the newest `Resolved:` reply on the PR since the review. Only `settlers`' replies count (the
  * agent, the owner), and only replies after the review: when the bot reviews again, its new review
  * needs its own.
  */
@@ -152,10 +152,12 @@ export const dismissedReviewEvent = ({ dismissal: { replies, review }, dismissed
  * open thread whose last comment is the agent's own (answered, but a ruleset wants it resolved) and
  * doesn't already ask to be resolved (the watcher does that, #279), and
  * each change request still counted (`changeRequests`) the watcher didn't dismiss: on an older commit,
- * or on the head (#290). Null when neither is
+ * or on the head (#290; a bot's there is settled with `Resolved:` replies where `dismiss`, the
+ * repository's DISMISS_STALE_BOT_REVIEWS, is on, else left to the owner). Null when neither is
  * the cause. Keyed by what blocks it, so a new cause is reported again.
  */
-export const blockedByReviewEvent = ({ head, pr, reviews, self, threads }: {
+export const blockedByReviewEvent = ({ dismiss, head, pr, reviews, self, threads }: {
+  dismiss: boolean
   head: string
   pr: number
   reviews: readonly Review[]
@@ -173,7 +175,7 @@ export const blockedByReviewEvent = ({ head, pr, reviews, self, threads }: {
     lines: [
       `BLOCKED_BY_REVIEW: approved and CI is green at ${head.slice(0, 7)}, but review blocks the merge:`,
       ...answered.map(thread => `  answered, not resolved: ${thread.url} (if settled, reply \`Resolved: <reason>\`)`),
-      ...stale.map(review => `  ${review.login} requested changes on ${where(review, head)}: ${review.commit === head && isBot(review.login) ? SETTLE : 'ask the owner to dismiss it'}`),
+      ...stale.map(review => `  ${review.login} requested changes on ${where(review, head)}: ${dismiss && review.commit === head && isBot(review.login) ? SETTLE : 'ask the owner to dismiss it'}`),
     ],
   }
 }

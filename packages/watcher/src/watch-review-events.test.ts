@@ -9,7 +9,7 @@ const thread = (id: string, changes: Partial<ReviewThread> = {}): ReviewThread =
 const review = (login: string, state: string, { commit = HEAD, id = 1, submittedAt = '2026-10-26T10:00:00Z' }: Partial<Pick<Review, 'commit' | 'id' | 'submittedAt'>> = {}): Review =>
   ({ commit, id, login, state, submittedAt })
 const comment = (author: string, body: string, createdAt = '2026-10-26T11:00:00Z'): PrComment => ({ author, body, createdAt, url: 'https://github.test/pr/1#c' })
-const event = (threads: ReviewThread[], reviews: Review[] = []) => blockedByReviewEvent({ head: HEAD, pr: 7, reviews, self: SELF, threads })
+const event = (threads: ReviewThread[], reviews: Review[] = [], dismiss = true) => blockedByReviewEvent({ dismiss, head: HEAD, pr: 7, reviews, self: SELF, threads })
 
 describe('blockedByReviewEvent', () => {
   it('names each open thread the agent answered last, with its link', () => {
@@ -44,9 +44,15 @@ describe('blockedByReviewEvent', () => {
     ])
   })
 
+  it('leaves a bot\'s change request on the head to the owner while dismissing is off', () => {
+    expect(event([], [review('head[bot]', 'CHANGES_REQUESTED')], false)?.lines.slice(1)).toEqual([
+      '  head[bot] requested changes on the head (abcdef1): ask the owner to dismiss it',
+    ])
+  })
+
   it('is null when neither blocks it, and without SELF no thread counts as answered', () => {
     expect(event([thread('T1', { resolved: true })], [review('owner', 'APPROVED')])).toBeNull()
-    expect(blockedByReviewEvent({ head: HEAD, pr: 7, reviews: [], self: '', threads: [thread('T1', { lastAuthor: '' })] })).toBeNull()
+    expect(blockedByReviewEvent({ dismiss: true, head: HEAD, pr: 7, reviews: [], self: '', threads: [thread('T1', { lastAuthor: '' })] })).toBeNull()
   })
 })
 

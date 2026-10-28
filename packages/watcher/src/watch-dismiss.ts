@@ -14,7 +14,7 @@ import { report } from './watch-output'
 import { allSettled, textOf } from './read'
 import { count, record, records } from './watch-text'
 
-const DISMISS_STALE_BOT_REVIEWS = process.env.DISMISS_STALE_BOT_REVIEWS === '1'
+export const DISMISS_STALE_BOT_REVIEWS = process.env.DISMISS_STALE_BOT_REVIEWS === '1'
 
 /** A PR's review threads (as `THREAD_FIELDS` in watch-github.ts), with the review that opened each thread (its first comment's), which the dismissal needs (#290). */
 const THREAD_REVIEW_FIELDS = 'reviewThreads(first:100){pageInfo{hasNextPage} nodes{id isResolved comments(last:1){nodes{body url author{login kind:__typename}}} first:comments(first:1){nodes{pullRequestReview{databaseId}}}}}'
