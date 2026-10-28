@@ -30,10 +30,13 @@ export interface Answer {
 export const answerFrom = (text: string): Answer => {
   const [head = '', ...rest] = text.split(/\r?\n\r?\n/u)
   const [statusLine = '', ...headerLines] = head.split(/\r?\n/u)
-  const headers = new Map(headerLines.flatMap(line => {
+  const headers = new Map<string, string>()
+  for (const line of headerLines) {
     const colon = line.indexOf(':')
-    return colon > 0 ? [[line.slice(0, colon).trim().toLowerCase(), line.slice(colon + 1).trim()] as const] : []
-  }))
+    if (colon > 0) {
+      headers.set(line.slice(0, colon).trim().toLowerCase(), line.slice(colon + 1).trim())
+    }
+  }
   const status = Number(/^HTTP\/\S+\s+(?<code>\d{3})/u.exec(statusLine)?.groups?.code ?? 0)
   const raw = rest.join('\n\n').trim()
   try {
@@ -121,7 +124,7 @@ const graphql = async (query: string, variables: Readonly<Record<string, number 
 const THREADS_QUERY = `query($owner:String!,$name:String!,$pr:Int!,$after:String){repository(owner:$owner,name:$name){pullRequest(number:$pr){
   reviewThreads(first:100,after:$after){nodes{id comments(first:100){nodes{id databaseId}}} pageInfo{hasNextPage endCursor}}}}}`
 
-/** Every review thread of the PR, a page of a hundred at a time. */
+/** Every review thread of the PR, a page of a hundred at a time, each with its first hundred comments (a longer thread is unheard of). */
 const threadsOf = async (repo: string, pr: number, after?: string): Promise<Thread[]> => {
   const [owner = '', name = ''] = repo.split('/')
   const variables = { name, owner, pr, ...(after === undefined ? {} : { after }) }
@@ -141,7 +144,7 @@ const repoOfFolder = async (): Promise<string> => {
 const main = async (): Promise<void> => {
   const [prText = '', target = '', bodyArg = ''] = Bun.argv.slice(2)
   const pr = Number(prText)
-  const body = bodyArg === '-' ? (await Bun.stdin.text()).trim() : bodyArg
+  const body = bodyArg === '-' ? await Bun.stdin.text() : bodyArg
   if (!Number.isInteger(pr) || pr < 1 || !hasText(target) || !hasText(body)) {
     process.stderr.write('Usage: reply-review-thread <pr> <comment-id|PRRT_id> <body> (a body of - is read from stdin)\n')
     process.exit(64)
