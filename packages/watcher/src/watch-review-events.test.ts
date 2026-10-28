@@ -232,12 +232,12 @@ describe('botsToAskResolve', () => {
   const bot = 'coderabbitai[bot]'
   const ask = (changes: Partial<Parameters<typeof botsToAskResolve>[0]> = {}) => botsToAskResolve({
     bots: ['coderabbitai'],
-    owner: 'Owner',
-    self: SELF,
     comments: [],
     complete: true,
     head: HEAD,
+    owner: 'Owner',
     reviews: [review(bot, 'CHANGES_REQUESTED', { id: 5 })],
+    self: SELF,
     threads: [thread('T1', { resolved: true })],
     ...changes,
   }).map(asked => asked.id)

@@ -101,7 +101,7 @@ const lastWord = (review: Review, comments: readonly PrComment[], settlers: Sett
 /** Whether the owner took back a change request without threads with a later comment (#294). */
 const takenBack = (review: Review, comments: readonly PrComment[], settlers: Settlers) => {
   const word = lastWord(review, comments, settlers)
-  return word !== undefined && !settles(settlers, word.author, word.body)
+  return word ? !settles(settlers, word.author, word.body) : false
 }
 
 /**
