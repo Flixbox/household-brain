@@ -67,8 +67,8 @@ export interface Dismissal {
 }
 
 /** Each reviewer's latest review that counts (as in `decisionFrom`) when it requests changes: GitHub counts it until it is dismissed. */
-const changeRequests = <Counted extends { login: string, state: string }>(reviews: readonly Counted[]): Counted[] => {
-  const latest = new Map<string, Counted>()
+const changeRequests = (reviews: readonly Review[]): Review[] => {
+  const latest = new Map<string, Review>()
   for (const review of reviews) {
     if (review.state === 'APPROVED' || review.state === 'CHANGES_REQUESTED' || review.state === 'DISMISSED') {
       latest.set(review.login, review)
@@ -227,14 +227,6 @@ export const RESOLVE_BOT_REVIEWS = botNames(process.env.RESOLVE_BOT_REVIEWS ?? '
 
 /** The comment that asks a bot to resolve its threads and approve (#303): CodeRabbit's documented trigger. */
 export const resolveCommand = (login: string): string => `@${bare(login)} resolve`
-
-/**
- * Of `bots` (in `bare` form), the ones whose latest counting review (as in `changeRequests`) requests
- * changes on `head`, from reviews with the commit each was left on: the cheap first check, on the PR's
- * state, before `botsToAskResolve` reads its threads and comments (#303).
- */
-export const botChangeRequestsOnHead = (bots: readonly string[], reviews: readonly { commit: string, login: string, state: string }[], head: string): string[] =>
-  changeRequests(reviews).filter(review => review.commit === head && bots.includes(bare(review.login))).map(review => bare(review.login))
 
 /**
  * The bots' change requests on `head` the watcher asks to resolve with `@<bot> resolve` (#303), once

@@ -1,7 +1,7 @@
 /** The project watcher's questions to GitHub, through the `gh` CLI, answered as plain data. */
 import { type MainRun, type OpenPr, type Run, approvedBy, decisionFrom } from './watch-events'
 import type { QueueEntry } from './watch-queue-events'
-import { RESOLVE_BOT_REVIEWS, REVIEW_BOTS, type ReviewThread, botChangeRequestsOnHead, botReviewed, threadsToResolve } from './watch-review-events'
+import { REVIEW_BOTS, type ReviewThread, botReviewed, threadsToResolve } from './watch-review-events'
 import { allIssueNumbers, goneIssueLine, isGone, isMoved, issueEventLine, issuePage } from './watch-issue-events'
 import { GH, failedStatus, ghText } from './watch-gh'
 import { ownerOfRepo } from './watch-owner'
@@ -165,8 +165,6 @@ export const openPrs = async (): Promise<OpenPr[]> => {
 
 export interface PrState {
   state: string
-  /** Who opened it, in the REST form (`name[bot]` for a bot). */
-  author: string
   mergeable: string
   /** GitHub's `mergeStateStatus`: `BLOCKED` while a rule (a review, an open thread) holds it back. */
   mergeState: string
@@ -177,8 +175,6 @@ export interface PrState {
   autoMerge: boolean
   draft: boolean
   botReviewed: boolean
-  /** The RESOLVE_BOT_REVIEWS bots whose latest counting review requests changes on the head (#303). */
-  botChangeRequests: string[]
   parked: boolean
   queued: boolean
   title: string
@@ -207,19 +203,14 @@ const stateOf = (value: Json): PrState => {
   const reviews = records(record(value.reviews).nodes)
     .map(review => ({ login: actor(review.author), state: textOf(review.state) }))
     .filter(review => review.login !== author && review.login !== SELF)
-  const head = textOf(value.headRefOid)
-  const withCommits = records(record(value.reviews).nodes)
-    .map(review => ({ commit: textOf(record(review.commit).oid), login: actor(review.author), state: textOf(review.state) }))
   return {
-    author,
     autoMerge: isRecord(value.autoMergeRequest),
-    botChangeRequests: botChangeRequestsOnHead(RESOLVE_BOT_REVIEWS, withCommits, head),
     botReviewed: botReviewed(REVIEW_BOTS, records(record(value.reviews).nodes), textOf(value.headRefOid)),
     // GitHub leaves `reviewDecision` empty under a ruleset (#197), and counts anyone's approval: the
     // reviews decide, an approval counting only from the owner (#277).
     decision: decisionFrom(textOf(value.reviewDecision), reviews, OWNER),
     draft: value.isDraft === true,
-    head,
+    head: textOf(value.headRefOid),
     mergeSha: textOf(record(value.mergeCommit).oid),
     mergeState: textOf(value.mergeStateStatus),
     mergeable: textOf(value.mergeable),

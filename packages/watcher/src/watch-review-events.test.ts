@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { type PrComment, type Review, type ReviewThread, approvedEvent, awaitsBotReview, blockedByReviewEvent, botChangeRequestsOnHead, botNames, botReviewed, botsToAskResolve, dismissalMessage, dismissedReviewEvent, resolveAskedEvent, resolveCommand, resolvedThreadEvent, reviewsToDismiss, threadsToResolve } from './watch-review-events'
+import { type PrComment, type Review, type ReviewThread, approvedEvent, awaitsBotReview, blockedByReviewEvent, botNames, botReviewed, botsToAskResolve, dismissalMessage, dismissedReviewEvent, resolveAskedEvent, resolveCommand, resolvedThreadEvent, reviewsToDismiss, threadsToResolve } from './watch-review-events'
 
 const HEAD = 'abcdef1234567890abcdef1234567890abcdef12'
 const OLD = '1234567890abcdef1234567890abcdef12345678'
@@ -220,20 +220,6 @@ describe('awaitsBotReview (#299)', () => {
   })
 })
 
-describe('botChangeRequestsOnHead', () => {
-  it('names each listed bot whose latest counting review requests changes on the head', () => {
-    const reviews = [
-      { commit: HEAD, login: 'coderabbitai[bot]', state: 'CHANGES_REQUESTED' },
-      { commit: HEAD, login: 'coderabbitai[bot]', state: 'COMMENTED' },
-      { commit: HEAD, login: 'other[bot]', state: 'CHANGES_REQUESTED' },
-      { commit: OLD, login: 'stale[bot]', state: 'CHANGES_REQUESTED' },
-      { commit: HEAD, login: 'approved[bot]', state: 'CHANGES_REQUESTED' },
-      { commit: HEAD, login: 'approved[bot]', state: 'APPROVED' },
-    ]
-    expect(botChangeRequestsOnHead(['coderabbitai', 'stale', 'approved'], reviews, HEAD)).toEqual(['coderabbitai'])
-    expect(botChangeRequestsOnHead([], reviews, HEAD)).toEqual([])
-  })
-})
 
 describe('botsToAskResolve', () => {
   const bot = 'coderabbitai[bot]'

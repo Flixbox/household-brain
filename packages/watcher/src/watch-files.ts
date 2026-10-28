@@ -1,7 +1,7 @@
 /* oxlint-disable import/no-nodejs-modules -- Bun has no directory listing or rename of its own; node:fs/promises is built into Bun */
 /** Where the project watchers on this machine keep their files, and how they write and tidy them. */
 import { mkdir, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import path from 'node:path'
 import { ignoreFailure, isRecord } from './read'
 
 const stateHome = process.env.XDG_STATE_HOME ?? `${process.env.HOME ?? '.'}/.local/state`
@@ -39,13 +39,13 @@ export const removeOlder = async (dir: string, maxAge: Temporal.Duration): Promi
 }
 
 /**
- * Creates the empty file `path` unless it is there, for something only one watcher on this machine may
+ * Creates the empty file `file` unless it is there, for something only one watcher on this machine may
  * do (#303): true for the one that created it, false where it was there already. Any other failure
  * fails, so nothing is done on a claim that couldn't be made. `unclaim` gives it back.
  */
-export const claim = async (path: string): Promise<boolean> => {
-  await mkdir(dirname(path), { recursive: true })
-  return writeFile(path, '', { flag: 'wx' }).then(() => true, (error: unknown) => {
+export const claim = async (file: string): Promise<boolean> => {
+  await mkdir(path.dirname(file), { recursive: true })
+  return writeFile(file, '', { flag: 'wx' }).then(() => true, (error: unknown) => {
     if (isRecord(error) && error.code === 'EEXIST') {
       return false
     }
@@ -53,4 +53,4 @@ export const claim = async (path: string): Promise<boolean> => {
   })
 }
 
-export const unclaim = async (path: string): Promise<void> => rm(path, { force: true })
+export const unclaim = async (file: string): Promise<void> => rm(file, { force: true })

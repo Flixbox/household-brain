@@ -3,8 +3,7 @@
 import { FOLLOW_NEWER, type MainRun, type Run, cancelledDeployEvent, mainRunEvent, replacementCandidates, runEvent } from './watch-events'
 import { type PrState, REPO, SELF, containsCommit, jobLines, mainAhead, mainHead, mainRuns, mergeCommand, newestMainRun, openPrs, prStates, readyCommand, recentlyMerged, resolveThread, runOf } from './watch-github'
 import { REVIEW_BOTS, approvedEvent, awaitsBotReview, blockedByReviewEvent, resolvedThreadEvent } from './watch-review-events'
-import { DISMISS_STALE_BOT_REVIEWS, dismissStale, reviewBlockers } from './watch-dismiss'
-import { askBotsToResolve } from './watch-resolve'
+import { DISMISS_STALE_BOT_REVIEWS, askBotsToResolve, dismissStale, reviewBlockers } from './watch-dismiss'
 import { FOLLOW, checkCode, flush, queue, quiet, report, reportLookups } from './watch-output'
 import { addLine, readLines, start, updateLines, writeLines } from './watch-state'
 import { checkActivity as checkPrActivity, checkTrackedActivity } from './watch-activity'
@@ -192,7 +191,6 @@ const checkOpen = async (pr: number, state: PrState): Promise<void> => {
   await resolveAsked(pr, state)
   await (reviewNews ? checkReview(pr, state) : Promise.resolve())
   await checkRun(pr, state.head, 'pr')
-  // After CI, whose result it needs: a settled bot change request is asked to be resolved (#303).
   await (reviewNews ? checkReady(pr, state).then(async () => askBotsToResolve(pr, state)).then(async () => checkMoved(pr, state.head)) : Promise.resolve())
 }
 
