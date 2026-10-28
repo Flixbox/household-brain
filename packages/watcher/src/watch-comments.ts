@@ -1,18 +1,8 @@
-/** The project watcher's questions to GitHub about comments: on pull requests, in reviews and on issues. */
-import { ACTIVITY_GH, IGNORED, OWNER, REPO, SELF, gh, login, perPr } from './watch-github'
-import { ACTIVITY_FIELDS, activityFrom, commentText } from './watch-comment-lines'
-import type { Activity } from './watch-events'
+/** The project watcher's questions to GitHub about new issues and the owner's comments on them. */
+import { OWNER, REPO, SELF, gh, login } from './watch-github'
+import { commentText } from './watch-comment-lines'
 import { count, oneLine, record, records } from './watch-text'
 import { textOf } from './read'
-
-/**
- * Comments, reviews (not plain approvals, each with its line comments) and review comments on each PR
- * asked about, the agent's own left out (see `activityFrom`). Read through GraphQL (#306), twenty PRs to
- * a query, so a reviewed PR's hundred reviews of a hundred line comments each stay within GitHub's
- * limits; a PR that couldn't be read is missing.
- */
-export const activitiesOf = async (prs: readonly number[]): Promise<Map<number, Activity[]>> =>
-  perPr(prs, ACTIVITY_FIELDS, value => activityFrom(value, { ignored: IGNORED, owner: OWNER, self: SELF }), { cli: ACTIVITY_GH, size: 20 })
 
 /**
  * New issues (not the agent's own) and the owner's comments on issues, newest first, each with when

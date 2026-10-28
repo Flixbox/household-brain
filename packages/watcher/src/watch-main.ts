@@ -6,11 +6,10 @@ import { REVIEW_BOTS, approvedEvent, awaitsBotReview, blockedByReviewEvent, reso
 import { DISMISS_STALE_BOT_REVIEWS, askBotsToResolve, dismissStale, reviewBlockers } from './watch-dismiss'
 import { FOLLOW, checkCode, flush, queue, quiet, report, reportLookups } from './watch-output'
 import { addLine, readLines, start, updateLines, writeLines } from './watch-state'
-import { checkActivity as checkPrActivity, checkTrackedActivity } from './watch-activity'
+import { activitiesOf, checkActivity as checkPrActivity, checkTrackedActivity } from './watch-activity'
 import { checkNotQueued, checkQueue } from './watch-queue'
 import { checkIssueStates, checkIssues } from './watch-issues'
 import { allSettled, hasText, ignoreFailure } from './read'
-import { activitiesOf } from './watch-comments'
 
 const [limitMinutes = '20', maxHours = '12'] = process.argv.slice(2).filter(arg => arg !== '--follow')
 if (!/^\d+$/u.test(limitMinutes) || !/^\d+$/u.test(maxHours)) {
@@ -195,7 +194,6 @@ const checkOpen = async (pr: number, state: PrState, items: Activity[] | undefin
   await (reviewNews ? checkReady(pr, state).then(async () => askBotsToResolve(pr, state)).then(async () => checkMoved(pr, state.head)) : Promise.resolve())
 }
 
-/** A PR's state and its comments and reviews (`items`), both read at the start of the round. */
 const checkPr = async (pr: number, state: PrState | undefined, items: Activity[] | undefined): Promise<void> => {
   if (!state) {
     round.complete = false
@@ -235,7 +233,6 @@ const checkPrs = async (): Promise<void> => {
   if (!prs) {
     return
   }
-  // Each in batched GraphQL queries (#235, #306), not REST calls per PR.
   const [states, activities] = await Promise.all([prStates(prs), activitiesOf(prs)])
   round.complete = true
   // All at once (#240): a slow PR holds back only its own events; GH_PARALLEL caps the calls.

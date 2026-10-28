@@ -22,6 +22,9 @@ export const ACTIVITY_FIELDS = `comments(last:100){nodes{databaseId body url cre
 /** The line a review comment is on; one on an outdated diff only has its original line. */
 const lineOf = (item: Json) => [item.line, item.originalLine].find((value): value is number => typeof value === 'number')
 
+/** Who wrote a comment or review, and when. */
+const by = (item: Json) => byline(actor(item.author), item.submittedAt ?? item.createdAt)
+
 interface People {
   /** Whose comments are no news: the agent's own and other bots' status comments. */
   ignored: ReadonlySet<string>
@@ -37,7 +40,6 @@ interface People {
  */
 export const activityFrom = (pr: Json, { ignored, owner, self }: People): Activity[] => {
   const text = (item: Json, indent?: string) => commentText(item, { author: actor(item.author), indent, owner })
-  const by = (item: Json) => byline(actor(item.author), item.submittedAt ?? item.createdAt)
   const reviews = records(at(pr, 'reviews', 'nodes'))
   const reviewComments = reviews.flatMap(review => records(at(review, 'comments', 'nodes')))
     .toSorted((first, second) => count(first.databaseId) - count(second.databaseId))
@@ -48,7 +50,7 @@ export const activityFrom = (pr: Json, { ignored, owner, self }: People): Activi
       .map(item => ({
         id: `review ${count(item.databaseId)}`,
         lines: [`review ${count(item.databaseId)} ${by(item)} ${textOf(item.state)}:`, ...text(item),
-          ...records(at(item, 'comments', 'nodes')).flatMap(comment => [`  ${textOf(comment.path)}:${lineOf(comment) ?? 'file'}:`, ...text(comment, '      ')])],
+          ...records(at(item, 'comments', 'nodes')).flatMap(comment => [`  ${textOf(comment.path)}:${lineOf(comment) ?? 'file'}:`].concat(text(comment, '      ')))],
       })),
     ...reviewComments.filter(item => actor(item.author) !== self || !isRecord(item.replyTo))
       .map(item => ({ id: `review-comment ${count(item.databaseId)}`, lines: [`review-comment ${count(item.databaseId)} ${by(item)} ${textOf(item.path)}:`, ...text(item)] })),

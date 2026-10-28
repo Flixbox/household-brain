@@ -1,9 +1,19 @@
 /** The project watcher's look at a pull request's comments and reviews (watch-project.ts). */
 import { type Activity, newActivity } from './watch-events'
+import { ACTIVITY_FIELDS, activityFrom } from './watch-comment-lines'
+import { ACTIVITY_GH, IGNORED, OWNER, SELF, perPr } from './watch-github'
 import { appendLines, exists, oneAtATime, readLines, writeLines } from './watch-state'
-import { activitiesOf } from './watch-comments'
 import { allSettled } from './read'
 import { queue } from './watch-output'
+
+/**
+ * Comments, reviews (not plain approvals, each with its line comments) and review comments on each PR
+ * asked about, the agent's own left out (see `activityFrom`). Read through GraphQL (#306), twenty PRs to
+ * a query, so a reviewed PR's hundred reviews of a hundred line comments each stay within GitHub's
+ * limits; a PR that couldn't be read is missing.
+ */
+export const activitiesOf = async (prs: readonly number[]): Promise<Map<number, Activity[]>> =>
+  perPr(prs, { cli: ACTIVITY_GH, fields: ACTIVITY_FIELDS, parse: value => activityFrom(value, { ignored: IGNORED, owner: OWNER, self: SELF }), size: 20 })
 
 /** The comments of a PR already reported. On the very first round, the ones already there are old news. */
 const seenActivity = async (pr: number, items: Activity[]): Promise<Set<string>> => {

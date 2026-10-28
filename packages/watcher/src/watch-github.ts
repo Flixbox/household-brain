@@ -105,8 +105,8 @@ export const graphql = async (fields: string, fresh = false, cli = GH): Promise<
  * through. A PR that couldn't be read is missing from the answer; its caller tries again next look. If
  * a batch fails (one PR GitHub won't answer for fails it all), each of its PRs is asked alone.
  */
-export const perPr = async <Value>(prs: readonly number[], fields: string, parse: (value: Json) => Value,
-  { cli = GH, fresh = false, size }: { cli?: string, fresh?: boolean, size: number }): Promise<Map<number, Value>> => {
+export const perPr = async <Value>(prs: readonly number[],
+  { cli = GH, fields, fresh = false, parse, size }: { cli?: string, fields: string, fresh?: boolean, parse: (value: Json) => Value, size: number }): Promise<Map<number, Value>> => {
   const ask = async (batch: readonly number[]): Promise<[number, Value][]> => {
     const repository = await graphql(batch.map(pr => `pr${pr}: pullRequest(number: ${pr}) { ${fields} }`).join(' '), fresh, cli)
     return batch.flatMap((pr): [number, Value][] => {
@@ -196,7 +196,7 @@ const stateOf = (value: Json): PrState => {
  * is missing. `fresh` asks GitHub even when another watcher just did (#264).
  */
 export const prStates = async (prs: readonly number[], fresh = false): Promise<Map<number, PrState>> =>
-  perPr(prs, PR_FIELDS, stateOf, { fresh, size: 50 })
+  perPr(prs, { fields: PR_FIELDS, fresh, parse: stateOf, size: 50 })
 
 export const openPrs = async (): Promise<OpenPr[]> => {
   const [listed, queue] = await Promise.all([
