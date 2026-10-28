@@ -4,6 +4,7 @@ import type { QueueEntry } from './watch-queue-events'
 import { type ReviewThread, threadsToResolve } from './watch-review-events'
 import { allIssueNumbers, goneIssueLine, isGone, isMoved, issueEventLine, issuePage } from './watch-issue-events'
 import { GH, failedStatus, ghText } from './watch-gh'
+import { ownerOfRepo } from './watch-owner'
 import { hasText, isRecord, textOf } from './read'
 import { type Json, count, oneLine, record, records } from './watch-text'
 
@@ -42,8 +43,8 @@ const WORKFLOW = process.env.WORKFLOW ?? 'ci.yml'
 // visible to its author, and the owner leaves those.
 export const ACTIVITY_GH = process.env.ACTIVITY_GH ?? 'gh'
 // OWNER: whose issue comments are news, and whose approval counts as one (#277); by default the
-// repository's owner.
-export const OWNER = process.env.OWNER ?? REPO.split('/')[0] ?? ''
+// repository's owner, or for an organisation's repository its one human admin (#295).
+export const OWNER = process.env.OWNER ?? await ownerOfRepo(REPO)
 // SELF: the agent's own login. Its comments and replies in review threads are not news to it; its
 // reviews (a reviewer agent posting as the same login) still are. None by default.
 export const SELF = process.env.SELF ?? ''

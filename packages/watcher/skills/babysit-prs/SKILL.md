@@ -47,7 +47,10 @@ default branch's CI, new issues, the owner's comments on issues, and issues clos
   - `GH`: the `gh` to ask with, e.g. a wrapper logged in as a bot. Plain `gh` by default.
   - `REPO`: `owner/name`. By default, the repository `gh` finds in the current folder.
   - `WORKFLOW`: the CI workflow file whose runs are followed (`ci.yml` by default).
-  - `OWNER`: whose issue comments are news (the repository's owner by default).
+  - `OWNER`: whose issue comments are news and whose approval counts. By default the repository's
+    owner; when an organisation owns it, its one human admin (bots left out, #295). With no human
+    admin or several, it stays the organisation, so no approval counts, and the watcher says so once
+    at the start: set `OWNER` then.
   - `ACTIVITY_GH`: the `gh` that reads comments; plain `gh` by default, because only the owner's own
     login sees their pending (unsubmitted) review.
   - `GH_TIMEOUT_SECONDS`: how long one `gh` call may take (30 by default); a slower one counts as a
