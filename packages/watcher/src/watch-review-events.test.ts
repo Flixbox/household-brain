@@ -220,7 +220,6 @@ describe('awaitsBotReview (#299)', () => {
   })
 })
 
-
 describe('botsToAskResolve', () => {
   const bot = 'coderabbitai[bot]'
   const ask = (changes: Partial<Parameters<typeof botsToAskResolve>[0]> = {}) => botsToAskResolve({

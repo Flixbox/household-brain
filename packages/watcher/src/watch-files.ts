@@ -1,7 +1,7 @@
 /* oxlint-disable import/no-nodejs-modules -- Bun has no directory listing or rename of its own; node:fs/promises is built into Bun */
 /** Where the project watchers on this machine keep their files, and how they write and tidy them. */
 import { mkdir, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
-import path from 'node:path'
+import nodePath from 'node:path'
 import { ignoreFailure, isRecord } from './read'
 
 const stateHome = process.env.XDG_STATE_HOME ?? `${process.env.HOME ?? '.'}/.local/state`
@@ -44,7 +44,7 @@ export const removeOlder = async (dir: string, maxAge: Temporal.Duration): Promi
  * fails, so nothing is done on a claim that couldn't be made. `unclaim` gives it back.
  */
 export const claim = async (file: string): Promise<boolean> => {
-  await mkdir(path.dirname(file), { recursive: true })
+  await mkdir(nodePath.dirname(file), { recursive: true })
   return writeFile(file, '', { flag: 'wx' }).then(() => true, (error: unknown) => {
     if (isRecord(error) && error.code === 'EEXIST') {
       return false
