@@ -76,6 +76,15 @@ default branch's CI, new issues, the owner's comments on issues, and issues clos
     no thread (#290). Its dismissal message quotes those replies; a newer review of the bot needs its
     own. Off by default, when `BLOCKED_BY_REVIEW` names it for the owner to dismiss. A person's
     change request is never dismissed. The `GH` token must be allowed to write pull requests.
+  - `RESOLVE_BOT_REVIEWS`: the review bots to ask with `@<bot> resolve` (`coderabbitai`, with or
+    without `[bot]`; comma-separated) (#303). A bot like CodeRabbit decides on approving only when it
+    reviews a new commit, so a settled change request never turns into its approval by itself. Once
+    its latest review on the head requests changes, every review thread is resolved and CI passed at
+    the head, the watcher posts `@<bot> resolve` on the PR, once per head commit (`BOT_RESOLVE_ASKED`).
+    It reads no risk rating: whatever the merge risk, it asks, and the bot's own settings
+    (CodeRabbit's `max_merge_risk`) decide whether it approves. Not for a draft, a PR the owner
+    opened, or one the owner approved (`DISMISS_STALE_BOT_REVIEWS` handles that one). None by
+    default. The `GH` token must be allowed to comment on pull requests.
   - `CLAUDE_CONFIG_DIR`: where the Claude login lives (`~/.claude` by default). Every notification
     ends with the owner's Claude usage (`Usage: session 12% used (88% left, resets 2026-10-17 14:10), week 66% used (34% left, resets …)`,
     the windows `/usage` shows: how much is used and left, and when each resets),
@@ -113,6 +122,8 @@ approved one whose auto-merge is still off and that isn't in the merge queue, no
 | `BLOCKED_BY_REVIEW` | The owner approved and CI is green (even while GitHub still says changes requested), but GitHub won't merge it, and the reviews are why. For each thread it names (answered by the agent, still open): check the answer settles it, then reply `Resolved: <reason>` in it (the watcher resolves it), or ask the owner. For each change request it names (still counted until dismissed): check its points are dealt with. Where `DISMISS_STALE_BOT_REVIEWS=1`, the watcher dismisses a bot's change request itself (`REVIEW_DISMISSED`): one left on an older commit once no thread is open (resolved, or ending in a `Resolved:` reply, #285), one on the head once you settle it with a `Resolved: <reason>` reply in each of its threads, or on the PR when it has none (#290). Otherwise ask the owner on the PR to dismiss it. |
 | `THREAD_RESOLVED` | The watcher resolved a review thread on a `Resolved: <reason>` reply (anyone's, #279). Nothing to do. |
 | `REVIEW_DISMISSED` | With `DISMISS_STALE_BOT_REVIEWS=1`, the watcher dismissed a bot's change request left on an older commit (the owner approved, no thread open, #285), or on the head once `Resolved:` replies settled it (#290). Nothing to do. |
+| `BOT_RESOLVE_ASKED` | With `RESOLVE_BOT_REVIEWS` set, the watcher posted `@<bot> resolve` on a PR whose bot change request on the head is settled (every thread resolved, CI green, #303). Nothing to do: the bot resolves its threads and approves if its own risk limit allows; if it doesn't approve, the PR waits for the owner as before. |
+| `BOT_RESOLVE_FAILED` | The watcher couldn't post that comment; it tries again on every look. Repeated, its `GH` token likely can't comment on pull requests: tell the owner. |
 | `REVIEW_DISMISS_FAILED` | The watcher couldn't dismiss such a change request; it tries again on every look. Repeated, its `GH` token likely can't write pull requests: tell the owner. |
 | `THREAD_RESOLVE_FAILED` | The watcher couldn't resolve such a thread; it tries again on every look. Repeated, its `GH` token likely can't write pull requests: tell the owner. |
 | `QUEUED` | The PR entered the merge queue (with its position). Nothing to do; no auto-merge reminders come for it while it is there. |
