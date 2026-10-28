@@ -73,9 +73,19 @@ repository), never with the owner's account.
 
 ### Before pushing
 
-- **Don't run locally what CI runs** (owner's rule, #308): lint, type check, unit and e2e tests run
-  on every push. Push and let CI check; run them locally only to reproduce a CI failure. Tools that
-  fix things (a formatter writing files) are fine to run.
+- **Don't rerun locally what CI runs** (owner's rule, #308): CI runs `bun run lint`, `bun run test`
+  (which type-checks first), the build and the e2e suite on every push, so push and let CI check.
+  Run them locally only to reproduce a CI failure. `bun run lint:fix` writes its fixes (oxlint's and
+  the package-file lint's) and is fine to run.
+- **Write code that passes oxlint the first time;** these traps cost PRs a CI round (#307, #310):
+  - object keys sorted (`eslint/sort-keys`), and members of an import (`eslint/sort-imports`);
+  - never write the identifier `undefined` (`eslint/no-undefined`): no `x === undefined`, no
+    `undefined` argument or value. Use `null` for "nothing", `typeof x === 'undefined'` to test a
+    value, and `Object.hasOwn` to test whether a property is there at all;
+  - small functions (`eslint/max-lines-per-function`, `eslint/max-statements`,
+    `sonarjs/cognitive-complexity`): split a long helper into named steps up front;
+  - shallow nesting (`eslint/max-depth`, `sonarjs/no-nested-functions`,
+    `sonarjs/no-nested-conditional` for nested ternaries, `unicorn/max-nested-calls`, set to 4 deep here).
 - **One push per batch of changes:** each push cancels the branch's running CI.
 - **Never pipe a command whose exit code matters** (`bun run lint | tail` succeeded on a failing
   lint once); use `set -o pipefail` or `${PIPESTATUS[0]}`.
