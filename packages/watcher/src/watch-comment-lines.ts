@@ -39,7 +39,7 @@ interface People {
  * the agent's own left out. A review's line comments come under it, as `path:line:`.
  */
 export const activityFrom = (pr: Json, { ignored, owner, self }: People): Activity[] => {
-  const text = (item: Json, indent?: string) => commentText(item, { author: actor(item.author), indent, owner })
+  const text = (item: Json, indent = '    ') => commentText(item, { author: actor(item.author), indent, owner })
   const reviews = records(at(pr, 'reviews', 'nodes'))
   const reviewComments = reviews.flatMap(review => records(at(review, 'comments', 'nodes')))
     .toSorted((first, second) => count(first.databaseId) - count(second.databaseId))
