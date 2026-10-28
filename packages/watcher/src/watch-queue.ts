@@ -40,23 +40,25 @@ export const checkQueue = async (): Promise<void> => {
   await (await exists('queued') ? checkChanges(entries, now) : writeLines('queued', now))
 }
 
+/** Whether a PR waits for the merge queue to take it (#305); never where the branch has no queue. */
+const waitsForQueue = (state: PrState): boolean => MERGE_QUEUE && state.state === 'OPEN' && !state.draft && !state.parked
+  && !state.queued && state.ownerApproved && state.checksPassed && state.autoMerge && state.mergeState === 'CLEAN'
+
 /**
  * A PR that should be in the merge queue but isn't (#305): open, not a draft or parked, approved by the
- * owner, CI green at its head, merge state CLEAN and auto-merge on. Reported once it has stayed so for
- * NOT_QUEUED_MINUTES, timed in the `unqueued` state file from the first look that saw it; any other
- * state (merged, queued, a new push) drops its line. Nothing to do where the branch has no queue.
+ * owner, every check passed, merge state CLEAN and auto-merge on. Timed in the `unqueued` state file
+ * from the first look that saw it so; once it has waited NOT_QUEUED_MINUTES, GitHub is asked once more,
+ * fresh, so a PR that just entered the queue isn't reported.
  */
-export const checkNotQueued = async (pr: number, state: PrState, green: boolean): Promise<void> => {
-  if (!MERGE_QUEUE) {
-    return
-  }
-  const waiting = state.state === 'OPEN' && !state.draft && !state.parked && !state.queued && state.ownerApproved && green
-    && state.autoMerge && state.mergeState === 'CLEAN'
+export const checkNotQueued = async (pr: number, state: PrState): Promise<void> => {
   const found = { overdue: false }
   await updateLines('unqueued', lines => {
-    const after = unqueuedLines({ head: state.head, lines, now: Temporal.Now.instant(), pr, waiting })
+    const after = unqueuedLines({ head: state.head, lines, now: Temporal.Now.instant(), pr, waiting: waitsForQueue(state) })
     found.overdue = after.overdue
     return after.lines
   })
-  await report(found.overdue ? notQueuedEvent({ gh: GH, head: state.head, id: state.id, pr }) : null, pr)
+  // A fresh state that can't be read reports nothing: the next look asks again.
+  const fresh = found.overdue ? await prStates([pr], true).then(states => states.get(pr), () => undefined) : undefined
+  const still = fresh !== undefined && fresh.head === state.head && waitsForQueue(fresh)
+  await report(still ? notQueuedEvent({ gh: GH, head: state.head, id: state.id, pr }) : null, pr)
 }

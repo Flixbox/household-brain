@@ -177,6 +177,8 @@ export interface PrState {
   autoMerge: boolean
   draft: boolean
   botReviewed: boolean
+  /** Every check on the head passed, as GitHub sums them up now (#305): a re-run that fails undoes it. */
+  checksPassed: boolean
   parked: boolean
   queued: boolean
   title: string
@@ -196,7 +198,7 @@ export const threadsFrom = (value: unknown): ReviewThread[] => records(at(value,
   const review = count(at(records(at(thread, 'first', 'nodes'))[0], 'pullRequestReview', 'databaseId'))
   return { id: textOf(thread.id), lastAuthor: actor(last.author), lastBody: textOf(last.body), resolved: thread.isResolved === true, review, url: textOf(last.url) }
 })
-const PR_FIELDS = 'id isDraft isInMergeQueue state mergeable mergeStateStatus headRefOid mergeCommit { oid } reviewDecision autoMergeRequest { enabledAt } title'
+const PR_FIELDS = 'id isDraft isInMergeQueue state mergeable mergeStateStatus headRefOid commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } mergeCommit { oid } reviewDecision autoMergeRequest { enabledAt } title'
   + ` labels(first: 100) { nodes { name } } author { login kind: __typename } reviews(last: 100) { nodes { state commit { oid } author { login kind: __typename } } } ${THREAD_FIELDS}`
 const PRS_PER_QUERY = 50
 
@@ -208,6 +210,7 @@ const stateOf = (value: Json): PrState => {
   return {
     autoMerge: isRecord(value.autoMergeRequest),
     botReviewed: botReviewed(REVIEW_BOTS, records(record(value.reviews).nodes), textOf(value.headRefOid)),
+    checksPassed: at(records(at(value, 'commits', 'nodes')).at(-1), 'commit', 'statusCheckRollup', 'state') === 'SUCCESS',
     // GitHub leaves `reviewDecision` empty under a ruleset (#197), and counts anyone's approval: the
     // reviews decide, an approval counting only from the owner (#277).
     decision: decisionFrom(textOf(value.reviewDecision), reviews, OWNER),

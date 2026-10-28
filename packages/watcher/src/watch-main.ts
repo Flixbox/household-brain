@@ -208,9 +208,8 @@ const checkPr = async (pr: number, state: PrState | undefined): Promise<void> =>
     return
   }
   await checkByState(pr, state)
-  // After its CI result is in, whatever its state: a merged or closed PR no longer waits for the queue (#305).
-  const green = (await readLines('reported')).includes(`pr-${pr} ci-passed ${state.head}`)
-  await checkNotQueued(pr, state, green)
+  // Whatever its state: a merged or closed PR no longer waits for the queue (#305).
+  await checkNotQueued(pr, state)
 }
 
 /** Open PRs, the ones followed until their deploy, and recently merged ones; null when a listing failed. */

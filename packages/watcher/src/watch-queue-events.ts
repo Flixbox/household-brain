@@ -35,9 +35,11 @@ export const dequeuedEvent = (pr: number, enqueuedAt: string, reason: string): E
 export const NOT_QUEUED_MINUTES = 5
 
 /**
- * The `unqueued` state file after a look at PR `pr` (#305): `<pr> <head> <since>` for each PR seen
- * waiting outside the queue, from the first look that saw it so at that head. A PR no longer waiting
- * (queued, merged, a new push, auto-merge off) loses its line; `overdue` says it has waited too long.
+ * The `unqueued` state file after a look at PR `pr` (#305): `<pr> <head> <since> <seen>` for each PR
+ * seen waiting outside the queue, timed from the first look that saw it so at that head, and when a
+ * look last did. A PR no longer waiting (queued, merged, a new push, auto-merge off) loses its line, and
+ * so does a wait no look saw for NOT_QUEUED_MINUTES (the watcher was stopped: it may have been queued
+ * meanwhile), which starts again. `overdue` says it has waited too long.
  */
 export const unqueuedLines = ({ head, lines, now, pr, waiting }: { head: string, lines: readonly string[], now: Temporal.Instant, pr: number, waiting: boolean }): { lines: string[], overdue: boolean } => {
   const mine = (line: string) => line.split(' ')[0] === String(pr)
@@ -45,10 +47,10 @@ export const unqueuedLines = ({ head, lines, now, pr, waiting }: { head: string,
   if (!waiting) {
     return { lines: others, overdue: false }
   }
-  const kept = lines.find(line => mine(line) && line.split(' ')[1] === head)
-  const since = kept?.split(' ')[2] ?? now.toString()
-  const overdue = Temporal.Instant.compare(Temporal.Instant.from(since).add({ minutes: NOT_QUEUED_MINUTES }), now) <= 0
-  return { lines: [...others, `${pr} ${head} ${since}`], overdue }
+  const minutesAgo = (at: string) => Temporal.Instant.from(at).until(now).total('minutes')
+  const [, , since = now.toString(), seen = ''] = lines.find(line => mine(line) && line.split(' ')[1] === head)?.split(' ') ?? []
+  const start = seen !== '' && minutesAgo(seen) < NOT_QUEUED_MINUTES ? since : now.toString()
+  return { lines: [...others, `${pr} ${head} ${start} ${now.toString()}`], overdue: minutesAgo(start) >= NOT_QUEUED_MINUTES }
 }
 
 /**

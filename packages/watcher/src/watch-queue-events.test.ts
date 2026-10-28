@@ -24,18 +24,21 @@ describe('a PR that never joins the merge queue (#305)', () => {
   const later = (minutes: number) => start.add({ minutes })
 
   it('starts timing a waiting PR on the first look, and is overdue only after the wait', () => {
-    const first = unqueuedLines({ head: 'abc', lines: ['8 def 2026-10-28T11:00:00Z'], now: start, pr: 7, waiting: true })
-    expect(first).toEqual({ lines: ['8 def 2026-10-28T11:00:00Z', '7 abc 2026-10-28T12:00:00Z'], overdue: false })
-    expect(unqueuedLines({ head: 'abc', lines: first.lines, now: later(NOT_QUEUED_MINUTES - 1), pr: 7, waiting: true }).overdue).toBe(false)
-    expect(unqueuedLines({ head: 'abc', lines: first.lines, now: later(NOT_QUEUED_MINUTES), pr: 7, waiting: true })).toEqual({ lines: first.lines, overdue: true })
+    const first = unqueuedLines({ head: 'abc', lines: ['8 def t0 t0'], now: start, pr: 7, waiting: true })
+    expect(first).toEqual({ lines: ['8 def t0 t0', `7 abc ${start.toString()} ${start.toString()}`], overdue: false })
+    const second = unqueuedLines({ head: 'abc', lines: first.lines, now: later(NOT_QUEUED_MINUTES - 1), pr: 7, waiting: true })
+    expect(second).toEqual({ lines: ['8 def t0 t0', `7 abc ${start.toString()} ${later(NOT_QUEUED_MINUTES - 1).toString()}`], overdue: false })
+    expect(unqueuedLines({ head: 'abc', lines: second.lines, now: later(NOT_QUEUED_MINUTES), pr: 7, waiting: true }).overdue).toBe(true)
   })
 
-  it('starts again on a new head, and forgets a PR that no longer waits', () => {
-    const lines = ['7 abc 2026-10-28T12:00:00Z', '8 def 2026-10-28T11:00:00Z']
-    expect(unqueuedLines({ head: 'new', lines, now: later(30), pr: 7, waiting: true })).toEqual({ lines: ['8 def 2026-10-28T11:00:00Z', '7 new 2026-10-28T12:30:00Z'], overdue: false })
-    expect(unqueuedLines({ head: 'abc', lines, now: later(30), pr: 7, waiting: false })).toEqual({ lines: ['8 def 2026-10-28T11:00:00Z'], overdue: false })
+  it('starts again on a new head, or after no look saw it for the wait, and forgets a PR that no longer waits', () => {
+    const lines = [`7 abc ${start.toString()} ${start.toString()}`, '8 def t0 t0']
+    expect(unqueuedLines({ head: 'new', lines, now: later(1), pr: 7, waiting: true })).toEqual({ lines: ['8 def t0 t0', `7 new ${later(1).toString()} ${later(1).toString()}`], overdue: false })
+    // The watcher was stopped for a while: the PR may have been queued and dequeued meanwhile.
+    expect(unqueuedLines({ head: 'abc', lines, now: later(30), pr: 7, waiting: true })).toEqual({ lines: ['8 def t0 t0', `7 abc ${later(30).toString()} ${later(30).toString()}`], overdue: false })
+    expect(unqueuedLines({ head: 'abc', lines, now: later(1), pr: 7, waiting: false })).toEqual({ lines: ['8 def t0 t0'], overdue: false })
     // A PR number that starts another's (7 and 70) is a different PR.
-    expect(unqueuedLines({ head: 'x', lines: ['70 x 2026-10-28T12:00:00Z'], now: start, pr: 7, waiting: false }).lines).toEqual(['70 x 2026-10-28T12:00:00Z'])
+    expect(unqueuedLines({ head: 'x', lines: ['70 x t0 t0'], now: start, pr: 7, waiting: false }).lines).toEqual(['70 x t0 t0'])
   })
 
   it('names the enqueuePullRequest mutation with the PR\'s node id, once per head', () => {
