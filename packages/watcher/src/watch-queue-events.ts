@@ -30,3 +30,33 @@ export const dequeuedEvent = (pr: number, enqueuedAt: string, reason: string): E
   key: `pr-${pr} dequeued ${enqueuedAt}`,
   lines: [`DEQUEUED: left the merge queue without merging (${reason || 'GitHub gives no reason'}): fix what it says, then queue it again`],
 })
+
+/** How long an approved, green, CLEAN PR with auto-merge on may stay outside the queue before it is news (#305). */
+export const NOT_QUEUED_MINUTES = 5
+
+/**
+ * The `unqueued` state file after a look at PR `pr` (#305): `<pr> <head> <since>` for each PR seen
+ * waiting outside the queue, from the first look that saw it so at that head. A PR no longer waiting
+ * (queued, merged, a new push, auto-merge off) loses its line; `overdue` says it has waited too long.
+ */
+export const unqueuedLines = ({ head, lines, now, pr, waiting }: { head: string, lines: readonly string[], now: Temporal.Instant, pr: number, waiting: boolean }): { lines: string[], overdue: boolean } => {
+  const mine = (line: string) => line.split(' ')[0] === String(pr)
+  const others = lines.filter(line => !mine(line))
+  if (!waiting) {
+    return { lines: others, overdue: false }
+  }
+  const kept = lines.find(line => mine(line) && line.split(' ')[1] === head)
+  const since = kept?.split(' ')[2] ?? now.toString()
+  const overdue = Temporal.Instant.compare(Temporal.Instant.from(since).add({ minutes: NOT_QUEUED_MINUTES }), now) <= 0
+  return { lines: [...others, `${pr} ${head} ${since}`], overdue }
+}
+
+/**
+ * Approved, green, CLEAN and auto-merge on, yet GitHub never put it into the merge queue (#305): seen
+ * on PRs whose change request was dismissed, or that were rebased after a conflict. Enabling auto-merge
+ * again doesn't help; the `enqueuePullRequest` mutation queues it at once. Once per head commit.
+ */
+export const notQueuedEvent = ({ gh, head, id, pr }: { gh: string, head: string, id: string, pr: number }): Event => ({
+  key: `pr-${pr} not-queued ${head}`,
+  lines: [`NOT_QUEUED: approved, CI green, merge state CLEAN and auto-merge on at ${head.slice(0, 7)}, but not in the merge queue after ${NOT_QUEUED_MINUTES} min: queue it with ${gh} api graphql -f query='mutation{enqueuePullRequest(input:{pullRequestId:"${id}"}){mergeQueueEntry{position}}}'`],
+})

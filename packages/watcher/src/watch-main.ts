@@ -7,7 +7,7 @@ import { DISMISS_STALE_BOT_REVIEWS, askBotsToResolve, dismissStale, reviewBlocke
 import { FOLLOW, checkCode, flush, queue, quiet, report, reportLookups } from './watch-output'
 import { addLine, readLines, start, updateLines, writeLines } from './watch-state'
 import { checkActivity as checkPrActivity, checkTrackedActivity } from './watch-activity'
-import { checkQueue } from './watch-queue'
+import { checkNotQueued, checkQueue } from './watch-queue'
 import { checkIssueStates, checkIssues } from './watch-issues'
 import { allSettled, hasText, ignoreFailure } from './read'
 
@@ -194,16 +194,23 @@ const checkOpen = async (pr: number, state: PrState): Promise<void> => {
   await (reviewNews ? checkReady(pr, state).then(async () => askBotsToResolve(pr, state)).then(async () => checkMoved(pr, state.head)) : Promise.resolve())
 }
 
-const checkPr = async (pr: number, state: PrState | undefined): Promise<void> => {
-  if (!state) {
-    round.complete = false
-    return
-  }
+const checkByState = async (pr: number, state: PrState): Promise<void> => {
   if (state.state === 'MERGED') {
     await checkMerged(pr, state.mergeSha)
     return
   }
   await (state.state === 'CLOSED' ? checkClosed(pr) : checkOpen(pr, state))
+}
+
+const checkPr = async (pr: number, state: PrState | undefined): Promise<void> => {
+  if (!state) {
+    round.complete = false
+    return
+  }
+  await checkByState(pr, state)
+  // After its CI result is in, whatever its state: a merged or closed PR no longer waits for the queue (#305).
+  const green = (await readLines('reported')).includes(`pr-${pr} ci-passed ${state.head}`)
+  await checkNotQueued(pr, state, green)
 }
 
 /** Open PRs, the ones followed until their deploy, and recently merged ones; null when a listing failed. */

@@ -33,7 +33,7 @@ const mergeQueued = async (): Promise<boolean> => {
   const query = `query={repository(owner:"${owner}",name:"${name}"){mergeQueue{id}}}`
   return ghText(['api', 'graphql', '-f', query, '-q', '.data.repository.mergeQueue.id']).then(text => hasText(text.trim()), () => false)
 }
-const MERGE_QUEUE = await mergeQueued()
+export const MERGE_QUEUE = await mergeQueued()
 
 /** The command that enables auto-merge for a PR, as the events suggest it. */
 export const mergeCommand = (pr: number): string => `${GH} pr merge ${pr} --auto${MERGE_QUEUE ? '' : ' --squash'}`
@@ -169,6 +169,8 @@ export interface PrState {
   /** GitHub's `mergeStateStatus`: `BLOCKED` while a rule (a review, an open thread) holds it back. */
   mergeState: string
   head: string
+  /** GraphQL's node id (`PR_…`), which `enqueuePullRequest` takes (#305). */
+  id: string
   mergeSha: string
   decision: string
   ownerApproved: boolean
@@ -194,7 +196,7 @@ export const threadsFrom = (value: unknown): ReviewThread[] => records(at(value,
   const review = count(at(records(at(thread, 'first', 'nodes'))[0], 'pullRequestReview', 'databaseId'))
   return { id: textOf(thread.id), lastAuthor: actor(last.author), lastBody: textOf(last.body), resolved: thread.isResolved === true, review, url: textOf(last.url) }
 })
-const PR_FIELDS = 'isDraft isInMergeQueue state mergeable mergeStateStatus headRefOid mergeCommit { oid } reviewDecision autoMergeRequest { enabledAt } title'
+const PR_FIELDS = 'id isDraft isInMergeQueue state mergeable mergeStateStatus headRefOid mergeCommit { oid } reviewDecision autoMergeRequest { enabledAt } title'
   + ` labels(first: 100) { nodes { name } } author { login kind: __typename } reviews(last: 100) { nodes { state commit { oid } author { login kind: __typename } } } ${THREAD_FIELDS}`
 const PRS_PER_QUERY = 50
 
@@ -211,6 +213,7 @@ const stateOf = (value: Json): PrState => {
     decision: decisionFrom(textOf(value.reviewDecision), reviews, OWNER),
     draft: value.isDraft === true,
     head: textOf(value.headRefOid),
+    id: textOf(value.id),
     mergeSha: textOf(record(value.mergeCommit).oid),
     mergeState: textOf(value.mergeStateStatus),
     mergeable: textOf(value.mergeable),
