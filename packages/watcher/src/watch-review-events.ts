@@ -3,7 +3,8 @@
  * `Resolved: <reason>` reply asks to resolve (#279), why an approved, green PR still can't merge (#278),
  * the bot change requests it may dismiss where the repository opts in: on an older commit (#285), or
  * on the head once `Resolved:` replies settled them (#290), and what an approval asks for (#298): for
- * a PR approved as a draft, a review bot's review of its head first, where REVIEW_BOTS names bots (#299).
+ * a PR approved as a draft, a review bot's review of its head first, where REVIEW_BOTS names bots (#299),
+ * and which bots to ask with `@<bot> resolve` where RESOLVE_BOT_REVIEWS names them (#303).
  */
 import type { Event } from './watch-events'
 import { type Json, oneLine, record } from './watch-text'
@@ -66,8 +67,8 @@ export interface Dismissal {
 }
 
 /** Each reviewer's latest review that counts (as in `decisionFrom`) when it requests changes: GitHub counts it until it is dismissed. */
-const changeRequests = (reviews: readonly Review[]): Review[] => {
-  const latest = new Map<string, Review>()
+const changeRequests = <Counted extends { login: string, state: string }>(reviews: readonly Counted[]): Counted[] => {
+  const latest = new Map<string, Counted>()
   for (const review of reviews) {
     if (review.state === 'APPROVED' || review.state === 'CHANGES_REQUESTED' || review.state === 'DISMISSED') {
       latest.set(review.login, review)
@@ -219,3 +220,49 @@ export const botReviewed = (bots: readonly string[], reviews: readonly Json[], h
  */
 export const awaitsBotReview = ({ bots, pr, reported, reviewed }: { bots: readonly string[], pr: number, reported: readonly string[], reviewed: boolean }): boolean =>
   bots.length > 0 && !reviewed && reported.some(line => line.startsWith(`pr-${pr} approved-draft `))
+
+// RESOLVE_BOT_REVIEWS: the review bots to ask with `@<bot> resolve` (#303), comma-separated
+// (`coderabbitai` or `coderabbitai[bot]`). None by default: the watcher asks none.
+export const RESOLVE_BOT_REVIEWS = botNames(process.env.RESOLVE_BOT_REVIEWS ?? '')
+
+/** The comment that asks a bot to resolve its threads and approve (#303): CodeRabbit's documented trigger. */
+export const resolveCommand = (login: string): string => `@${bare(login)} resolve`
+
+/**
+ * Of `bots` (in `bare` form), the ones whose latest counting review (as in `changeRequests`) requests
+ * changes on `head`, from reviews with the commit each was left on: the cheap first check, on the PR's
+ * state, before `botsToAskResolve` reads its threads and comments (#303).
+ */
+export const botChangeRequestsOnHead = (bots: readonly string[], reviews: readonly { commit: string, login: string, state: string }[], head: string): string[] =>
+  changeRequests(reviews).filter(review => review.commit === head && bots.includes(bare(review.login))).map(review => bare(review.login))
+
+/**
+ * The bots' change requests on `head` the watcher asks to resolve with `@<bot> resolve` (#303), once
+ * every review thread is resolved and every thread was read (`complete`). Not one already asked for:
+ * a PR comment saying the command after the review (by anyone, another watcher too) settles it. Whether
+ * the bot then approves is the bot's call (CodeRabbit's `max_merge_risk`); the watcher reads no risk
+ * rating. The caller checks the rest: CI green, not a draft, not approved by the owner nor theirs.
+ */
+export const botsToAskResolve = ({ bots, comments, complete, head, reviews, threads }: {
+  bots: readonly string[]
+  comments: readonly PrComment[]
+  complete: boolean
+  head: string
+  reviews: readonly Review[]
+  threads: readonly ReviewThread[]
+}): Review[] => {
+  if (bots.length === 0 || !complete || threads.some(thread => !thread.resolved)) {
+    return []
+  }
+  const asked = (review: Review) => comments.some(comment =>
+    after(comment.createdAt, review.submittedAt) && comment.body.trim().toLowerCase() === resolveCommand(review.login))
+  return changeRequests(reviews).filter(review => review.commit === head && bots.includes(bare(review.login)) && !asked(review))
+}
+
+/** The event for a bot the watcher asked to resolve its change request on `head`, or failed to: reported once per head and bot. */
+export const resolveAskedEvent = ({ asked, head, pr, review }: { asked: boolean, head: string, pr: number, review: Review }): Event => {
+  const what = `${bare(review.login)} (\`${resolveCommand(review.login)}\`) for its change request on ${where(review, head)}`
+  return asked
+    ? { key: `pr-${pr} bot-resolve-asked ${head} ${bare(review.login)}`, lines: [`BOT_RESOLVE_ASKED: asked ${what}: every review thread is resolved and CI is green`] }
+    : { key: `pr-${pr} bot-resolve-failed ${head} ${bare(review.login)}`, lines: [`BOT_RESOLVE_FAILED: couldn't ask ${what} (it tries again on every look); check the GH token may write pull requests`] }
+}

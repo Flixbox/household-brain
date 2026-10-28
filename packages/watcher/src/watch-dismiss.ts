@@ -23,11 +23,12 @@ const THREAD_REVIEW_FIELDS = 'reviewThreads(first:100){pageInfo{hasNextPage} nod
  * A PR's review threads (see `THREAD_REVIEW_FIELDS`), its reviews with the commit each was left on
  * (#278), its id (#285) and when, and its last hundred PR comments, where a review without threads is
  * settled (#290). `complete` says every thread was read: with more, the watcher dismisses nothing.
+ * `fresh` asks GitHub even when another watcher just did (#264), for a comment that must not be posted twice (#303).
  */
-export const reviewBlockers = async (pr: number): Promise<{ comments: PrComment[], complete: boolean, reviews: Review[], threads: ReviewThread[] }> => {
+export const reviewBlockers = async (pr: number, fresh = false): Promise<{ comments: PrComment[], complete: boolean, reviews: Review[], threads: ReviewThread[] }> => {
   const fields = `${THREAD_REVIEW_FIELDS} reviews(last:100){nodes{databaseId state submittedAt commit{oid} author{login kind:__typename}}}`
     + ' comments(last:100){nodes{body url createdAt author{login kind:__typename}}}'
-  const value = record(at(await graphql(`pullRequest(number:${pr}){${fields}}`), 'pullRequest'))
+  const value = record(at(await graphql(`pullRequest(number:${pr}){${fields}}`, fresh), 'pullRequest'))
   return {
     comments: records(at(value, 'comments', 'nodes'))
       .map(comment => ({ author: actor(comment.author), body: textOf(comment.body), createdAt: textOf(comment.createdAt), url: textOf(comment.url) })),

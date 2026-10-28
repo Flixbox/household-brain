@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { type PrComment, type Review, type ReviewThread, approvedEvent, awaitsBotReview, blockedByReviewEvent, botNames, botReviewed, dismissalMessage, dismissedReviewEvent, resolvedThreadEvent, reviewsToDismiss, threadsToResolve } from './watch-review-events'
+import { type PrComment, type Review, type ReviewThread, approvedEvent, awaitsBotReview, blockedByReviewEvent, botChangeRequestsOnHead, botNames, botReviewed, botsToAskResolve, dismissalMessage, dismissedReviewEvent, resolveAskedEvent, resolveCommand, resolvedThreadEvent, reviewsToDismiss, threadsToResolve } from './watch-review-events'
 
 const HEAD = 'abcdef1234567890abcdef1234567890abcdef12'
 const OLD = '1234567890abcdef1234567890abcdef12345678'
@@ -217,5 +217,66 @@ describe('awaitsBotReview (#299)', () => {
   it('never waits without bots named, or for a PR not approved as a draft', () => {
     expect(awaitsBotReview({ ...waiting, bots: [] })).toBe(false)
     expect(awaitsBotReview({ ...waiting, reported: ['pr-70 approved-draft 1234567', 'pr-7 ready 1234567'] })).toBe(false)
+  })
+})
+
+describe('botChangeRequestsOnHead', () => {
+  it('names each listed bot whose latest counting review requests changes on the head', () => {
+    const reviews = [
+      { commit: HEAD, login: 'coderabbitai[bot]', state: 'CHANGES_REQUESTED' },
+      { commit: HEAD, login: 'coderabbitai[bot]', state: 'COMMENTED' },
+      { commit: HEAD, login: 'other[bot]', state: 'CHANGES_REQUESTED' },
+      { commit: OLD, login: 'stale[bot]', state: 'CHANGES_REQUESTED' },
+      { commit: HEAD, login: 'approved[bot]', state: 'CHANGES_REQUESTED' },
+      { commit: HEAD, login: 'approved[bot]', state: 'APPROVED' },
+    ]
+    expect(botChangeRequestsOnHead(['coderabbitai', 'stale', 'approved'], reviews, HEAD)).toEqual(['coderabbitai'])
+    expect(botChangeRequestsOnHead([], reviews, HEAD)).toEqual([])
+  })
+})
+
+describe('botsToAskResolve', () => {
+  const bot = 'coderabbitai[bot]'
+  const ask = (changes: Partial<Parameters<typeof botsToAskResolve>[0]> = {}) => botsToAskResolve({
+    bots: ['coderabbitai'],
+    comments: [],
+    complete: true,
+    head: HEAD,
+    reviews: [review(bot, 'CHANGES_REQUESTED', { id: 5 })],
+    threads: [thread('T1', { resolved: true })],
+    ...changes,
+  }).map(asked => asked.id)
+
+  it('asks a listed bot whose change request on the head has every thread resolved', () => {
+    expect(ask()).toEqual([5])
+    expect(resolveCommand(bot)).toBe('@coderabbitai resolve')
+  })
+
+  it('waits while a thread is open, even one asking to be resolved, or not every thread was read', () => {
+    expect(ask({ threads: [thread('T1', { lastBody: 'Resolved: fixed in abc1234' })] })).toEqual([])
+    expect(ask({ complete: false })).toEqual([])
+  })
+
+  it('leaves out a change request on an older commit, an unlisted bot, and a later approval', () => {
+    expect(ask({ reviews: [review(bot, 'CHANGES_REQUESTED', { commit: OLD })] })).toEqual([])
+    expect(ask({ bots: ['other'] })).toEqual([])
+    expect(ask({ reviews: [review(bot, 'CHANGES_REQUESTED'), review(bot, 'APPROVED', { id: 6 })] })).toEqual([])
+  })
+
+  it('asks once: a `@<bot> resolve` comment after the review, by anyone, settles it', () => {
+    expect(ask({ comments: [comment('someone', ' @CodeRabbitAI resolve ')] })).toEqual([])
+    expect(ask({ comments: [comment(SELF, '@coderabbitai resolve', '2026-10-26T09:00:00Z')] })).toEqual([5])
+    expect(ask({ comments: [comment(SELF, '@coderabbitai resolve please')] })).toEqual([5])
+  })
+})
+
+describe('resolveAskedEvent', () => {
+  it('reports the ask once per head and bot, and a failure under its own key', () => {
+    const asked = review('coderabbitai[bot]', 'CHANGES_REQUESTED')
+    expect(resolveAskedEvent({ asked: true, head: HEAD, pr: 7, review: asked })).toEqual({
+      key: `pr-7 bot-resolve-asked ${HEAD} coderabbitai`,
+      lines: ['BOT_RESOLVE_ASKED: asked coderabbitai (`@coderabbitai resolve`) for its change request on the head (abcdef1): every review thread is resolved and CI is green'],
+    })
+    expect(resolveAskedEvent({ asked: false, head: HEAD, pr: 7, review: asked }).key).toBe(`pr-7 bot-resolve-failed ${HEAD} coderabbitai`)
   })
 })

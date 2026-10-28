@@ -26,6 +26,12 @@
  *                                    or the owner settled it with `Resolved:` replies (in each of its threads,
  *                                    or on the PR when it has none, #290), with its `GH` token.
  *                                    REVIEW_DISMISS_FAILED: it couldn't (it tries again on every look)
+ *   PR #<n>: BOT_RESOLVE_ASKED       with RESOLVE_BOT_REVIEWS naming a bot (none by default, #303): its latest
+ *                                    review requests changes on the head, every review thread is resolved,
+ *                                    CI passed, and the PR is no draft, not the owner's and not approved by
+ *                                    them: the watcher posted `@<bot> resolve` (once per head), and the bot's
+ *                                    own risk limit decides whether it approves. BOT_RESOLVE_FAILED: it
+ *                                    couldn't (it tries again on every look)
  *   PR #<n>: THREAD_RESOLVED         the watcher resolved a review thread whose last comment, from anyone,
  *                                    starts `Resolved: <reason>` (#279), with its `GH` token; agents never
  *                                    resolve threads themselves. THREAD_RESOLVE_FAILED: it couldn't (it
