@@ -73,8 +73,9 @@ repository), never with the owner's account.
 
 ### Before pushing
 
-- `bun run lint && bun run test` locally (`test` type-checks first). Leave the e2e suite to CI;
-  run it locally only to debug a failure.
+- **Don't run locally what CI runs** (owner's rule, #308): lint, type check, unit and e2e tests run
+  on every push. Push and let CI check; run them locally only to reproduce a CI failure. Tools that
+  fix things (a formatter writing files) are fine to run.
 - **One push per batch of changes:** each push cancels the branch's running CI.
 - **Never pipe a command whose exit code matters** (`bun run lint | tail` succeeded on a failing
   lint once); use `set -o pipefail` or `${PIPESTATUS[0]}`.

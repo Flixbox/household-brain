@@ -8,6 +8,15 @@ export const count = (value: unknown) => (typeof value === 'number' ? value : 0)
 export const record = (value: unknown): Json => (isRecord(value) ? value : {})
 export const oneLine = (value: unknown, length: number) => textOf(value).replaceAll(/\s+/gu, ' ').slice(0, length)
 
+/** What is at `keys` inside a GraphQL answer; an empty object where something on the way is missing. */
+export const at = (value: unknown, ...keys: string[]): unknown => keys.reduce((inside: unknown, key) => record(inside)[key], value)
+
+/** GraphQL names a bot `name`, the REST API (and `SELF`) `name[bot]`: the REST form, as everywhere else. */
+export const actor = (value: unknown): string => {
+  const who = record(value)
+  return who.kind === 'Bot' ? `${textOf(who.login)}[bot]` : textOf(who.login)
+}
+
 /** Characters of someone else's comment that are printed; the rest is behind the comment's link. */
 const LIMIT = 300
 

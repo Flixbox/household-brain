@@ -1,6 +1,6 @@
 /* oxlint-disable eslint/no-await-in-loop -- each poller's looks run one after another, on purpose */
 /** The project watcher's looks, started by watch-project.ts once it has read which code it runs (#265). */
-import { FOLLOW_NEWER, type MainRun, type Run, cancelledDeployEvent, mainRunEvent, replacementCandidates, runEvent } from './watch-events'
+import { type Activity, FOLLOW_NEWER, type MainRun, type Run, cancelledDeployEvent, mainRunEvent, replacementCandidates, runEvent } from './watch-events'
 import { type PrState, REPO, SELF, containsCommit, jobLines, mainAhead, mainHead, mainRuns, mergeCommand, newestMainRun, openPrs, prStates, readyCommand, recentlyMerged, resolveThread, runOf } from './watch-github'
 import { REVIEW_BOTS, approvedEvent, awaitsBotReview, blockedByReviewEvent, resolvedThreadEvent } from './watch-review-events'
 import { DISMISS_STALE_BOT_REVIEWS, askBotsToResolve, dismissStale, reviewBlockers } from './watch-dismiss'
@@ -10,6 +10,7 @@ import { checkActivity as checkPrActivity, checkTrackedActivity } from './watch-
 import { checkNotQueued, checkQueue } from './watch-queue'
 import { checkIssueStates, checkIssues } from './watch-issues'
 import { allSettled, hasText, ignoreFailure } from './read'
+import { activitiesOf } from './watch-comments'
 
 const [limitMinutes = '20', maxHours = '12'] = process.argv.slice(2).filter(arg => arg !== '--follow')
 if (!/^\d+$/u.test(limitMinutes) || !/^\d+$/u.test(maxHours)) {
@@ -32,8 +33,8 @@ const inOrder = async <Item>(items: readonly Item[], each: (item: Item) => Promi
   }, Promise.resolve())
 
 /** A PR's new comments and reviews; a PR whose comments couldn't be read leaves the round incomplete. */
-const checkActivity = async (pr: number): Promise<boolean> => {
-  const read = await checkPrActivity(pr)
+const checkActivity = async (pr: number, items: Activity[] | undefined): Promise<boolean> => {
+  const read = await checkPrActivity(pr, items)
   round.complete &&= read
   return read
 }
@@ -118,16 +119,16 @@ const untrack = async (pr: number) => updateLines('tracked', lines => lines.filt
 const tracked = async (pr: number) => (await readLines('tracked')).includes(String(pr))
 
 /** A merged PR: its comments while followed (#129), then its deploy until that is reported. */
-const checkMerged = async (pr: number, mergeSha: string): Promise<void> => {
-  if (await tracked(pr) && !await checkActivity(pr)) {
+const checkMerged = async (pr: number, mergeSha: string, items: Activity[] | undefined): Promise<void> => {
+  if (await tracked(pr) && !await checkActivity(pr, items)) {
     return
   }
   const deployed = (await readLines('reported')).some(line => line.startsWith(`pr-${pr} deployed `))
   await (deployed ? untrack(pr) : checkRun(pr, mergeSha, 'deploy'))
 }
 
-const checkClosed = async (pr: number): Promise<void> => {
-  if (await tracked(pr) && !await checkActivity(pr)) {
+const checkClosed = async (pr: number, items: Activity[] | undefined): Promise<void> => {
+  if (await tracked(pr) && !await checkActivity(pr, items)) {
     return
   }
   await untrack(pr)
@@ -178,13 +179,13 @@ const checkReady = async (pr: number, state: PrState): Promise<void> => {
   await (state.ownerApproved && green && state.mergeState === 'BLOCKED' ? checkBlocked(pr, state.head) : Promise.resolve())
 }
 
-const checkOpen = async (pr: number, state: PrState): Promise<void> => {
+const checkOpen = async (pr: number, state: PrState, items: Activity[] | undefined): Promise<void> => {
   await addLine('tracked', String(pr))
   await report({ key: `pr-${pr} opened`, lines: [`NEW_PR: ${state.title}`] }, pr)
   // Comments before the approval: an approval often comes with review comments, and reporting it
   // first meant auto-merge went on before they were read (#152). While the comments can't be read,
   // the approval waits too.
-  const commentsRead = await checkActivity(pr)
+  const commentsRead = await checkActivity(pr, items)
   // A PR labelled `parked` is left open on purpose: only its CI and comments are news.
   const reviewNews = commentsRead && !state.parked
   // Before the merge checks, so a thread resolved now no longer blocks the merge.
@@ -194,17 +195,18 @@ const checkOpen = async (pr: number, state: PrState): Promise<void> => {
   await (reviewNews ? checkReady(pr, state).then(async () => askBotsToResolve(pr, state)).then(async () => checkMoved(pr, state.head)) : Promise.resolve())
 }
 
-const checkPr = async (pr: number, state: PrState | undefined): Promise<void> => {
+/** A PR's state and its comments and reviews (`items`), both read at the start of the round. */
+const checkPr = async (pr: number, state: PrState | undefined, items: Activity[] | undefined): Promise<void> => {
   if (!state) {
     round.complete = false
     return
   }
   await checkNotQueued(pr, state)
   if (state.state === 'MERGED') {
-    await checkMerged(pr, state.mergeSha)
+    await checkMerged(pr, state.mergeSha, items)
     return
   }
-  await (state.state === 'CLOSED' ? checkClosed(pr) : checkOpen(pr, state))
+  await (state.state === 'CLOSED' ? checkClosed(pr, items) : checkOpen(pr, state, items))
 }
 
 /** Open PRs, the ones followed until their deploy, and recently merged ones; null when a listing failed. */
@@ -230,13 +232,14 @@ const watchedPrs = async (): Promise<number[] | null> => {
 const checkPrs = async (): Promise<void> => {
   // A round with a failed listing is skipped rather than run with pull requests missing.
   const prs = await watchedPrs()
-  const states = prs ? await prStates(prs) : null
-  if (!prs || !states) {
+  if (!prs) {
     return
   }
+  // Each in batched GraphQL queries (#235, #306), not REST calls per PR.
+  const [states, activities] = await Promise.all([prStates(prs), activitiesOf(prs)])
   round.complete = true
   // All at once (#240): a slow PR holds back only its own events; GH_PARALLEL caps the calls.
-  await allSettled(prs.map(async pr => checkPr(pr, states.get(pr))))
+  await allSettled(prs.map(async pr => checkPr(pr, states.get(pr), activities.get(pr))))
   // From here on, a PR seen for the first time is a new one. Only after a round in which every PR
   // answered: one that failed must still get its comments recorded.
   await (roundComplete() ? writeLines('initialized', []) : Promise.resolve())

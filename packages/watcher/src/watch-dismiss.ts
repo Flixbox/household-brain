@@ -11,13 +11,13 @@
  * repository names the bot in RESOLVE_BOT_REVIEWS (#303): `askBotsToResolve`.
  */
 import { type PrComment, RESOLVE_BOT_REVIEWS, type Review, type ReviewThread, bare, botsToAskResolve, dismissalMessage, dismissedReviewEvent, resolveAskedEvent, resolveCommand, reviewsToDismiss } from './watch-review-events'
-import { OWNER, type PrState, REPO, SELF, actor, at, gh, graphql, threadsFrom } from './watch-github'
+import { OWNER, type PrState, REPO, SELF, gh, graphql, threadsFrom } from './watch-github'
 import { GH, ghText } from './watch-gh'
 import { report } from './watch-output'
 import { readLines } from './watch-state'
 import { WATCHERS_DIR, claim, removeOlder, unclaim } from './watch-files'
 import { allSettled, textOf } from './read'
-import { count, record, records } from './watch-text'
+import { actor, at, count, record, records } from './watch-text'
 
 export const DISMISS_STALE_BOT_REVIEWS = process.env.DISMISS_STALE_BOT_REVIEWS === '1'
 

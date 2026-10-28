@@ -6,7 +6,7 @@ import { allIssueNumbers, goneIssueLine, isGone, isMoved, issueEventLine, issueP
 import { GH, failedStatus, ghText } from './watch-gh'
 import { ownerOfRepo } from './watch-owner'
 import { hasText, isRecord, textOf } from './read'
-import { type Json, count, oneLine, record, records } from './watch-text'
+import { type Json, actor, at, count, oneLine, record, records } from './watch-text'
 
 // Settings, all from the environment (#200), so the watcher works in any repository; GH,
 // GH_TIMEOUT_SECONDS and GH_PARALLEL are in watch-gh.ts.
@@ -55,12 +55,6 @@ export const IGNORED = new Set([SELF, 'nx-cloud[bot]'])
 
 export const gh = async (args: string[], cli = GH, fresh = false): Promise<unknown> => JSON.parse(await ghText(args, cli, fresh))
 
-/** Every item of a paged list, all pages in one array (`--slurp` wraps each page). */
-export const allPages = async (path: string, cli = GH): Promise<Json[]> => {
-  const pages = await gh(['api', '--paginate', '--slurp', path], cli)
-  return Array.isArray(pages) ? pages.flatMap(item => records(item)) : []
-}
-
 const runFrom = (value: Json): Run => ({
   ageSeconds: Math.floor(Temporal.Instant.from(textOf(value.startedAt)).until(Temporal.Now.instant()).total('seconds')),
   attempt: count(value.attempt),
@@ -98,31 +92,33 @@ export const jobLines = async (run: number): Promise<string[]> =>
   records(record(await gh(['run', 'view', String(run), '--repo', REPO, '--json', 'jobs'])).jobs)
     .map(job => `  ${textOf(job.name)}: ${textOf(job.status)} ${textOf(job.conclusion)}`)
 
-/**
- * The review decision (see `decisionFrom`): GitHub's, unless it is empty or an approval, which the
- * reviews then decide, an approval counting only from `OWNER` (#277). The PR's author and the agent
- * itself don't count (the reviewer agent posts as the same bot that opens the PRs). Unknown (empty)
- * when the reviews can't be read: the PR is then simply not approved yet this round, rather than the
- * whole listing failing.
- */
-const decisionOf = async (pr: number, reviewDecision: unknown, author: string): Promise<string> => {
-  const given = textOf(reviewDecision)
-  if (given !== '' && given !== 'APPROVED') {
-    return given
-  }
-  const reviews = await allPages(`repos/${REPO}/pulls/${pr}/reviews`).catch(() => [])
-  return decisionFrom(given, reviews
-    .map(item => ({ login: login(item), state: textOf(item.state) }))
-    .filter(review => review.login !== author && review.login !== SELF), OWNER)
-}
-
-export const graphql = async (fields: string, fresh = false): Promise<Json> => {
+/** Asks for `fields` of the repository through GraphQL, with `cli` (the `GH` token by default). */
+export const graphql = async (fields: string, fresh = false, cli = GH): Promise<Json> => {
   const [owner = '', name = ''] = REPO.split('/')
-  return record(record(record(await gh(['api', 'graphql', '-f', `query={repository(owner:"${owner}",name:"${name}"){${fields}}}`], GH, fresh)).data).repository)
+  return record(record(record(await gh(['api', 'graphql', '-f', `query={repository(owner:"${owner}",name:"${name}"){${fields}}}`], cli, fresh)).data).repository)
 }
 
-/** What is at `keys` inside a GraphQL answer; an empty object where something on the way is missing. */
-export const at = (value: unknown, ...keys: string[]): unknown => keys.reduce((inside: unknown, key) => record(inside)[key], value)
+/**
+ * What `parse` makes of each PR asked about, its `fields` read in one GraphQL query per `size` PRs
+ * (#235, #306): one REST call per PR and question cost seconds each on a slow `gh`, and agents sharing
+ * one app installation had REST calls refused with 403 rate-limit errors in bursts, while GraphQL went
+ * through. A PR that couldn't be read is missing from the answer; its caller tries again next look. If
+ * a batch fails (one PR GitHub won't answer for fails it all), each of its PRs is asked alone.
+ */
+export const perPr = async <Value>(prs: readonly number[], fields: string, parse: (value: Json) => Value,
+  { cli = GH, fresh = false, size }: { cli?: string, fresh?: boolean, size: number }): Promise<Map<number, Value>> => {
+  const ask = async (batch: readonly number[]): Promise<[number, Value][]> => {
+    const repository = await graphql(batch.map(pr => `pr${pr}: pullRequest(number: ${pr}) { ${fields} }`).join(' '), fresh, cli)
+    return batch.flatMap((pr): [number, Value][] => {
+      const value = repository[`pr${pr}`]
+      return isRecord(value) ? [[pr, parse(value)]] : []
+    })
+  }
+  const oneByOne = async (batch: readonly number[]): Promise<[number, Value][]> =>
+    (await Promise.all(batch.map(async pr => ask([pr]).catch((): [number, Value][] => [])))).flat()
+  const chunks = Array.from({ length: Math.ceil(prs.length / size) }, (_chunk, index) => prs.slice(index * size, (index + 1) * size))
+  return new Map((await Promise.all(chunks.map(async chunk => ask(chunk).catch(async () => oneByOne(chunk))))).flat())
+}
 
 /** Every PR in the merge queue, by number (#251); none where the default branch has no queue. */
 export const queueEntries = async (): Promise<Map<number, QueueEntry>> => {
@@ -140,27 +136,6 @@ export const dequeueReason = async (pr: number): Promise<string> => {
   const query = `pullRequest(number:${pr}){timelineItems(last:1,itemTypes:[REMOVED_FROM_MERGE_QUEUE_EVENT]){nodes{...on RemovedFromMergeQueueEvent{reason}}}}`
   const removal = records(at(await graphql(query), 'pullRequest', 'timelineItems', 'nodes'))
   return oneLine(removal.at(-1)?.reason, 200)
-}
-
-export const openPrs = async (): Promise<OpenPr[]> => {
-  const [listed, queue] = await Promise.all([
-    gh(['pr', 'list', '--repo', REPO, '--state', 'open', '--limit', '100', '--json', 'number,title,isDraft,headRefOid,reviews,reviewDecision,autoMergeRequest,labels,statusCheckRollup,author,mergeStateStatus']),
-    // An unreadable queue lists the PRs as not queued (#251), rather than leaving out the list and its reminders.
-    queueEntries().catch((): Map<number, QueueEntry> => new Map()),
-  ])
-  return Promise.all(records(listed)
-    .map(async pr => ({
-      autoMerge: Boolean(pr.autoMergeRequest),
-      botReviewed: botReviewed(REVIEW_BOTS, records(pr.reviews), textOf(pr.headRefOid)),
-      checks: records(pr.statusCheckRollup).map(check => textOf(check.conclusion) || textOf(check.state) || 'pending'),
-      draft: pr.isDraft === true,
-      mergeState: textOf(pr.mergeStateStatus),
-      number: count(pr.number),
-      parked: records(pr.labels).some(label => label.name === 'parked'),
-      queued: queue.has(count(pr.number)),
-      reviewDecision: await decisionOf(count(pr.number), pr.reviewDecision, textOf(record(pr.author).login)),
-      title: textOf(pr.title),
-    })))
 }
 
 export interface PrState {
@@ -181,12 +156,6 @@ export interface PrState {
   toResolve: ReviewThread[]
 }
 
-/** GraphQL names a bot `name`, the REST API (and `SELF`) `name[bot]`: the REST form, as everywhere else. */
-export const actor = (value: unknown): string => {
-  const who = record(value)
-  return who.kind === 'Bot' ? `${textOf(who.login)}[bot]` : textOf(who.login)
-}
-
 /** A PR's review threads, each with its last comment: the first hundred, more is beyond a PR the agent babysits. */
 const THREAD_FIELDS = 'reviewThreads(first:100){nodes{id isResolved comments(last:1){nodes{body url author{login kind:__typename}}}}}'
 export const threadsFrom = (value: unknown): ReviewThread[] => records(at(value, 'reviewThreads', 'nodes')).map(thread => {
@@ -196,7 +165,6 @@ export const threadsFrom = (value: unknown): ReviewThread[] => records(at(value,
 })
 const PR_FIELDS = 'isDraft isInMergeQueue state mergeable mergeStateStatus headRefOid mergeCommit { oid } reviewDecision autoMergeRequest { enabledAt } title'
   + ` labels(first: 100) { nodes { name } } author { login kind: __typename } reviews(last: 100) { nodes { state commit { oid } author { login kind: __typename } } } ${THREAD_FIELDS}`
-const PRS_PER_QUERY = 50
 
 const stateOf = (value: Json): PrState => {
   const author = actor(value.author)
@@ -223,33 +191,36 @@ const stateOf = (value: Json): PrState => {
   }
 }
 
-const statesOf = async (prs: readonly number[], fresh: boolean): Promise<[number, PrState][]> => {
-  const repository = await graphql(prs.map(pr => `pr${pr}: pullRequest(number: ${pr}) { ${PR_FIELDS} }`).join(' '), fresh)
-  return prs.flatMap((pr): [number, PrState][] => {
-    const value = repository[`pr${pr}`]
-    return isRecord(value) ? [[pr, stateOf(value)]] : []
-  })
-}
-
-/** Each PR on its own, so one GitHub won't answer for is the only one missing. */
-const oneByOne = async (prs: readonly number[], fresh: boolean): Promise<[number, PrState][]> => {
-  const each = await Promise.all(prs.map(async pr => statesOf([pr], fresh).catch((): [number, PrState][] => [])))
-  return each.flat()
-}
-
-/** A batch's states; if the batch fails (one PR GitHub won't answer for fails it all), each PR alone. */
-const batchStates = async (prs: readonly number[], fresh: boolean): Promise<[number, PrState][]> =>
-  statesOf(prs, fresh).catch(async () => oneByOne(prs, fresh))
-
 /**
- * The state of every PR asked about, in one GraphQL query per fifty (#235): one `pr view` each, plus
- * their reviews, took seconds per PR on a slow `gh`, and a look waited for all of them. A PR whose
- * state couldn't be read is missing from the answer; its caller tries again next look. `fresh` asks
- * GitHub even when another watcher just did (#264).
+ * The state of every PR asked about, fifty to a query (see `perPr`); one whose state couldn't be read
+ * is missing. `fresh` asks GitHub even when another watcher just did (#264).
  */
-export const prStates = async (prs: readonly number[], fresh = false): Promise<Map<number, PrState>> => {
-  const chunks = Array.from({ length: Math.ceil(prs.length / PRS_PER_QUERY) }, (_chunk, index) => prs.slice(index * PRS_PER_QUERY, (index + 1) * PRS_PER_QUERY))
-  return new Map((await Promise.all(chunks.map(async chunk => batchStates(chunk, fresh)))).flat())
+export const prStates = async (prs: readonly number[], fresh = false): Promise<Map<number, PrState>> =>
+  perPr(prs, PR_FIELDS, stateOf, { fresh, size: 50 })
+
+export const openPrs = async (): Promise<OpenPr[]> => {
+  const [listed, queue] = await Promise.all([
+    gh(['pr', 'list', '--repo', REPO, '--state', 'open', '--limit', '100', '--json', 'number,title,isDraft,headRefOid,reviews,autoMergeRequest,labels,statusCheckRollup,mergeStateStatus']),
+    // An unreadable queue lists the PRs as not queued (#251), rather than leaving out the list and its reminders.
+    queueEntries().catch((): Map<number, QueueEntry> => new Map()),
+  ])
+  // The review decision as `prStates` reads it, through GraphQL (#306). Unknown (empty) for a PR
+  // whose state couldn't be read: it is then simply not approved yet this round, rather than the
+  // whole listing failing.
+  const states = await prStates(records(listed).map(pr => count(pr.number)))
+  return records(listed)
+    .map(pr => ({
+      autoMerge: Boolean(pr.autoMergeRequest),
+      botReviewed: botReviewed(REVIEW_BOTS, records(pr.reviews), textOf(pr.headRefOid)),
+      checks: records(pr.statusCheckRollup).map(check => textOf(check.conclusion) || textOf(check.state) || 'pending'),
+      draft: pr.isDraft === true,
+      mergeState: textOf(pr.mergeStateStatus),
+      number: count(pr.number),
+      parked: records(pr.labels).some(label => label.name === 'parked'),
+      queued: queue.has(count(pr.number)),
+      reviewDecision: states.get(count(pr.number))?.decision ?? '',
+      title: textOf(pr.title),
+    }))
 }
 
 /** Resolves a review thread with the `GH` token, on a `Resolved:` reply (#279); never a shared answer. */
