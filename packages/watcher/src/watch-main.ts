@@ -194,22 +194,17 @@ const checkOpen = async (pr: number, state: PrState): Promise<void> => {
   await (reviewNews ? checkReady(pr, state).then(async () => askBotsToResolve(pr, state)).then(async () => checkMoved(pr, state.head)) : Promise.resolve())
 }
 
-const checkByState = async (pr: number, state: PrState): Promise<void> => {
-  if (state.state === 'MERGED') {
-    await checkMerged(pr, state.mergeSha)
-    return
-  }
-  await (state.state === 'CLOSED' ? checkClosed(pr) : checkOpen(pr, state))
-}
-
 const checkPr = async (pr: number, state: PrState | undefined): Promise<void> => {
   if (!state) {
     round.complete = false
     return
   }
-  await checkByState(pr, state)
-  // Whatever its state: a merged or closed PR no longer waits for the queue (#305).
   await checkNotQueued(pr, state)
+  if (state.state === 'MERGED') {
+    await checkMerged(pr, state.mergeSha)
+    return
+  }
+  await (state.state === 'CLOSED' ? checkClosed(pr) : checkOpen(pr, state))
 }
 
 /** Open PRs, the ones followed until their deploy, and recently merged ones; null when a listing failed. */

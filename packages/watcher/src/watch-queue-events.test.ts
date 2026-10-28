@@ -45,6 +45,6 @@ describe('a PR that never joins the merge queue (#305)', () => {
     const event = notQueuedEvent({ gh: 'agent-gh', head: 'abcdef1234', id: 'PR_kw1', pr: 7 })
     expect(event.key).toBe('pr-7 not-queued abcdef1234')
     expect(event.lines[0]).toStartWith('NOT_QUEUED: ')
-    expect(event.lines[0]).toContain(`agent-gh api graphql -f query='mutation{enqueuePullRequest(input:{pullRequestId:"PR_kw1"}){mergeQueueEntry{position}}}'`)
+    expect(event.lines[0]).toContain('agent-gh api graphql -f query=\'mutation{enqueuePullRequest(input:{pullRequestId:"PR_kw1"}){mergeQueueEntry{position}}}\'')
   })
 })
