@@ -6,6 +6,7 @@
   "license": "Unlicense",
   "bin": {
     "claude-usage": "./src/claude-usage.ts",
+    "reply-review-thread": "./src/reply-review-thread.ts",
     "watch-project": "./src/watch-project.ts"
   },
   "scripts": {
