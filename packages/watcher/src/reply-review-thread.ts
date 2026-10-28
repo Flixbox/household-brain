@@ -26,24 +26,36 @@ export interface Answer {
   status: number
 }
 
-/** Reads what `gh api -i` prints: a status line, the headers, an empty line, then the body. */
-export const answerFrom = (text: string): Answer => {
-  const [head = '', ...rest] = text.split(/\r?\n\r?\n/u)
-  const [statusLine = '', ...headerLines] = head.split(/\r?\n/u)
+/** The headers of an answer, by their names in lower case. */
+const headersFrom = (lines: readonly string[]): Map<string, string> => {
   const headers = new Map<string, string>()
-  for (const line of headerLines) {
+  for (const line of lines) {
     const colon = line.indexOf(':')
     if (colon > 0) {
       headers.set(line.slice(0, colon).trim().toLowerCase(), line.slice(colon + 1).trim())
     }
   }
-  const status = Number(/^HTTP\/\S+\s+(?<code>\d{3})/u.exec(statusLine)?.groups?.code ?? 0)
-  const raw = rest.join('\n\n').trim()
-  try {
-    return { body: raw === '' ? null : JSON.parse(raw), headers, status }
-  } catch {
-    return { body: raw, headers, status }
+  return headers
+}
+
+/** An answer's body: its JSON, or the text where it is none; null when empty. */
+const bodyFrom = (raw: string): unknown => {
+  if (raw === '') {
+    return null
   }
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return raw
+  }
+}
+
+/** Reads what `gh api -i` prints: a status line, the headers, an empty line, then the body. */
+export const answerFrom = (text: string): Answer => {
+  const [head = '', ...rest] = text.split(/\r?\n\r?\n/u)
+  const [statusLine = '', ...headerLines] = head.split(/\r?\n/u)
+  const status = Number(/^HTTP\/\S+\s+(?<code>\d{3})/u.exec(statusLine)?.groups?.code ?? 0)
+  return { body: bodyFrom(rest.join('\n\n').trim()), headers: headersFrom(headerLines), status }
 }
 
 const MINUTE_MS = 60_000
@@ -88,7 +100,7 @@ export const threadIdOf = (target: string, threads: readonly Thread[]): string |
 
 /** The threads of one page of `reviewThreads`. */
 export const threadsFrom = (page: unknown): Thread[] => records(record(page).nodes).map(node => ({
-  commentIds: records(record(node.comments).nodes).flatMap(comment => [textOf(comment.id), String(comment.databaseId ?? '')].filter(id => hasText(id))),
+  commentIds: records(record(node.comments).nodes).flatMap(comment => [textOf(comment.id), typeof comment.databaseId === 'number' ? String(comment.databaseId) : ''].filter(id => hasText(id))),
   id: textOf(node.id),
 }))
 
@@ -101,47 +113,73 @@ const run = async (args: readonly string[]): Promise<{ code: number, out: string
   return { code: await call.exited, out }
 }
 
-/** A GraphQL call's `data` (variables are numbers or strings), waiting once and trying again if GitHub refused it for a rate limit. */
-const graphql = async (query: string, variables: Readonly<Record<string, number | string>>, retried = false): Promise<Json> => {
-  // `-f` passes a string as it is; `-F` would read a value starting with `@` as a file, so only numbers take it.
-  const fields = Object.entries(variables).flatMap(([name, value]) => [typeof value === 'number' ? '-F' : '-f', `${name}=${value}`])
-  const { out } = await run(['api', 'graphql', '-i', '-f', `query=${query}`, ...fields])
-  const answer = answerFrom(out)
+/** What is at `keys` inside an answer; an empty object where something on the way is missing. */
+const at = (value: unknown, ...keys: string[]): Json => keys.reduce((inside: Json, key) => record(inside[key]), record(value))
+
+type Variables = Readonly<Record<string, number | string | null>>
+
+/**
+ * A GraphQL call's `gh` arguments. `-f` passes a string as it is; `-F` would read a value starting
+ * with `@` as a file, so only numbers and null (`-F` turns `null` into JSON's null) take it.
+ */
+const graphqlArgs = (query: string, variables: Variables): string[] => ['api', 'graphql', '-i', '-f', `query=${query}`,
+  ...Object.entries(variables).flatMap(([name, value]) => [typeof value === 'string' ? '-f' : '-F', `${name}=${value ?? 'null'}`])]
+
+/** Why GitHub refused a call, or null when it answered. */
+const refusal = (answer: Answer): Error | null => {
+  const errors = records(record(answer.body).errors)
+  if (answer.status === 200 && errors.length === 0) {
+    return null
+  }
+  const why = errors.map(error => textOf(error.message)).join('; ') || (isRecord(answer.body) ? textOf(answer.body.message) : textOf(answer.body))
+  return new Error(`GitHub refused the call (HTTP ${answer.status}): ${why}`)
+}
+
+/** A GraphQL call's `data`, waiting once and trying again if GitHub refused it for a rate limit. */
+const graphql = async (query: string, variables: Variables, retried = false): Promise<Json> => {
+  const answer = answerFrom((await run(graphqlArgs(query, variables))).out)
   const wait = rateLimitWait(answer, Math.floor(Temporal.Now.instant().epochMilliseconds / 1000))
   if (wait !== null && !retried) {
     process.stderr.write(`Rate limited; trying once more in ${Math.ceil(wait / 1000)} s\n`)
     await Bun.sleep(wait)
     return graphql(query, variables, true)
   }
-  const errors = records(record(answer.body).errors)
-  if (answer.status !== 200 || errors.length > 0) {
-    const why = errors.map(error => textOf(error.message)).join('; ') || (isRecord(answer.body) ? textOf(answer.body.message) : textOf(answer.body))
-    throw new Error(`GitHub refused the call (HTTP ${answer.status}): ${why}`)
+  const error = refusal(answer)
+  if (error) {
+    throw error
   }
-  return record(record(answer.body).data)
+  return at(answer.body, 'data')
 }
 
 const THREADS_QUERY = `query($owner:String!,$name:String!,$pr:Int!,$after:String){repository(owner:$owner,name:$name){pullRequest(number:$pr){
   reviewThreads(first:100,after:$after){nodes{id comments(first:100){nodes{id databaseId}}} pageInfo{hasNextPage endCursor}}}}}`
 
 /** Every review thread of the PR, a page of a hundred at a time, each with its first hundred comments (a longer thread is unheard of). */
-const threadsOf = async (repo: string, pr: number, after?: string): Promise<Thread[]> => {
+const threadsOf = async (repo: string, pr: number, after: string | null = null): Promise<Thread[]> => {
   const [owner = '', name = ''] = repo.split('/')
-  const variables = { name, owner, pr, ...(after === undefined ? {} : { after }) }
-  const page = record(record(record(record(await graphql(THREADS_QUERY, variables)).repository).pullRequest).reviewThreads)
-  const info = record(page.pageInfo)
+  const page = at(await graphql(THREADS_QUERY, { after, name, owner, pr }), 'repository', 'pullRequest', 'reviewThreads')
+  const info = at(page, 'pageInfo')
   const rest = info.hasNextPage === true ? await threadsOf(repo, pr, textOf(info.endCursor)) : []
   return [...threadsFrom(page), ...rest]
 }
 
-const REPLY_MUTATION = `mutation($thread:ID!,$body:String!){addPullRequestReviewThreadReply(input:{pullRequestReviewThreadId:$thread,body:$body}){comment{url}}}`
+const REPLY_MUTATION = 'mutation($thread:ID!,$body:String!){addPullRequestReviewThreadReply(input:{pullRequestReviewThreadId:$thread,body:$body}){comment{url}}}'
 
-const repoOfFolder = async (): Promise<string> => {
+/** REPO, else the repository of the current folder; exits when there is none. */
+const repoOf = async (): Promise<string> => {
+  if (hasText(process.env.REPO)) {
+    return process.env.REPO
+  }
   const { code, out } = await run(['repo', 'view', '--json', 'nameWithOwner', '-q', '.nameWithOwner'])
-  return code === 0 ? out.trim() : ''
+  if (code !== 0 || !hasText(out.trim())) {
+    process.stderr.write(`Which repository? Run this inside a GitHub repository's folder with ${GH} logged in, or set REPO=owner/name.\n`)
+    process.exit(2)
+  }
+  return out.trim()
 }
 
-const main = async (): Promise<void> => {
+/** The command's arguments; exits with the usage when they don't fit. */
+const argsOf = async (): Promise<{ body: string, pr: number, target: string }> => {
   const [prText = '', target = '', bodyArg = ''] = Bun.argv.slice(2)
   const pr = Number(prText)
   const body = bodyArg === '-' ? await Bun.stdin.text() : bodyArg
@@ -149,18 +187,19 @@ const main = async (): Promise<void> => {
     process.stderr.write('Usage: reply-review-thread <pr> <comment-id|PRRT_id> <body> (a body of - is read from stdin)\n')
     process.exit(64)
   }
-  const repo = hasText(process.env.REPO) ? process.env.REPO : await repoOfFolder()
-  if (!hasText(repo)) {
-    process.stderr.write(`Which repository? Run this inside a GitHub repository's folder with ${GH} logged in, or set REPO=owner/name.\n`)
-    process.exit(2)
-  }
+  return { body, pr, target }
+}
+
+const main = async (): Promise<void> => {
+  const { body, pr, target } = await argsOf()
+  const repo = await repoOf()
   const thread = threadIdOf(target, target.startsWith('PRRT_') ? [] : await threadsOf(repo, pr))
   if (thread === null) {
     process.stderr.write(`No review thread on ${repo}#${pr} holds comment ${target}\n`)
     process.exit(1)
   }
   const reply = await graphql(REPLY_MUTATION, { body, thread })
-  process.stdout.write(`${textOf(record(record(reply.addPullRequestReviewThreadReply).comment).url)}\n`)
+  process.stdout.write(`${textOf(at(reply, 'addPullRequestReviewThreadReply', 'comment').url)}\n`)
 }
 
 if (import.meta.main) {
