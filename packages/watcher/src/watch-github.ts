@@ -237,8 +237,6 @@ export const recentlyMerged = async (hours: number): Promise<number[]> => {
     .map(pr => count(pr.number))
 }
 
-/** Who wrote a comment or review, and when (#240): `Flixbox at 12:09:20`. */
-export const login = (item: Json) => textOf(record(item.user).login)
 /** Commits main has that `head` doesn't, and the newest of them. */
 export const mainAhead = async (head: string): Promise<{ ahead: number, newest: string }> => {
   const value = record(await gh(['api', `repos/${REPO}/compare/${head}...main`]))

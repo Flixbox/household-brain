@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { type IssuePage, allIssueNumbers, goneIssueLine, isGone, isMoved, issueEventLine, issuePage } from './watch-issue-events'
+import { type IssuePage, allIssueNumbers, goneIssueLine, isGone, isMoved, issueEventLine, issueEventsFrom, issuePage } from './watch-issue-events'
 
 const page = (numbers: number[], endCursor: string | null) => ({ nodes: numbers.map(number => ({ number })), pageInfo: { endCursor, hasNextPage: endCursor !== null } })
 
@@ -72,5 +72,39 @@ describe('an issue that is gone (#263)', () => {
   it('reports a gone issue that left the open list as closed, and not one that joined it', () => {
     expect(goneIssueLine(7, 'closed')).toBe('ISSUE_CLOSED #7 (deleted or transferred)')
     expect(goneIssueLine(7, 'reopened')).toBeNull()
+  })
+})
+
+describe('new issues and the owner\'s issue comments (#314)', () => {
+  const people = { owner: 'someone', self: 'helper[bot]' }
+  const author = (login: string) => (login.endsWith('[bot]') ? { kind: 'Bot', login: login.replaceAll('[bot]', '') } : { kind: 'User', login })
+  const issue = (number: number, login: string) => ({ author: author(login), createdAt: `2026-10-0${number % 10}T09:00:00Z`, number, title: `Issue  ${number}` })
+  const comment = (databaseId: number, login: string, createdAt: string) =>
+    ({ author: author(login), body: 'Do it.\nThen this.', createdAt, databaseId, url: `https://github.test/o/r/issues/1#issuecomment-${databaseId}` })
+  const answer = (parts: Record<string, unknown[]>) =>
+    ({ created: { nodes: parts.created ?? [] }, newestPr: { nodes: parts.newestPr ?? [] }, updated: { nodes: parts.updated ?? [] }, updatedPrs: { nodes: parts.updatedPrs ?? [] } })
+  const later = (count: number) => Array.from({ length: count }, (_item, index) => ({ createdAt: `2026-10-06T09:${String(index).padStart(2, '0')}:00Z` }))
+
+  it('reports new issues, not the agent\'s own, keyed by number', () => {
+    expect(issueEventsFrom(answer({ created: [issue(2, 'someone'), issue(1, 'helper[bot]')] }), people))
+      .toEqual([{ at: '2026-10-02T09:00:00Z', key: 'issue #2', lines: ['NEW_ISSUE #2 Issue 2'] }])
+  })
+
+  it('leaves out an issue older than the fifty newest issues and PRs', () => {
+    expect(issueEventsFrom(answer({ created: [issue(9, 'someone')], newestPr: [{ number: 59 }] }), people)).toEqual([])
+    expect(issueEventsFrom(answer({ created: [issue(9, 'someone')], newestPr: [{ number: 58 }] }), people)).toHaveLength(1)
+  })
+
+  it('reports the owner\'s comments whole, with their issue, keyed by id', () => {
+    const updated = [{ comments: { nodes: [comment(11, 'someone', '2026-10-05T09:00:00Z'), comment(12, 'other', '2026-10-05T10:00:00Z')] }, number: 7 }]
+    expect(issueEventsFrom(answer({ updated }), people)).toEqual([
+      { at: '2026-10-05T09:00:00Z', key: 'issue-comment 11', lines: ['ISSUE_COMMENT 11 #7:', '    Do it.', '    Then this.'] },
+    ])
+  })
+
+  it('leaves out an owner\'s comment older than the fifty newest on issues and PRs', () => {
+    const updated = [{ comments: { nodes: [comment(11, 'someone', '2026-10-05T09:00:00Z')] }, number: 7 }]
+    expect(issueEventsFrom(answer({ updated, updatedPrs: [{ comments: { nodes: later(50) } }] }), people)).toEqual([])
+    expect(issueEventsFrom(answer({ updated, updatedPrs: [{ comments: { nodes: later(49) } }] }), people)).toHaveLength(1)
   })
 })
