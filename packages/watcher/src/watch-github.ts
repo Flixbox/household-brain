@@ -1,7 +1,7 @@
 /** The project watcher's questions to GitHub, through the `gh` CLI, answered as plain data. */
 import { type MainRun, type OpenPr, type Run, approvedBy, decisionFrom } from './watch-events'
 import type { QueueEntry } from './watch-queue-events'
-import { type ReviewThread, threadsToResolve } from './watch-review-events'
+import { REVIEW_BOTS, type ReviewThread, botReviewed, threadsToResolve } from './watch-review-events'
 import { allIssueNumbers, goneIssueLine, isGone, isMoved, issueEventLine, issuePage } from './watch-issue-events'
 import { GH, failedStatus, ghText } from './watch-gh'
 import { ownerOfRepo } from './watch-owner'
@@ -144,14 +144,14 @@ export const dequeueReason = async (pr: number): Promise<string> => {
 
 export const openPrs = async (): Promise<OpenPr[]> => {
   const [listed, queue] = await Promise.all([
-    gh(['pr', 'list', '--repo', REPO, '--state', 'open', '--limit', '100', '--json', 'number,title,isDraft,reviewDecision,autoMergeRequest,labels,statusCheckRollup,author,mergeStateStatus']),
-    // A queue that can't be read just now leaves the PRs listed as not queued, as before #251, rather
-    // than leaving out the list, and every reminder with it.
+    gh(['pr', 'list', '--repo', REPO, '--state', 'open', '--limit', '100', '--json', 'number,title,isDraft,headRefOid,reviews,reviewDecision,autoMergeRequest,labels,statusCheckRollup,author,mergeStateStatus']),
+    // An unreadable queue lists the PRs as not queued (#251), rather than leaving out the list and its reminders.
     queueEntries().catch((): Map<number, QueueEntry> => new Map()),
   ])
   return Promise.all(records(listed)
     .map(async pr => ({
       autoMerge: Boolean(pr.autoMergeRequest),
+      botReviewed: botReviewed(REVIEW_BOTS, records(pr.reviews), textOf(pr.headRefOid)),
       checks: records(pr.statusCheckRollup).map(check => textOf(check.conclusion) || textOf(check.state) || 'pending'),
       draft: pr.isDraft === true,
       mergeState: textOf(pr.mergeStateStatus),
@@ -174,6 +174,7 @@ export interface PrState {
   ownerApproved: boolean
   autoMerge: boolean
   draft: boolean
+  botReviewed: boolean
   parked: boolean
   queued: boolean
   title: string
@@ -194,7 +195,7 @@ export const threadsFrom = (value: unknown): ReviewThread[] => records(at(value,
   return { id: textOf(thread.id), lastAuthor: actor(last.author), lastBody: textOf(last.body), resolved: thread.isResolved === true, review, url: textOf(last.url) }
 })
 const PR_FIELDS = 'isDraft isInMergeQueue state mergeable mergeStateStatus headRefOid mergeCommit { oid } reviewDecision autoMergeRequest { enabledAt } title'
-  + ` labels(first: 100) { nodes { name } } author { login kind: __typename } reviews(last: 100) { nodes { state author { login kind: __typename } } } ${THREAD_FIELDS}`
+  + ` labels(first: 100) { nodes { name } } author { login kind: __typename } reviews(last: 100) { nodes { state commit { oid } author { login kind: __typename } } } ${THREAD_FIELDS}`
 const PRS_PER_QUERY = 50
 
 const stateOf = (value: Json): PrState => {
@@ -204,6 +205,7 @@ const stateOf = (value: Json): PrState => {
     .filter(review => review.login !== author && review.login !== SELF)
   return {
     autoMerge: isRecord(value.autoMergeRequest),
+    botReviewed: botReviewed(REVIEW_BOTS, records(record(value.reviews).nodes), textOf(value.headRefOid)),
     // GitHub leaves `reviewDecision` empty under a ruleset (#197), and counts anyone's approval: the
     // reviews decide, an approval counting only from the owner (#277).
     decision: decisionFrom(textOf(value.reviewDecision), reviews, OWNER),

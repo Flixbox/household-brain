@@ -6,10 +6,11 @@
  * `---` line, so one slow call never holds back an event found before it (#240), and it goes on (#196).
  */
 import { usageLine } from './claude-usage'
-import { type Event, answerFirst, clockTime, listsOpenPrs, openPrLines, reminderLines, stamped } from './watch-events'
+import { type Event, type OpenPr, answerFirst, clockTime, listsOpenPrs, openPrLines, reminderLines, stamped } from './watch-events'
 import { lookupNews, lookups } from './watch-gh'
 import { openPrs } from './watch-github'
-import { addLine } from './watch-state'
+import { addLine, readLines } from './watch-state'
+import { REVIEW_BOTS, awaitsBotReview } from './watch-review-events'
 import { codeVersion, outdatedLine, startedOn } from './watch-version'
 
 export const FOLLOW = process.argv.includes('--follow')
@@ -62,6 +63,13 @@ export const report = async (event: Event | null, pr: number | null = null): Pro
   queue([pr === null ? first : `PR #${pr}: ${first}`, ...rest, ...prs])
 }
 
+/** The reminders for the open PRs, holding auto-merge for those that wait on a review bot (#299). */
+const reminders = async (prs: OpenPr[]): Promise<string[]> => {
+  const reported = await readLines('reported')
+  const awaiting = prs.filter(pr => awaitsBotReview({ bots: REVIEW_BOTS, pr: pr.number, reported, reviewed: pr.botReviewed }))
+  return reminderLines(prs, new Set(awaiting.map(pr => pr.number)))
+}
+
 /**
  * Ends a round that found events: prints the ones kept (not following), answers first, and after them
  * a reminder for each open PR waiting on the agent (#224, #226); then exits, or when following, ends
@@ -75,7 +83,7 @@ export const flush = async (): Promise<boolean> => {
   printFound()
   printed.any = false
   // Then the reminders, and the owner's Claude usage (#233) to close every notification.
-  const closing = [...await openPrs().then(reminderLines, () => []), await usageLine()]
+  const closing = [...await openPrs().then(reminders, () => []), await usageLine()]
   say(FOLLOW ? [...closing, '---'] : closing)
   quiet.since = Temporal.Now.instant()
   if (!FOLLOW) {
