@@ -1,7 +1,7 @@
 /** The project watcher's questions to GitHub, through the `gh` CLI, answered as plain data. */
 import { type MainRun, type OpenPr, type Run, approvedBy, decisionFrom } from './watch-events'
 import type { QueueEntry } from './watch-queue-events'
-import { type Review, type ReviewThread, threadsToResolve } from './watch-review-events'
+import { type ReviewThread, threadsToResolve } from './watch-review-events'
 import { allIssueNumbers, goneIssueLine, isGone, isMoved, issueEventLine, issuePage } from './watch-issue-events'
 import { GH, failedStatus, ghText } from './watch-gh'
 import { hasText, isRecord, textOf } from './read'
@@ -113,13 +113,13 @@ const decisionOf = async (pr: number, reviewDecision: unknown, author: string): 
     .filter(review => review.login !== author && review.login !== SELF), OWNER)
 }
 
-const graphql = async (fields: string, fresh = false): Promise<Json> => {
+export const graphql = async (fields: string, fresh = false): Promise<Json> => {
   const [owner = '', name = ''] = REPO.split('/')
   return record(record(record(await gh(['api', 'graphql', '-f', `query={repository(owner:"${owner}",name:"${name}"){${fields}}}`], GH, fresh)).data).repository)
 }
 
 /** What is at `keys` inside a GraphQL answer; an empty object where something on the way is missing. */
-const at = (value: unknown, ...keys: string[]): unknown => keys.reduce((inside: unknown, key) => record(inside)[key], value)
+export const at = (value: unknown, ...keys: string[]): unknown => keys.reduce((inside: unknown, key) => record(inside)[key], value)
 
 /** Every PR in the merge queue, by number (#251); none where the default branch has no queue. */
 export const queueEntries = async (): Promise<Map<number, QueueEntry>> => {
@@ -176,16 +176,17 @@ export interface PrState {
 }
 
 /** GraphQL names a bot `name`, the REST API (and `SELF`) `name[bot]`: the REST form, as everywhere else. */
-const actor = (value: unknown): string => {
+export const actor = (value: unknown): string => {
   const who = record(value)
   return who.kind === 'Bot' ? `${textOf(who.login)}[bot]` : textOf(who.login)
 }
 
 /** A PR's review threads, each with its last comment: the first hundred, more is beyond a PR the agent babysits. */
 const THREAD_FIELDS = 'reviewThreads(first:100){nodes{id isResolved comments(last:1){nodes{body url author{login kind:__typename}}}}}'
-const threadsFrom = (value: unknown): ReviewThread[] => records(at(value, 'reviewThreads', 'nodes')).map(thread => {
+export const threadsFrom = (value: unknown): ReviewThread[] => records(at(value, 'reviewThreads', 'nodes')).map(thread => {
   const last = records(at(thread, 'comments', 'nodes')).at(-1) ?? {}
-  return { id: textOf(thread.id), lastAuthor: actor(last.author), lastBody: textOf(last.body), resolved: thread.isResolved === true, url: textOf(last.url) }
+  const review = count(at(records(at(thread, 'first', 'nodes'))[0], 'pullRequestReview', 'databaseId'))
+  return { id: textOf(thread.id), lastAuthor: actor(last.author), lastBody: textOf(last.body), resolved: thread.isResolved === true, review, url: textOf(last.url) }
 })
 const PR_FIELDS = 'isInMergeQueue state mergeable mergeStateStatus headRefOid mergeCommit { oid } reviewDecision autoMergeRequest { enabledAt } title'
   + ` labels(first: 100) { nodes { name } } author { login kind: __typename } reviews(last: 100) { nodes { state author { login kind: __typename } } } ${THREAD_FIELDS}`
@@ -241,16 +242,6 @@ const batchStates = async (prs: readonly number[], fresh: boolean): Promise<[num
 export const prStates = async (prs: readonly number[], fresh = false): Promise<Map<number, PrState>> => {
   const chunks = Array.from({ length: Math.ceil(prs.length / PRS_PER_QUERY) }, (_chunk, index) => prs.slice(index * PRS_PER_QUERY, (index + 1) * PRS_PER_QUERY))
   return new Map((await Promise.all(chunks.map(async chunk => batchStates(chunk, fresh)))).flat())
-}
-
-/** A PR's review threads (see `THREAD_FIELDS`), and its reviews with the commit each was left on (#278) and its id (#285). */
-export const reviewBlockers = async (pr: number): Promise<{ reviews: Review[], threads: ReviewThread[] }> => {
-  const value = record(at(await graphql(`pullRequest(number:${pr}){${THREAD_FIELDS} reviews(last:100){nodes{databaseId state commit{oid} author{login kind:__typename}}}}`), 'pullRequest'))
-  return {
-    reviews: records(at(value, 'reviews', 'nodes'))
-      .map(review => ({ commit: textOf(record(review.commit).oid), id: count(review.databaseId), login: actor(review.author), state: textOf(review.state) })),
-    threads: threadsFrom(value),
-  }
 }
 
 /** Resolves a review thread with the `GH` token, on a `Resolved:` reply (#279); never a shared answer. */

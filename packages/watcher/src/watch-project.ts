@@ -14,12 +14,15 @@
  *   PR #<n>: READY_TO_MERGE          approved, CI green for the current head, auto-merge still off
  *   PR #<n>: BLOCKED_BY_REVIEW       the owner approved, CI green, but GitHub blocks the merge (#278): names
  *                                    each open thread the agent answered last (reply `Resolved: <reason>`
- *                                    once settled), and each change request left on an older commit (the
- *                                    owner dismisses it; GitHub's decision stays CHANGES_REQUESTED until
- *                                    then, #286)
+ *                                    once settled), and each change request still counted, on an older
+ *                                    commit or the head (the owner dismisses it, or, for a bot's on the
+ *                                    head, `Resolved:` replies settle it, #290; GitHub's decision stays
+ *                                    CHANGES_REQUESTED until then, #286)
  *   PR #<n>: REVIEW_DISMISSED        with DISMISS_STALE_BOT_REVIEWS=1 (off by default, #285): the owner approved,
- *                                    no review thread is open, and the watcher dismissed a bot's change
- *                                    request left on an older commit, with its `GH` token.
+ *                                    no review thread is open unsettled, and the watcher dismissed a bot's
+ *                                    change request left on an older commit, or on the head once the agent
+ *                                    or the owner settled it with `Resolved:` replies (in each of its threads,
+ *                                    or on the PR when it has none, #290), with its `GH` token.
  *                                    REVIEW_DISMISS_FAILED: it couldn't (it tries again on every look)
  *   PR #<n>: THREAD_RESOLVED         the watcher resolved a review thread whose last comment, from anyone,
  *                                    starts `Resolved: <reason>` (#279), with its `GH` token; agents never
