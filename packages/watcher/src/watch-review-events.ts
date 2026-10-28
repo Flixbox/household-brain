@@ -185,10 +185,13 @@ export const blockedByReviewEvent = ({ dismiss, head, pr, reviews, self, threads
  * is READY_TO_MERGE with `merge`, the command that enables auto-merge. A draft is APPROVED_DRAFT
  * instead (#298), whatever CI says: it can't be queued and a review bot skips drafts, so it is marked
  * ready (`ready`, the command) first; marking drafts ready stays the agent's step. Once per head.
+ * Ready again at a head that was an approved draft (`wasDraft`), READY_TO_MERGE says to wait for the
+ * bot's review first, which the watcher doesn't see.
  */
-export const approvedEvent = ({ draft, green, head, merge, pr, ready }: { draft: boolean, green: boolean, head: string, merge: string, pr: number, ready: string }): Event | null => {
+export const approvedEvent = ({ draft, green, head, merge, pr, ready, wasDraft }: { draft: boolean, green: boolean, head: string, merge: string, pr: number, ready: string, wasDraft: boolean }): Event | null => {
   if (draft) {
     return { key: `pr-${pr} approved-draft ${head}`, lines: [`APPROVED_DRAFT: approved by the owner but still a draft: mark it ready (${ready}), wait for the bot review, then queue`] }
   }
-  return green ? { key: `pr-${pr} ready ${head}`, lines: [`READY_TO_MERGE: approved and CI is green at ${head.slice(0, 7)}, but auto-merge is off. Enable it: ${merge}`] } : null
+  const when = wasDraft ? 'Once the bot has reviewed it since it was marked ready and its threads are settled, enable it' : 'Enable it'
+  return green ? { key: `pr-${pr} ready ${head}`, lines: [`READY_TO_MERGE: approved and CI is green at ${head.slice(0, 7)}, but auto-merge is off. ${when}: ${merge}`] } : null
 }

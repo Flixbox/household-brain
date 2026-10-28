@@ -166,10 +166,11 @@ const resolveAsked = async (pr: number, state: PrState): Promise<void> => {
 
 /** Approved and green for the current head, but auto-merge is still off or it is a draft (#298), or GitHub blocks the merge (#278, #286). */
 const checkReady = async (pr: number, state: PrState): Promise<void> => {
-  const green = (await readLines('reported')).includes(`pr-${pr} ci-passed ${state.head}`)
+  const reported = await readLines('reported')
+  const green = reported.includes(`pr-${pr} ci-passed ${state.head}`)
   // A PR in the merge queue shows auto-merge as off: it waits on the queue, not on the agent (#251).
   const waits = state.decision === 'APPROVED' && !state.autoMerge && !state.queued
-  await report(waits ? approvedEvent({ draft: state.draft, green, head: state.head, merge: mergeCommand(pr), pr, ready: readyCommand(pr) }) : null, pr)
+  await report(waits ? approvedEvent({ draft: state.draft, green, head: state.head, merge: mergeCommand(pr), pr, ready: readyCommand(pr), wasDraft: reported.includes(`pr-${pr} approved-draft ${state.head}`) }) : null, pr)
   // The owner's own approval, not the decision: a stale change request, one of the causes it names,
   // keeps GitHub's decision at CHANGES_REQUESTED (#286).
   await (state.ownerApproved && green && state.mergeState === 'BLOCKED' ? checkBlocked(pr, state.head) : Promise.resolve())
