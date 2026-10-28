@@ -200,7 +200,7 @@ export const approvedEvent = ({ draft, green, head, merge, pr, ready, wasDraft }
 }
 
 /** A login as GraphQL and `gh` give it, in lower case: a bot without its REST suffix `[bot]`. */
-const bare = (login: string) => login.trim().toLowerCase().replace(/\[bot\]$/u, '')
+export const bare = (login: string): string => login.trim().toLowerCase().replace(/\[bot\]$/u, '')
 
 /** The logins in a comma-separated setting, in `bare` form. */
 export const botNames = (setting: string): string[] => setting.split(',').map(name => bare(name)).filter(name => name !== '')
