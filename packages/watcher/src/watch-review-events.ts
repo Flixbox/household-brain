@@ -82,21 +82,42 @@ const isBot = (login: string) => login.endsWith('[bot]')
 const after = (later: string, earlier: string) =>
   later !== '' && earlier !== '' && Temporal.Instant.compare(Temporal.Instant.from(later), Temporal.Instant.from(earlier)) > 0
 
+/** Who has a say on a bot's change request: the agent (`self`) and the owner, in lower case; an empty login is no one. */
+interface Settlers { owner: string, self: string }
+const settlersOf = ({ owner, self }: { owner: string, self: string }): Settlers => ({ owner: owner.toLowerCase(), self: self.toLowerCase() })
+const settles = ({ owner, self }: Settlers, author: string, body: string) =>
+  author !== '' && (author.toLowerCase() === owner || author.toLowerCase() === self) && RESOLVED.test(body)
+
+/**
+ * The last word on the PR about a change request without threads, since the review: the newest
+ * comment that settles it (a `Resolved:` reply by the agent or the owner) or takes it back (any other
+ * comment of the owner's, e.g. "not settled yet", #294). The agent's other comments (rebase notes,
+ * summaries) count for neither. Undefined when there is none.
+ */
+const lastWord = (review: Review, comments: readonly PrComment[], settlers: Settlers) => comments.findLast(comment =>
+  after(comment.createdAt, review.submittedAt)
+  && (settles(settlers, comment.author, comment.body) || (settlers.owner !== '' && comment.author.toLowerCase() === settlers.owner)))
+
+/** Whether the owner took back a change request without threads with a later comment (#294). */
+const takenBack = (review: Review, comments: readonly PrComment[], settlers: Settlers) => {
+  const word = lastWord(review, comments, settlers)
+  return word !== undefined && !settles(settlers, word.author, word.body)
+}
+
 /**
  * The `Resolved: <reason>` replies that settle a change request on the head (#290), or null while it
  * isn't settled: the last comment of each of its threads, or, when it has none (an outside-diff or
- * summary-only review), the newest `Resolved:` reply on the PR since the review. Only `settlers`' replies count (the
- * agent, the owner), and only replies after the review: when the bot reviews again, its new review
- * needs its own.
+ * summary-only review), the `lastWord` on the PR when that is a `Resolved:` reply. Only the agent's and
+ * the owner's replies count, and only replies after the review: when the bot reviews again, its new
+ * review needs its own.
  */
-const headReplies = (review: Review, { comments, settlers, threads }: { comments: readonly PrComment[], settlers: ReadonlySet<string>, threads: readonly ReviewThread[] }) => {
-  const settles = (author: string, body: string) => settlers.has(author.toLowerCase()) && RESOLVED.test(body)
+const headReplies = (review: Review, { comments, settlers, threads }: { comments: readonly PrComment[], settlers: Settlers, threads: readonly ReviewThread[] }) => {
   const own = threads.filter(thread => thread.review === review.id)
   if (own.length > 0) {
-    return own.every(thread => settles(thread.lastAuthor, thread.lastBody)) ? own.map(thread => ({ body: thread.lastBody, url: thread.url })) : null
+    return own.every(thread => settles(settlers, thread.lastAuthor, thread.lastBody)) ? own.map(thread => ({ body: thread.lastBody, url: thread.url })) : null
   }
-  const reply = comments.findLast(comment => after(comment.createdAt, review.submittedAt) && settles(comment.author, comment.body))
-  return reply ? [{ body: reply.body, url: reply.url }] : null
+  const reply = lastWord(review, comments, settlers)
+  return reply && settles(settlers, reply.author, reply.body) ? [{ body: reply.body, url: reply.url }] : null
 }
 
 /**
@@ -106,21 +127,22 @@ const headReplies = (review: Review, { comments, settlers, threads }: { comments
  * bot (`…[bot]`) whose latest counting review requests changes on an older commit, or on the head and is
  * settled by `Resolved:` replies (`headReplies`, #290): then that bot's change requests on older
  * commits, and those on the head that are settled themselves, each with its own replies. A person's
- * change request is never dismissed: that stays the owner's call. `settlers` are the logins whose
- * replies count.
+ * change request is never dismissed: that stays the owner's call. `owner` and `self` (the agent) are
+ * the logins whose replies count.
  */
-export const reviewsToDismiss = ({ comments, complete, head, reviews, settlers, threads }: {
+export const reviewsToDismiss = ({ comments, complete, head, owner, reviews, self, threads }: {
   comments: readonly PrComment[]
   complete: boolean
   head: string
+  owner: string
   reviews: readonly Review[]
-  settlers: readonly string[]
+  self: string
   threads: readonly ReviewThread[]
 }): Dismissal[] => {
   if (!complete || threads.some(thread => !thread.resolved && !asksToResolve(thread))) {
     return []
   }
-  const context = { comments, settlers: new Set(settlers.filter(login => login !== '').map(login => login.toLowerCase())), threads }
+  const context = { comments, settlers: settlersOf({ owner, self }), threads }
   const replies = (review: Review) => (review.commit === head ? headReplies(review, context) : [])
   return changeRequests(reviews).filter(latest => isBot(latest.login) && replies(latest) !== null).flatMap(latest =>
     reviews.filter(review => review.login === latest.login && review.state === 'CHANGES_REQUESTED').flatMap(review => {
@@ -231,16 +253,20 @@ export const resolveCommand = (login: string): string => `@${bare(login)} resolv
 /**
  * The bots' change requests on `head` the watcher asks to resolve with `@<bot> resolve` (#303), once
  * every review thread is resolved and every thread was read (`complete`). Not one already asked for:
- * a PR comment saying the command after the review (by anyone, another watcher too) settles it. Whether
- * the bot then approves is the bot's call (CodeRabbit's `max_merge_risk`); the watcher reads no risk
- * rating. The caller checks the rest: CI green, not a draft, not approved by the owner nor theirs.
+ * a PR comment saying the command after the review (by anyone, another watcher too) settles it. Nor
+ * one without threads that the owner took back with a later comment (`takenBack`, #294) until a
+ * `Resolved:` reply of the agent's or the owner's follows. Whether the bot then approves is the bot's
+ * call (CodeRabbit's `max_merge_risk`); the watcher reads no risk rating. The caller checks the rest:
+ * CI green, not a draft, not approved by the owner nor theirs.
  */
-export const botsToAskResolve = ({ bots, comments, complete, head, reviews, threads }: {
+export const botsToAskResolve = ({ bots, comments, complete, head, owner, reviews, self, threads }: {
   bots: readonly string[]
   comments: readonly PrComment[]
   complete: boolean
   head: string
+  owner: string
   reviews: readonly Review[]
+  self: string
   threads: readonly ReviewThread[]
 }): Review[] => {
   if (bots.length === 0 || !complete || threads.some(thread => !thread.resolved)) {
@@ -248,7 +274,9 @@ export const botsToAskResolve = ({ bots, comments, complete, head, reviews, thre
   }
   const asked = (review: Review) => comments.some(comment =>
     after(comment.createdAt, review.submittedAt) && comment.body.trim().toLowerCase() === resolveCommand(review.login))
-  return changeRequests(reviews).filter(review => review.commit === head && bots.includes(bare(review.login)) && !asked(review))
+  const settlers = settlersOf({ owner, self })
+  const notTakenBack = (review: Review) => threads.some(thread => thread.review === review.id) || !takenBack(review, comments, settlers)
+  return changeRequests(reviews).filter(review => review.commit === head && bots.includes(bare(review.login)) && !asked(review) && notTakenBack(review))
 }
 
 /** The event for a bot the watcher asked to resolve its change request on `head`, or failed to: reported once per head and bot. */

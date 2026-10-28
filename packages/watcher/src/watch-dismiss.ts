@@ -77,7 +77,7 @@ export const dismissStale = async ({ comments, complete, head, pr, reviews, thre
   threads: ReviewThread[]
 }): Promise<{ reviews: Review[], threads: ReviewThread[] }> => {
   const dismissed = new Set<number>()
-  const toDismiss = DISMISS_STALE_BOT_REVIEWS ? reviewsToDismiss({ comments, complete, head, reviews, settlers: [SELF, OWNER], threads }) : []
+  const toDismiss = DISMISS_STALE_BOT_REVIEWS ? reviewsToDismiss({ comments, complete, head, owner: OWNER, reviews, self: SELF, threads }) : []
   await allSettled(toDismiss.map(async dismissal => {
     const done = await dismiss(pr, dismissal.review.id, dismissalMessage(dismissal))
     if (done) {
@@ -130,7 +130,7 @@ export const askBotsToResolve = async (pr: number, state: PrState): Promise<void
   const eligible = state.decision === 'CHANGES_REQUESTED' && !state.draft && !state.ownerApproved && !asked
     && reported.includes(`pr-${pr} ci-passed ${state.head}`)
   const found = RESOLVE_BOT_REVIEWS.length > 0 && eligible ? await reviewBlockers(pr).catch(() => null) : null
-  const toAsk = found && found.author.toLowerCase() !== OWNER.toLowerCase() ? botsToAskResolve({ ...found, bots: RESOLVE_BOT_REVIEWS, head: state.head }) : []
+  const toAsk = found && found.author.toLowerCase() !== OWNER.toLowerCase() ? botsToAskResolve({ ...found, bots: RESOLVE_BOT_REVIEWS, head: state.head, owner: OWNER, self: SELF }) : []
   await allSettled(toAsk.map(async review => {
     const posted = await askOnce(pr, state.head, review.login)
     await (posted === null ? Promise.resolve() : report(resolveAskedEvent({ asked: posted, head: state.head, pr, review }), pr))

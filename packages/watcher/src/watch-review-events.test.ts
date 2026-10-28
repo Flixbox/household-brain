@@ -81,9 +81,9 @@ describe('resolvedThreadEvent', () => {
 })
 
 describe('reviewsToDismiss', () => {
-  const settlers = [SELF, 'Owner']
+  const settlers = { owner: 'Owner', self: SELF }
   const dismiss = (reviews: Review[], threads: ReviewThread[] = [], comments: PrComment[] = []) =>
-    reviewsToDismiss({ comments, complete: true, head: HEAD, reviews, settlers, threads }).map(each => each.review.id)
+    reviewsToDismiss({ ...settlers, comments, complete: true, head: HEAD, reviews, threads }).map(each => each.review.id)
   const settled = (id: string, changes: Partial<ReviewThread> = {}) => thread(id, { lastBody: `Resolved: fixed (${id})`, resolved: true, review: 9, ...changes })
   const onHead = review('coderabbit[bot]', 'CHANGES_REQUESTED', { id: 9 })
 
@@ -106,7 +106,7 @@ describe('reviewsToDismiss', () => {
   })
 
   it('takes none when not every thread could be read', () => {
-    expect(reviewsToDismiss({ comments: [], complete: false, head: HEAD, reviews: [review('reviewer[bot]', 'CHANGES_REQUESTED', { commit: OLD })], settlers, threads: [] })).toEqual([])
+    expect(reviewsToDismiss({ ...settlers, comments: [], complete: false, head: HEAD, reviews: [review('reviewer[bot]', 'CHANGES_REQUESTED', { commit: OLD })], threads: [] })).toEqual([])
   })
 
   it('takes a bot\'s older change requests with its latest, but one on the head only when settled itself', () => {
@@ -116,7 +116,7 @@ describe('reviewsToDismiss', () => {
   })
 
   it('takes a bot\'s change request on the head once each of its threads ends in a `Resolved:` reply, quoting them', () => {
-    const dismissals = reviewsToDismiss({ comments: [], complete: true, head: HEAD, reviews: [onHead], settlers, threads: [settled('T1'), settled('T2', { lastAuthor: 'owner', resolved: false }), thread('T3', { resolved: true })] })
+    const dismissals = reviewsToDismiss({ ...settlers, comments: [], complete: true, head: HEAD, reviews: [onHead], threads: [settled('T1'), settled('T2', { lastAuthor: 'owner', resolved: false }), thread('T3', { resolved: true })] })
     expect(dismissals).toEqual([{ replies: [{ body: 'Resolved: fixed (T1)', url: 'https://github.test/pr/1#T1' }, { body: 'Resolved: fixed (T2)', url: 'https://github.test/pr/1#T2' }], review: onHead }])
   })
 
@@ -131,6 +131,14 @@ describe('reviewsToDismiss', () => {
     expect(dismiss([onHead], [], [comment(SELF, 'Resolved: too early', '2026-10-26T09:00:00Z')])).toEqual([])
     expect(dismiss([onHead], [], [comment('passer-by', 'Resolved: says who')])).toEqual([])
     expect(dismiss([onHead], [], [comment(SELF, 'Fixed, see above')])).toEqual([])
+  })
+
+  it('leaves a head change request without threads that a later owner comment took back, but not for the agent\'s own (#294)', () => {
+    const resolved = comment(SELF, 'Resolved: the summary\'s points are fixed')
+    expect(dismiss([onHead], [], [resolved, comment('owner', 'Not settled yet: the second point stands', '2026-10-26T11:30:00Z')])).toEqual([])
+    expect(dismiss([onHead], [], [resolved, comment(SELF, 'Rebased onto main', '2026-10-26T11:30:00Z')])).toEqual([9])
+    expect(dismiss([onHead], [], [comment('owner', 'Not settled yet'), comment(SELF, 'Resolved: fixed the second point too', '2026-10-26T11:30:00Z')])).toEqual([9])
+    expect(dismiss([onHead], [], [resolved, comment('owner', 'Resolved: agreed', '2026-10-26T11:30:00Z')])).toEqual([9])
   })
 
   it('lets a newer review of the bot win: its own threads, or a reply after it, are needed', () => {
@@ -224,6 +232,8 @@ describe('botsToAskResolve', () => {
   const bot = 'coderabbitai[bot]'
   const ask = (changes: Partial<Parameters<typeof botsToAskResolve>[0]> = {}) => botsToAskResolve({
     bots: ['coderabbitai'],
+    owner: 'Owner',
+    self: SELF,
     comments: [],
     complete: true,
     head: HEAD,
@@ -252,6 +262,15 @@ describe('botsToAskResolve', () => {
     expect(ask({ comments: [comment('someone', ' @CodeRabbitAI resolve ')] })).toEqual([])
     expect(ask({ comments: [comment(SELF, '@coderabbitai resolve', '2026-10-26T09:00:00Z')] })).toEqual([5])
     expect(ask({ comments: [comment(SELF, '@coderabbitai resolve please')] })).toEqual([5])
+  })
+
+  it('leaves out a change request without threads that a later owner comment took back, until a `Resolved:` reply follows (#294)', () => {
+    const takenBack = comment('owner', 'Not settled yet: the second point stands')
+    expect(ask({ comments: [takenBack] })).toEqual([])
+    expect(ask({ comments: [takenBack, comment(SELF, 'Rebased onto main', '2026-10-26T11:30:00Z')] })).toEqual([])
+    expect(ask({ comments: [takenBack, comment(SELF, 'Resolved: fixed the second point', '2026-10-26T11:30:00Z')] })).toEqual([5])
+    expect(ask({ comments: [comment('owner', 'Looks wrong', '2026-10-26T09:00:00Z')] })).toEqual([5])
+    expect(ask({ comments: [takenBack], threads: [thread('T1', { resolved: true, review: 5 })] })).toEqual([5])
   })
 })
 
