@@ -99,7 +99,8 @@ default branch's CI, new issues, the owner's comments on issues, and issues clos
     last numbers read come with their time (`(as of 12:04)`), and `Usage: unknown` only when none
     ever were. Only when it is due (#318): when the session's or the week's use is in another 2.5%
     step (2.5%, 5%, 7.5% …) than in this watcher's last usage line, at most once a minute, or 10
-    minutes after that line as a heartbeat; a notification in between leaves it out. Each watcher
+    minutes after that line as a heartbeat; a notification in between leaves it out. With `--follow`
+    a due line also comes on its own (ending with `---`) when no event brought it. Each watcher
     keeps its own last line. `CLAUDE_USAGE_CACHE` moves that cache, `CLAUDE_USAGE_LOCK_PORT` its lock's port.
   - `SELF`: **set it to the login you comment as** (a bot's is `name[bot]`); without it your own
     comments, replies and issues are reported back to you as news. Your reviews still are.

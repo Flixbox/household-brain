@@ -112,6 +112,17 @@ export const flush = async (): Promise<boolean> => {
 }
 
 /**
+ * Following, the usage line comes on its own when it is due and no event brought it (#318): a step
+ * or the heartbeat in a quiet repository. A one-shot watcher exits only on events, so not there.
+ */
+export const reportUsage = async (): Promise<void> => {
+  const lines = FOLLOW ? await dueUsage() : []
+  if (lines.length > 0) {
+    say([...lines, '---'])
+  }
+}
+
+/**
  * Says so when no `gh` call has succeeded for a while (#253): every check treats a failed call as
  * "try again next look", so a watcher whose calls all fail would otherwise look like a quiet repository.
  */
