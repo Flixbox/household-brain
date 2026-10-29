@@ -26,7 +26,7 @@
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "6.0.0",
-    "@nx/playwright": "23.3.0",
+    "@nx/playwright": "24.0.2",
     "@playwright/test": "1.64.1",
     "@stylistic/eslint-plugin": "5.10.0",
     "@types/bun": "1.4.4",
@@ -40,7 +40,7 @@
     "firebase": "13.1.0",
     "firebase-tools": "15.34.1",
     "npm-package-json-lint": "11.0.0",
-    "nx": "23.3.0",
+    "nx": "24.0.2",
     "oxlint": "1.90.0",
     "oxlint-tsgolint": "7.0.2005",
     "typescript": "7.0.2"
