@@ -10,6 +10,7 @@
  *   open-issues    the open issues seen last round
  *   queued         the PRs in the merge queue, each with when it entered (#251)
  *   unqueued       the PRs that should be in the merge queue but aren't, with their head and since when (#305)
+ *   usage          the last usage line this watcher posted: its numbers and when, as JSON (#318)
  *   pr-<n>-seen    the comments and reviews of a PR already reported
  *   initialized    set after the first complete round: from then on, a PR is new, and so is all on it
  *

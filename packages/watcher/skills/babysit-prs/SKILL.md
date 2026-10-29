@@ -91,13 +91,17 @@ default branch's CI, new issues, the owner's comments on issues, and issues clos
     (CodeRabbit's `max_merge_risk`) decide whether it approves. Not for a draft, a PR the owner
     opened, or one the owner approved (`DISMISS_STALE_BOT_REVIEWS` handles that one). None by
     default. The `GH` token must be allowed to comment on pull requests.
-  - `CLAUDE_CONFIG_DIR`: where the Claude login lives (`~/.claude` by default). Every notification
+  - `CLAUDE_CONFIG_DIR`: where the Claude login lives (`~/.claude` by default). A notification
     ends with the owner's Claude usage (`Usage: session 12% used (88% left, resets 2026-10-17 14:10), week 66% used (34% left, resets …)`,
     the windows `/usage` shows: how much is used and left, and when each resets),
     from the cache it shares with the `claude-usage` command (`packages/watcher/src/claude-usage.ts`,
     #260): the endpoint is asked at most once a minute and backed off after a refusal; meanwhile the
     last numbers read come with their time (`(as of 12:04)`), and `Usage: unknown` only when none
-    ever were. `CLAUDE_USAGE_CACHE` moves that cache, `CLAUDE_USAGE_LOCK_PORT` its lock's port.
+    ever were. Only when it is due (#318): when the session's or the week's use is in another 2.5%
+    step (2.5%, 5%, 7.5% …) than in this watcher's last usage line, at most once a minute, or 10
+    minutes after that line as a heartbeat; a notification in between leaves it out. With `--follow`
+    a due line also comes on its own (ending with `---`) when no event brought it. Each watcher
+    keeps its own last line. `CLAUDE_USAGE_CACHE` moves that cache, `CLAUDE_USAGE_LOCK_PORT` its lock's port.
   - `SELF`: **set it to the login you comment as** (a bot's is `name[bot]`); without it your own
     comments, replies and issues are reported back to you as news. Your reviews still are.
 - It remembers what it reported under `$XDG_STATE_HOME/watch-project`, per repository and watcher

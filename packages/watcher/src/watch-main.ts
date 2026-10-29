@@ -4,7 +4,7 @@ import { type Activity, FOLLOW_NEWER, type MainRun, type Run, cancelledDeployEve
 import { type PrState, REPO, containsCommit, jobLines, mainAhead, mainHead, mainRuns, mergeCommand, newestMainRun, openPrs, prStates, recentlyMerged, resolveThread, runOf } from './watch-github'
 import { APPROVED_DRAFT_NOTE, checkApproval } from './watch-approval'
 import { resolvedThreadEvent } from './watch-review-events'
-import { FOLLOW, checkCode, flush, queue, quiet, report, reportLookups } from './watch-output'
+import { FOLLOW, checkCode, flush, queue, quiet, report, reportLookups, reportUsage } from './watch-output'
 import { addLine, readLines, start, updateLines, writeLines } from './watch-state'
 import { activitiesOf, checkActivity as checkPrActivity, checkTrackedActivity } from './watch-activity'
 import { checkNotQueued, checkQueue } from './watch-queue'
@@ -264,6 +264,8 @@ const poll = async (poller: Poller): Promise<never> => {
     // After every look of one poller, whatever it found (#253). If the line can't be printed, the
     // next look tries again.
     await (poller.heartbeat ? reportLookups().catch(ignoreFailure) : Promise.resolve())
+    // A failed read or write leaves the line for the next look.
+    await (poller.heartbeat ? reportUsage().catch(ignoreFailure) : Promise.resolve())
     await (busy ? Promise.resolve() : Bun.sleep(poller.pauseSeconds * 1000))
   }
 }

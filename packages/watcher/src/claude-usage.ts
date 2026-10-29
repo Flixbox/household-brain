@@ -5,8 +5,9 @@
  * token. The token goes to that endpoint only, and is never printed, logged or stored.
  *
  * Every reader on this machine shares one cache, `$XDG_STATE_HOME/claude-usage.json` (or
- * `CLAUDE_USAGE_CACHE`): the watcher closes its notifications with it, and agents run this file as the
- * `claude-usage` command. Several agents asking at once had the endpoint answer 429, so:
+ * `CLAUDE_USAGE_CACHE`): the watcher closes its notifications with it (when due, watch-usage.ts), and
+ * agents run this file as the `claude-usage` command. Several agents asking at once had the endpoint
+ * answer 429, so:
  *
  * - **Debounce:** the endpoint is asked at most once a minute; until then the cache answers.
  * - **One at a time:** the caller asking holds a local port as its lock (like the watcher's, #245),
@@ -191,9 +192,6 @@ export const usageText = (usage: Usage, at = now(), timeZone = Temporal.Now.time
 /** The week's reset time as the endpoint gives it (ISO), or `unknown`. */
 export const weekReset = (usage: Usage): string =>
   (isRecord(usage.answer) && isRecord(usage.answer.seven_day) && typeof usage.answer.seven_day.resets_at === 'string' ? usage.answer.seven_day.resets_at : 'unknown')
-
-/** The usage line that closes every watcher notification. */
-export const usageLine = async (): Promise<string> => usageText(await readUsage())
 
 if (import.meta.main) {
   const usage = await readUsage()
