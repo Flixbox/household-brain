@@ -5,13 +5,14 @@
  * is the notification). With `--follow`, each event comes out the moment it is found, ending with a
  * `---` line, so one slow call never holds back an event found before it (#240), and it goes on (#196).
  */
-import { usageLine } from './claude-usage'
+import { readUsage, usageText } from './claude-usage'
 import { type Event, type OpenPr, answerFirst, clockTime, listsOpenPrs, openPrLines, reminderLines, stamped } from './watch-events'
 import { lookupNews, lookups } from './watch-gh'
 import { openPrs } from './watch-github'
-import { addLine, readLines } from './watch-state'
+import { addLine, oneAtATime, readLines, writeLines } from './watch-state'
 import { REVIEW_BOTS, awaitsBotReview } from './watch-review-events'
 import { codeVersion, outdatedLine, startedOn } from './watch-version'
+import { postedFrom, shownUsage, usageDue } from './watch-usage'
 
 export const FOLLOW = process.argv.includes('--follow')
 
@@ -71,6 +72,22 @@ const reminders = async (prs: OpenPr[]): Promise<string[]> => {
 }
 
 /**
+ * The owner's Claude usage line (#233), only when it is due (#318): on a 2.5% step, or 10 minutes
+ * after this watcher's last one. Decided and recorded in one step, so two pollers post it once.
+ */
+const dueUsage = async (): Promise<string[]> => oneAtATime('usage-due', async () => {
+  const usage = await readUsage()
+  const at = Temporal.Now.instant().epochMilliseconds
+  const shown = shownUsage(usage.answer, at)
+  const [last = ''] = await readLines('usage')
+  if (!usageDue(postedFrom(last), shown)) {
+    return []
+  }
+  await writeLines('usage', [JSON.stringify(shown)])
+  return [usageText(usage, at)]
+})
+
+/**
  * Ends a round that found events: prints the ones kept (not following), answers first, and after them
  * a reminder for each open PR waiting on the agent (#224, #226); then exits, or when following, ends
  * with `---` and returns whether anything was printed, so the next round can start at once.
@@ -82,9 +99,11 @@ export const flush = async (): Promise<boolean> => {
   // The events first: a slow listing must not hold them back.
   printFound()
   printed.any = false
-  // Then the reminders, and the owner's Claude usage (#233) to close every notification.
-  const closing = [...await openPrs().then(reminders, () => []), await usageLine()]
-  say(FOLLOW ? [...closing, '---'] : closing)
+  // Then the reminders, and the owner's Claude usage when it is due (#233, #318).
+  const closing = [...await openPrs().then(reminders, () => []), ...await dueUsage()]
+  if (closing.length > 0) {
+    say(FOLLOW ? [...closing, '---'] : closing)
+  }
   quiet.since = Temporal.Now.instant()
   if (!FOLLOW) {
     process.exit(0)

@@ -58,7 +58,10 @@
  *   LOOKUPS_FAILING / LOOKUPS_RECOVERED  no `gh` call has succeeded for minutes (on every look while it
  *                                    lasts), or they succeed again (#253)
  *   Usage: session <n>% used (<m>% left, resets …), week <n>% used (<m>% left, resets …)
- *                                    last on every notification: the owner's Claude usage (#233)
+ *                                    last on a notification: the owner's Claude usage (#233), only when the
+ *                                    session's or the week's use crossed a 2.5% step since this watcher's
+ *                                    last one (at most once a minute), or 10 minutes after it (#318); old
+ *                                    numbers end with `(as of HH:MM)`
  *   REMINDER: PR #<n> …              after every notification, each open PR that waits on the agent: a
  *                                    branch behind main or in conflict, or approved with CI finished
  *                                    (auto-merge to enable, or CI to fix)
@@ -79,7 +82,7 @@
  *
  * With `--follow` it keeps running instead (#196): each event is printed the moment it is found
  * (#240), ending with a `---` line, for a harness that wakes on new output (Claude Code's Monitor), so
- * one watcher lasts the whole session; the reminders and the usage close each look that found any.
+ * one watcher lasts the whole session; the reminders and the usage (when due) close each look that found any.
  * Following, two pollers run side by side (#240): one for what someone waits for an answer to (new
  * issues, the owner's comments, every followed PR's comments and reviews), every 30 s; one for main
  * and each PR's CI, reviews and deploy, every 60 s. The PRs are checked at once, with at most
