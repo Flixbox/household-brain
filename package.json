@@ -40,7 +40,7 @@
     "firebase": "13.1.0",
     "firebase-tools": "15.34.1",
     "npm-package-json-lint": "11.0.0",
-    "nx": "23.3.0",
+    "nx": "24.0.2",
     "oxlint": "1.89.0",
     "oxlint-tsgolint": "7.0.2005",
     "typescript": "7.0.2"
