@@ -2,9 +2,10 @@
  * What a PR the owner approved asks of the watcher, checked once its comments were read: READY_TO_MERGE
  * or APPROVED_DRAFT while auto-merge is off (#298, #299), what blocks an approved, green PR (#278), and
  * asking a review bot to resolve (#303). Where the repository opts in with READY_APPROVED_DRAFTS=1
- * (#301), it marks a draft ready itself once the owner approved its head: a draft can't be queued and
- * a review bot skips it, so the owner's approval is the go-ahead. Which drafts is `marksReady`
- * (watch-ready-events.ts). The `GH` token must then be allowed to write pull requests.
+ * (#301), it marks a draft ready itself once the owner's latest review approves it, on any commit
+ * (#317): a draft can't be queued and a review bot skips it, so the owner's approval is the go-ahead.
+ * Merging still waits for CI and, with REVIEW_BOTS, a bot's review of the head. Which drafts is
+ * `marksReady` (watch-ready-events.ts). The `GH` token must then be allowed to write pull requests.
  */
 import { DISMISS_STALE_BOT_REVIEWS, askBotsToResolve, dismissStale, reviewBlockers } from './watch-dismiss'
 import { type PrState, REPO, SELF, mergeCommand, readyCommand } from './watch-github'
@@ -24,11 +25,11 @@ export const APPROVED_DRAFT_NOTE = draftNote(READY_APPROVED_DRAFTS)
  * ready` nothing to do, which still succeeds.
  */
 const readyApprovedDraft = async (pr: number, state: PrState): Promise<boolean> => {
-  if (!marksReady({ draft: state.draft, enabled: READY_APPROVED_DRAFTS, ownerApprovedHead: state.ownerApprovedHead })) {
+  if (!marksReady({ approvedCommit: state.ownerApprovalCommit, draft: state.draft, enabled: READY_APPROVED_DRAFTS })) {
     return false
   }
   const readied = await ghText(['pr', 'ready', String(pr), '--repo', REPO], GH, true).then(() => true, () => false)
-  await report(draftReadiedEvent({ head: state.head, pr, readied }), pr)
+  await report(draftReadiedEvent({ approved: state.ownerApprovalCommit, head: state.head, pr, readied }), pr)
   return readied
 }
 

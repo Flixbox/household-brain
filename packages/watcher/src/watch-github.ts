@@ -5,7 +5,7 @@ import { REVIEW_BOTS, type ReviewThread, botReviewed, threadsToResolve } from '.
 import { allIssueNumbers, goneIssueLine, isGone, isMoved, issueEventLine, issuePage } from './watch-issue-events'
 import { GH, failedStatus, ghText } from './watch-gh'
 import { ownerOfRepo } from './watch-owner'
-import { ownerApprovedHead } from './watch-ready-events'
+import { ownerApprovalCommit } from './watch-ready-events'
 import { hasText, isRecord, textOf } from './read'
 import { type Json, actor, at, count, oneLine, record, records } from './watch-text'
 
@@ -148,7 +148,8 @@ export interface PrState {
   mergeSha: string
   decision: string
   ownerApproved: boolean
-  ownerApprovedHead: boolean
+  /** The commit the owner's latest review approves, '' when it isn't an approval (#301, #317). */
+  ownerApprovalCommit: string
   autoMerge: boolean
   draft: boolean
   botReviewed: boolean
@@ -184,9 +185,10 @@ const stateOf = (value: Json): PrState => {
     mergeSha: textOf(record(value.mergeCommit).oid),
     mergeState: textOf(value.mergeStateStatus),
     mergeable: textOf(value.mergeable),
+    // The commit the owner's latest review approves, on any commit: it marks a draft ready where
+    // READY_APPROVED_DRAFTS is on (#301, #317).
+    ownerApprovalCommit: ownerApprovalCommit(reviews, OWNER),
     ownerApproved: approvedBy(reviews, OWNER),
-    // The owner's approval of this very head, which marks a draft ready where that is on (#301).
-    ownerApprovedHead: ownerApprovedHead(reviews, OWNER, textOf(value.headRefOid)),
     parked: records(record(value.labels).nodes).some(label => label.name === 'parked'),
     queued: value.isInMergeQueue === true,
     state: textOf(value.state),
