@@ -5,6 +5,7 @@ import { REVIEW_BOTS, type ReviewThread, botReviewed, threadsToResolve } from '.
 import { allIssueNumbers, goneIssueLine, isGone, isMoved, issueEventLine, issuePage } from './watch-issue-events'
 import { GH, failedStatus, ghText } from './watch-gh'
 import { ownerOfRepo } from './watch-owner'
+import { ownerApprovedHead } from './watch-ready-events'
 import { hasText, isRecord, textOf } from './read'
 import { type Json, actor, at, count, oneLine, record, records } from './watch-text'
 
@@ -147,6 +148,7 @@ export interface PrState {
   mergeSha: string
   decision: string
   ownerApproved: boolean
+  ownerApprovedHead: boolean
   autoMerge: boolean
   draft: boolean
   botReviewed: boolean
@@ -169,7 +171,7 @@ const PR_FIELDS = 'isDraft isInMergeQueue state mergeable mergeStateStatus headR
 const stateOf = (value: Json): PrState => {
   const author = actor(value.author)
   const reviews = records(record(value.reviews).nodes)
-    .map(review => ({ login: actor(review.author), state: textOf(review.state) }))
+    .map(review => ({ commit: textOf(record(review.commit).oid), login: actor(review.author), state: textOf(review.state) }))
     .filter(review => review.login !== author && review.login !== SELF)
   return {
     autoMerge: isRecord(value.autoMergeRequest),
@@ -183,6 +185,8 @@ const stateOf = (value: Json): PrState => {
     mergeState: textOf(value.mergeStateStatus),
     mergeable: textOf(value.mergeable),
     ownerApproved: approvedBy(reviews, OWNER),
+    // The owner's approval of this very head, which marks a draft ready where that is on (#301).
+    ownerApprovedHead: ownerApprovedHead(reviews, OWNER, textOf(value.headRefOid)),
     parked: records(record(value.labels).nodes).some(label => label.name === 'parked'),
     queued: value.isInMergeQueue === true,
     state: textOf(value.state),

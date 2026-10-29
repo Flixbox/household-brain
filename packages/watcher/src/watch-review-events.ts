@@ -9,6 +9,7 @@
 import type { Event } from './watch-events'
 import { type Json, oneLine, record } from './watch-text'
 import { textOf } from './read'
+import { draftKeys } from './watch-ready-events'
 
 /** What `BLOCKED_BY_REVIEW` asks for a bot's change request on the head (#290). */
 const SETTLE = 'once its points are dealt with, reply `Resolved: <reason>` in each of its threads (on the PR when it has none), or ask the owner to dismiss it'
@@ -209,7 +210,8 @@ export const blockedByReviewEvent = ({ dismiss, head, pr, reviews, self, threads
  * What an approved PR (`OWNER`'s decision) with auto-merge off asks for. With CI green at `head`, it
  * is READY_TO_MERGE with `merge`, the command that enables auto-merge. A draft is APPROVED_DRAFT
  * instead (#298), whatever CI says: it can't be queued and a review bot skips drafts, so it is marked
- * ready (`ready`, the command) first; marking drafts ready stays the agent's step. Once per head.
+ * ready (`ready`, the command) first: by the agent, unless READY_APPROVED_DRAFTS has the watcher do it
+ * (#301). Once per head.
  * Ready again at a head that was an approved draft (`wasDraft`), READY_TO_MERGE says to settle the
  * review bot's threads first (where REVIEW_BOTS names bots, it comes only once one has reviewed, #299).
  */
@@ -238,10 +240,11 @@ export const botReviewed = (bots: readonly string[], reviews: readonly Json[], h
 
 /**
  * Whether PR `pr` waits for a bot's review: bots are named, it was approved as a draft (APPROVED_DRAFT
- * reported at any head, so a push after marking it ready still waits), and no bot reviewed its head.
+ * or DRAFT_READIED, #301, reported at any head, so a push after marking it ready still waits), and no
+ * bot reviewed its head.
  */
 export const awaitsBotReview = ({ bots, pr, reported, reviewed }: { bots: readonly string[], pr: number, reported: readonly string[], reviewed: boolean }): boolean =>
-  bots.length > 0 && !reviewed && reported.some(line => line.startsWith(`pr-${pr} approved-draft `))
+  bots.length > 0 && !reviewed && reported.some(line => draftKeys(pr).some(key => line.startsWith(key)))
 
 // RESOLVE_BOT_REVIEWS: the review bots to ask with `@<bot> resolve` (#303), comma-separated
 // (`coderabbitai` or `coderabbitai[bot]`). None by default: the watcher asks none.

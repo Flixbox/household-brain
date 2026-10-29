@@ -1,9 +1,9 @@
 /* oxlint-disable eslint/no-await-in-loop -- each poller's looks run one after another, on purpose */
 /** The project watcher's looks, started by watch-project.ts once it has read which code it runs (#265). */
 import { type Activity, FOLLOW_NEWER, type MainRun, type Run, cancelledDeployEvent, mainRunEvent, replacementCandidates, runEvent } from './watch-events'
-import { type PrState, REPO, SELF, containsCommit, jobLines, mainAhead, mainHead, mainRuns, mergeCommand, newestMainRun, openPrs, prStates, readyCommand, recentlyMerged, resolveThread, runOf } from './watch-github'
-import { REVIEW_BOTS, approvedEvent, awaitsBotReview, blockedByReviewEvent, resolvedThreadEvent } from './watch-review-events'
-import { DISMISS_STALE_BOT_REVIEWS, askBotsToResolve, dismissStale, reviewBlockers } from './watch-dismiss'
+import { type PrState, REPO, containsCommit, jobLines, mainAhead, mainHead, mainRuns, mergeCommand, newestMainRun, openPrs, prStates, recentlyMerged, resolveThread, runOf } from './watch-github'
+import { APPROVED_DRAFT_NOTE, checkApproval } from './watch-approval'
+import { resolvedThreadEvent } from './watch-review-events'
 import { FOLLOW, checkCode, flush, queue, quiet, report, reportLookups } from './watch-output'
 import { addLine, readLines, start, updateLines, writeLines } from './watch-state'
 import { activitiesOf, checkActivity as checkPrActivity, checkTrackedActivity } from './watch-activity'
@@ -139,18 +139,8 @@ const checkReview = async (pr: number, state: PrState): Promise<void> => {
   await report(state.mergeable === 'CONFLICTING' ? { key: `pr-${pr} conflict ${state.head}`, lines: [`CONFLICT at ${short(state.head)}: rebase on main`] } : null, pr)
   // Already in the merge queue, there is no auto-merge to enable (#251).
   const after = state.queued ? 'It is in the merge queue already.' : `Once it is well reviewed, enable auto-merge: ${mergeCommand(pr)}`
-  const next = state.draft ? 'It is a draft: mark it ready first (see APPROVED_DRAFT).' : after
+  const next = state.draft ? APPROVED_DRAFT_NOTE : after
   await report(state.decision === 'APPROVED' ? { key: `pr-${pr} approved`, lines: [`APPROVED by the owner. ${next}`] } : null, pr)
-}
-
-/**
- * Approved and green, yet GitHub won't merge it (#278): what in the reviews blocks it, after dismissing
- * a settled bot change request where the repository opts in (#285, #290). Asked only while GitHub says it is
- * blocked; a lookup that fails says nothing, and the next look asks again.
- */
-const checkBlocked = async (pr: number, head: string): Promise<void> => {
-  const blockers = await reviewBlockers(pr).then(async found => dismissStale({ ...found, head, pr })).catch(() => null)
-  await report(blockers && blockedByReviewEvent({ ...blockers, dismiss: DISMISS_STALE_BOT_REVIEWS, head, pr, self: SELF }), pr)
 }
 
 /**
@@ -162,20 +152,6 @@ const resolveAsked = async (pr: number, state: PrState): Promise<void> => {
     const resolved = await resolveThread(thread.id).catch(() => false)
     await report(resolvedThreadEvent(pr, thread, resolved), pr)
   }))
-}
-
-/** Approved and green for the current head, but auto-merge is still off or it is a draft (#298), or GitHub blocks the merge (#278, #286). */
-const checkReady = async (pr: number, state: PrState): Promise<void> => {
-  const reported = await readLines('reported')
-  const green = reported.includes(`pr-${pr} ci-passed ${state.head}`)
-  // A PR in the merge queue shows auto-merge as off: it waits on the queue, not on the agent (#251).
-  // Out of draft, READY_TO_MERGE waits for a review bot's review where REVIEW_BOTS names one (#299).
-  const held = !state.draft && awaitsBotReview({ bots: REVIEW_BOTS, pr, reported, reviewed: state.botReviewed })
-  const waits = state.decision === 'APPROVED' && !state.autoMerge && !state.queued && !held
-  await report(waits ? approvedEvent({ draft: state.draft, green, head: state.head, merge: mergeCommand(pr), pr, ready: readyCommand(pr), wasDraft: reported.includes(`pr-${pr} approved-draft ${state.head}`) }) : null, pr)
-  // The owner's own approval, not the decision: a stale change request, one of the causes it names,
-  // keeps GitHub's decision at CHANGES_REQUESTED (#286).
-  await (state.ownerApproved && green && state.mergeState === 'BLOCKED' ? checkBlocked(pr, state.head) : Promise.resolve())
 }
 
 const checkOpen = async (pr: number, state: PrState, items: Activity[] | undefined): Promise<void> => {
@@ -191,7 +167,7 @@ const checkOpen = async (pr: number, state: PrState, items: Activity[] | undefin
   await resolveAsked(pr, state)
   await (reviewNews ? checkReview(pr, state) : Promise.resolve())
   await checkRun(pr, state.head, 'pr')
-  await (reviewNews ? checkReady(pr, state).then(async () => askBotsToResolve(pr, state)).then(async () => checkMoved(pr, state.head)) : Promise.resolve())
+  await (reviewNews ? checkApproval(pr, state).then(async () => checkMoved(pr, state.head)) : Promise.resolve())
 }
 
 const checkPr = async (pr: number, state: PrState | undefined, items: Activity[] | undefined): Promise<void> => {
