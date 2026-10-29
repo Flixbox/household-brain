@@ -87,6 +87,14 @@ const dueUsage = async (): Promise<string[]> => oneAtATime('usage-due', async ()
   return [usageText(usage, at)]
 })
 
+/** The reminders, and the owner's Claude usage when it is due (#233, #318); nothing when neither has a line. */
+const sayClosing = async (): Promise<void> => {
+  const closing = [...await openPrs().then(reminders, () => []), ...await dueUsage()]
+  if (closing.length > 0) {
+    say(FOLLOW ? [...closing, '---'] : closing)
+  }
+}
+
 /**
  * Ends a round that found events: prints the ones kept (not following), answers first, and after them
  * a reminder for each open PR waiting on the agent (#224, #226); then exits, or when following, ends
@@ -99,11 +107,7 @@ export const flush = async (): Promise<boolean> => {
   // The events first: a slow listing must not hold them back.
   printFound()
   printed.any = false
-  // Then the reminders, and the owner's Claude usage when it is due (#233, #318).
-  const closing = [...await openPrs().then(reminders, () => []), ...await dueUsage()]
-  if (closing.length > 0) {
-    say(FOLLOW ? [...closing, '---'] : closing)
-  }
+  await sayClosing()
   quiet.since = Temporal.Now.instant()
   if (!FOLLOW) {
     process.exit(0)
