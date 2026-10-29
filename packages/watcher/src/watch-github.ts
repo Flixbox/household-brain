@@ -185,10 +185,10 @@ const stateOf = (value: Json): PrState => {
     mergeSha: textOf(record(value.mergeCommit).oid),
     mergeState: textOf(value.mergeStateStatus),
     mergeable: textOf(value.mergeable),
-    ownerApproved: approvedBy(reviews, OWNER),
     // The commit the owner's latest review approves, on any commit: it marks a draft ready where
     // READY_APPROVED_DRAFTS is on (#301, #317).
     ownerApprovalCommit: ownerApprovalCommit(reviews, OWNER),
+    ownerApproved: approvedBy(reviews, OWNER),
     parked: records(record(value.labels).nodes).some(label => label.name === 'parked'),
     queued: value.isInMergeQueue === true,
     state: textOf(value.state),
