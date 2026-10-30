@@ -3,13 +3,11 @@
  * `Resolved: <reason>` reply asks to resolve (#279), why an approved, green PR still can't merge (#278),
  * the bot change requests it may dismiss where the repository opts in: on an older commit (#285), or
  * on the head once `Resolved:` replies settled them (#290), and what an approval asks for (#298): for
- * a PR approved as a draft, a review bot's review of its head first, where REVIEW_BOTS names bots (#299),
- * and which bots to ask with `@<bot> resolve` where RESOLVE_BOT_REVIEWS names them (#303).
+ * a PR asked for a review bot's review, that review first (#299, #324; watch-bot-review-events.ts), and
+ * which bots to ask with `@<bot> resolve` (#303).
  */
 import type { Event } from './watch-events'
-import { type Json, oneLine, record } from './watch-text'
-import { textOf } from './read'
-import { draftKeys } from './watch-ready-events'
+import { oneLine } from './watch-text'
 
 /** What `BLOCKED_BY_REVIEW` asks for a bot's change request on the head (#290). */
 const SETTLE = 'once its points are dealt with, reply `Resolved: <reason>` in each of its threads (on the PR when it has none), or ask the owner to dismiss it'
@@ -212,14 +210,14 @@ export const blockedByReviewEvent = ({ dismiss, head, pr, reviews, self, threads
  * instead (#298), whatever CI says: it can't be queued and a review bot skips drafts, so it is marked
  * ready (`ready`, the command) first: by the agent, unless READY_APPROVED_DRAFTS has the watcher do it
  * (#301). Once per head.
- * Ready again at a head that was an approved draft (`wasDraft`), READY_TO_MERGE says to settle the
- * review bot's threads first (where REVIEW_BOTS names bots, it comes only once one has reviewed, #299).
+ * For a PR a review bot was asked about (`botAsked`, #324), READY_TO_MERGE comes once it has reviewed,
+ * and says to settle its threads first.
  */
-export const approvedEvent = ({ draft, green, head, merge, pr, ready, wasDraft }: { draft: boolean, green: boolean, head: string, merge: string, pr: number, ready: string, wasDraft: boolean }): Event | null => {
+export const approvedEvent = ({ botAsked, draft, green, head, merge, pr, ready }: { botAsked: boolean, draft: boolean, green: boolean, head: string, merge: string, pr: number, ready: string }): Event | null => {
   if (draft) {
-    return { key: `pr-${pr} approved-draft ${head}`, lines: [`APPROVED_DRAFT: approved by the owner but still a draft: mark it ready (${ready}), wait for the bot review, then queue`] }
+    return { key: `pr-${pr} approved-draft ${head}`, lines: [`APPROVED_DRAFT: approved by the owner but still a draft: mark it ready (${ready}), then queue (after the review a bot was asked for, if any)`] }
   }
-  const when = wasDraft ? 'Once a review bot has reviewed this head and its threads are settled, enable it' : 'Enable it'
+  const when = botAsked ? 'Once the review bot\'s threads are settled, enable it' : 'Enable it'
   return green ? { key: `pr-${pr} ready ${head}`, lines: [`READY_TO_MERGE: approved and CI is green at ${head.slice(0, 7)}, but auto-merge is off. ${when}: ${merge}`] } : null
 }
 
@@ -228,23 +226,6 @@ export const bare = (login: string): string => login.trim().toLowerCase().replac
 
 /** The logins in a comma-separated setting, in `bare` form. */
 export const botNames = (setting: string): string[] => setting.split(',').map(name => bare(name)).filter(name => name !== '')
-
-// REVIEW_BOTS: the review bots' logins, comma-separated (`coderabbitai` or `coderabbitai[bot]`). A PR
-// approved as a draft waits for one of them to review its head before READY_TO_MERGE and its
-// reminder. None by default: nothing waits.
-export const REVIEW_BOTS = botNames(process.env.REVIEW_BOTS ?? '')
-
-/** Whether one of `bots` reviewed commit `head`; `reviews` as GitHub gives them, with `author.login` and `commit.oid`. */
-export const botReviewed = (bots: readonly string[], reviews: readonly Json[], head: string): boolean =>
-  reviews.some(review => bots.includes(bare(textOf(record(review.author).login))) && textOf(record(review.commit).oid) === head)
-
-/**
- * Whether PR `pr` waits for a bot's review: bots are named, it was approved as a draft (APPROVED_DRAFT
- * or DRAFT_READIED, #301, reported at any head, so a push after marking it ready still waits), and no
- * bot reviewed its head.
- */
-export const awaitsBotReview = ({ bots, pr, reported, reviewed }: { bots: readonly string[], pr: number, reported: readonly string[], reviewed: boolean }): boolean =>
-  bots.length > 0 && !reviewed && reported.some(line => draftKeys(pr).some(key => line.startsWith(key)))
 
 // RESOLVE_BOT_REVIEWS: the review bots to ask with `@<bot> resolve` (#303), comma-separated
 // (`coderabbitai` or `coderabbitai[bot]`). None by default: the watcher asks none.

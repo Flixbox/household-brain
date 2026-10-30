@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { type PrComment, type Review, type ReviewThread, approvedEvent, awaitsBotReview, blockedByReviewEvent, botNames, botReviewed, botsToAskResolve, dismissalMessage, dismissedReviewEvent, resolveAskedEvent, resolveCommand, resolvedThreadEvent, reviewsToDismiss, threadsToResolve } from './watch-review-events'
+import { type PrComment, type Review, type ReviewThread, approvedEvent, blockedByReviewEvent, botsToAskResolve, dismissalMessage, dismissedReviewEvent, resolveAskedEvent, resolveCommand, resolvedThreadEvent, reviewsToDismiss, threadsToResolve } from './watch-review-events'
 
 const HEAD = 'abcdef1234567890abcdef1234567890abcdef12'
 const OLD = '1234567890abcdef1234567890abcdef12345678'
@@ -179,7 +179,7 @@ describe('dismissedReviewEvent', () => {
 })
 
 describe('approvedEvent (#298)', () => {
-  const approved = { draft: false, green: true, head: HEAD, merge: 'gh pr merge 7 --auto', pr: 7, ready: 'gh pr ready 7', wasDraft: false }
+  const approved = { botAsked: false, draft: false, green: true, head: HEAD, merge: 'gh pr merge 7 --auto', pr: 7, ready: 'gh pr ready 7' }
 
   it('asks to enable auto-merge once CI is green', () => {
     expect(approvedEvent(approved)).toEqual({ key: `pr-7 ready ${HEAD}`, lines: ['READY_TO_MERGE: approved and CI is green at abcdef1, but auto-merge is off. Enable it: gh pr merge 7 --auto'] })
@@ -187,47 +187,15 @@ describe('approvedEvent (#298)', () => {
   })
 
   it('asks to mark a draft ready instead, once per head, green or not', () => {
-    const draftEvent = { key: `pr-7 approved-draft ${HEAD}`, lines: ['APPROVED_DRAFT: approved by the owner but still a draft: mark it ready (gh pr ready 7), wait for the bot review, then queue'] }
+    const draftEvent = { key: `pr-7 approved-draft ${HEAD}`, lines: ['APPROVED_DRAFT: approved by the owner but still a draft: mark it ready (gh pr ready 7), then queue (after the review a bot was asked for, if any)'] }
     expect(approvedEvent({ ...approved, draft: true })).toEqual(draftEvent)
     expect(approvedEvent({ ...approved, draft: true, green: false })).toEqual(draftEvent)
   })
 
-  it('once a draft is marked ready, asks to wait for the bot review before enabling auto-merge', () => {
-    expect(approvedEvent({ ...approved, wasDraft: true })?.lines[0]).toContain('Once a review bot has reviewed this head')
+  it('asks to settle the review bot\'s threads first where a bot was asked for its review (#324)', () => {
+    expect(approvedEvent({ ...approved, botAsked: true })?.lines[0]).toContain('Once the review bot\'s threads are settled')
   })
 })
-const botReview = (login: string, oid = HEAD) => ({ author: { login }, commit: { oid }, state: 'COMMENTED' })
-
-describe('botNames', () => {
-  it('reads a comma-separated setting, with or without `[bot]`, in lower case', () => {
-    expect(botNames(' CodeRabbitAI[bot], other ,')).toEqual(['coderabbitai', 'other'])
-    expect(botNames('')).toEqual([])
-  })
-})
-
-describe('botReviewed (#299)', () => {
-  it("counts only a named bot's review of the head", () => {
-    expect(botReviewed(['coderabbitai'], [botReview('coderabbitai')], HEAD)).toBe(true)
-    expect(botReviewed(['coderabbitai'], [botReview('coderabbitai[bot]')], HEAD)).toBe(true)
-    expect(botReviewed(['coderabbitai'], [botReview('coderabbitai', 'older')], HEAD)).toBe(false)
-    expect(botReviewed(['coderabbitai'], [botReview('someone')], HEAD)).toBe(false)
-  })
-})
-
-describe('awaitsBotReview (#299)', () => {
-  const waiting = { bots: ['coderabbitai'], pr: 7, reported: ['pr-7 approved-draft 1234567'], reviewed: false }
-
-  it('waits for a PR approved as a draft, at any later head, until a bot reviewed its head', () => {
-    expect(awaitsBotReview(waiting)).toBe(true)
-    expect(awaitsBotReview({ ...waiting, reviewed: true })).toBe(false)
-  })
-
-  it('never waits without bots named, or for a PR not approved as a draft', () => {
-    expect(awaitsBotReview({ ...waiting, bots: [] })).toBe(false)
-    expect(awaitsBotReview({ ...waiting, reported: ['pr-70 approved-draft 1234567', 'pr-7 ready 1234567'] })).toBe(false)
-  })
-})
-
 describe('botsToAskResolve', () => {
   const bot = 'coderabbitai[bot]'
   const ask = (changes: Partial<Parameters<typeof botsToAskResolve>[0]> = {}) => botsToAskResolve({

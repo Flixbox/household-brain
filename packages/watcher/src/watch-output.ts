@@ -9,8 +9,8 @@ import { readUsage, usageText } from './claude-usage'
 import { type Event, type OpenPr, answerFirst, clockTime, listsOpenPrs, openPrLines, reminderLines, stamped } from './watch-events'
 import { lookupNews, lookups } from './watch-gh'
 import { openPrs } from './watch-github'
-import { addLine, oneAtATime, readLines, writeLines } from './watch-state'
-import { REVIEW_BOTS, awaitsBotReview } from './watch-review-events'
+import { addLine, askedBots, oneAtATime, readLines, writeLines } from './watch-state'
+import { awaitsBotReview } from './watch-bot-review-events'
 import { codeVersion, outdatedLine, startedOn } from './watch-version'
 import { postedFrom, shownUsage, usageDue } from './watch-usage'
 
@@ -64,11 +64,10 @@ export const report = async (event: Event | null, pr: number | null = null): Pro
   queue([pr === null ? first : `PR #${pr}: ${first}`, ...rest, ...prs])
 }
 
-/** The reminders for the open PRs, holding auto-merge for those that wait on a review bot (#299). */
+/** The reminders for the open PRs, holding auto-merge for those that wait on a review bot asked for or reviewing (#299, #324). */
 const reminders = async (prs: OpenPr[]): Promise<string[]> => {
-  const reported = await readLines('reported')
-  const awaiting = prs.filter(pr => awaitsBotReview({ bots: REVIEW_BOTS, pr: pr.number, reported, reviewed: pr.botReviewed }))
-  return reminderLines(prs, new Set(awaiting.map(pr => pr.number)))
+  const waits = await Promise.all(prs.map(async pr => awaitsBotReview({ asked: await askedBots(pr.number), state: pr.bot })))
+  return reminderLines(prs, new Set(prs.filter((_pr, index) => waits[index] === true).map(pr => pr.number)))
 }
 
 /**

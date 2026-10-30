@@ -100,6 +100,13 @@ The Firebase project is a Google Cloud project; everything below happens in it.
   never use the `pull_request_target` or `workflow_run` triggers; never add self-hosted runners.
 - Manual fallback: `bun run firebase deploy --only hosting,firestore:rules,firestore:indexes`.
 
+**A review bot asked once per PR, on request** (#324)
+- Where a review bot (CodeRabbit) reviews, switch its automatic reviews off in its config and set
+  `REVIEW_BOTS` in the watcher's settings; then a PR gets the bot's review only when it is labelled
+  `bot-review` (`BOT_REVIEW_LABEL`), once: the watcher asks the bot and takes the label off.
+- Create the label in that repository once (`gh label create bot-review`): GitHub adds only labels
+  that exist.
+
 **The `claude-usage` command, for agents on a machine** (#260)
 - It shares its cache with the watcher. Install it as a wrapper around this repository's copy, e.g.
   the watcher plugin's clone (which the watcher's run command keeps pulled):

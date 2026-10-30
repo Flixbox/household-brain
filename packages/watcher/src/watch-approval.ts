@@ -4,15 +4,17 @@
  * asking a review bot to resolve (#303). Where the repository opts in with READY_APPROVED_DRAFTS=1
  * (#301), it marks a draft ready itself once the owner's latest review approves it, on any commit
  * (#317): a draft can't be queued and a review bot skips it, so the owner's approval is the go-ahead.
- * Merging still waits for CI and, with REVIEW_BOTS, a bot's review of the head. Which drafts is
+ * Merging still waits for CI and, where a review bot was asked (#324), its review. Which drafts is
  * `marksReady` (watch-ready-events.ts). The `GH` token must then be allowed to write pull requests.
  */
 import { DISMISS_STALE_BOT_REVIEWS, askBotsToResolve, dismissStale, reviewBlockers } from './watch-dismiss'
 import { type PrState, REPO, SELF, mergeCommand, readyCommand } from './watch-github'
-import { READY_APPROVED_DRAFTS, draftNote, draftReadiedEvent, marksReady, wasDraftAt } from './watch-ready-events'
-import { REVIEW_BOTS, approvedEvent, awaitsBotReview, blockedByReviewEvent } from './watch-review-events'
+import { READY_APPROVED_DRAFTS, draftNote, draftReadiedEvent, marksReady } from './watch-ready-events'
+import { approvedEvent, blockedByReviewEvent } from './watch-review-events'
+import { askBotReviews } from './watch-bot-review'
+import { awaitsBotReview } from './watch-bot-review-events'
 import { GH, ghText } from './watch-gh'
-import { readLines } from './watch-state'
+import { askedBots, readLines } from './watch-state'
 import { report } from './watch-output'
 
 /** What the APPROVED event says about a draft: who marks it ready. */
@@ -37,15 +39,16 @@ const readyApprovedDraft = async (pr: number, state: PrState): Promise<boolean> 
  * For a PR the owner approved with auto-merge off: READY_TO_MERGE once CI is `green`, or for a draft
  * DRAFT_READIED where the watcher marks it ready itself, else APPROVED_DRAFT (`approvedEvent`).
  */
-const checkAutoMergeOff = async ({ green, pr, reported, state }: { green: boolean, pr: number, reported: readonly string[], state: PrState }): Promise<void> => {
+const checkAutoMergeOff = async ({ green, pr, state }: { green: boolean, pr: number, state: PrState }): Promise<void> => {
   // A PR in the merge queue shows auto-merge as off: it waits on the queue, not on the agent (#251).
-  // Out of draft, READY_TO_MERGE waits for a review bot's review where REVIEW_BOTS names one (#299).
-  const held = !state.draft && awaitsBotReview({ bots: REVIEW_BOTS, pr, reported, reviewed: state.botReviewed })
+  // Out of draft, READY_TO_MERGE waits for the review a bot was asked for, or one in progress (#299, #324).
+  const asked = await askedBots(pr)
+  const held = !state.draft && awaitsBotReview({ asked, state: state.bot })
   const waits = state.decision === 'APPROVED' && !state.autoMerge && !state.queued && !held
   if (!waits || await readyApprovedDraft(pr, state)) {
     return
   }
-  await report(approvedEvent({ draft: state.draft, green, head: state.head, merge: mergeCommand(pr), pr, ready: readyCommand(pr), wasDraft: wasDraftAt(reported, pr, state.head) }), pr)
+  await report(approvedEvent({ botAsked: asked.length > 0, draft: state.draft, green, head: state.head, merge: mergeCommand(pr), pr, ready: readyCommand(pr) }), pr)
 }
 
 /**
@@ -63,9 +66,11 @@ const checkBlocked = async (pr: number, head: string): Promise<void> => {
  * GitHub blocks the merge (#278, #286); then a review bot to ask to resolve (#303).
  */
 export const checkApproval = async (pr: number, state: PrState): Promise<void> => {
+  // A review bot asked for once, on the label (#324), before what waits on it.
+  await (state.bot.requested ? askBotReviews(pr, state) : Promise.resolve())
   const reported = await readLines('reported')
   const green = reported.includes(`pr-${pr} ci-passed ${state.head}`)
-  await checkAutoMergeOff({ green, pr, reported, state })
+  await checkAutoMergeOff({ green, pr, state })
   // The owner's own approval, not the decision: a stale change request, one of the causes it names,
   // keeps GitHub's decision at CHANGES_REQUESTED (#286).
   await (state.ownerApproved && green && state.mergeState === 'BLOCKED' ? checkBlocked(pr, state.head) : Promise.resolve())

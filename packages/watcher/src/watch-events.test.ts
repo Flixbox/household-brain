@@ -103,11 +103,11 @@ describe('mainRunEvent', () => {
 describe('openPrLines', () => {
   it('says where each PR stands', () => {
     expect(openPrLines([
-      { autoMerge: false, botReviewed: false, checks: ['SUCCESS', 'SKIPPED'], draft: false, mergeState: 'CLEAN', number: 3, parked: true, queued: false, reviewDecision: '', title: 'Bump a tool' },
-      { autoMerge: true, botReviewed: false, checks: ['SUCCESS', 'IN_PROGRESS'], draft: false, mergeState: 'CLEAN', number: 4, parked: false, queued: false, reviewDecision: 'APPROVED', title: 'Add a page' },
-      { autoMerge: false, botReviewed: false, checks: ['FAILURE'], draft: false, mergeState: 'CLEAN', number: 5, parked: false, queued: false, reviewDecision: 'CHANGES_REQUESTED', title: 'Fix a bug' },
-      { autoMerge: false, botReviewed: false, checks: ['SUCCESS'], draft: true, mergeState: 'CLEAN', number: 7, parked: false, queued: false, reviewDecision: 'APPROVED', title: 'Show a model' },
-      { autoMerge: false, botReviewed: false, checks: ['SUCCESS'], draft: false, mergeState: 'CLEAN', number: 6, parked: false, queued: true, reviewDecision: 'APPROVED', title: 'Ship it' },
+      { autoMerge: false, bot: { requested: false, reviewed: [], reviewing: false }, checks: ['SUCCESS', 'SKIPPED'], draft: false, mergeState: 'CLEAN', number: 3, parked: true, queued: false, reviewDecision: '', title: 'Bump a tool' },
+      { autoMerge: true, bot: { requested: false, reviewed: [], reviewing: false }, checks: ['SUCCESS', 'IN_PROGRESS'], draft: false, mergeState: 'CLEAN', number: 4, parked: false, queued: false, reviewDecision: 'APPROVED', title: 'Add a page' },
+      { autoMerge: false, bot: { requested: false, reviewed: [], reviewing: false }, checks: ['FAILURE'], draft: false, mergeState: 'CLEAN', number: 5, parked: false, queued: false, reviewDecision: 'CHANGES_REQUESTED', title: 'Fix a bug' },
+      { autoMerge: false, bot: { requested: false, reviewed: [], reviewing: false }, checks: ['SUCCESS'], draft: true, mergeState: 'CLEAN', number: 7, parked: false, queued: false, reviewDecision: 'APPROVED', title: 'Show a model' },
+      { autoMerge: false, bot: { requested: false, reviewed: [], reviewing: false }, checks: ['SUCCESS'], draft: false, mergeState: 'CLEAN', number: 6, parked: false, queued: true, reviewDecision: 'APPROVED', title: 'Ship it' },
     ])).toEqual([
       'Open PRs:',
       '  #3 Bump a tool: parked, awaiting approval, auto-merge off, CI green',
@@ -144,7 +144,7 @@ describe('answerFirst (#222)', () => {
 })
 
 describe('reminderLines (#224)', () => {
-  const pr = (changes: Partial<OpenPr>): OpenPr => ({ autoMerge: false, botReviewed: false, checks: ['SUCCESS'], draft: false, mergeState: 'CLEAN', number: 1, parked: false, queued: false, reviewDecision: 'APPROVED', title: 'x', ...changes })
+  const pr = (changes: Partial<OpenPr>): OpenPr => ({ autoMerge: false, bot: { requested: false, reviewed: [], reviewing: false }, checks: ['SUCCESS'], draft: false, mergeState: 'CLEAN', number: 1, parked: false, queued: false, reviewDecision: 'APPROVED', title: 'x', ...changes })
 
   it('reminds of an approved PR with green CI and auto-merge off, and of one whose CI failed', () => {
     expect(reminderLines([pr({ number: 284 }), pr({ checks: ['SUCCESS', 'FAILURE'], number: 290 })])).toEqual([
@@ -174,7 +174,7 @@ describe('reminderLines (#224)', () => {
 })
 
 describe('reminders for branches that can\'t merge (#226)', () => {
-  const pr = (changes: Partial<OpenPr>): OpenPr => ({ autoMerge: true, botReviewed: false, checks: ['SUCCESS'], draft: false, mergeState: 'CLEAN', number: 314, parked: false, queued: false, reviewDecision: 'APPROVED', title: 'x', ...changes })
+  const pr = (changes: Partial<OpenPr>): OpenPr => ({ autoMerge: true, bot: { requested: false, reviewed: [], reviewing: false }, checks: ['SUCCESS'], draft: false, mergeState: 'CLEAN', number: 314, parked: false, queued: false, reviewDecision: 'APPROVED', title: 'x', ...changes })
 
   it('reminds of a branch behind main or in conflict, approved or not', () => {
     expect(reminderLines([pr({ mergeState: 'BEHIND' }), pr({ mergeState: 'DIRTY', number: 9, reviewDecision: '' })])).toEqual([

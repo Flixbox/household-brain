@@ -118,7 +118,7 @@ export interface OpenPr {
   reviewDecision: string
   autoMerge: boolean
   draft: boolean
-  botReviewed: boolean
+  bot: { requested: boolean, reviewed: string[], reviewing: boolean }
   parked: boolean
   checks: string[]
   /** GitHub's `mergeStateStatus`: `BEHIND` (out of date with the base branch), `DIRTY` (conflicts), … */
