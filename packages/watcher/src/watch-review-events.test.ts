@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { type PrComment, type Review, type ReviewThread, approvedEvent, blockedByReviewEvent, botsToAskResolve, dismissalMessage, dismissedReviewEvent, dismissesCleared, resolveAskedEvent, resolveCommand, resolvedThreadEvent, reviewsToDismiss, threadsToResolve } from './watch-review-events'
+import { type PrComment, type Review, type ReviewThread, approvedEvent, blockedByReviewEvent, botsToAskResolve, dismissalMessage, dismissedReviewEvent, resolveAskedEvent, resolveCommand, resolvedThreadEvent, reviewsToDismiss, threadsToResolve } from './watch-review-events'
 
 const HEAD = 'abcdef1234567890abcdef1234567890abcdef12'
 const OLD = '1234567890abcdef1234567890abcdef12345678'
@@ -169,24 +169,6 @@ describe('dismissalMessage', () => {
     )
     expect(dismissalMessage({ replies: [{ body: 'Resolved: fixed', url: 'https://github.test/r1' }], review: review('coderabbit[bot]', 'CHANGES_REQUESTED') }, 'subagent-cleared'))
       .toStartWith("Dismissed by the project watcher: the PR is labelled `subagent-cleared` (cleared without the owner's approval), and this change request was settled")
-  })
-})
-
-describe('dismissesCleared (#327)', () => {
-  const cleared = { cleared: true, decision: 'CHANGES_REQUESTED', draft: false, enabled: true, green: true, ownerApproved: false }
-
-  it('dismisses on a labelled, green PR that changes are requested on', () => {
-    expect(dismissesCleared(cleared)).toBe(true)
-  })
-
-  it('leaves every other PR alone', () => {
-    expect(dismissesCleared({ ...cleared, cleared: false })).toBe(false)
-    expect(dismissesCleared({ ...cleared, enabled: false })).toBe(false)
-    expect(dismissesCleared({ ...cleared, green: false })).toBe(false)
-    expect(dismissesCleared({ ...cleared, draft: true })).toBe(false)
-    expect(dismissesCleared({ ...cleared, decision: '' })).toBe(false)
-    // The owner's approval takes the usual way (BLOCKED_BY_REVIEW and its dismissal).
-    expect(dismissesCleared({ ...cleared, ownerApproved: true })).toBe(false)
   })
 })
 

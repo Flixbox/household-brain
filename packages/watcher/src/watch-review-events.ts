@@ -154,25 +154,6 @@ export const reviewsToDismiss = ({ comments, complete, head, owner, reviews, sel
 /** Where a change request was left, as the events and the dismissal say it. */
 const where = (review: Review, head: string) => `${review.commit === head ? 'the head' : 'an older commit'} (${review.commit.slice(0, 7)})`
 
-// CLEARED_LABEL: the label the main session puts on a PR it cleared for queueing without the owner's
-// approval (#327), after a review subagent's clean review; `subagent-cleared` by default. With
-// DISMISS_STALE_BOT_REVIEWS on, such a PR's settled bot change requests are dismissed as on an approved one.
-export const CLEARED_LABEL = process.env.CLEARED_LABEL ?? 'subagent-cleared'
-
-/**
- * Whether the watcher dismisses settled bot change requests on a PR the owner hasn't approved (#327):
- * where the repository opts in (`enabled`), the PR carries CLEARED_LABEL (`cleared`), changes are
- * requested, CI is `green` at the head and it is no draft. One the owner approved goes the usual way.
- */
-export const dismissesCleared = ({ cleared, decision, draft, enabled, green, ownerApproved }: {
-  cleared: boolean
-  decision: string
-  draft: boolean
-  enabled: boolean
-  green: boolean
-  ownerApproved: boolean
-}): boolean => enabled && cleared && decision === 'CHANGES_REQUESTED' && green && !draft && !ownerApproved
-
 /** Why a change request may go: the owner's approval, or the PR's `cleared` label (#327; '' when it isn't the reason). */
 const basisOf = (cleared: string, replies: boolean) => {
   if (cleared !== '') {

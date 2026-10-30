@@ -12,7 +12,8 @@
  * labelled CLEARED_LABEL, cleared for queueing without the owner's approval, has its settled bot change
  * requests dismissed as on an approved one (#327): `dismissCleared`.
  */
-import { CLEARED_LABEL, type PrComment, RESOLVE_BOT_REVIEWS, type Review, type ReviewThread, bare, botsToAskResolve, dismissalMessage, dismissedReviewEvent, resolveAskedEvent, resolveCommand, reviewsToDismiss } from './watch-review-events'
+import { type PrComment, RESOLVE_BOT_REVIEWS, type Review, type ReviewThread, bare, botsToAskResolve, dismissalMessage, dismissedReviewEvent, resolveAskedEvent, resolveCommand, reviewsToDismiss } from './watch-review-events'
+import { CLEARED_LABEL, clearedAt, coveredByClearance } from './watch-cleared-events'
 import { OWNER, type PrState, REPO, SELF, gh, graphql, threadsFrom } from './watch-github'
 import { GH, ghText } from './watch-gh'
 import { report } from './watch-output'
@@ -66,22 +67,24 @@ const dismiss = async (pr: number, id: number, message: string): Promise<boolean
 }
 
 /**
- * For a PR the owner approved, or one labelled `cleared` (#327; the caller checks): dismisses what
- * `reviewsToDismiss` names, when the setting is on, and reports each, a failure once (it is tried again
+ * For a PR the owner approved, or one labelled `cleared` at `since` (#327; the caller checks): dismisses
+ * what `reviewsToDismiss` names (for a cleared one, what the clearance covers), when the setting is on, and reports each, a failure once (it is tried again
  * on every look). Returns the reviews with the dismissed ones marked so, for what still blocks the
  * merge.
  */
-export const dismissStale = async ({ cleared = '', comments, complete, head, pr, reviews, threads }: {
+export const dismissStale = async ({ cleared = '', comments, complete, head, pr, reviews, since = '', threads }: {
   cleared?: string
   comments: PrComment[]
   complete: boolean
   head: string
   pr: number
   reviews: Review[]
+  since?: string
   threads: ReviewThread[]
 }): Promise<{ reviews: Review[], threads: ReviewThread[] }> => {
   const dismissed = new Set<number>()
-  const toDismiss = DISMISS_STALE_BOT_REVIEWS ? reviewsToDismiss({ comments, complete, head, owner: OWNER, reviews, self: SELF, threads }) : []
+  const named = DISMISS_STALE_BOT_REVIEWS ? reviewsToDismiss({ comments, complete, head, owner: OWNER, reviews, self: SELF, threads }) : []
+  const toDismiss = cleared === '' ? named : coveredByClearance(named, since)
   await allSettled(toDismiss.map(async dismissal => {
     const done = await dismiss(pr, dismissal.review.id, dismissalMessage(dismissal, cleared))
     if (done) {
@@ -94,13 +97,15 @@ export const dismissStale = async ({ cleared = '', comments, complete, head, pr,
 
 /**
  * For a PR labelled CLEARED_LABEL that `dismissesCleared` picks (the caller checks): dismisses its
- * settled bot change requests as `dismissStale` does for an approved one (#327). The label stays: it
- * marks the PR cleared, like an approval, and keeps no state the watcher would have to retry. A
- * lookup that fails dismisses nothing; the next look asks again.
+ * settled bot change requests as `dismissStale` does for an approved one (#327), those submitted
+ * before the label was last put on (`coveredByClearance`). A lookup that fails dismisses nothing; the
+ * next look asks again.
  */
 export const dismissCleared = async (pr: number, head: string): Promise<void> => {
-  const found = await reviewBlockers(pr).catch(() => null)
-  await (found ? dismissStale({ ...found, cleared: CLEARED_LABEL, head, pr }) : Promise.resolve())
+  const labelled = graphql(`pullRequest(number:${pr}){timelineItems(itemTypes:[LABELED_EVENT],last:100){nodes{... on LabeledEvent{createdAt label{name}}}}}`)
+    .then(value => clearedAt(records(at(value, 'pullRequest', 'timelineItems', 'nodes'))))
+  const [found, since] = await Promise.all([reviewBlockers(pr), labelled]).catch(() => [null, ''] as const)
+  await (found ? dismissStale({ ...found, cleared: CLEARED_LABEL, head, pr, since }) : Promise.resolve())
 }
 
 /** Where the asks to resolve are claimed (#303): one file per PR, head and bot, shared by this machine's watchers of the repository. */
