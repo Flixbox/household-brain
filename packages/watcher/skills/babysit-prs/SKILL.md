@@ -85,7 +85,17 @@ default branch's CI, new issues, the owner's comments on issues, and issues clos
     <reason>` replies, the last comment in each of its threads, or a PR comment after it when it has
     no thread (#290). Its dismissal message quotes those replies; a newer review of the bot needs its
     own. Off by default, when `BLOCKED_BY_REVIEW` names it for the owner to dismiss. A person's
-    change request is never dismissed. The `GH` token must be allowed to write pull requests.
+    change request is never dismissed. The `GH` token must be allowed to write pull requests. It also
+    dismisses them without the owner's approval on a PR labelled `CLEARED_LABEL`, once CI is green at
+    the head and it is no draft (#327): those submitted before the owner or the agent (`SELF`) last
+    put the label on (not since taken off), and only once settled by `Resolved:` replies, on an older
+    commit too (no approval vouches for them).
+  - `CLEARED_LABEL`: the label that marks a PR cleared for queueing without the owner's approval
+    (`subagent-cleared` by default, #327), e.g. after a review subagent's clean review of a PR that
+    isn't user-facing. With `DISMISS_STALE_BOT_REVIEWS=1`, its settled bot change requests are
+    dismissed as on an approved PR, instead of asking the bot to resolve (`RESOLVE_BOT_REVIEWS`). The
+    label must exist in the repository. The watcher never removes it; a bot's change request after
+    the clearance (on new commits) needs a new one: take the label off and put it on again.
   - `READY_APPROVED_DRAFTS`: `1` lets the watcher mark a draft ready itself (`$GH pr ready <n>`)
     once the owner's (never a bot's, nor anyone else's) latest review is an approval, on any commit
     (#301, #317: an approval before a rebase still counts), and report `DRAFT_READIED`, naming the
@@ -99,7 +109,8 @@ default branch's CI, new issues, the owner's comments on issues, and issues clos
     the head, the watcher posts `@<bot> resolve` on the PR, once per head commit (`BOT_RESOLVE_ASKED`).
     It reads no risk rating: whatever the merge risk, it asks, and the bot's own settings
     (CodeRabbit's `max_merge_risk`) decide whether it approves. Not for a draft, a PR the owner
-    opened, or one the owner approved (`DISMISS_STALE_BOT_REVIEWS` handles that one). None by
+    opened, or one the owner approved or labelled `CLEARED_LABEL` (`DISMISS_STALE_BOT_REVIEWS` handles
+    those). None by
     default. The `GH` token must be allowed to comment on pull requests. `@<bot> resolve` asks the bot
     to settle its own change request, not for a new review: it never counts as the one ask of
     `BOT_REVIEW_LABEL`, and the bot's approval after it never counts as the review asked for (it only
@@ -146,7 +157,7 @@ approved one whose auto-merge is still off and that isn't in the merge queue, no
 | `DRAFT_READY_FAILED` | The watcher couldn't mark the approved draft ready; it tries again on every look, and `APPROVED_DRAFT` asks you to do it meanwhile. Repeated, its `GH` token likely can't write pull requests: tell the owner. |
 | `BLOCKED_BY_REVIEW` | The owner approved and CI is green (even while GitHub still says changes requested), but GitHub won't merge it, and the reviews are why. For each thread it names (answered by the agent, still open): check the answer settles it, then reply `Resolved: <reason>` in it with the reply helper (see `ACTIVITY`; the watcher resolves it), or ask the owner. For each change request it names (still counted until dismissed): check its points are dealt with. Where `DISMISS_STALE_BOT_REVIEWS=1`, the watcher dismisses a bot's change request itself (`REVIEW_DISMISSED`): one left on an older commit once no thread is open (resolved, or ending in a `Resolved:` reply, #285), one on the head once you settle it with a `Resolved: <reason>` reply in each of its threads, or on the PR when it has none (#290; a later comment of the owner's that isn't a `Resolved:` reply takes that back until a new `Resolved:` reply follows, #294). Otherwise ask the owner on the PR to dismiss it. |
 | `THREAD_RESOLVED` | The watcher resolved a review thread on a `Resolved: <reason>` reply (anyone's, #279). Nothing to do. |
-| `REVIEW_DISMISSED` | With `DISMISS_STALE_BOT_REVIEWS=1`, the watcher dismissed a bot's change request left on an older commit (the owner approved, no thread open, #285), or on the head once `Resolved:` replies settled it (#290). Nothing to do. |
+| `REVIEW_DISMISSED` | With `DISMISS_STALE_BOT_REVIEWS=1`, the watcher dismissed a bot's change request left on an older commit (the owner approved, no thread open, #285), or on the head once `Resolved:` replies settled it (#290); or the same on a PR labelled `CLEARED_LABEL` without the owner's approval (#327), which the event names. Nothing to do: queue a cleared PR once nothing else blocks it. To clear a PR that waits only on a bot's settled change request, label it `CLEARED_LABEL` (the main session does, after a clean review). |
 | `BOT_REVIEW_ASKED` | With `REVIEW_BOTS` set, the PR got the label `BOT_REVIEW_LABEL` and the watcher posted `@<bot> review` on it, the only time it ever will for that PR, and took the label off (#324; the event says when it couldn't yet, and it tries again). Wait for the review: `READY_TO_MERGE` and its reminder hold until the bot has reviewed. Then handle its points and settle its threads with `Resolved:` replies as usual. Agents never post `@<bot>` commands themselves: label the PR instead. |
 | `BOT_REVIEW_SKIPPED` | The PR got the label, but the bot reviewed it already or was asked already (a `@<bot> review` comment), so it isn't asked again (#324): a PR gets at most one bot review. The label came off. Go on without a new bot review. |
 | `BOT_REVIEW_FAILED` | The watcher couldn't post `@<bot> review`; the label stays and it tries again on every look. Repeated, its `GH` token likely can't comment on pull requests: tell the owner. |

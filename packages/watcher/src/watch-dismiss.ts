@@ -8,9 +8,12 @@
  * change request for the owner to dismiss instead. The `GH` token must be allowed to write pull requests.
  *
  * Before the owner approves, it asks a bot to resolve such a change request instead, where the
- * repository names the bot in RESOLVE_BOT_REVIEWS (#303): `askBotsToResolve`.
+ * repository names the bot in RESOLVE_BOT_REVIEWS (#303): `askBotsToResolve`. A PR the main session
+ * labelled CLEARED_LABEL, cleared for queueing without the owner's approval, has its settled bot change
+ * requests dismissed as on an approved one (#327): `dismissCleared`.
  */
 import { type PrComment, RESOLVE_BOT_REVIEWS, type Review, type ReviewThread, bare, botsToAskResolve, dismissalMessage, dismissedReviewEvent, resolveAskedEvent, resolveCommand, reviewsToDismiss } from './watch-review-events'
+import { CLEARED_LABEL, clearedAt, coveredByClearance } from './watch-cleared-events'
 import { OWNER, type PrState, REPO, SELF, gh, graphql, threadsFrom } from './watch-github'
 import { GH, ghText } from './watch-gh'
 import { report } from './watch-output'
@@ -64,28 +67,47 @@ const dismiss = async (pr: number, id: number, message: string): Promise<boolean
 }
 
 /**
- * For a PR the owner approved (the caller checks): dismisses what `reviewsToDismiss` names, when the
- * setting is on, and reports each, a failure once (it is tried again on every look). Returns the
- * reviews with the dismissed ones marked so, for what still blocks the merge.
+ * For a PR the owner approved, or one labelled `cleared` at `since` (#327; the caller checks): dismisses
+ * what `reviewsToDismiss` names (for a cleared one, what the clearance covers), when the setting is on, and reports each, a failure once (it is tried again
+ * on every look). Returns the reviews with the dismissed ones marked so, for what still blocks the
+ * merge.
  */
-export const dismissStale = async ({ comments, complete, head, pr, reviews, threads }: {
+export const dismissStale = async ({ cleared = '', comments, complete, head, pr, reviews, since = '', threads }: {
+  cleared?: string
   comments: PrComment[]
   complete: boolean
   head: string
   pr: number
   reviews: Review[]
+  since?: string
   threads: ReviewThread[]
 }): Promise<{ reviews: Review[], threads: ReviewThread[] }> => {
   const dismissed = new Set<number>()
-  const toDismiss = DISMISS_STALE_BOT_REVIEWS ? reviewsToDismiss({ comments, complete, head, owner: OWNER, reviews, self: SELF, threads }) : []
+  const strict = cleared !== ''
+  const named = DISMISS_STALE_BOT_REVIEWS ? reviewsToDismiss({ comments, complete, head, owner: OWNER, reviews, self: SELF, strict, threads }) : []
+  const toDismiss = strict ? coveredByClearance(named, since) : named
   await allSettled(toDismiss.map(async dismissal => {
-    const done = await dismiss(pr, dismissal.review.id, dismissalMessage(dismissal))
+    const done = await dismiss(pr, dismissal.review.id, dismissalMessage(dismissal, cleared))
     if (done) {
       dismissed.add(dismissal.review.id)
     }
-    await report(dismissedReviewEvent({ dismissal, dismissed: done, head, pr }), pr)
+    await report(dismissedReviewEvent({ cleared, dismissal, dismissed: done, head, pr }), pr)
   }))
   return { reviews: reviews.map(review => (dismissed.has(review.id) ? { ...review, state: 'DISMISSED' } : review)), threads }
+}
+
+/**
+ * For a PR labelled CLEARED_LABEL that `dismissesCleared` picks (the caller checks): dismisses its
+ * settled bot change requests as `dismissStale` does for an approved one (#327), those submitted
+ * before the label was last put on (`coveredByClearance`). A lookup that fails dismisses nothing; the
+ * next look asks again.
+ */
+export const dismissCleared = async (pr: number, head: string): Promise<void> => {
+  const event = 'createdAt actor{login kind:__typename} label{name}'
+  const labelled = graphql(`pullRequest(number:${pr}){timelineItems(itemTypes:[LABELED_EVENT,UNLABELED_EVENT],last:100){nodes{kind:__typename ... on LabeledEvent{${event}} ... on UnlabeledEvent{${event}}}}}`)
+    .then(value => clearedAt(records(at(value, 'pullRequest', 'timelineItems', 'nodes')), [OWNER, SELF]))
+  const [found, since] = await Promise.all([reviewBlockers(pr), labelled]).catch(() => [null, ''] as const)
+  await (found ? dismissStale({ ...found, cleared: CLEARED_LABEL, head, pr, since }) : Promise.resolve())
 }
 
 /** Where the asks to resolve are claimed (#303): one file per PR, head and bot, shared by this machine's watchers of the repository. */
@@ -120,7 +142,8 @@ const askOnce = async (pr: number, head: string, login: string): Promise<boolean
  * once its change request is settled it never approves by itself, and a low-risk PR waits for the
  * owner. The comment makes it resolve its threads and approve within its own `max_merge_risk`: the
  * watcher reads no risk rating. Only for a PR that changes are requested on, with CI passed at the
- * head, no draft, not the owner's and not approved by them (`dismissStale` handles that one); which bots
+ * head, no draft, not the owner's and not approved by them (`dismissStale` handles that one; the caller
+ * skips one `dismissCleared` handles, #327); which bots
  * is `botsToAskResolve`. Each ask is reported, a failure once (tried again on every look). A lookup
  * that fails asks nothing.
  */

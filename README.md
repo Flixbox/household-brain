@@ -107,6 +107,15 @@ The Firebase project is a Google Cloud project; everything below happens in it.
 - Create the label in that repository once (`gh label create bot-review`): GitHub adds only labels
   that exist.
 
+**Clearing a PR without the owner's approval** (#327)
+- Where a PR that isn't user-facing may be queued without the owner, after a clean review by a
+  review subagent, label it `subagent-cleared` (`CLEARED_LABEL`): with `DISMISS_STALE_BOT_REVIEWS=1`
+  the watcher then dismisses a bot's settled change request on it (CI green, every thread settled),
+  which would otherwise keep blocking the merge. Only the owner's or the agent's label counts, every
+  such change request needs its `Resolved:` replies, and it covers only those submitted before the
+  label was last put on: after a later one, take the label off and put it on again to clear it.
+- Create the label in that repository once (`gh label create subagent-cleared`).
+
 **The `claude-usage` command, for agents on a machine** (#260)
 - It shares its cache with the watcher. Install it as a wrapper around this repository's copy, e.g.
   the watcher plugin's clone (which the watcher's run command keeps pulled):

@@ -105,6 +105,17 @@ describe('reviewsToDismiss', () => {
     expect(dismiss([review('reviewer[bot]', 'CHANGES_REQUESTED', { commit: OLD })], [thread('T1', { resolved: true })])).toEqual([1])
   })
 
+  it('asks the same `Resolved:` replies of an older commit\'s change request when strict (#327)', () => {
+    const older = review('coderabbit[bot]', 'CHANGES_REQUESTED', { commit: OLD, id: 8 })
+    const strict = (threads: ReviewThread[], comments: PrComment[] = []) =>
+      reviewsToDismiss({ ...settlers, comments, complete: true, head: HEAD, reviews: [older], strict: true, threads }).map(each => each.review.id)
+    // Summary-only, or its threads resolved by a click: unsettled.
+    expect(strict([])).toEqual([])
+    expect(strict([thread('T1', { lastAuthor: 'coderabbit[bot]', lastBody: 'Please fix.', resolved: true, review: 8 })])).toEqual([])
+    expect(strict([settled('T1', { review: 8 })])).toEqual([8])
+    expect(strict([], [comment(SELF, 'Resolved: the summary\'s points are fixed')])).toEqual([8])
+  })
+
   it('takes none when not every thread could be read', () => {
     expect(reviewsToDismiss({ ...settlers, comments: [], complete: false, head: HEAD, reviews: [review('reviewer[bot]', 'CHANGES_REQUESTED', { commit: OLD })], threads: [] })).toEqual([])
   })
@@ -162,6 +173,14 @@ describe('dismissalMessage', () => {
     )
     expect(dismissalMessage({ replies: [], review: review('reviewer[bot]', 'CHANGES_REQUESTED', { commit: OLD }) })).toContain('a newer commit')
   })
+
+  it('names the label on a PR cleared without the owner (#327)', () => {
+    expect(dismissalMessage({ replies: [], review: review('reviewer[bot]', 'CHANGES_REQUESTED', { commit: OLD }) }, 'subagent-cleared')).toBe(
+      "Dismissed by the project watcher: the PR is labelled `subagent-cleared` (cleared without the owner's approval), and no review thread is open (DISMISS_STALE_BOT_REVIEWS).",
+    )
+    expect(dismissalMessage({ replies: [{ body: 'Resolved: fixed', url: 'https://github.test/r1' }], review: review('coderabbit[bot]', 'CHANGES_REQUESTED') }, 'subagent-cleared'))
+      .toStartWith("Dismissed by the project watcher: the PR is labelled `subagent-cleared` (cleared without the owner's approval), and this change request was settled")
+  })
 })
 
 describe('dismissedReviewEvent', () => {
@@ -174,6 +193,13 @@ describe('dismissedReviewEvent', () => {
     expect(dismissedReviewEvent({ dismissal: { replies: [], review: old }, dismissed: false, head: HEAD, pr: 7 }).key).toBe('pr-7 review-dismiss-failed 42')
     expect(dismissedReviewEvent({ dismissal: { replies: [{ body: 'Resolved: x', url: '' }], review: review('reviewer[bot]', 'CHANGES_REQUESTED', { id: 43 }) }, dismissed: true, head: HEAD, pr: 7 }).lines).toEqual([
       "REVIEW_DISMISSED: dismissed reviewer[bot]'s change request on the head (abcdef1): the owner approved, and `Resolved:` replies settled it",
+    ])
+  })
+
+  it('names the label instead of an approval on a PR cleared without the owner (#327)', () => {
+    const old = review('reviewer[bot]', 'CHANGES_REQUESTED', { commit: OLD, id: 42 })
+    expect(dismissedReviewEvent({ cleared: 'subagent-cleared', dismissal: { replies: [], review: old }, dismissed: true, head: HEAD, pr: 7 }).lines).toEqual([
+      "REVIEW_DISMISSED: dismissed reviewer[bot]'s change request on an older commit (1234567): the PR is labelled `subagent-cleared`, and no review thread is open",
     ])
   })
 })
