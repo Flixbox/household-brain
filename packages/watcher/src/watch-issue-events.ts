@@ -1,19 +1,32 @@
 /** What the watcher reports about issues opening and closing, decided from what GitHub answered (pure, so it is tested). */
 import { type Json, actor, at, count, oneLine, record, records } from './watch-text'
 import { commentText } from './watch-comment-lines'
+import type { OpenIssue } from './watch-link-cycles'
 import { textOf } from './read'
 
-/** One page of open issues: their numbers, and the cursor of the next page (null on the last). */
+/** One page of open issues: each with its blockers, and the cursor of the next page (null on the last). */
 export interface IssuePage {
-  numbers: number[]
+  issues: OpenIssue[]
   next: string | null
 }
+
+/**
+ * The open issues' fields: with each, the issues it is blocked by (#335), for LINK_CYCLE, in the same
+ * query, so the cycle check costs no extra call. A blocker in another repository is left out.
+ */
+export const OPEN_ISSUE_FIELDS = 'number blockedBy(first:50){nodes{number repository{nameWithOwner}}}'
+
+/** The issues `issue` is blocked by in `repo`. */
+const blockersIn = (issue: Json, repo: string): number[] =>
+  records(at(issue, 'blockedBy', 'nodes'))
+    .filter(blocker => textOf(record(blocker.repository).nameWithOwner).toLowerCase() === repo.toLowerCase())
+    .map(blocker => count(blocker.number))
 
 /**
  * A page of GraphQL's `issues` connection. An answer without `pageInfo` is a failed one, not an empty
  * last page: a list cut short would report every issue past it as closed (#261).
  */
-export const issuePage = (connection: unknown): IssuePage => {
+export const issuePage = (connection: unknown, repo: string): IssuePage => {
   const { nodes, pageInfo } = record(connection)
   const info = record(pageInfo)
   if (!Array.isArray(nodes) || typeof info.hasNextPage !== 'boolean') {
@@ -23,16 +36,16 @@ export const issuePage = (connection: unknown): IssuePage => {
   if (info.hasNextPage && next === '') {
     throw new Error('GitHub gave no cursor for the next page of open issues')
   }
-  return { next: info.hasNextPage ? next : null, numbers: records(nodes).map(node => count(node.number)) }
+  return { issues: records(nodes).map(node => ({ blockedBy: blockersIn(node, repo), number: count(node.number) })), next: info.hasNextPage ? next : null }
 }
 
 /**
  * Every open issue, page by page through GraphQL's cursors (#261): GitHub's REST list stopped after
  * its first hundred open issues. Any page failing fails the whole list.
  */
-export const allIssueNumbers = async (page: (cursor: string | null) => Promise<IssuePage>, cursor: string | null = null): Promise<number[]> => {
-  const { next, numbers } = await page(cursor)
-  return next === null ? numbers : [...numbers, ...await allIssueNumbers(page, next)]
+export const allOpenIssues = async (page: (cursor: string | null) => Promise<IssuePage>, cursor: string | null = null): Promise<OpenIssue[]> => {
+  const { issues, next } = await page(cursor)
+  return next === null ? issues : [...issues, ...await allOpenIssues(page, next)]
 }
 
 /**

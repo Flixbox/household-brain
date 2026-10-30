@@ -4,8 +4,9 @@ import type { QueueEntry } from './watch-queue-events'
 import { type BotReviewState, NO_BOT_REVIEW, REVIEW_BOTS, botReviewStateOf } from './watch-bot-review-events'
 import { type ReviewThread, threadsToResolve } from './watch-review-events'
 import { CLEARED_LABEL } from './watch-cleared-events'
-import { allIssueNumbers, goneIssueLine, isGone, isMoved, issueEventLine, issuePage } from './watch-issue-events'
+import { OPEN_ISSUE_FIELDS, allOpenIssues, goneIssueLine, isGone, isMoved, issueEventLine, issuePage } from './watch-issue-events'
 import { GH, failedStatus, ghText } from './watch-gh'
+import type { OpenIssue } from './watch-link-cycles'
 import { ownerOfRepo } from './watch-owner'
 import { ownerApprovalCommit } from './watch-ready-events'
 import { hasText, isRecord, textOf } from './read'
@@ -266,9 +267,9 @@ export const mainHead = async (): Promise<{ sha: string, subject: string }> => {
   return { sha: textOf(value.sha), subject: textOf(record(value.commit).message).split('\n')[0] ?? '' }
 }
 
-/** Every open issue's number (#261), through GraphQL: the REST list stops after its first hundred. */
-export const openIssueNumbers = async (): Promise<number[]> => allIssueNumbers(async cursor =>
-  issuePage(at(await graphql(`issues(states:OPEN,first:100,after:${JSON.stringify(cursor)}){nodes{number} pageInfo{hasNextPage endCursor}}`), 'issues')))
+/** Every open issue (#261), with its blockers (#335), through GraphQL: the REST list stops after its first hundred. */
+export const openIssues = async (): Promise<OpenIssue[]> => allOpenIssues(async cursor =>
+  issuePage(at(await graphql(`issues(states:OPEN,first:100,after:${JSON.stringify(cursor)}){nodes{${OPEN_ISSUE_FIELDS}} pageInfo{hasNextPage endCursor}}`), 'issues'), REPO))
 
 /**
  * The line for an issue that left or joined the open list. An issue that is gone (deleted or
