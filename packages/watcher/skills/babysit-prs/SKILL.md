@@ -87,12 +87,12 @@ default branch's CI, new issues, the owner's comments on issues, and issues clos
     own. Off by default, when `BLOCKED_BY_REVIEW` names it for the owner to dismiss. A person's
     change request is never dismissed. The `GH` token must be allowed to write pull requests. It also
     dismisses them without the owner's approval on a PR labelled `CLEARED_LABEL`, once CI is green at
-    the head and it is no draft (#327), and takes the label off once it dismissed one (and none failed).
+    the head and it is no draft (#327); the label stays on.
   - `CLEARED_LABEL`: the label that marks a PR cleared for queueing without the owner's approval
     (`subagent-cleared` by default, #327), e.g. after a review subagent's clean review of a PR that
     isn't user-facing. With `DISMISS_STALE_BOT_REVIEWS=1`, its settled bot change requests are
     dismissed as on an approved PR, instead of asking the bot to resolve (`RESOLVE_BOT_REVIEWS`). The
-    label must exist in the repository, and the `GH` token must be allowed to remove labels.
+    label must exist in the repository. The watcher never removes it: it counts like an approval.
   - `READY_APPROVED_DRAFTS`: `1` lets the watcher mark a draft ready itself (`$GH pr ready <n>`)
     once the owner's (never a bot's, nor anyone else's) latest review is an approval, on any commit
     (#301, #317: an approval before a rebase still counts), and report `DRAFT_READIED`, naming the

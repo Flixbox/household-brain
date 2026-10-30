@@ -111,7 +111,7 @@ The Firebase project is a Google Cloud project; everything below happens in it.
 - Where a PR that isn't user-facing may be queued without the owner, after a clean review by a
   review subagent, label it `subagent-cleared` (`CLEARED_LABEL`): with `DISMISS_STALE_BOT_REVIEWS=1`
   the watcher then dismisses a bot's settled change request on it (CI green, every thread settled),
-  which would otherwise keep blocking the merge, and takes the label off.
+  which would otherwise keep blocking the merge. The label stays on, like an approval.
 - Create the label in that repository once (`gh label create subagent-cleared`).
 
 **The `claude-usage` command, for agents on a machine** (#260)

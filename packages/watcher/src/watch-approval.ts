@@ -58,7 +58,7 @@ const checkAutoMergeOff = async ({ green, pr, state }: { green: boolean, pr: num
  */
 const checkBlocked = async (pr: number, head: string): Promise<void> => {
   const blockers = await reviewBlockers(pr).then(async found => dismissStale({ ...found, head, pr })).catch(() => null)
-  await report(blockers && blockedByReviewEvent({ dismiss: DISMISS_STALE_BOT_REVIEWS, head, pr, reviews: blockers.reviews, self: SELF, threads: blockers.threads }), pr)
+  await report(blockers && blockedByReviewEvent({ ...blockers, dismiss: DISMISS_STALE_BOT_REVIEWS, head, pr, self: SELF }), pr)
 }
 
 /**

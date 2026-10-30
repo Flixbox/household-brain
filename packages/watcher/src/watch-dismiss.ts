@@ -14,7 +14,7 @@
  */
 import { CLEARED_LABEL, type PrComment, RESOLVE_BOT_REVIEWS, type Review, type ReviewThread, bare, botsToAskResolve, dismissalMessage, dismissedReviewEvent, resolveAskedEvent, resolveCommand, reviewsToDismiss } from './watch-review-events'
 import { OWNER, type PrState, REPO, SELF, gh, graphql, threadsFrom } from './watch-github'
-import { GH, failedStatus, ghText } from './watch-gh'
+import { GH, ghText } from './watch-gh'
 import { report } from './watch-output'
 import { readLines } from './watch-state'
 import { WATCHERS_DIR, claim, removeOlder, unclaim } from './watch-files'
@@ -69,7 +69,7 @@ const dismiss = async (pr: number, id: number, message: string): Promise<boolean
  * For a PR the owner approved, or one labelled `cleared` (#327; the caller checks): dismisses what
  * `reviewsToDismiss` names, when the setting is on, and reports each, a failure once (it is tried again
  * on every look). Returns the reviews with the dismissed ones marked so, for what still blocks the
- * merge, and how many it dismissed and failed to.
+ * merge.
  */
 export const dismissStale = async ({ cleared = '', comments, complete, head, pr, reviews, threads }: {
   cleared?: string
@@ -79,7 +79,7 @@ export const dismissStale = async ({ cleared = '', comments, complete, head, pr,
   pr: number
   reviews: Review[]
   threads: ReviewThread[]
-}): Promise<{ dismissed: number, failed: number, reviews: Review[], threads: ReviewThread[] }> => {
+}): Promise<{ reviews: Review[], threads: ReviewThread[] }> => {
   const dismissed = new Set<number>()
   const toDismiss = DISMISS_STALE_BOT_REVIEWS ? reviewsToDismiss({ comments, complete, head, owner: OWNER, reviews, self: SELF, threads }) : []
   await allSettled(toDismiss.map(async dismissal => {
@@ -89,28 +89,18 @@ export const dismissStale = async ({ cleared = '', comments, complete, head, pr,
     }
     await report(dismissedReviewEvent({ cleared, dismissal, dismissed: done, head, pr }), pr)
   }))
-  const marked = reviews.map(review => (dismissed.has(review.id) ? { ...review, state: 'DISMISSED' } : review))
-  return { dismissed: dismissed.size, failed: toDismiss.length - dismissed.size, reviews: marked, threads }
+  return { reviews: reviews.map(review => (dismissed.has(review.id) ? { ...review, state: 'DISMISSED' } : review)), threads }
 }
 
 /**
- * Takes label `label` off PR `pr` with the `GH` token; true once it is gone, also when another watcher
- * was first (404).
- */
-export const unlabel = async (pr: number, label: string): Promise<boolean> =>
-  gh(['api', '-X', 'DELETE', `repos/${REPO}/issues/${pr}/labels/${encodeURIComponent(label)}`], GH, true)
-    .then(() => true, (error: unknown) => failedStatus(error) === 404)
-
-/**
  * For a PR labelled CLEARED_LABEL that `dismissesCleared` picks (the caller checks): dismisses its
- * settled bot change requests as `dismissStale` does for an approved one (#327), and takes the label
- * off once it dismissed one and none failed, so a later change request needs a new clearance. A
+ * settled bot change requests as `dismissStale` does for an approved one (#327). The label stays: it
+ * marks the PR cleared, like an approval, and keeps no state the watcher would have to retry. A
  * lookup that fails dismisses nothing; the next look asks again.
  */
 export const dismissCleared = async (pr: number, head: string): Promise<void> => {
   const found = await reviewBlockers(pr).catch(() => null)
-  const outcome = found ? await dismissStale({ ...found, cleared: CLEARED_LABEL, head, pr }) : null
-  await (outcome && outcome.dismissed > 0 && outcome.failed === 0 ? unlabel(pr, CLEARED_LABEL) : Promise.resolve())
+  await (found ? dismissStale({ ...found, cleared: CLEARED_LABEL, head, pr }) : Promise.resolve())
 }
 
 /** Where the asks to resolve are claimed (#303): one file per PR, head and bot, shared by this machine's watchers of the repository. */

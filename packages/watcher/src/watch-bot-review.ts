@@ -12,12 +12,21 @@
  */
 import { BOT_REVIEW_LABEL, REVIEW_BOTS, botReviewEvent, notAskingBecause, reviewCommand } from './watch-bot-review-events'
 import type { PrComment } from './watch-review-events'
-import type { PrState } from './watch-github'
+import { type PrState, REPO, gh } from './watch-github'
+import { GH, failedStatus } from './watch-gh'
 import { askedFile } from './watch-state'
 import { claim, unclaim, writeWhole } from './watch-files'
 import { allSettled } from './read'
 import { report } from './watch-output'
-import { comment, reviewBlockers, unlabel } from './watch-dismiss'
+import { comment, reviewBlockers } from './watch-dismiss'
+
+/**
+ * Takes BOT_REVIEW_LABEL off PR `pr` with the `GH` token; true once it is gone, also when another
+ * watcher was first (404).
+ */
+const unlabel = async (pr: number): Promise<boolean> =>
+  gh(['api', '-X', 'DELETE', `repos/${REPO}/issues/${pr}/labels/${encodeURIComponent(BOT_REVIEW_LABEL)}`], GH, true)
+    .then(() => true, (error: unknown) => failedStatus(error) === 404)
 
 type Outcome = { asked: boolean } | { skipped: string } | 'done' | 'pending'
 
@@ -71,7 +80,7 @@ export const askBotReviews = async (pr: number, state: PrState): Promise<void> =
   }
   const outcomes = await Promise.all(REVIEW_BOTS.map(async bot => ({ bot, outcome: await askOnce({ bot, comments: found.comments, pr, state }) })))
   const finished = outcomes.every(({ outcome }) => outcome === 'done' || (typeof outcome === 'object' && !('asked' in outcome && !outcome.asked)))
-  const unlabelled = finished && await unlabel(pr, BOT_REVIEW_LABEL)
+  const unlabelled = finished && await unlabel(pr)
   await allSettled(outcomes.map(async ({ bot, outcome }) =>
     (typeof outcome === 'string' ? Promise.resolve() : report(botReviewEvent({ bot, outcome, pr, unlabelled }), pr))))
 }
