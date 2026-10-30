@@ -14,12 +14,17 @@
  *   pr-<n>-seen    the comments and reviews of a PR already reported
  *   initialized    set after the first complete round: from then on, a PR is new, and so is all on it
  *
+ * And, shared by all of this machine's watchers of the repository: `review-asked/pr-<n>-<bot>`, one
+ * empty file for each review bot asked to review a PR, or seen asked (#324), so it is asked once.
+ *
  * Any number of watchers can watch one repository at once, and each reports every event (#264): each
  * remembers in a folder of its own, by its WATCHER_ID.
  */
 import { REPO } from './watch-github'
 import { WATCHERS_DIR, removeOlder, writeWhole } from './watch-files'
 import { hasText, ignoreFailure } from './read'
+import { REVIEW_BOTS } from './watch-bot-review-events'
+import { bare } from './watch-review-events'
 
 // WATCHER_ID: which watcher this is (#264); by default the Claude Code session's id, so a watcher
 // started again in the same session (a re-armed Monitor) goes on where the last one stopped, and one
@@ -35,6 +40,14 @@ const watcherDir = hasText(WATCHER_ID) ? `${SESSIONS_DIR}/${folderOf(WATCHER_ID)
 const DIR = hasText(process.env.STATE_DIR) ? process.env.STATE_DIR : watcherDir
 
 const stateFile = (name: string) => `${DIR}/${name}`
+
+/** Where the asks for a bot's review are claimed (#324): one file per PR and bot, shared by this machine's watchers. */
+const ASKED_DIR = `${REPO_DIR}/review-asked`
+export const askedFile = (pr: number, bot: string): string => `${ASKED_DIR}/pr-${pr}-${bare(bot)}`
+
+/** The bots in REVIEW_BOTS that a watcher on this machine asked to review PR `pr`, or saw asked (#324). */
+export const askedBots = async (pr: number): Promise<string[]> =>
+  (await Promise.all(REVIEW_BOTS.map(async bot => ((await Bun.file(askedFile(pr, bot)).exists()) ? [bot] : [])))).flat()
 
 export const exists = async (name: string): Promise<boolean> => Bun.file(stateFile(name)).exists()
 
@@ -96,6 +109,8 @@ export const addLine = async (name: string, line: string): Promise<boolean> => o
 export const start = async (): Promise<void> => {
   // A session that came back after this long starts afresh: it hears where each PR stands again.
   await removeOlder(SESSIONS_DIR, Temporal.Duration.from({ hours: 24 * 14 }))
+  // A PR asked about months ago is long merged or closed: its claim is only taking up room.
+  await removeOlder(ASKED_DIR, Temporal.Duration.from({ hours: 24 * 90 }))
   process.on('SIGTERM', () => { process.exit(143) })
   process.on('SIGINT', () => { process.exit(130) })
 }

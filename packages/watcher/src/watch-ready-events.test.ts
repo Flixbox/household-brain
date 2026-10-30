@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { draftNote, draftReadiedEvent, marksReady, ownerApprovalCommit, wasDraftAt } from './watch-ready-events'
-import { awaitsBotReview } from './watch-review-events'
+import { draftNote, draftReadiedEvent, marksReady, ownerApprovalCommit } from './watch-ready-events'
 
 const HEAD = 'abcdef1234567890'
 const OLD = '1234567890abcdef'
@@ -48,7 +47,7 @@ describe('draftReadiedEvent (#301)', () => {
   it('reports the draft marked ready once per head, and a failure under its own key', () => {
     expect(draftReadiedEvent({ approved: HEAD, head: HEAD, pr: 7, readied: true })).toEqual({
       key: `pr-7 draft-readied ${HEAD}`,
-      lines: ["DRAFT_READIED: the owner approved the draft's head (abcdef1), so the watcher marked it ready (READY_APPROVED_DRAFTS): wait for the bot review of the head, settle its threads, then queue"],
+      lines: ["DRAFT_READIED: the owner approved the draft's head (abcdef1), so the watcher marked it ready (READY_APPROVED_DRAFTS): queue once CI is green (after the review a bot was asked for, if any, and its threads settled)"],
     })
     expect(draftReadiedEvent({ approved: HEAD, head: HEAD, pr: 7, readied: false }).key).toBe(`pr-7 draft-ready-failed ${HEAD}`)
   })
@@ -56,22 +55,7 @@ describe('draftReadiedEvent (#301)', () => {
   it('names the older commit the owner approved, keyed by the head (#317)', () => {
     expect(draftReadiedEvent({ approved: OLD, head: HEAD, pr: 7, readied: true })).toEqual({
       key: `pr-7 draft-readied ${HEAD}`,
-      lines: ['DRAFT_READIED: the owner approved the draft at 1234567, before its head abcdef1, so the watcher marked it ready (READY_APPROVED_DRAFTS): wait for the bot review of the head, settle its threads, then queue'],
+      lines: ['DRAFT_READIED: the owner approved the draft at 1234567, before its head abcdef1, so the watcher marked it ready (READY_APPROVED_DRAFTS): queue once CI is green (after the review a bot was asked for, if any, and its threads settled)'],
     })
-  })
-
-  it('counts as approved as a draft, like APPROVED_DRAFT, for the wait on the bot review (#299)', () => {
-    const reported = [`pr-7 draft-readied ${HEAD}`]
-    expect(wasDraftAt(reported, 7, HEAD)).toBe(true)
-    expect(wasDraftAt([`pr-7 approved-draft ${HEAD}`], 7, HEAD)).toBe(true)
-    expect(wasDraftAt(reported, 7, OLD)).toBe(false)
-    expect(wasDraftAt([`pr-7 draft-ready-failed ${HEAD}`], 7, HEAD)).toBe(false)
-    expect(awaitsBotReview({ bots: ['coderabbitai'], pr: 7, reported, reviewed: false })).toBe(true)
-  })
-
-  it('still waits for the bot review of the head when the approval was on an older commit (#317)', () => {
-    const reported = [draftReadiedEvent({ approved: OLD, head: HEAD, pr: 7, readied: true }).key]
-    expect(awaitsBotReview({ bots: ['coderabbitai'], pr: 7, reported, reviewed: false })).toBe(true)
-    expect(awaitsBotReview({ bots: ['coderabbitai'], pr: 7, reported, reviewed: true })).toBe(false)
   })
 })

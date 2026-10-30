@@ -66,9 +66,19 @@ default branch's CI, new issues, the owner's comments on issues, and issues clos
   - `GH_PARALLEL`: how many `gh` calls run at once (4 by default); the pull requests are checked in
     parallel, and the cap keeps the bursts within GitHub's rate limits.
   - `REVIEW_BOTS`: the review bots' logins, comma-separated (`coderabbitai`, with or without `[bot]`).
-    A PR the owner approved while it was a draft gets no `READY_TO_MERGE` and no auto-merge reminder
-    until one of them has reviewed its current head (#299), since a review bot skips drafts. None by
-    default: nothing waits.
+    Their reviews are asked for, never awaited by default (#324): a PR labelled `BOT_REVIEW_LABEL`
+    gets `@<bot> review` from the watcher, once per PR ever (not again after new pushes, nor when the
+    bot reviewed it already or someone posted `@<bot> review` before), and the label comes off
+    (`BOT_REVIEW_ASKED`). Only such a PR, or one whose head shows a bot's check run still going (a
+    review in progress), gets no `READY_TO_MERGE` and no auto-merge reminder until the bot has
+    reviewed it; a PR nobody asked a bot about waits for none (#299 waited for every approved draft).
+    None by default: nothing is asked, nothing waits. The `GH` token must be allowed to comment on
+    pull requests and to remove labels.
+  - `BOT_REVIEW_LABEL`: the label that asks `REVIEW_BOTS` for a review (`bot-review` by default,
+    #324). The label must exist in the repository. Which asks were made is remembered on this
+    machine (`$XDG_STATE_HOME/watch-project/<owner>_<repo>/review-asked/`), shared by its watchers; a
+    watcher on another machine sees the `@<bot> review` comment and doesn't ask again, but waits only
+    on asks it saw.
   - `DISMISS_STALE_BOT_REVIEWS`: `1` lets the watcher dismiss a bot's (`…[bot]`) change request, once
     the owner approved and no review thread is open without a `Resolved:` reply: one left on an older
     commit (#285), or one on the head once the agent (`SELF`) or the owner settled it with `Resolved:
@@ -79,8 +89,8 @@ default branch's CI, new issues, the owner's comments on issues, and issues clos
   - `READY_APPROVED_DRAFTS`: `1` lets the watcher mark a draft ready itself (`$GH pr ready <n>`)
     once the owner's (never a bot's, nor anyone else's) latest review is an approval, on any commit
     (#301, #317: an approval before a rebase still counts), and report `DRAFT_READIED`, naming the
-    approved commit, instead of `APPROVED_DRAFT`. Merging still waits for CI and, with `REVIEW_BOTS`,
-    for a bot's review of the head. Off by default, when `APPROVED_DRAFT` asks you to
+    approved commit, instead of `APPROVED_DRAFT`. Merging still waits for CI and, where a review bot
+    was asked (#324), for its review. Off by default, when `APPROVED_DRAFT` asks you to
     mark it ready. The `GH` token must be allowed to write pull requests.
   - `RESOLVE_BOT_REVIEWS`: the review bots to ask with `@<bot> resolve` (`coderabbitai`, with or
     without `[bot]`; comma-separated) (#303). A bot like CodeRabbit decides on approving only when it
@@ -90,7 +100,10 @@ default branch's CI, new issues, the owner's comments on issues, and issues clos
     It reads no risk rating: whatever the merge risk, it asks, and the bot's own settings
     (CodeRabbit's `max_merge_risk`) decide whether it approves. Not for a draft, a PR the owner
     opened, or one the owner approved (`DISMISS_STALE_BOT_REVIEWS` handles that one). None by
-    default. The `GH` token must be allowed to comment on pull requests.
+    default. The `GH` token must be allowed to comment on pull requests. `@<bot> resolve` asks the bot
+    to settle its own change request, not for a new review: it never counts as the one ask of
+    `BOT_REVIEW_LABEL`, and the bot's approval after it never counts as the review asked for (it only
+    follows an earlier review).
   - `CLAUDE_CONFIG_DIR`: where the Claude login lives (`~/.claude` by default). A notification
     ends with the owner's Claude usage (`Usage: session 12% used (88% left, resets 2026-10-17 14:10), week 66% used (34% left, resets …)`,
     the windows `/usage` shows: how much is used and left, and when each resets),
@@ -128,12 +141,15 @@ approved one whose auto-merge is still off and that isn't in the merge queue, no
 | `MAIN_MOVED` | The default branch moved under the pull request. Rebase, run the checks, push once, so what gets merged is what was tested. |
 | `APPROVED` | The owner approved: only `OWNER`'s approval counts, never a bot's or anyone else's (#277), here, in the open-PR list, `READY_TO_MERGE` and `REMINDER`. If the review's findings are fixed, read the pull request for unanswered comments, then enable auto-merge with the command the event names (`--squash` unless the branch merges through a merge queue), or as the repository's notes say). A plain approval comes only as this; one with text also comes as `ACTIVITY`: answer it first. For a PR already in the merge queue, the event says so: there is no auto-merge to enable. |
 | `READY_TO_MERGE` | Approved and green, auto-merge still off: enable it the same way, unless review findings are still open. Not reported for a PR in the merge queue, or for a draft (`APPROVED_DRAFT`). |
-| `APPROVED_DRAFT` | The owner approved a pull request that is still a draft (#298). A draft can't be queued and a review bot skips it, so: mark it ready (`gh pr ready <n>`, the command the event names), wait for the bot's review on the head and settle its threads, then enable auto-merge. Where `REVIEW_BOTS` names the bot, `READY_TO_MERGE` comes only once it has reviewed the head (#299). Where `READY_APPROVED_DRAFTS=1`, the watcher marks it ready itself once the owner's latest review is an approval, on any commit, and reports `DRAFT_READIED` instead (#301, #317); this event then comes only when marking it ready failed. Neither `READY_TO_MERGE` nor its reminder comes while it is a draft; the open-PR list says `draft`. |
-| `DRAFT_READIED` | With `READY_APPROVED_DRAFTS=1`, the owner's latest review approves a draft, on any commit (it names that commit, and the head where they differ, e.g. after a rebase), and the watcher marked it ready (#301, #317). Wait for the bot's review on the head and settle its threads, then enable auto-merge, as for `APPROVED_DRAFT`; where `REVIEW_BOTS` names the bot, `READY_TO_MERGE` waits for its review. |
+| `APPROVED_DRAFT` | The owner approved a pull request that is still a draft (#298). A draft can't be queued and a review bot skips it, so: mark it ready (`gh pr ready <n>`, the command the event names), then enable auto-merge. Where a review bot was asked (`BOT_REVIEW_ASKED`, #324), wait for its review and settle its threads first: `READY_TO_MERGE` comes only once it has reviewed. Where `READY_APPROVED_DRAFTS=1`, the watcher marks it ready itself once the owner's latest review is an approval, on any commit, and reports `DRAFT_READIED` instead (#301, #317); this event then comes only when marking it ready failed. Neither `READY_TO_MERGE` nor its reminder comes while it is a draft; the open-PR list says `draft`. |
+| `DRAFT_READIED` | With `READY_APPROVED_DRAFTS=1`, the owner's latest review approves a draft, on any commit (it names that commit, and the head where they differ, e.g. after a rebase), and the watcher marked it ready (#301, #317). Enable auto-merge once CI is green, as for `APPROVED_DRAFT`; where a review bot was asked (#324), `READY_TO_MERGE` waits for its review: settle its threads first. |
 | `DRAFT_READY_FAILED` | The watcher couldn't mark the approved draft ready; it tries again on every look, and `APPROVED_DRAFT` asks you to do it meanwhile. Repeated, its `GH` token likely can't write pull requests: tell the owner. |
 | `BLOCKED_BY_REVIEW` | The owner approved and CI is green (even while GitHub still says changes requested), but GitHub won't merge it, and the reviews are why. For each thread it names (answered by the agent, still open): check the answer settles it, then reply `Resolved: <reason>` in it with the reply helper (see `ACTIVITY`; the watcher resolves it), or ask the owner. For each change request it names (still counted until dismissed): check its points are dealt with. Where `DISMISS_STALE_BOT_REVIEWS=1`, the watcher dismisses a bot's change request itself (`REVIEW_DISMISSED`): one left on an older commit once no thread is open (resolved, or ending in a `Resolved:` reply, #285), one on the head once you settle it with a `Resolved: <reason>` reply in each of its threads, or on the PR when it has none (#290; a later comment of the owner's that isn't a `Resolved:` reply takes that back until a new `Resolved:` reply follows, #294). Otherwise ask the owner on the PR to dismiss it. |
 | `THREAD_RESOLVED` | The watcher resolved a review thread on a `Resolved: <reason>` reply (anyone's, #279). Nothing to do. |
 | `REVIEW_DISMISSED` | With `DISMISS_STALE_BOT_REVIEWS=1`, the watcher dismissed a bot's change request left on an older commit (the owner approved, no thread open, #285), or on the head once `Resolved:` replies settled it (#290). Nothing to do. |
+| `BOT_REVIEW_ASKED` | With `REVIEW_BOTS` set, the PR got the label `BOT_REVIEW_LABEL` and the watcher posted `@<bot> review` on it, the only time it ever will for that PR, and took the label off (#324; the event says when it couldn't yet, and it tries again). Wait for the review: `READY_TO_MERGE` and its reminder hold until the bot has reviewed. Then handle its points and settle its threads with `Resolved:` replies as usual. Agents never post `@<bot>` commands themselves: label the PR instead. |
+| `BOT_REVIEW_SKIPPED` | The PR got the label, but the bot reviewed it already or was asked already (a `@<bot> review` comment), so it isn't asked again (#324): a PR gets at most one bot review. The label came off. Go on without a new bot review. |
+| `BOT_REVIEW_FAILED` | The watcher couldn't post `@<bot> review`; the label stays and it tries again on every look. Repeated, its `GH` token likely can't comment on pull requests: tell the owner. |
 | `BOT_RESOLVE_ASKED` | With `RESOLVE_BOT_REVIEWS` set, the watcher posted `@<bot> resolve` on a PR whose bot change request on the head is settled (every thread resolved, CI green, #303; not one without threads that a later owner comment took back, #294). Nothing to do: the bot resolves its threads and approves if its own risk limit allows; if it doesn't approve, the PR waits for the owner as before. |
 | `BOT_RESOLVE_FAILED` | The watcher couldn't post that comment; it tries again on every look. Repeated, its `GH` token likely can't comment on pull requests: tell the owner. |
 | `REVIEW_DISMISS_FAILED` | The watcher couldn't dismiss such a change request; it tries again on every look. Repeated, its `GH` token likely can't write pull requests: tell the owner. |

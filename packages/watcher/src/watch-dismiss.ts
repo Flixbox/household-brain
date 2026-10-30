@@ -94,7 +94,7 @@ const CLAIMS_DIR = `${WATCHERS_DIR}/${REPO.replace('/', '_')}/resolve-asked`
 await removeOlder(CLAIMS_DIR, Temporal.Duration.from({ hours: 24 * 14 }))
 
 /** Comments `body` on PR `pr` with the `GH` token; false when it couldn't. */
-const comment = async (pr: number, body: string): Promise<boolean> =>
+export const comment = async (pr: number, body: string): Promise<boolean> =>
   ghText(['pr', 'comment', String(pr), '--repo', REPO, '--body', body], GH, true).then(() => true, () => false)
 
 /**

@@ -1,7 +1,8 @@
 /** The project watcher's questions to GitHub, through the `gh` CLI, answered as plain data. */
 import { type MainRun, type OpenPr, type Run, approvedBy, decisionFrom } from './watch-events'
 import type { QueueEntry } from './watch-queue-events'
-import { REVIEW_BOTS, type ReviewThread, botReviewed, threadsToResolve } from './watch-review-events'
+import { BOT_REVIEW_LABEL, type BotReviewState, NO_BOT_REVIEW, REVIEW_BOTS, botReviewStateOf } from './watch-bot-review-events'
+import { type ReviewThread, threadsToResolve } from './watch-review-events'
 import { allIssueNumbers, goneIssueLine, isGone, isMoved, issueEventLine, issuePage } from './watch-issue-events'
 import { GH, failedStatus, ghText } from './watch-gh'
 import { ownerOfRepo } from './watch-owner'
@@ -152,7 +153,10 @@ export interface PrState {
   ownerApprovalCommit: string
   autoMerge: boolean
   draft: boolean
-  botReviewed: boolean
+  /** The review bots' reviews of the PR and whether one is reviewing it (#324). */
+  bot: BotReviewState
+  /** Labelled BOT_REVIEW_LABEL: asks REVIEW_BOTS for a review (#324). */
+  botReviewLabel: boolean
   parked: boolean
   queued: boolean
   title: string
@@ -168,15 +172,20 @@ export const threadsFrom = (value: unknown): ReviewThread[] => records(at(value,
 })
 const PR_FIELDS = 'isDraft isInMergeQueue state mergeable mergeStateStatus headRefOid mergeCommit { oid } reviewDecision autoMergeRequest { enabledAt } title'
   + ` labels(first: 100) { nodes { name } } author { login kind: __typename } reviews(last: 100) { nodes { state commit { oid } author { login kind: __typename } } } ${THREAD_FIELDS}`
+  // The head's check suites, for a review bot's check run still going (#324).
+  + ' commits(last: 1) { nodes { commit { checkSuites(first: 10) { nodes { app { slug } checkRuns(first: 5) { nodes { status } } } } } } }'
 
 const stateOf = (value: Json): PrState => {
   const author = actor(value.author)
+  const labels = new Set(records(record(value.labels).nodes).map(label => textOf(label.name)))
+  const suites = records(at(records(at(value, 'commits', 'nodes'))[0], 'commit', 'checkSuites', 'nodes'))
   const reviews = records(record(value.reviews).nodes)
     .map(review => ({ commit: textOf(record(review.commit).oid), login: actor(review.author), state: textOf(review.state) }))
     .filter(review => review.login !== author && review.login !== SELF)
   return {
     autoMerge: isRecord(value.autoMergeRequest),
-    botReviewed: botReviewed(REVIEW_BOTS, records(record(value.reviews).nodes), textOf(value.headRefOid)),
+    bot: botReviewStateOf(REVIEW_BOTS, records(record(value.reviews).nodes), suites),
+    botReviewLabel: REVIEW_BOTS.length > 0 && labels.has(BOT_REVIEW_LABEL),
     // GitHub leaves `reviewDecision` empty under a ruleset (#197), and counts anyone's approval: the
     // reviews decide, an approval counting only from the owner (#277).
     decision: decisionFrom(textOf(value.reviewDecision), reviews, OWNER),
@@ -189,7 +198,7 @@ const stateOf = (value: Json): PrState => {
     // READY_APPROVED_DRAFTS is on (#301, #317).
     ownerApprovalCommit: ownerApprovalCommit(reviews, OWNER),
     ownerApproved: approvedBy(reviews, OWNER),
-    parked: records(record(value.labels).nodes).some(label => label.name === 'parked'),
+    parked: labels.has('parked'),
     queued: value.isInMergeQueue === true,
     state: textOf(value.state),
     title: `${textOf(value.title)} (by ${author})`,
@@ -206,7 +215,7 @@ export const prStates = async (prs: readonly number[], fresh = false): Promise<M
 
 export const openPrs = async (): Promise<OpenPr[]> => {
   const [listed, queue] = await Promise.all([
-    gh(['pr', 'list', '--repo', REPO, '--state', 'open', '--limit', '100', '--json', 'number,title,isDraft,headRefOid,reviews,autoMergeRequest,labels,statusCheckRollup,mergeStateStatus']),
+    gh(['pr', 'list', '--repo', REPO, '--state', 'open', '--limit', '100', '--json', 'number,title,isDraft,autoMergeRequest,labels,statusCheckRollup,mergeStateStatus']),
     // An unreadable queue lists the PRs as not queued (#251), rather than leaving out the list and its reminders.
     queueEntries().catch((): Map<number, QueueEntry> => new Map()),
   ])
@@ -217,7 +226,7 @@ export const openPrs = async (): Promise<OpenPr[]> => {
   return records(listed)
     .map(pr => ({
       autoMerge: Boolean(pr.autoMergeRequest),
-      botReviewed: botReviewed(REVIEW_BOTS, records(pr.reviews), textOf(pr.headRefOid)),
+      bot: states.get(count(pr.number))?.bot ?? NO_BOT_REVIEW,
       checks: records(pr.statusCheckRollup).map(check => textOf(check.conclusion) || textOf(check.state) || 'pending'),
       draft: pr.isDraft === true,
       mergeState: textOf(pr.mergeStateStatus),

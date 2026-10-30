@@ -12,12 +12,11 @@
  *   PR #<n>: MAIN_MOVED              main got commits the PR doesn't have yet: rebase and test again
  *   PR #<n>: APPROVED                the owner approved (enable auto-merge once it is well reviewed)
  *   PR #<n>: READY_TO_MERGE          approved, CI green for the current head, auto-merge still off
- *   PR #<n>: APPROVED_DRAFT          approved but still a draft (#298): mark it ready, wait for the bot review, queue
- *                                    (with REVIEW_BOTS set, READY_TO_MERGE then waits for the bot's review of the head, #299)
+ *   PR #<n>: APPROVED_DRAFT          approved but still a draft (#298): mark it ready, queue (after the review a bot was asked for)
  *   PR #<n>: DRAFT_READIED           with READY_APPROVED_DRAFTS=1 (off by default, #301): the owner's latest review
  *                                    approves a draft, on any commit (#317, named), and the watcher marked it
- *                                    ready (`$GH pr ready <n>`) instead of reporting APPROVED_DRAFT: wait for
- *                                    the bot review of the head, queue.
+ *                                    ready (`$GH pr ready <n>`) instead of reporting APPROVED_DRAFT: queue
+ *                                    (after the review a bot was asked for).
  *                                    DRAFT_READY_FAILED: it couldn't (it tries again on every look; APPROVED_DRAFT too)
  *   PR #<n>: BLOCKED_BY_REVIEW       the owner approved, CI green, but GitHub blocks the merge (#278): names
  *                                    each open thread the agent answered last (reply `Resolved: <reason>`
@@ -37,6 +36,12 @@
  *                                    them: the watcher posted `@<bot> resolve` (once per head), and the bot's
  *                                    own risk limit decides whether it approves. BOT_RESOLVE_FAILED: it
  *                                    couldn't (it tries again on every look)
+ *   PR #<n>: BOT_REVIEW_ASKED        with REVIEW_BOTS naming a bot, the PR got the label BOT_REVIEW_LABEL (`bot-review`
+ *                                    by default, #324): the watcher posted `@<bot> review`, once per PR ever, and
+ *                                    took the label off; READY_TO_MERGE and its reminder then wait for that review
+ *                                    (or for one in progress), and only then. BOT_REVIEW_SKIPPED: the bot reviewed
+ *                                    the PR or was asked already, so it isn't asked again. BOT_REVIEW_FAILED: the
+ *                                    comment failed (it tries again on every look, the label stays)
  *   PR #<n>: THREAD_RESOLVED         the watcher resolved a review thread whose last comment, from anyone,
  *                                    starts `Resolved: <reason>` (#279), with its `GH` token; agents never
  *                                    resolve threads themselves. THREAD_RESOLVE_FAILED: it couldn't (it
