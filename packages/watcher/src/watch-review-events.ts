@@ -2,7 +2,8 @@
  * What a PR's review threads and reviews ask of the watcher (pure, so it is tested): the threads a
  * `Resolved: <reason>` reply asks to resolve (#279), why an approved, green PR still can't merge (#278),
  * the bot change requests it may dismiss where the repository opts in: on an older commit (#285), or
- * on the head once `Resolved:` replies settled them (#290), and what an approval asks for (#298): for
+ * on the head once `Resolved:` replies settled them (#290), also on a PR cleared without the owner
+ * (#327), and what an approval asks for (#298): for
  * a PR asked for a review bot's review, that review first (#299, #324; watch-bot-review-events.ts), and
  * which bots to ask with `@<bot> resolve` (#303).
  */
@@ -153,19 +154,47 @@ export const reviewsToDismiss = ({ comments, complete, head, owner, reviews, sel
 /** Where a change request was left, as the events and the dismissal say it. */
 const where = (review: Review, head: string) => `${review.commit === head ? 'the head' : 'an older commit'} (${review.commit.slice(0, 7)})`
 
-/** The message a dismissal leaves on the review: why, quoting the `Resolved:` replies it relied on (#290). */
-export const dismissalMessage = ({ replies }: Dismissal): string => {
-  if (replies.length === 0) {
-    return 'Dismissed by the project watcher: the owner approved a newer commit, and no review thread is open (DISMISS_STALE_BOT_REVIEWS).'
+// CLEARED_LABEL: the label the main session puts on a PR it cleared for queueing without the owner's
+// approval (#327), after a review subagent's clean review; `subagent-cleared` by default. With
+// DISMISS_STALE_BOT_REVIEWS on, such a PR's settled bot change requests are dismissed as on an approved one.
+export const CLEARED_LABEL = process.env.CLEARED_LABEL ?? 'subagent-cleared'
+
+/**
+ * Whether the watcher dismisses settled bot change requests on a PR the owner hasn't approved (#327):
+ * where the repository opts in (`enabled`), the PR carries CLEARED_LABEL (`cleared`), changes are
+ * requested, CI is `green` at the head and it is no draft. One the owner approved goes the usual way.
+ */
+export const dismissesCleared = ({ cleared, decision, draft, enabled, green, ownerApproved }: {
+  cleared: boolean
+  decision: string
+  draft: boolean
+  enabled: boolean
+  green: boolean
+  ownerApproved: boolean
+}): boolean => enabled && cleared && decision === 'CHANGES_REQUESTED' && green && !draft && !ownerApproved
+
+/** Why a change request may go: the owner's approval, or the PR's `cleared` label (#327; '' when it isn't the reason). */
+const basisOf = (cleared: string, replies: boolean) => {
+  if (cleared !== '') {
+    return `the PR is labelled \`${cleared}\` (cleared without the owner's approval)`
   }
-  const quotes = replies.map(reply => `> ${oneLine(reply.body, 300)}\n> ${reply.url}`)
-  return ['Dismissed by the project watcher: the owner approved, and this change request was settled with `Resolved:` replies (DISMISS_STALE_BOT_REVIEWS):', ...quotes].join('\n\n')
+  return replies ? 'the owner approved' : 'the owner approved a newer commit'
 }
 
-/** The event for a change request the watcher dismissed, or failed to: reported once per review. */
-export const dismissedReviewEvent = ({ dismissal: { replies, review }, dismissed, head, pr }: { dismissal: Dismissal, dismissed: boolean, head: string, pr: number }): Event => {
+/** The message a dismissal leaves on the review: why, quoting the `Resolved:` replies it relied on (#290), on the `cleared` label if that is why (#327). */
+export const dismissalMessage = ({ replies }: Dismissal, cleared = ''): string => {
+  if (replies.length === 0) {
+    return `Dismissed by the project watcher: ${basisOf(cleared, false)}, and no review thread is open (DISMISS_STALE_BOT_REVIEWS).`
+  }
+  const quotes = replies.map(reply => `> ${oneLine(reply.body, 300)}\n> ${reply.url}`)
+  return [`Dismissed by the project watcher: ${basisOf(cleared, true)}, and this change request was settled with \`Resolved:\` replies (DISMISS_STALE_BOT_REVIEWS):`, ...quotes].join('\n\n')
+}
+
+/** The event for a change request the watcher dismissed, or failed to: reported once per review; `cleared` as in `dismissalMessage`. */
+export const dismissedReviewEvent = ({ cleared = '', dismissal: { replies, review }, dismissed, head, pr }: { cleared?: string, dismissal: Dismissal, dismissed: boolean, head: string, pr: number }): Event => {
   const what = `${review.login}'s change request on ${where(review, head)}`
-  const why = replies.length === 0 ? 'the owner approved, and no review thread is open' : 'the owner approved, and `Resolved:` replies settled it'
+  const basis = cleared === '' ? 'the owner approved' : `the PR is labelled \`${cleared}\``
+  const why = replies.length === 0 ? `${basis}, and no review thread is open` : `${basis}, and \`Resolved:\` replies settled it`
   return dismissed
     ? { key: `pr-${pr} review-dismissed ${review.id}`, lines: [`REVIEW_DISMISSED: dismissed ${what}: ${why}`] }
     : { key: `pr-${pr} review-dismiss-failed ${review.id}`, lines: [`REVIEW_DISMISS_FAILED: couldn't dismiss ${what} (it tries again on every look); check the GH token may write pull requests`] }

@@ -2,7 +2,7 @@
 import { type MainRun, type OpenPr, type Run, approvedBy, decisionFrom } from './watch-events'
 import type { QueueEntry } from './watch-queue-events'
 import { type BotReviewState, NO_BOT_REVIEW, REVIEW_BOTS, botReviewStateOf } from './watch-bot-review-events'
-import { type ReviewThread, threadsToResolve } from './watch-review-events'
+import { CLEARED_LABEL, type ReviewThread, threadsToResolve } from './watch-review-events'
 import { allIssueNumbers, goneIssueLine, isGone, isMoved, issueEventLine, issuePage } from './watch-issue-events'
 import { GH, failedStatus, ghText } from './watch-gh'
 import { ownerOfRepo } from './watch-owner'
@@ -152,6 +152,8 @@ export interface PrState {
   /** The commit the owner's latest review approves, '' when it isn't an approval (#301, #317). */
   ownerApprovalCommit: string
   autoMerge: boolean
+  /** The PR carries CLEARED_LABEL: the main session cleared it for queueing without the owner's approval (#327). */
+  cleared: boolean
   draft: boolean
   /** The review bots' reviews of the PR, whether one is reviewing it, and whether its label asks for one (#324). */
   bot: BotReviewState
@@ -183,6 +185,7 @@ const stateOf = (value: Json): PrState => {
   return {
     autoMerge: isRecord(value.autoMergeRequest),
     bot: botReviewStateOf({ bots: REVIEW_BOTS, labels, reviews: records(record(value.reviews).nodes), suites }),
+    cleared: labels.includes(CLEARED_LABEL),
     // GitHub leaves `reviewDecision` empty under a ruleset (#197), and counts anyone's approval: the
     // reviews decide, an approval counting only from the owner (#277).
     decision: decisionFrom(textOf(value.reviewDecision), reviews, OWNER),

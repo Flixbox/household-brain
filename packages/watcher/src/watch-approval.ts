@@ -7,10 +7,10 @@
  * Merging still waits for CI and, where a review bot was asked (#324), its review. Which drafts is
  * `marksReady` (watch-ready-events.ts). The `GH` token must then be allowed to write pull requests.
  */
-import { DISMISS_STALE_BOT_REVIEWS, askBotsToResolve, dismissStale, reviewBlockers } from './watch-dismiss'
+import { DISMISS_STALE_BOT_REVIEWS, askBotsToResolve, dismissCleared, dismissStale, reviewBlockers } from './watch-dismiss'
 import { type PrState, REPO, SELF, mergeCommand, readyCommand } from './watch-github'
 import { READY_APPROVED_DRAFTS, draftNote, draftReadiedEvent, marksReady } from './watch-ready-events'
-import { approvedEvent, blockedByReviewEvent } from './watch-review-events'
+import { approvedEvent, blockedByReviewEvent, dismissesCleared } from './watch-review-events'
 import { askBotReviews } from './watch-bot-review'
 import { awaitsBotReview } from './watch-bot-review-events'
 import { GH, ghText } from './watch-gh'
@@ -58,12 +58,13 @@ const checkAutoMergeOff = async ({ green, pr, state }: { green: boolean, pr: num
  */
 const checkBlocked = async (pr: number, head: string): Promise<void> => {
   const blockers = await reviewBlockers(pr).then(async found => dismissStale({ ...found, head, pr })).catch(() => null)
-  await report(blockers && blockedByReviewEvent({ ...blockers, dismiss: DISMISS_STALE_BOT_REVIEWS, head, pr, self: SELF }), pr)
+  await report(blockers && blockedByReviewEvent({ dismiss: DISMISS_STALE_BOT_REVIEWS, head, pr, reviews: blockers.reviews, self: SELF, threads: blockers.threads }), pr)
 }
 
 /**
  * Approved and green for the current head, but auto-merge is still off or it is a draft (#298), or
- * GitHub blocks the merge (#278, #286); then a review bot to ask to resolve (#303).
+ * GitHub blocks the merge (#278, #286); not approved but labelled as cleared without the owner, a
+ * settled bot change request to dismiss (#327); then a review bot to ask to resolve (#303).
  */
 export const checkApproval = async (pr: number, state: PrState): Promise<void> => {
   // A review bot asked for once, on the label (#324), before what waits on it.
@@ -74,5 +75,6 @@ export const checkApproval = async (pr: number, state: PrState): Promise<void> =
   // The owner's own approval, not the decision: a stale change request, one of the causes it names,
   // keeps GitHub's decision at CHANGES_REQUESTED (#286).
   await (state.ownerApproved && green && state.mergeState === 'BLOCKED' ? checkBlocked(pr, state.head) : Promise.resolve())
-  await askBotsToResolve(pr, state)
+  const cleared = dismissesCleared({ ...state, enabled: DISMISS_STALE_BOT_REVIEWS, green })
+  await (cleared ? dismissCleared(pr, state.head) : askBotsToResolve(pr, state))
 }
