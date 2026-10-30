@@ -176,4 +176,7 @@ approved one whose auto-merge is still off and that isn't in the merge queue, no
 
 - **Read the pull request for unanswered comments first, as its own step**, never chained into the
   merge command: an approval and a comment often arrive together.
-- Only with the owner's approval, and once the review's findings are fixed.
+- Once the review's findings are fixed: a user-facing PR, one that changes the rules for approving,
+  queueing or merging (in `AGENTS.md` or elsewhere), or one you can't place, only with the owner's
+  approval; any other PR as the repository's `AGENTS.md` says (e.g. once CI is green, every thread
+  is settled and a review subagent finds nothing blocking).
