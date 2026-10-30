@@ -51,7 +51,7 @@ describe('findCycles (#334)', () => {
 
   it('stops at MAX_CYCLES', () => {
     // Every issue blocked by every other: far more cycles than that.
-    const issues = Array.from({ length: 8 }, (_, at) => `#${at + 1}`)
+    const issues = ['#1', '#2', '#3', '#4', '#5', '#6', '#7', '#8']
     expect(findCycles(new Map(issues.map(issue => [issue, issues.filter(other => other !== issue)])))).toHaveLength(MAX_CYCLES)
   })
 
