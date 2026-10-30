@@ -24,16 +24,28 @@ describe('dismissesCleared (#327)', () => {
 })
 
 describe('clearedAt (#327)', () => {
-  it('takes the last time the label was put on', () => {
+  const by = (login: string) => ({ kind: 'User', login })
+  const labelled = (createdAt: string, actor = by('Owner'), name = 'subagent-cleared') => ({ actor, createdAt, kind: 'LabeledEvent', label: { name } })
+  const unlabelled = (createdAt: string) => ({ actor: by('someone'), createdAt, kind: 'UnlabeledEvent', label: { name: 'subagent-cleared' } })
+  const clearers = ['owner', 'agent[bot]']
+
+  it('takes the last time the owner or the agent put the label on', () => {
     expect(clearedAt([
-      { createdAt: '2026-10-30T08:00:00Z', label: { name: 'subagent-cleared' } },
-      { createdAt: '2026-10-30T09:00:00Z', label: { name: 'subagent-cleared' } },
-      { createdAt: '2026-10-30T10:00:00Z', label: { name: 'parked' } },
-    ])).toBe('2026-10-30T09:00:00Z')
+      labelled('2026-10-30T08:00:00Z'),
+      labelled('2026-10-30T09:00:00Z', { kind: 'Bot', login: 'agent' }),
+      labelled('2026-10-30T10:00:00Z', by('Owner'), 'parked'),
+    ], clearers)).toBe('2026-10-30T09:00:00Z')
   })
 
-  it('is empty when it never was', () => {
-    expect(clearedAt([{ createdAt: '2026-10-30T08:00:00Z', label: { name: 'parked' } }])).toBe('')
+  it('counts no one else\'s label', () => {
+    expect(clearedAt([labelled('2026-10-30T08:00:00Z'), labelled('2026-10-30T09:00:00Z', by('passer-by'))], clearers)).toBe('2026-10-30T08:00:00Z')
+    expect(clearedAt([labelled('2026-10-30T09:00:00Z', by('passer-by'))], clearers)).toBe('')
+  })
+
+  it('is empty when it never was, or was taken off since', () => {
+    expect(clearedAt([labelled('2026-10-30T08:00:00Z', by('Owner'), 'parked')], clearers)).toBe('')
+    expect(clearedAt([labelled('2026-10-30T08:00:00Z'), unlabelled('2026-10-30T09:00:00Z')], clearers)).toBe('')
+    expect(clearedAt([labelled('2026-10-30T08:00:00Z'), unlabelled('2026-10-30T09:00:00Z'), labelled('2026-10-30T10:00:00Z', by('passer-by'))], clearers)).toBe('')
   })
 })
 
@@ -45,7 +57,8 @@ describe('coveredByClearance (#327)', () => {
     expect(coveredByClearance([early, late], '2026-10-30T09:00:00Z')).toEqual([early])
   })
 
-  it('covers none without a clearance', () => {
+  it('covers none without a clearance, nor one with a time that isn\'t one', () => {
     expect(coveredByClearance([early, late], '')).toEqual([])
+    expect(coveredByClearance([dismissal(3, 'yesterday')], '2026-10-30T09:00:00Z')).toEqual([])
   })
 })

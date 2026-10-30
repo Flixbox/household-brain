@@ -128,22 +128,24 @@ const headReplies = (review: Review, { comments, settlers, threads }: { comments
  * settled by `Resolved:` replies (`headReplies`, #290): then that bot's change requests on older
  * commits, and those on the head that are settled themselves, each with its own replies. A person's
  * change request is never dismissed: that stays the owner's call. `owner` and `self` (the agent) are
- * the logins whose replies count.
+ * the logins whose replies count. `strict`, on a PR cleared without the owner (#327), asks the same
+ * `Resolved:` replies of a change request on an older commit: no approval vouches for it there.
  */
-export const reviewsToDismiss = ({ comments, complete, head, owner, reviews, self, threads }: {
+export const reviewsToDismiss = ({ comments, complete, head, owner, reviews, self, strict = false, threads }: {
   comments: readonly PrComment[]
   complete: boolean
   head: string
   owner: string
   reviews: readonly Review[]
   self: string
+  strict?: boolean
   threads: readonly ReviewThread[]
 }): Dismissal[] => {
   if (!complete || threads.some(thread => !thread.resolved && !asksToResolve(thread))) {
     return []
   }
   const context = { comments, settlers: settlersOf({ owner, self }), threads }
-  const replies = (review: Review) => (review.commit === head ? headReplies(review, context) : [])
+  const replies = (review: Review) => (strict || review.commit === head ? headReplies(review, context) : [])
   return changeRequests(reviews).filter(latest => isBot(latest.login) && replies(latest) !== null).flatMap(latest =>
     reviews.filter(review => review.login === latest.login && review.state === 'CHANGES_REQUESTED').flatMap(review => {
       const settled = latest.commit === head || review.commit !== head ? replies(review) : null

@@ -4,7 +4,7 @@
  * which: only those submitted before the label was last put on, so a bot's later change request (on
  * new commits) needs a new clearance. The label stays on; nothing needs taking off or retrying.
  */
-import { type Json, record } from './watch-text'
+import { type Json, actor, record } from './watch-text'
 import type { Dismissal } from './watch-review-events'
 import { textOf } from './read'
 
@@ -27,11 +27,27 @@ export const dismissesCleared = ({ cleared, decision, draft, enabled, green, own
   ownerApproved: boolean
 }): boolean => enabled && cleared && decision === 'CHANGES_REQUESTED' && green && !draft && !ownerApproved
 
-/** When CLEARED_LABEL was last put on the PR, from its `LabeledEvent`s (oldest first, `createdAt` and `label.name`); '' when never. */
-export const clearedAt = (events: readonly Json[]): string =>
-  textOf(record(events.findLast(event => textOf(record(event.label).name) === CLEARED_LABEL)).createdAt)
+/**
+ * When CLEARED_LABEL was last put on the PR by one of `clearers` (the owner and the agent), from its
+ * `LabeledEvent`s and `UnlabeledEvent`s (oldest first: `kind`, `createdAt`, `actor`, `label.name`); ''
+ * when never, or when it was taken off since. Someone else putting it on clears nothing.
+ */
+export const clearedAt = (events: readonly Json[], clearers: readonly string[]): string => {
+  const allowed = new Set(clearers.filter(login => login !== '').map(login => login.toLowerCase()))
+  const counts = (event: Json) => event.kind === 'UnlabeledEvent' || (event.kind === 'LabeledEvent' && allowed.has(actor(event.actor).toLowerCase()))
+  const last = events.findLast(event => textOf(record(event.label).name) === CLEARED_LABEL && counts(event))
+  return last?.kind === 'LabeledEvent' ? textOf(last.createdAt) : ''
+}
+
+/** Whether `earlier` is before `later`; a time that isn't one counts as not. */
+const before = (earlier: string, later: string): boolean => {
+  try {
+    return Temporal.Instant.compare(Temporal.Instant.from(earlier), Temporal.Instant.from(later)) < 0
+  } catch {
+    return false
+  }
+}
 
 /** The dismissals a clearance at `at` covers: change requests submitted before it; none without one. */
-export const coveredByClearance = (dismissals: readonly Dismissal[], at: string): Dismissal[] => at === ''
-  ? []
-  : dismissals.filter(({ review }) => review.submittedAt !== '' && Temporal.Instant.compare(Temporal.Instant.from(review.submittedAt), Temporal.Instant.from(at)) < 0)
+export const coveredByClearance = (dismissals: readonly Dismissal[], at: string): Dismissal[] =>
+  dismissals.filter(({ review }) => before(review.submittedAt, at))

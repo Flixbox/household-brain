@@ -83,8 +83,9 @@ export const dismissStale = async ({ cleared = '', comments, complete, head, pr,
   threads: ReviewThread[]
 }): Promise<{ reviews: Review[], threads: ReviewThread[] }> => {
   const dismissed = new Set<number>()
-  const named = DISMISS_STALE_BOT_REVIEWS ? reviewsToDismiss({ comments, complete, head, owner: OWNER, reviews, self: SELF, threads }) : []
-  const toDismiss = cleared === '' ? named : coveredByClearance(named, since)
+  const strict = cleared !== ''
+  const named = DISMISS_STALE_BOT_REVIEWS ? reviewsToDismiss({ comments, complete, head, owner: OWNER, reviews, self: SELF, strict, threads }) : []
+  const toDismiss = strict ? coveredByClearance(named, since) : named
   await allSettled(toDismiss.map(async dismissal => {
     const done = await dismiss(pr, dismissal.review.id, dismissalMessage(dismissal, cleared))
     if (done) {
@@ -102,8 +103,9 @@ export const dismissStale = async ({ cleared = '', comments, complete, head, pr,
  * next look asks again.
  */
 export const dismissCleared = async (pr: number, head: string): Promise<void> => {
-  const labelled = graphql(`pullRequest(number:${pr}){timelineItems(itemTypes:[LABELED_EVENT],last:100){nodes{... on LabeledEvent{createdAt label{name}}}}}`)
-    .then(value => clearedAt(records(at(value, 'pullRequest', 'timelineItems', 'nodes'))))
+  const event = 'createdAt actor{login kind:__typename} label{name}'
+  const labelled = graphql(`pullRequest(number:${pr}){timelineItems(itemTypes:[LABELED_EVENT,UNLABELED_EVENT],last:100){nodes{kind:__typename ... on LabeledEvent{${event}} ... on UnlabeledEvent{${event}}}}}`)
+    .then(value => clearedAt(records(at(value, 'pullRequest', 'timelineItems', 'nodes')), [OWNER, SELF]))
   const [found, since] = await Promise.all([reviewBlockers(pr), labelled]).catch(() => [null, ''] as const)
   await (found ? dismissStale({ ...found, cleared: CLEARED_LABEL, head, pr, since }) : Promise.resolve())
 }

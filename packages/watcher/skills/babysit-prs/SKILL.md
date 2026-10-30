@@ -87,7 +87,9 @@ default branch's CI, new issues, the owner's comments on issues, and issues clos
     own. Off by default, when `BLOCKED_BY_REVIEW` names it for the owner to dismiss. A person's
     change request is never dismissed. The `GH` token must be allowed to write pull requests. It also
     dismisses them without the owner's approval on a PR labelled `CLEARED_LABEL`, once CI is green at
-    the head and it is no draft (#327): those submitted before the label was last put on.
+    the head and it is no draft (#327): those submitted before the owner or the agent (`SELF`) last
+    put the label on (not since taken off), and only once settled by `Resolved:` replies, on an older
+    commit too (no approval vouches for them).
   - `CLEARED_LABEL`: the label that marks a PR cleared for queueing without the owner's approval
     (`subagent-cleared` by default, #327), e.g. after a review subagent's clean review of a PR that
     isn't user-facing. With `DISMISS_STALE_BOT_REVIEWS=1`, its settled bot change requests are

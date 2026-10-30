@@ -105,6 +105,17 @@ describe('reviewsToDismiss', () => {
     expect(dismiss([review('reviewer[bot]', 'CHANGES_REQUESTED', { commit: OLD })], [thread('T1', { resolved: true })])).toEqual([1])
   })
 
+  it('asks the same `Resolved:` replies of an older commit\'s change request when strict (#327)', () => {
+    const older = review('coderabbit[bot]', 'CHANGES_REQUESTED', { commit: OLD, id: 8 })
+    const strict = (threads: ReviewThread[], comments: PrComment[] = []) =>
+      reviewsToDismiss({ ...settlers, comments, complete: true, head: HEAD, reviews: [older], strict: true, threads }).map(each => each.review.id)
+    // Summary-only, or its threads resolved by a click: unsettled.
+    expect(strict([])).toEqual([])
+    expect(strict([thread('T1', { lastAuthor: 'coderabbit[bot]', lastBody: 'Please fix.', resolved: true, review: 8 })])).toEqual([])
+    expect(strict([settled('T1', { review: 8 })])).toEqual([8])
+    expect(strict([], [comment(SELF, 'Resolved: the summary\'s points are fixed')])).toEqual([8])
+  })
+
   it('takes none when not every thread could be read', () => {
     expect(reviewsToDismiss({ ...settlers, comments: [], complete: false, head: HEAD, reviews: [review('reviewer[bot]', 'CHANGES_REQUESTED', { commit: OLD })], threads: [] })).toEqual([])
   })
