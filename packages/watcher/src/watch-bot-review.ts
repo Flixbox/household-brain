@@ -12,12 +12,12 @@
  * `@<bot> review` comments, the files (`askedBots` in watch-state.ts), and the label itself while it
  * is on; a bot nobody asked holds nothing back, unless its check run on the head shows it reviewing.
  */
-import { BOT_REVIEW_LABEL, type LabelFate, REVIEW_BOTS, botReviewEvent, notAskingBecause, reviewCommand } from './watch-bot-review-events'
-import { type PrState, REPO, gh } from './watch-github'
+import { BOT_REVIEW_LABEL, type BotReviewState, type LabelFate, REVIEW_BOTS, botReviewEvent, notAskingBecause, reviewCommand } from './watch-bot-review-events'
+import { REPO, gh, prStates } from './watch-github'
 import { GH, failedStatus } from './watch-gh'
 import { allSettled, ignoreFailure } from './read'
 import { writeWhole } from './watch-files'
-import { askedFile } from './watch-state'
+import { askedFile, isAsked } from './watch-state'
 import { comment } from './watch-dismiss'
 import { report } from './watch-output'
 
@@ -49,24 +49,38 @@ type Outcome = { asked: boolean } | { skipped: string } | 'done'
  * (nothing to report), `skipped` when GitHub shows it reviewed or was asked before (recorded then, so
  * this machine counts it as asked), else whether the comment went through.
  */
-const askOnce = async ({ bot, pr, state }: { bot: string, pr: number, state: PrState }): Promise<Outcome> => {
-  if (await Bun.file(askedFile(pr, bot)).exists()) {
+const askOnce = async ({ bot, pr, state }: { bot: string, pr: number, state: BotReviewState }): Promise<Outcome> => {
+  if (await isAsked(pr, bot)) {
     return 'done'
   }
-  const why = notAskingBecause({ bot, state: state.bot })
+  const why = notAskingBecause({ bot, state })
   const asked = why === null ? await comment(pr, reviewCommand(bot)) : true
   await (asked ? remember(pr, bot) : Promise.resolve())
   return why === null ? { asked } : { skipped: why }
 }
 
 /**
+ * The PR's review bots as GitHub shows them now, read once the claim is made: a state read before it
+ * may miss the asks of a watcher that held the claim before and put the label back. Null when it
+ * can't be read.
+ */
+const botStateNow = async (pr: number): Promise<BotReviewState | null> =>
+  prStates([pr], true).then(states => states.get(pr)?.bot ?? null, () => null)
+
+/**
  * For a PR labelled BOT_REVIEW_LABEL (the caller checks, with REVIEW_BOTS named): claims the asks by
  * taking the label off, then asks each bot that wasn't asked yet and reports each ask, skip or
- * failure. A failed ask puts the label back, so the next look tries again (READY_TO_MERGE waits
- * meanwhile); a watcher whose claim didn't go through asks nothing.
+ * failure. A failed ask, or a PR state that can't be read after the claim, puts the label back, so
+ * the next look tries again (READY_TO_MERGE waits meanwhile); a watcher whose claim didn't go
+ * through asks nothing.
  */
-export const askBotReviews = async (pr: number, state: PrState): Promise<void> => {
+export const askBotReviews = async (pr: number): Promise<void> => {
   if (await takeLabel(pr) !== 'taken') {
+    return
+  }
+  const state = await botStateNow(pr)
+  if (!state) {
+    await putLabelBack(pr)
     return
   }
   const outcomes = await Promise.all(REVIEW_BOTS.map(async bot => ({ bot, outcome: await askOnce({ bot, pr, state }) })))

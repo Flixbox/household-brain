@@ -69,7 +69,7 @@ const checkBlocked = async (pr: number, head: string): Promise<void> => {
  */
 export const checkApproval = async (pr: number, state: PrState): Promise<void> => {
   // A review bot asked for once, on the label (#324), before what waits on it.
-  await (state.bot.requested ? askBotReviews(pr, state) : Promise.resolve())
+  await (state.bot.requested ? askBotReviews(pr) : Promise.resolve())
   const reported = await readLines('reported')
   const green = reported.includes(`pr-${pr} ci-passed ${state.head}`)
   await checkAutoMergeOff({ green, pr, state })
