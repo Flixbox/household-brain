@@ -64,10 +64,11 @@ repository), never with the owner's account.
 - **Stuck? File an issue** for what blocks you, assigned to the owner, and carry on with other work.
 - **"Blocked by" links between issues go through `issue-links`** (owner's rule, #256): the plugin's
   `block_issue` / `unblock_issue` / `issue_links` tools, or
-  `sh packages/issue-links/run.sh cli block <issue> <blocked-by>` (also `unblock`, `links`, `audit`), never raw
-  API calls. It refuses a link that would close a cycle, and prints the cycle. Links set past it
-  (GitHub's page, another tool) skip that check: `audit_links` or `run.sh cli audit [--repo
-  <owner/repo>]` finds every cycle among a repository's open issues (#334); unblock one link in each.
+  `sh packages/issue-links/run.sh cli block <issue> <blocked-by>` (also `unblock`, `links`,
+  `audit`), never raw API calls. It refuses a link that would close a cycle, and prints the cycle.
+  Links set past it (GitHub's page, another tool) skip that check: `audit_links` or
+  `run.sh cli audit [--repo <owner/repo>]` finds every cycle among a repository's open issues
+  (#334); unblock one link in each, then audit again.
 - **Long things run in the background** (tests, builds, CI, watchers, reviewers); do the next thing
   meanwhile.
 

@@ -5,7 +5,7 @@
  */
 import { type IssueRef, refKey, refOf, refText } from './refs'
 import { isRecord } from './read'
-import { blockingPath, findCycles } from './cycle'
+import { MAX_CYCLES, blockingPath, findCycles } from './cycle'
 import { ghJson } from './gh'
 
 const path = ({ number, repo }: IssueRef) => `repos/${repo}/issues/${number}`
@@ -103,7 +103,8 @@ export const audit = async (repo: string): Promise<string> => {
     [refKey(ref), (await blockersOf(ref)).map(blocker => refKey(blocker)).filter(key => openKeys.has(key))] as const))
   const cycles = findCycles(new Map(links))
   if (cycles.length > 0) {
-    throw new Error([`${cycles.length} cycle(s) in ${repo}'s blocked-by links; unblock one link in each:`, ...cycles.map(cycle => cycle.map(key => shortText(key, repo)).join(' → '))].join('\n'))
+    const count = cycles.length < MAX_CYCLES ? `${cycles.length}` : `at least ${MAX_CYCLES}`
+    throw new Error([`${count} cycle(s) in ${repo}'s blocked-by links; unblock one link in each, then audit again:`, ...cycles.map(cycle => cycle.map(key => shortText(key, repo)).join(' → '))].join('\n'))
   }
   return `no cycles in the blocked-by links between ${repo}'s ${open.length} open issues`
 }

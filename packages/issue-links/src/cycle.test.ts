@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { blockingPath, findCycles } from './cycle'
+import { MAX_CYCLES, blockingPath, findCycles } from './cycle'
 
 /** Blockers as a map: issue → the issues it is blocked by. */
 const graph = (edges: Record<string, string[]>) => async (issue: string) => edges[issue] ?? []
@@ -41,6 +41,18 @@ describe('findCycles (#334)', () => {
   it('finds each of several cycles once', () => {
     expect(findCycles(edges({ '#1': ['#2'], '#2': ['#1'], '#3': ['#4'], '#4': ['#3'], '#5': ['#1', '#3'] })))
       .toEqual([['#1', '#2', '#1'], ['#3', '#4', '#3']])
+  })
+
+  it('finds cycles that share issues, each on its own', () => {
+    // Unblocking one link of the first two alone would leave #1 → #3 → #1.
+    expect(findCycles(edges({ '#1': ['#2', '#3'], '#2': ['#3'], '#3': ['#1', '#2'] })))
+      .toEqual([['#1', '#2', '#3', '#1'], ['#1', '#3', '#1'], ['#2', '#3', '#2']])
+  })
+
+  it('stops at MAX_CYCLES', () => {
+    // Every issue blocked by every other: far more cycles than that.
+    const issues = Array.from({ length: 8 }, (_, at) => `#${at + 1}`)
+    expect(findCycles(new Map(issues.map(issue => [issue, issues.filter(other => other !== issue)])))).toHaveLength(MAX_CYCLES)
   })
 
   it('raises no alarm on two paths to the same blocker (a diamond) or a blocker it was not given', () => {
