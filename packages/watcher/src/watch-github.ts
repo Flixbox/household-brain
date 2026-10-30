@@ -173,7 +173,9 @@ export const threadsFrom = (value: unknown): ReviewThread[] => records(at(value,
 })
 const PR_FIELDS = 'isDraft isInMergeQueue state mergeable mergeStateStatus headRefOid mergeCommit { oid } reviewDecision autoMergeRequest { enabledAt } title'
   + ` labels(first: 100) { nodes { name } } author { login kind: __typename } reviews(last: 100) { nodes { state commit { oid } author { login kind: __typename } } } ${THREAD_FIELDS}`
-  // The head's check suites, for a review bot's check run still going (#324).
+  // The last hundred comments' text, for a `@<bot> review` ask from any machine (#325), and the head's
+  // check suites, for a review bot's check run still going (#324).
+  + ' comments(last: 100) { nodes { body } }'
   + ' commits(last: 1) { nodes { commit { checkSuites(first: 30) { nodes { app { slug } checkRuns(first: 10) { nodes { status } } } } } } }'
 
 const stateOf = (value: Json): PrState => {
@@ -185,7 +187,7 @@ const stateOf = (value: Json): PrState => {
     .filter(review => review.login !== author && review.login !== SELF)
   return {
     autoMerge: isRecord(value.autoMergeRequest),
-    bot: botReviewStateOf({ bots: REVIEW_BOTS, labels, reviews: records(record(value.reviews).nodes), suites }),
+    bot: botReviewStateOf({ bots: REVIEW_BOTS, comments: records(record(value.comments).nodes), labels, reviews: records(record(value.reviews).nodes), suites }),
     cleared: labels.includes(CLEARED_LABEL),
     // GitHub leaves `reviewDecision` empty under a ruleset (#197), and counts anyone's approval: the
     // reviews decide, an approval counting only from the owner (#277).

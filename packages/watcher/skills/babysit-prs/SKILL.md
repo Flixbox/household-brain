@@ -73,12 +73,13 @@ default branch's CI, new issues, the owner's comments on issues, and issues clos
     bot's check run still going (a review in progress), gets no `READY_TO_MERGE` and no auto-merge reminder until the bot has
     reviewed it; a PR nobody asked a bot about waits for none (#299 waited for every approved draft).
     None by default: nothing is asked, nothing waits. The `GH` token must be allowed to comment on
-    pull requests and to remove labels.
+    pull requests and to add and remove labels.
   - `BOT_REVIEW_LABEL`: the label that asks `REVIEW_BOTS` for a review (`bot-review` by default,
-    #324). The label must exist in the repository. Which asks were made is remembered on this
-    machine for good (`$XDG_STATE_HOME/watch-project/<owner>_<repo>/review-asked/`), shared by its
-    watchers; a watcher on another machine sees the `@<bot> review` comment and doesn't ask again,
-    but waits only on asks it saw, and two machines asking in the same moment would both post.
+    #324). The label must exist in the repository. Taking it off is the claim on the ask, made on
+    GitHub before anything is posted, so only one watcher asks, on any number of machines (#325); a
+    failed ask puts it back for the next look (`BOT_REVIEW_FAILED` says whether that worked). Every
+    watcher reads the `@<bot> review` comments with the PR and waits on them; this machine's asks are
+    also remembered for good (`$XDG_STATE_HOME/watch-project/<owner>_<repo>/review-asked/`).
   - `DISMISS_STALE_BOT_REVIEWS`: `1` lets the watcher dismiss a bot's (`…[bot]`) change request, once
     the owner approved and no review thread is open without a `Resolved:` reply: one left on an older
     commit (#285), or one on the head once the agent (`SELF`) or the owner settled it with `Resolved:
