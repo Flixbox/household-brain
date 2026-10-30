@@ -59,19 +59,8 @@ const checkLinkCycles = async (issues: readonly OpenIssue[]): Promise<void> => {
   }
 }
 
-/**
- * Issues closed or reopened since the last round, and new cycles in their links. A failed lookup
- * leaves the state as it was, so the next round tries again; a gone issue isn't a failed lookup
- * (#263). An empty list counts as a failed one, and an empty stored list as none (#261): compared
- * with either, every issue would look closed or reopened.
- */
-export const checkIssueStates = async (): Promise<void> => {
-  const issues = await openIssues().catch(() => null)
-  if (!issues || issues.length === 0) {
-    return
-  }
-  await checkLinkCycles(issues)
-  const now = issues.map(({ number }) => number).toSorted(byNumber).map(String)
+/** Issues closed or reopened since the open list `now` was last stored; the first list is stored as it is. */
+const checkOpenList = async (now: string[]): Promise<void> => {
   if (await firstRun('open-issues', now)) {
     return
   }
@@ -84,4 +73,19 @@ export const checkIssueStates = async (): Promise<void> => {
   if (lines.length > 0) {
     queue(lines)
   }
+}
+
+/**
+ * Issues closed or reopened since the last round, and new cycles in their links. A failed lookup
+ * leaves the state as it was, so the next round tries again; a gone issue isn't a failed lookup
+ * (#263). An empty list counts as a failed one, and an empty stored list as none (#261): compared
+ * with either, every issue would look closed or reopened.
+ */
+export const checkIssueStates = async (): Promise<void> => {
+  const issues = await openIssues().catch(() => null)
+  if (!issues || issues.length === 0) {
+    return
+  }
+  await checkLinkCycles(issues)
+  await checkOpenList(issues.map(({ number }) => number).toSorted(byNumber).map(String))
 }
