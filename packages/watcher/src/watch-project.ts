@@ -58,6 +58,9 @@
  *   NEW_ISSUE / ISSUE_COMMENT        a new issue (not the agent's own), or the owner commented on one
  *   ISSUE_CLOSED / ISSUE_REOPENED    an issue was closed (by anyone; also deleted or transferred, #263)
  *                                    or reopened
+ *   LINK_CYCLE #<a> → #<b> → #<a>     the blocked-by links between open issues close a cycle (#335), set past
+ *                                    `issue-links`; each cycle once while it stays, also one there before the
+ *                                    first look, and again if it comes back after a fix
  *   IDLE                             nothing happened for max-hours (with --follow: a heartbeat, then it goes on)
  *   WATCHER_ERROR                    a look failed (e.g. a state file stayed locked); it goes on with the next
  *   WATCHER_OUTDATED                 its code changed in its checkout after it started (#265); it exits:

@@ -1,39 +1,47 @@
 import { describe, expect, it } from 'bun:test'
-import { type IssuePage, allIssueNumbers, goneIssueLine, isGone, isMoved, issueEventLine, issueEventsFrom, issuePage } from './watch-issue-events'
+import { type IssuePage, allOpenIssues, goneIssueLine, isGone, isMoved, issueEventLine, issueEventsFrom, issuePage } from './watch-issue-events'
 
 const page = (numbers: number[], endCursor: string | null) => ({ nodes: numbers.map(number => ({ number })), pageInfo: { endCursor, hasNextPage: endCursor !== null } })
+const open = (numbers: number[]) => numbers.map(number => ({ blockedBy: [], number }))
+const REPO = 'owner/repo'
 
 describe('open issues (#261)', () => {
   it('reads a page of the issues connection, and the cursor of the next one', () => {
-    expect(issuePage(page([1, 2], 'c1'))).toEqual({ next: 'c1', numbers: [1, 2] })
-    expect(issuePage(page([3], null))).toEqual({ next: null, numbers: [3] })
-    expect(issuePage(page([], null))).toEqual({ next: null, numbers: [] })
+    expect(issuePage(page([1, 2], 'c1'), REPO)).toEqual({ issues: open([1, 2]), next: 'c1' })
+    expect(issuePage(page([3], null), REPO)).toEqual({ issues: open([3]), next: null })
+    expect(issuePage(page([], null), REPO)).toEqual({ issues: [], next: null })
+  })
+
+  it("reads each issue's blockers in the same repository, in any case, and leaves out other repositories' (#335)", () => {
+    const blocker = (number: number, nameWithOwner: string) => ({ number, repository: { nameWithOwner } })
+    const nodes = [{ blockedBy: { nodes: [blocker(2, 'Owner/Repo'), blocker(9, 'other/repo')] }, number: 1 }]
+    expect(issuePage({ nodes, pageInfo: { endCursor: null, hasNextPage: false } }, REPO)).toEqual({ issues: [{ blockedBy: [2], number: 1 }], next: null })
   })
 
   it('takes an answer without a page for a failure, not for an empty list', () => {
-    expect(() => issuePage({})).toThrow()
-    expect(() => issuePage({ nodes: [] })).toThrow()
-    expect(() => issuePage({ nodes: [{ number: 1 }], pageInfo: { endCursor: null, hasNextPage: true } })).toThrow()
+    expect(() => issuePage({}, REPO)).toThrow()
+    expect(() => issuePage({ nodes: [] }, REPO)).toThrow()
+    expect(() => issuePage({ nodes: [{ number: 1 }], pageInfo: { endCursor: null, hasNextPage: true } }, REPO)).toThrow()
   })
 
   it('follows the cursors through a list longer than one page', async () => {
     const pages = new Map<string | null, IssuePage>([
-      [null, issuePage(page(Array.from({ length: 100 }, (_item, index) => index + 1), 'c1'))],
-      ['c1', issuePage(page(Array.from({ length: 74 }, (_item, index) => index + 101), null))],
+      [null, issuePage(page(Array.from({ length: 100 }, (_item, index) => index + 1), 'c1'), REPO)],
+      ['c1', issuePage(page(Array.from({ length: 74 }, (_item, index) => index + 101), null), REPO)],
     ])
     const asked: (string | null)[] = []
-    const numbers = await allIssueNumbers(async cursor => {
+    const issues = await allOpenIssues(async cursor => {
       asked.push(cursor)
-      return pages.get(cursor) ?? issuePage({})
+      return pages.get(cursor) ?? issuePage({}, REPO)
     })
     expect(asked).toEqual([null, 'c1'])
-    expect(numbers).toHaveLength(174)
-    expect(numbers.at(-1)).toBe(174)
+    expect(issues).toHaveLength(174)
+    expect(issues.at(-1)?.number).toBe(174)
   })
 
   it('fails the whole list when a later page fails', async () => {
-    const pages = async (cursor: string | null): Promise<IssuePage> => (cursor === null ? issuePage(page([1], 'c1')) : issuePage({}))
-    await expect(allIssueNumbers(pages)).rejects.toThrow()
+    const pages = async (cursor: string | null): Promise<IssuePage> => (cursor === null ? issuePage(page([1], 'c1'), REPO) : issuePage({}, REPO))
+    await expect(allOpenIssues(pages)).rejects.toThrow()
   })
 })
 

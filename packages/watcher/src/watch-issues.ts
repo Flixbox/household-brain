@@ -1,5 +1,6 @@
-/** The project watcher's issue checks (watch-project.ts): new issues, the owner's comments, closings. */
-import { issueLine, openIssueNumbers } from './watch-github'
+/** The project watcher's issue checks (watch-project.ts): new issues, the owner's comments, closings, cycles in their links. */
+import { MAX_CYCLES, type OpenIssue, linkCycles, newCycles } from './watch-link-cycles'
+import { issueLine, openIssues } from './watch-github'
 import { issueEventLines } from './watch-comments'
 import { queue } from './watch-output'
 import { appendLines, exists, readLines, writeLines } from './watch-state'
@@ -43,13 +44,24 @@ const issueChanges = async (before: string[], now: string[]): Promise<string[] |
   ]).then(lines => lines.filter(line => line !== null), () => null)
 
 /**
- * Issues closed or reopened since the last round. A failed lookup leaves the state as it was, so the
- * next round tries again; a gone issue isn't a failed lookup (#263). An empty list counts as a failed one, and an empty stored list as none
- * (#261): compared with either, every issue would look closed or reopened.
+ * Cycles in the blocked-by links between open issues that weren't there on the last look (#335),
+ * one LINK_CYCLE line each. Unlike other news, a cycle there before the first look is reported too:
+ * it holds its issues up until someone unblocks a link.
  */
-export const checkIssueStates = async (): Promise<void> => {
-  const now = await openIssueNumbers().then(numbers => numbers.toSorted(byNumber).map(String), () => null)
-  if (!now || now.length === 0 || await firstRun('open-issues', now)) {
+const checkLinkCycles = async (issues: readonly OpenIssue[]): Promise<void> => {
+  const now = linkCycles(issues)
+  const fresh = newCycles(await readLines('link-cycles'), now)
+  await writeLines('link-cycles', now)
+  if (fresh.length > 0) {
+    // At the cap, more cycles may hide behind these; they come as news once these are fixed.
+    const more = now.length >= MAX_CYCLES ? [`(at least ${MAX_CYCLES} cycles; more may come once these are fixed: run issue-links audit)`] : []
+    queue([...fresh.map(cycle => `LINK_CYCLE ${cycle}`), ...more])
+  }
+}
+
+/** Issues closed or reopened since the open list `now` was last stored; the first list is stored as it is. */
+const checkOpenList = async (now: string[]): Promise<void> => {
+  if (await firstRun('open-issues', now)) {
     return
   }
   const before = await readLines('open-issues')
@@ -61,4 +73,19 @@ export const checkIssueStates = async (): Promise<void> => {
   if (lines.length > 0) {
     queue(lines)
   }
+}
+
+/**
+ * Issues closed or reopened since the last round, and new cycles in their links. A failed lookup
+ * leaves the state as it was, so the next round tries again; a gone issue isn't a failed lookup
+ * (#263). An empty list counts as a failed one, and an empty stored list as none (#261): compared
+ * with either, every issue would look closed or reopened.
+ */
+export const checkIssueStates = async (): Promise<void> => {
+  const issues = await openIssues().catch(() => null)
+  if (!issues || issues.length === 0) {
+    return
+  }
+  await checkLinkCycles(issues)
+  await checkOpenList(issues.map(({ number }) => number).toSorted(byNumber).map(String))
 }

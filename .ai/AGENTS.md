@@ -68,7 +68,8 @@ repository), never with the owner's account.
   `audit`), never raw API calls. It refuses a link that would close a cycle, and prints the cycle.
   Links set past it (GitHub's page, another tool) skip that check: `audit_links` or
   `run.sh cli audit [--repo <owner/repo>]` finds every cycle among a repository's open issues
-  (#334); unblock one link in each, then audit again.
+  (#334); unblock one link in each, then audit again. The watcher reports a new one as `LINK_CYCLE`
+  (#335).
 - **Long things run in the background** (tests, builds, CI, watchers, reviewers); do the next thing
   meanwhile.
 
