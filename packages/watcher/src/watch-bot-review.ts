@@ -59,6 +59,14 @@ const askOnce = async ({ bot, pr, state }: { bot: string, pr: number, state: Bot
   return why === null ? { asked } : { skipped: why }
 }
 
+/** What becomes of the label once the asks are done: off for good, or back after a `failed` ask (`lost` when that fails). */
+const labelAfter = async (pr: number, failed: boolean): Promise<LabelFate> => {
+  if (!failed) {
+    return 'removed'
+  }
+  return (await putLabelBack(pr)) ? 'restored' : 'lost'
+}
+
 /**
  * The PR's review bots as GitHub shows them now, read once the claim is made: a state read before it
  * may miss the asks of a watcher that held the claim before and put the label back. Null when it
@@ -84,9 +92,7 @@ export const askBotReviews = async (pr: number): Promise<void> => {
     return
   }
   const outcomes = await Promise.all(REVIEW_BOTS.map(async bot => ({ bot, outcome: await askOnce({ bot, pr, state }) })))
-  const failed = outcomes.some(({ outcome }) => typeof outcome === 'object' && 'asked' in outcome && !outcome.asked)
-  const restored = failed && await putLabelBack(pr)
-  const label: LabelFate = failed ? (restored ? 'restored' : 'lost') : 'removed'
+  const label = await labelAfter(pr, outcomes.some(({ outcome }) => typeof outcome === 'object' && 'asked' in outcome && !outcome.asked))
   await allSettled(outcomes.map(async ({ bot, outcome }) =>
     (typeof outcome === 'string' ? Promise.resolve() : report(botReviewEvent({ bot, label, outcome, pr }), pr))))
 }
