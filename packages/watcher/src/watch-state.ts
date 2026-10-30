@@ -15,7 +15,8 @@
  *   initialized    set after the first complete round: from then on, a PR is new, and so is all on it
  *
  * And, shared by all of this machine's watchers of the repository: `review-asked/pr-<n>-<bot>`, one
- * empty file for each review bot asked to review a PR, or seen asked (#324), so it is asked once.
+ * file for each review bot asked to review a PR, or seen asked (#324), so it is asked once: empty
+ * while a watcher is asking, `done` once it did. Never removed: a PR is asked once, ever.
  *
  * Any number of watchers can watch one repository at once, and each reports every event (#264): each
  * remembers in a folder of its own, by its WATCHER_ID.
@@ -109,8 +110,6 @@ export const addLine = async (name: string, line: string): Promise<boolean> => o
 export const start = async (): Promise<void> => {
   // A session that came back after this long starts afresh: it hears where each PR stands again.
   await removeOlder(SESSIONS_DIR, Temporal.Duration.from({ hours: 24 * 14 }))
-  // A PR asked about months ago is long merged or closed: its claim is only taking up room.
-  await removeOlder(ASKED_DIR, Temporal.Duration.from({ hours: 24 * 90 }))
   process.on('SIGTERM', () => { process.exit(143) })
   process.on('SIGINT', () => { process.exit(130) })
 }

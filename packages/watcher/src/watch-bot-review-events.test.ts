@@ -6,7 +6,7 @@ const SELF = 'agent[bot]'
 const comment = (author: string, body: string): PrComment => ({ author, body, createdAt: '2026-10-26T11:00:00Z', url: 'https://github.test/pr/1#c' })
 const botReview = (login: string, oid = 'abcdef1') => ({ author: { login }, commit: { oid }, state: 'COMMENTED' })
 const suite = (slug: string, ...statuses: string[]) => ({ app: { slug }, checkRuns: { nodes: statuses.map(status => ({ status })) } })
-const none = { reviewed: [], reviewing: false }
+const none = { requested: false, reviewed: [], reviewing: false }
 
 describe('botNames', () => {
   it('reads a comma-separated setting, with or without `[bot]`, in lower case', () => {
@@ -19,16 +19,22 @@ describe('botReviewStateOf', () => {
   const bots = ['coderabbitai']
 
   it('lists the named bots that reviewed the PR, on any commit, once each', () => {
-    expect(botReviewStateOf(bots, [botReview('coderabbitai[bot]', 'older'), botReview('coderabbitai'), botReview('someone')], []).reviewed).toEqual(['coderabbitai'])
-    expect(botReviewStateOf(bots, [botReview('someone')], []).reviewed).toEqual([])
+    expect(botReviewStateOf({ bots, labels: [], reviews: [botReview('coderabbitai[bot]', 'older'), botReview('coderabbitai'), botReview('someone')], suites: [] }).reviewed).toEqual(['coderabbitai'])
+    expect(botReviewStateOf({ bots, labels: [], reviews: [botReview('someone')], suites: [] }).reviewed).toEqual([])
+  })
+
+  it('sees the label ask for a review, only with bots named', () => {
+    expect(botReviewStateOf({ bots, labels: ['parked', 'bot-review'], reviews: [], suites: [] }).requested).toBe(true)
+    expect(botReviewStateOf({ bots: [], labels: ['bot-review'], reviews: [], suites: [] }).requested).toBe(false)
+    expect(botReviewStateOf({ bots, labels: ['parked'], reviews: [], suites: [] }).requested).toBe(false)
   })
 
   it("sees a named bot reviewing while its check run on the head isn't completed", () => {
-    expect(botReviewStateOf(bots, [], [suite('coderabbitai', 'IN_PROGRESS')]).reviewing).toBe(true)
-    expect(botReviewStateOf(bots, [], [suite('coderabbitai', 'COMPLETED')]).reviewing).toBe(false)
-    expect(botReviewStateOf(bots, [], [suite('github-actions', 'IN_PROGRESS')]).reviewing).toBe(false)
+    expect(botReviewStateOf({ bots, labels: [], reviews: [], suites: [suite('coderabbitai', 'IN_PROGRESS')] }).reviewing).toBe(true)
+    expect(botReviewStateOf({ bots, labels: [], reviews: [], suites: [suite('coderabbitai', 'COMPLETED')] }).reviewing).toBe(false)
+    expect(botReviewStateOf({ bots, labels: [], reviews: [], suites: [suite('github-actions', 'IN_PROGRESS')] }).reviewing).toBe(false)
     // A suite the app never started a run in (GitHub queues one for every app on a push) isn't a review.
-    expect(botReviewStateOf(bots, [], [suite('coderabbitai')]).reviewing).toBe(false)
+    expect(botReviewStateOf({ bots, labels: [], reviews: [], suites: [suite('coderabbitai')] }).reviewing).toBe(false)
   })
 })
 
@@ -40,6 +46,10 @@ describe('awaitsBotReview', () => {
 
   it('waits for a review in progress, asked for or not', () => {
     expect(awaitsBotReview({ asked: [], state: { ...none, reviewing: true } })).toBe(true)
+  })
+
+  it('waits while the label still asks for a review the watcher has yet to post', () => {
+    expect(awaitsBotReview({ asked: [], state: { ...none, requested: true } })).toBe(true)
   })
 
   it('never waits for a review nobody asked for (unlike #299)', () => {

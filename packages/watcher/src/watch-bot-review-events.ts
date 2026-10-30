@@ -19,19 +19,22 @@ export const BOT_REVIEW_LABEL = process.env.BOT_REVIEW_LABEL ?? 'bot-review'
 
 /** What a PR's reviews and checks say about the review bots: who reviewed it (any commit), and whether one is reviewing now. */
 export interface BotReviewState {
+  /** The PR carries BOT_REVIEW_LABEL: a review is asked for and the ask not yet done (#324). */
+  requested: boolean
   /** The named bots that left a review on the PR, on any commit, in `bare` form. */
   reviewed: string[]
   /** A named bot's check run on the head is still queued or in progress (CodeRabbit's "CodeRabbit" check). */
   reviewing: boolean
 }
 
-export const NO_BOT_REVIEW: BotReviewState = { reviewed: [], reviewing: false }
+export const NO_BOT_REVIEW: BotReviewState = { requested: false, reviewed: [], reviewing: false }
 
 /**
- * The review bots' state from a PR as GraphQL gives it: `reviews` with `author.login`, and the head's
- * check suites with their app's slug (a bot's login without `[bot]`) and check runs (#324).
+ * The review bots' state from a PR as GraphQL gives it: its label names, `reviews` with `author.login`,
+ * and the head's check suites with their app's slug (a bot's login without `[bot]`) and check runs (#324).
  */
-export const botReviewStateOf = (bots: readonly string[], reviews: readonly Json[], suites: readonly Json[]): BotReviewState => ({
+export const botReviewStateOf = ({ bots, labels, reviews, suites }: { bots: readonly string[], labels: readonly string[], reviews: readonly Json[], suites: readonly Json[] }): BotReviewState => ({
+  requested: bots.length > 0 && labels.includes(BOT_REVIEW_LABEL),
   reviewed: [...new Set(reviews.map(review => bare(textOf(record(review.author).login))).filter(login => bots.includes(login)))],
   reviewing: suites.some(suite => bots.includes(bare(textOf(record(suite.app).slug)))
     && records(at(suite, 'checkRuns', 'nodes')).some(run => textOf(run.status) !== 'COMPLETED')),
@@ -41,14 +44,15 @@ export const botReviewStateOf = (bots: readonly string[], reviews: readonly Json
 export const reviewCommand = (login: string): string => `@${bare(login)} review`
 
 /**
- * Whether PR's READY_TO_MERGE waits for a review bot (#324): one is reviewing it now, or one of
- * `asked` (the bots the watcher asked, `@<bot> review`) hasn't reviewed it yet. The watcher asks a bot
+ * Whether PR's READY_TO_MERGE waits for a review bot (#324): its label still asks for a review, one
+ * is reviewing it now, or one of `asked` (the bots the watcher asked, `@<bot> review`) hasn't reviewed
+ * it yet. The watcher asks a bot
  * only while it never reviewed the PR, so any review of its after the ask is the one asked for; its
  * approval after `@<bot> resolve` (#303) comes only after an earlier review, so it is never taken for
  * it, and a `resolve` is never an ask. A PR nobody asked a bot about waits for none (unlike #299).
  */
 export const awaitsBotReview = ({ asked, state }: { asked: readonly string[], state: BotReviewState }): boolean =>
-  state.reviewing || asked.some(bot => !state.reviewed.includes(bare(bot)))
+  state.requested || state.reviewing || asked.some(bot => !state.reviewed.includes(bare(bot)))
 
 /** Why the watcher doesn't ask `bot` (#324): it reviewed the PR already, or someone asked it already (a `@<bot> review` comment); null to ask. */
 export const notAskingBecause = ({ bot, comments, state }: { bot: string, comments: readonly PrComment[], state: BotReviewState }): string | null => {

@@ -69,16 +69,16 @@ default branch's CI, new issues, the owner's comments on issues, and issues clos
     Their reviews are asked for, never awaited by default (#324): a PR labelled `BOT_REVIEW_LABEL`
     gets `@<bot> review` from the watcher, once per PR ever (not again after new pushes, nor when the
     bot reviewed it already or someone posted `@<bot> review` before), and the label comes off
-    (`BOT_REVIEW_ASKED`). Only such a PR, or one whose head shows a bot's check run still going (a
-    review in progress), gets no `READY_TO_MERGE` and no auto-merge reminder until the bot has
+    (`BOT_REVIEW_ASKED`). Only such a PR (also while the label is still on), or one whose head shows a
+    bot's check run still going (a review in progress), gets no `READY_TO_MERGE` and no auto-merge reminder until the bot has
     reviewed it; a PR nobody asked a bot about waits for none (#299 waited for every approved draft).
     None by default: nothing is asked, nothing waits. The `GH` token must be allowed to comment on
     pull requests and to remove labels.
   - `BOT_REVIEW_LABEL`: the label that asks `REVIEW_BOTS` for a review (`bot-review` by default,
     #324). The label must exist in the repository. Which asks were made is remembered on this
-    machine (`$XDG_STATE_HOME/watch-project/<owner>_<repo>/review-asked/`), shared by its watchers; a
-    watcher on another machine sees the `@<bot> review` comment and doesn't ask again, but waits only
-    on asks it saw.
+    machine for good (`$XDG_STATE_HOME/watch-project/<owner>_<repo>/review-asked/`), shared by its
+    watchers; a watcher on another machine sees the `@<bot> review` comment and doesn't ask again,
+    but waits only on asks it saw, and two machines asking in the same moment would both post.
   - `DISMISS_STALE_BOT_REVIEWS`: `1` lets the watcher dismiss a bot's (`…[bot]`) change request, once
     the owner approved and no review thread is open without a `Resolved:` reply: one left on an older
     commit (#285), or one on the head once the agent (`SELF`) or the owner settled it with `Resolved:

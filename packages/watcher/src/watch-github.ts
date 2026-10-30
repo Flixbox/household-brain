@@ -1,7 +1,7 @@
 /** The project watcher's questions to GitHub, through the `gh` CLI, answered as plain data. */
 import { type MainRun, type OpenPr, type Run, approvedBy, decisionFrom } from './watch-events'
 import type { QueueEntry } from './watch-queue-events'
-import { BOT_REVIEW_LABEL, type BotReviewState, NO_BOT_REVIEW, REVIEW_BOTS, botReviewStateOf } from './watch-bot-review-events'
+import { type BotReviewState, NO_BOT_REVIEW, REVIEW_BOTS, botReviewStateOf } from './watch-bot-review-events'
 import { type ReviewThread, threadsToResolve } from './watch-review-events'
 import { allIssueNumbers, goneIssueLine, isGone, isMoved, issueEventLine, issuePage } from './watch-issue-events'
 import { GH, failedStatus, ghText } from './watch-gh'
@@ -153,10 +153,8 @@ export interface PrState {
   ownerApprovalCommit: string
   autoMerge: boolean
   draft: boolean
-  /** The review bots' reviews of the PR and whether one is reviewing it (#324). */
+  /** The review bots' reviews of the PR, whether one is reviewing it, and whether its label asks for one (#324). */
   bot: BotReviewState
-  /** Labelled BOT_REVIEW_LABEL: asks REVIEW_BOTS for a review (#324). */
-  botReviewLabel: boolean
   parked: boolean
   queued: boolean
   title: string
@@ -173,19 +171,18 @@ export const threadsFrom = (value: unknown): ReviewThread[] => records(at(value,
 const PR_FIELDS = 'isDraft isInMergeQueue state mergeable mergeStateStatus headRefOid mergeCommit { oid } reviewDecision autoMergeRequest { enabledAt } title'
   + ` labels(first: 100) { nodes { name } } author { login kind: __typename } reviews(last: 100) { nodes { state commit { oid } author { login kind: __typename } } } ${THREAD_FIELDS}`
   // The head's check suites, for a review bot's check run still going (#324).
-  + ' commits(last: 1) { nodes { commit { checkSuites(first: 10) { nodes { app { slug } checkRuns(first: 5) { nodes { status } } } } } } }'
+  + ' commits(last: 1) { nodes { commit { checkSuites(first: 30) { nodes { app { slug } checkRuns(first: 10) { nodes { status } } } } } } }'
 
 const stateOf = (value: Json): PrState => {
   const author = actor(value.author)
-  const labels = new Set(records(record(value.labels).nodes).map(label => textOf(label.name)))
+  const labels = records(record(value.labels).nodes).map(label => textOf(label.name))
   const suites = records(at(records(at(value, 'commits', 'nodes'))[0], 'commit', 'checkSuites', 'nodes'))
   const reviews = records(record(value.reviews).nodes)
     .map(review => ({ commit: textOf(record(review.commit).oid), login: actor(review.author), state: textOf(review.state) }))
     .filter(review => review.login !== author && review.login !== SELF)
   return {
     autoMerge: isRecord(value.autoMergeRequest),
-    bot: botReviewStateOf(REVIEW_BOTS, records(record(value.reviews).nodes), suites),
-    botReviewLabel: REVIEW_BOTS.length > 0 && labels.has(BOT_REVIEW_LABEL),
+    bot: botReviewStateOf({ bots: REVIEW_BOTS, labels, reviews: records(record(value.reviews).nodes), suites }),
     // GitHub leaves `reviewDecision` empty under a ruleset (#197), and counts anyone's approval: the
     // reviews decide, an approval counting only from the owner (#277).
     decision: decisionFrom(textOf(value.reviewDecision), reviews, OWNER),
@@ -198,7 +195,7 @@ const stateOf = (value: Json): PrState => {
     // READY_APPROVED_DRAFTS is on (#301, #317).
     ownerApprovalCommit: ownerApprovalCommit(reviews, OWNER),
     ownerApproved: approvedBy(reviews, OWNER),
-    parked: labels.has('parked'),
+    parked: labels.includes('parked'),
     queued: value.isInMergeQueue === true,
     state: textOf(value.state),
     title: `${textOf(value.title)} (by ${author})`,
