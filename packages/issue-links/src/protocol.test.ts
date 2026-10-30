@@ -3,6 +3,7 @@ import { answer, tools } from './protocol'
 
 const calls: string[][] = []
 const all = tools({
+  audit: async repo => `no cycles in ${repo === '' ? 'here' : repo}`,
   block: async (...texts) => {
     calls.push(['block', ...texts])
     return texts[1] === 'cycle' ? Promise.reject(new Error('refused: would close a cycle')) : 'now blocked'
@@ -12,11 +13,11 @@ const all = tools({
 })
 
 describe('the MCP answers (#256)', () => {
-  it('starts with the version the client asks for, and lists the three tools', async () => {
+  it('starts with the version the client asks for, and lists the four tools', async () => {
     expect(await answer({ id: 1, jsonrpc: '2.0', method: 'initialize', params: { protocolVersion: '2025-06-18' } }, all))
       .toMatchObject({ id: 1, result: { capabilities: { tools: {} }, protocolVersion: '2025-06-18', serverInfo: { name: 'issue-links' } } })
     expect(await answer({ id: 2, jsonrpc: '2.0', method: 'tools/list' }, all)).toMatchObject({
-      result: { tools: [{ inputSchema: { required: ['issue', 'blocked_by'] }, name: 'block_issue' }, { name: 'unblock_issue' }, { name: 'issue_links' }] },
+      result: { tools: [{ inputSchema: { required: ['issue', 'blocked_by'] }, name: 'block_issue' }, { name: 'unblock_issue' }, { name: 'issue_links' }, { inputSchema: { required: [] }, name: 'audit_links' }] },
     })
   })
 
@@ -26,6 +27,13 @@ describe('the MCP answers (#256)', () => {
     expect(calls).toContainEqual(['block', '#1', '#2'])
     expect(await answer({ id: 4, jsonrpc: '2.0', method: 'tools/call', params: { arguments: { blocked_by: 'cycle', issue: '#1' }, name: 'block_issue' } }, all))
       .toMatchObject({ result: { content: [{ text: 'refused: would close a cycle' }], isError: true } })
+  })
+
+  it('audits with or without a repository (#334)', async () => {
+    expect(await answer({ id: 11, jsonrpc: '2.0', method: 'tools/call', params: { arguments: {}, name: 'audit_links' } }, all))
+      .toMatchObject({ result: { content: [{ text: 'no cycles in here' }] } })
+    expect(await answer({ id: 12, jsonrpc: '2.0', method: 'tools/call', params: { arguments: { repo: 'owner/repo' }, name: 'audit_links' } }, all))
+      .toMatchObject({ result: { content: [{ text: 'no cycles in owner/repo' }] } })
   })
 
   it('agrees on a version it follows, and on its newest for any other', async () => {

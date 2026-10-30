@@ -5,7 +5,7 @@
  */
 import { type IssueRef, refKey, refOf, refText } from './refs'
 import { isRecord } from './read'
-import { blockingPath } from './cycle'
+import { MAX_CYCLES, blockingPath, findCycles } from './cycle'
 import { ghJson } from './gh'
 
 const path = ({ number, repo }: IssueRef) => `repos/${repo}/issues/${number}`
@@ -74,4 +74,37 @@ const list = (refs: IssueRef[]) => (refs.length === 0 ? 'nothing' : refs.map(ref
 export const linksOf = async (issue: IssueRef): Promise<string> => {
   const [blockers, blocked] = await Promise.all([blockersOf(issue), blockedIssuesOf(issue)])
   return `${refText(issue)} is blocked by ${list(blockers)}; it blocks ${list(blocked)}`
+}
+
+/** The open issues of `repo` (no pull requests), each with whether an open issue blocks it. */
+const openIssuesOf = async (repo: string): Promise<{ blocked: boolean, ref: IssueRef }[]> => {
+  const answer = await ghJson(['api', '--paginate', '--slurp', `repos/${repo}/issues?state=open&per_page=100`])
+  return (Array.isArray(answer) ? answer.flat() : []).flatMap((item: unknown) => {
+    const ref = isRecord(item) && !isRecord(item.pull_request) ? refOf({ number: item.number, repository_url: item.repository_url }) : null
+    const summary = isRecord(item) && isRecord(item.issue_dependencies_summary) ? item.issue_dependencies_summary : {}
+    // Without the summary (an older GitHub), every issue is asked for its blockers.
+    return ref ? [{ blocked: summary.blocked_by !== 0, ref }] : []
+  })
+}
+
+/** `#12` for an issue in `repo`, the full reference for one elsewhere. */
+const shortText = (key: string, repo: string) => (key.startsWith(`${repo.toLowerCase()}#`) ? key.slice(key.indexOf('#')) : key)
+
+/**
+ * Every cycle in the "blocked by" links between `repo`'s open issues (#334): links set past `block`
+ * (GitHub's page, `gh api`) skip its check. Links to closed issues or other repositories' issues are
+ * left out: a closed issue no longer holds anything up. Throws the cycles, one path per line, when
+ * there are any, so the command line exits non-zero.
+ */
+export const audit = async (repo: string): Promise<string> => {
+  const open = await openIssuesOf(repo)
+  const openKeys = new Set(open.map(({ ref }) => refKey(ref)))
+  const links = await Promise.all(open.filter(({ blocked }) => blocked).map(async ({ ref }) =>
+    [refKey(ref), (await blockersOf(ref)).map(blocker => refKey(blocker)).filter(key => openKeys.has(key))] as const))
+  const cycles = findCycles(new Map(links))
+  if (cycles.length > 0) {
+    const count = cycles.length < MAX_CYCLES ? `${cycles.length}` : `at least ${MAX_CYCLES}`
+    throw new Error([`${count} cycle(s) in ${repo}'s blocked-by links; unblock one link in each, then audit again:`, ...cycles.map(cycle => cycle.map(key => shortText(key, repo)).join(' → '))].join('\n'))
+  }
+  return `no cycles in the blocked-by links between ${repo}'s ${open.length} open issues`
 }
