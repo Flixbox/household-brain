@@ -4,14 +4,15 @@
  *   issue-links block <issue> <blocked-by>     mark <issue> as blocked by <blocked-by> (refused if it closes a cycle)
  *   issue-links unblock <issue> <blocked-by>   remove that link
  *   issue-links links <issue>                  what blocks <issue>, and what it blocks
+ *   issue-links audit [--repo <owner/repo>]    every cycle in the blocked-by links between open issues (#334)
  *
  * An issue is `12`, `#12` (in REPO, or the repository of the current folder) or `owner/repo#12`.
- * GH sets the `gh` to ask with. Exits 1 with the reason when GitHub or the deadlock check refuses,
+ * GH sets the `gh` to ask with. Exits 1 with the reason when GitHub or the deadlock check refuses, or the audit finds a cycle;
  * 64 on a wrong command.
  */
 import { commands } from './commands'
 
-const USAGE = 'usage: issue-links block <issue> <blocked-by> | unblock <issue> <blocked-by> | links <issue>'
+const USAGE = 'usage: issue-links block <issue> <blocked-by> | unblock <issue> <blocked-by> | links <issue> | audit [--repo <owner/repo>]'
 
 class UsageError extends Error {
   public override name = 'UsageError'
@@ -24,6 +25,9 @@ const run = async (args: string[]): Promise<string> => {
   }
   if (command === 'links' && args.length === 2) {
     return commands.links(first)
+  }
+  if (command === 'audit' && (args.length === 1 || (args.length === 3 && first === '--repo'))) {
+    return commands.audit(second)
   }
   throw new UsageError(USAGE)
 }

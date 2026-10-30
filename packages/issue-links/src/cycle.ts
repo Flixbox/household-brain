@@ -23,3 +23,33 @@ export const blockingPath = async (from: string, target: string, blockersOf: (is
   }
   return walk([from])
 }
+
+/**
+ * Every cycle in a repository's "blocked by" links (#334), each as the path from an issue back to
+ * itself: `[a, b, …, a]`, a blocked by b and so on; a self-link is `[a, a]`. `blockersOf` maps an
+ * issue to the issues it is blocked by. A depth-first walk reports each link that leads back into the
+ * path it is on, so two paths to the same blocker (a diamond) are no cycle, and each issue is walked
+ * from once.
+ */
+export const findCycles = (blockersOf: ReadonlyMap<string, readonly string[]>): string[][] => {
+  const done = new Set<string>()
+  const cycles: string[][] = []
+  const visit = (issue: string, path: string[]): void => {
+    const at = path.indexOf(issue)
+    if (at !== -1) {
+      cycles.push([...path.slice(at), issue])
+      return
+    }
+    if (done.has(issue)) {
+      return
+    }
+    for (const blocker of blockersOf.get(issue) ?? []) {
+      visit(blocker, [...path, issue])
+    }
+    done.add(issue)
+  }
+  for (const issue of blockersOf.keys()) {
+    visit(issue, [])
+  }
+  return cycles
+}

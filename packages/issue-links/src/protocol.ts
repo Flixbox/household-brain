@@ -10,7 +10,7 @@ type Command = (...texts: string[]) => Promise<string>
 const ISSUE = 'An issue: 12, #12 (in the repository Claude Code runs in, or REPO) or owner/repo#12.'
 
 /** The tools, each with the command it runs and the arguments it passes, in order. */
-export const tools = (commands: Record<'block' | 'links' | 'unblock', Command>) => [
+export const tools = (commands: Record<'audit' | 'block' | 'links' | 'unblock', Command>) => [
   {
     arguments: ['issue', 'blocked_by'],
     command: commands.block,
@@ -19,13 +19,26 @@ export const tools = (commands: Record<'block' | 'links' | 'unblock', Command>) 
   },
   { arguments: ['issue', 'blocked_by'], command: commands.unblock, description: 'Remove the link that marks an issue as blocked by another.', name: 'unblock_issue' },
   { arguments: ['issue'], command: commands.links, description: 'What an issue is blocked by, and what it blocks.', name: 'issue_links' },
+  {
+    arguments: ['repo'],
+    command: commands.audit,
+    description: "Find every cycle in the blocked-by links between a repository's open issues, links set past block_issue included. Each cycle comes back as an error, as a path #a → #b → … → #a.",
+    name: 'audit_links',
+  },
 ]
 
 type Tool = ReturnType<typeof tools>[number]
 
+const ARGUMENTS: Record<string, string> = {
+  blocked_by: `The blocking issue. ${ISSUE}`,
+  issue: ISSUE,
+  repo: 'The repository, owner/repo; by default the one Claude Code runs in, or REPO.',
+}
+
+/** Every argument is required but `repo`, which has a default. */
 const schema = (tool: Tool) => ({
-  properties: Object.fromEntries(tool.arguments.map(name => [name, { description: name === 'issue' ? ISSUE : `The blocking issue. ${ISSUE}`, type: 'string' }])),
-  required: tool.arguments,
+  properties: Object.fromEntries(tool.arguments.map(name => [name, { description: ARGUMENTS[name] ?? '', type: 'string' }])),
+  required: tool.arguments.filter(name => name !== 'repo'),
   type: 'object',
 })
 
