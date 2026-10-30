@@ -139,9 +139,16 @@ Every PR that changes the UI shows it in a GIF in its description (after the
 
 ### Merge
 
-- **Enable auto-merge** (`agent-gh pr merge <n> --auto --squash`) only with the owner's approval and
-  once the PR is well reviewed: the findings fixed and the fixes looked at. Four review rounds is the
-  soft cap; after it, fix and merge, and say what wasn't re-reviewed.
+- **Enable auto-merge** (`agent-gh pr merge <n> --auto --squash`) only once the PR is well reviewed
+  (Codex's blockers and should-fix items fixed and the fixes looked at, CI green, every thread
+  settled) and cleared for its kind. Four review rounds is the soft cap; after it, fix and merge, and
+  say what wasn't re-reviewed.
+  - **A user-facing PR** (the web app's UI) is cleared by the owner's approval.
+  - **Any other PR** (tooling, CI, docs, the watcher, agent rules) needs no approval (owner's ground
+    rule, #328): it is cleared once a review subagent finds no blocker and no should-fix item left;
+    say so on the PR. A PR that changes these merge rules waits for the owner.
+  - **The owner's approval is permanent:** pushes after it need none again; name each in a PR comment
+    and queue.
 - **Read the PR for unanswered comments first, as its own step**, never chained to the merge command
   (#154): an approval and a comment often arrive together.
 - `main` only takes PRs with green CI; never push to it. A failed deploy gets a follow-up PR.
@@ -264,5 +271,5 @@ in the next PR (first, if the app is unusable). Report what it showed.
   (console → Authentication → Settings → User actions), let them sign in once, allowlist their uid
   (copied from Authentication → Users, not a screenshot), switch it off again. While it is off,
   nobody can sign in for the first time.
-- **Merging is the owner's auto-merge**, never a required review: the owner can't approve PRs opened
-  with their own account.
+- **Merging is auto-merge**, never a required approval in GitHub's ruleset: the owner can't approve
+  PRs opened with their own account. The reviews above still apply.
