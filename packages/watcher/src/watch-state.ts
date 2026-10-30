@@ -46,9 +46,16 @@ const stateFile = (name: string) => `${DIR}/${name}`
 const ASKED_DIR = `${REPO_DIR}/review-asked`
 export const askedFile = (pr: number, bot: string): string => `${ASKED_DIR}/pr-${pr}-${bare(bot)}`
 
+/**
+ * Whether a watcher on this machine asked `bot` to review PR `pr`, or saw it asked (#324): its file says
+ * `done`. An empty one is a claim an older watcher left behind mid-ask (#325), and counts for nothing.
+ */
+export const isAsked = async (pr: number, bot: string): Promise<boolean> =>
+  (await Bun.file(askedFile(pr, bot)).text().catch(() => '')).trim() === 'done'
+
 /** The bots in REVIEW_BOTS that a watcher on this machine asked to review PR `pr`, or saw asked (#324). */
 export const askedBots = async (pr: number): Promise<string[]> =>
-  (await Promise.all(REVIEW_BOTS.map(async bot => ((await Bun.file(askedFile(pr, bot)).exists()) ? [bot] : [])))).flat()
+  (await Promise.all(REVIEW_BOTS.map(async bot => ((await isAsked(pr, bot)) ? [bot] : [])))).flat()
 
 export const exists = async (name: string): Promise<boolean> => Bun.file(stateFile(name)).exists()
 

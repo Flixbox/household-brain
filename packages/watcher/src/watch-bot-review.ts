@@ -2,85 +2,97 @@
  * Asks the review bots for a review once per PR, on request (#324): a PR labelled BOT_REVIEW_LABEL
  * gets `@<bot> review` from the watcher for each bot in REVIEW_BOTS that never reviewed it and was never
  * asked, then the label comes off. Reviews are scarce, so never twice for the same PR, also after new
- * pushes: the asks are claimed in files shared by this machine's watchers of the repository, and a
- * `@<bot> review` comment already on the PR (another machine's, or anyone's) counts as asked.
+ * pushes, and also with watchers on several machines (#325): the claim is made on GitHub, by taking
+ * the label off before anything is posted. GitHub removes it for one watcher and answers 404 to every
+ * other, wherever it runs, so only that one asks. A `@<bot> review` comment already on the PR (another
+ * watcher's, or anyone's; `asked` in the PR state) counts as asked, and this machine's asks are
+ * recorded in files too: a fast path, and what its watchers wait on before the comment shows.
  *
- * Which bots were asked is what READY_TO_MERGE and its reminder wait on (`askedBots` in
- * watch-state.ts), and the label itself while it is on; a bot nobody asked holds nothing back, unless
- * its check run on the head shows it reviewing. Watchers on different machines share no claims: each
- * sees the other's comment once it is posted, but two asking in the same moment would both post.
+ * Which bots were asked is what READY_TO_MERGE and its reminder wait on (`awaitsBotReview`): the
+ * `@<bot> review` comments, the files (`askedBots` in watch-state.ts), and the label itself while it
+ * is on; a bot nobody asked holds nothing back, unless its check run on the head shows it reviewing.
  */
-import { BOT_REVIEW_LABEL, REVIEW_BOTS, botReviewEvent, notAskingBecause, reviewCommand } from './watch-bot-review-events'
-import type { PrComment } from './watch-review-events'
-import { type PrState, REPO, gh } from './watch-github'
+import { BOT_REVIEW_LABEL, type BotReviewState, type LabelFate, REVIEW_BOTS, botReviewEvent, notAskingBecause, reviewCommand } from './watch-bot-review-events'
+import { REPO, gh, prStates } from './watch-github'
 import { GH, failedStatus } from './watch-gh'
-import { askedFile } from './watch-state'
-import { claim, unclaim, writeWhole } from './watch-files'
-import { allSettled } from './read'
+import { allSettled, ignoreFailure } from './read'
+import { writeWhole } from './watch-files'
+import { askedFile, isAsked } from './watch-state'
+import { comment } from './watch-dismiss'
 import { report } from './watch-output'
-import { comment, reviewBlockers } from './watch-dismiss'
+
+const LABEL_PATH = `repos/${REPO}/issues`
 
 /**
- * Takes BOT_REVIEW_LABEL off PR `pr` with the `GH` token; true once it is gone, also when another
- * watcher was first (404).
+ * Takes BOT_REVIEW_LABEL off PR `pr` with the `GH` token, the claim on its asks (#325): `taken` for the
+ * one watcher whose removal went through, `gone` when the label was off already (another watcher, on
+ * any machine, took it and asks), `failed` otherwise (the next look tries again).
  */
-const unlabel = async (pr: number): Promise<boolean> =>
-  gh(['api', '-X', 'DELETE', `repos/${REPO}/issues/${pr}/labels/${encodeURIComponent(BOT_REVIEW_LABEL)}`], GH, true)
-    .then(() => true, (error: unknown) => failedStatus(error) === 404)
+const takeLabel = async (pr: number): Promise<'failed' | 'gone' | 'taken'> =>
+  gh(['api', '-X', 'DELETE', `${LABEL_PATH}/${pr}/labels/${encodeURIComponent(BOT_REVIEW_LABEL)}`], GH, true)
+    .then(() => 'taken' as const, (error: unknown) => (failedStatus(error) === 404 ? 'gone' : 'failed'))
 
-type Outcome = { asked: boolean } | { skipped: string } | 'done' | 'pending'
-
-/** How long a claim may stay empty (its watcher asking) before it counts as left behind by a watcher that stopped. */
-const PENDING_SECONDS = 600
+/** Puts BOT_REVIEW_LABEL back on PR `pr` after an ask failed, so the next look, on any machine, tries again; true once it is on. */
+const putLabelBack = async (pr: number): Promise<boolean> =>
+  gh(['api', '-X', 'POST', `${LABEL_PATH}/${pr}/labels`, '-f', `labels[]=${BOT_REVIEW_LABEL}`], GH, true).then(() => true, () => false)
 
 /**
- * Another watcher's claim: `done` once it asked or skipped; `pending` while it is asking. One left
- * empty for longer than PENDING_SECONDS (its watcher stopped mid-ask) is given back, to be asked
- * again on the next look.
+ * Records that `bot` was asked about PR `pr` (or that it needn't be), for good. A record that can't be
+ * written loses nothing: the `@<bot> review` comment on GitHub says the same to every watcher.
  */
-const claimedElsewhere = async (path: string): Promise<'done' | 'pending'> => {
-  const file = Bun.file(path)
-  if ((await file.text().catch(() => '')).trim() === 'done') {
+const remember = async (pr: number, bot: string): Promise<void> => writeWhole(askedFile(pr, bot), 'done').catch(ignoreFailure)
+
+type Outcome = { asked: boolean } | { skipped: string } | 'done'
+
+/**
+ * Asks `bot`, by the watcher holding the claim: `done` when this machine's record says it was asked
+ * (nothing to report), `skipped` when GitHub shows it reviewed or was asked before (recorded then, so
+ * this machine counts it as asked), else whether the comment went through.
+ */
+const askOnce = async ({ bot, pr, state }: { bot: string, pr: number, state: BotReviewState }): Promise<Outcome> => {
+  if (await isAsked(pr, bot)) {
     return 'done'
   }
-  const now = Temporal.Now.instant().epochMilliseconds
-  const ageSeconds = (now - await file.stat().then(info => info.mtimeMs, () => now)) / 1000
-  await (ageSeconds > PENDING_SECONDS ? unclaim(path) : Promise.resolve())
-  return 'pending'
-}
-
-/**
- * Asks `bot` once among this machine's watchers: only the one that claims it first, also after a
- * restart. `skipped` when GitHub shows it reviewed or was asked before (the claim is made then, so
- * it counts as asked), `done` or `pending` when another watcher claimed it (nothing to report), else
- * whether the comment went through. A failed post gives the claim back, to be tried again next look.
- */
-const askOnce = async ({ bot, comments, pr, state }: { bot: string, comments: readonly PrComment[], pr: number, state: PrState }): Promise<Outcome> => {
-  const path = askedFile(pr, bot)
-  const claimed = await claim(path).then(made => (made ? 'claimed' : 'taken'), () => 'failed')
-  if (claimed !== 'claimed') {
-    return claimed === 'taken' ? claimedElsewhere(path) : { asked: false }
-  }
-  const why = notAskingBecause({ bot, comments, state: state.bot })
+  const why = notAskingBecause({ bot, state })
   const asked = why === null ? await comment(pr, reviewCommand(bot)) : true
-  await (asked ? writeWhole(path, 'done') : unclaim(path))
+  await (asked ? remember(pr, bot) : Promise.resolve())
   return why === null ? { asked } : { skipped: why }
 }
 
+/** What becomes of the label once the asks are done: off for good, or back after a `failed` ask (`lost` when that fails). */
+const labelAfter = async (pr: number, failed: boolean): Promise<LabelFate> => {
+  if (!failed) {
+    return 'removed'
+  }
+  return (await putLabelBack(pr)) ? 'restored' : 'lost'
+}
+
 /**
- * For a PR labelled BOT_REVIEW_LABEL (the caller checks, with REVIEW_BOTS named): asks each bot that
- * wasn't asked yet, reports each ask, skip or failure, and takes the label off once every bot's ask is
- * done. The label stays while one failed or another watcher is still asking, so the next look tries
- * again (READY_TO_MERGE waits meanwhile); a lookup that fails asks nothing.
+ * The PR's review bots as GitHub shows them now, read once the claim is made: a state read before it
+ * may miss the asks of a watcher that held the claim before and put the label back. Null when it
+ * can't be read.
  */
-export const askBotReviews = async (pr: number, state: PrState): Promise<void> => {
-  const found = await reviewBlockers(pr).catch(() => null)
-  if (!found) {
+const botStateNow = async (pr: number): Promise<BotReviewState | null> =>
+  prStates([pr], true).then(states => states.get(pr)?.bot ?? null, () => null)
+
+/**
+ * For a PR labelled BOT_REVIEW_LABEL (the caller checks, with REVIEW_BOTS named): claims the asks by
+ * taking the label off, then asks each bot that wasn't asked yet and reports each ask, skip or
+ * failure. A failed ask, or a PR state that can't be read after the claim, puts the label back, so
+ * the next look tries again (READY_TO_MERGE waits meanwhile); a watcher whose claim didn't go
+ * through asks nothing.
+ */
+export const askBotReviews = async (pr: number): Promise<void> => {
+  if (await takeLabel(pr) !== 'taken') {
     return
   }
-  const outcomes = await Promise.all(REVIEW_BOTS.map(async bot => ({ bot, outcome: await askOnce({ bot, comments: found.comments, pr, state }) })))
-  const finished = outcomes.every(({ outcome }) => outcome === 'done' || (typeof outcome === 'object' && !('asked' in outcome && !outcome.asked)))
-  const unlabelled = finished && await unlabel(pr)
+  const state = await botStateNow(pr)
+  if (!state) {
+    await putLabelBack(pr)
+    return
+  }
+  const outcomes = await Promise.all(REVIEW_BOTS.map(async bot => ({ bot, outcome: await askOnce({ bot, pr, state }) })))
+  const label = await labelAfter(pr, outcomes.some(({ outcome }) => typeof outcome === 'object' && 'asked' in outcome && !outcome.asked))
   await allSettled(outcomes.map(async ({ bot, outcome }) =>
-    (typeof outcome === 'string' ? Promise.resolve() : report(botReviewEvent({ bot, outcome, pr, unlabelled }), pr))))
+    (typeof outcome === 'string' ? Promise.resolve() : report(botReviewEvent({ bot, label, outcome, pr }), pr))))
 }
