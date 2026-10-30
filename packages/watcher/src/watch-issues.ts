@@ -1,5 +1,5 @@
 /** The project watcher's issue checks (watch-project.ts): new issues, the owner's comments, closings, cycles in their links. */
-import { type OpenIssue, linkCycles, newCycles } from './watch-link-cycles'
+import { MAX_CYCLES, type OpenIssue, linkCycles, newCycles } from './watch-link-cycles'
 import { issueLine, openIssues } from './watch-github'
 import { issueEventLines } from './watch-comments'
 import { queue } from './watch-output'
@@ -53,7 +53,9 @@ const checkLinkCycles = async (issues: readonly OpenIssue[]): Promise<void> => {
   const fresh = newCycles(await readLines('link-cycles'), now)
   await writeLines('link-cycles', now)
   if (fresh.length > 0) {
-    queue(fresh.map(cycle => `LINK_CYCLE ${cycle}`))
+    // At the cap, more cycles may hide behind these; they come as news once these are fixed.
+    const more = now.length >= MAX_CYCLES ? [`(at least ${MAX_CYCLES} cycles; more may come once these are fixed: run issue-links audit)`] : []
+    queue([...fresh.map(cycle => `LINK_CYCLE ${cycle}`), ...more])
   }
 }
 

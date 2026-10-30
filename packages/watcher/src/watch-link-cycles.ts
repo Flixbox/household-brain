@@ -7,7 +7,7 @@ export interface OpenIssue {
 }
 
 /** The most cycles `findCycles` lists: their number can grow very fast, and a few are enough to act on. */
-const MAX_CYCLES = 100
+export const MAX_CYCLES = 100
 
 /**
  * A copy of `findCycles` in `packages/issue-links/src/cycle.ts` (#334): each plugin is installed as

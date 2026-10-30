@@ -12,7 +12,8 @@ export interface IssuePage {
 
 /**
  * The open issues' fields: with each, the issues it is blocked by (#335), for LINK_CYCLE, in the same
- * query, so the cycle check costs no extra call. A blocker in another repository is left out.
+ * query, so the cycle check costs no extra call. A blocker in another repository is left out. GitHub
+ * lets an issue have at most fifty blockers, so the first fifty are all of them.
  */
 export const OPEN_ISSUE_FIELDS = 'number blockedBy(first:50){nodes{number repository{nameWithOwner}}}'
 
