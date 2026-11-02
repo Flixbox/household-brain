@@ -1,5 +1,6 @@
 /** What the project watcher reports, decided from what GitHub answered (pure, so it is tested). */
 import { isRecord } from './read'
+import { ciState } from './watch-ci-state'
 
 export interface Event {
   /** Remembered once reported, so the same event is never reported twice. */
@@ -120,21 +121,14 @@ export interface OpenPr {
   draft: boolean
   bot: { asked: string[], requested: boolean, reviewed: string[], reviewing: boolean }
   parked: boolean
+  /** Every check GitHub's rollup holds for the head, other apps' too: says what failed, never on its own that CI passed. */
   checks: string[]
+  /** WORKFLOW's newest run on the head commit (#342); null when there is none or it can't be read. */
+  headRun: Run | null
   /** GitHub's `mergeStateStatus`: `BEHIND` (out of date with the base branch), `DIRTY` (conflicts), … */
   mergeState: string
   /** In the merge queue (#251): auto-merge shows as off there, and enabling it only says "already queued". */
   queued: boolean
-}
-
-const FAILED = new Set(['FAILURE', 'ERROR', 'TIMED_OUT', 'CANCELLED', 'STARTUP_FAILURE', 'ACTION_REQUIRED'])
-const DONE = new Set(['SUCCESS', 'SKIPPED', 'NEUTRAL'])
-
-const ciState = (checks: string[]) => {
-  if (checks.some(check => FAILED.has(check))) {
-    return 'failed'
-  }
-  return checks.every(check => DONE.has(check)) ? 'green' : 'running'
 }
 
 /** A branch that can't merge as it is (#226): behind the base branch, or in conflict with it. */
@@ -151,8 +145,7 @@ const approvalProblem = (pr: OpenPr, awaitingBot: boolean): string | null => {
   if (pr.reviewDecision !== 'APPROVED' || pr.queued) {
     return null
   }
-  // No checks at all means CI hasn't reported yet, not that it passed.
-  const ci = pr.checks.length > 0 ? ciState(pr.checks) : 'running'
+  const ci = ciState(pr)
   if (ci === 'failed') {
     return `REMINDER: PR #${pr.number} is approved and CI failed: fix it.`
   }
@@ -218,7 +211,7 @@ const mergeWay = (pr: OpenPr) => {
 
 export const openPrLines = (prs: OpenPr[]): string[] => [
   'Open PRs:',
-  ...prs.map(pr => `  #${pr.number} ${pr.title.slice(0, 60)}: ${pr.parked ? 'parked, ' : ''}${pr.draft ? 'draft, ' : ''}${review(pr.reviewDecision)}, ${mergeWay(pr)}, CI ${ciState(pr.checks)}${branchState(pr.mergeState)}`),
+  ...prs.map(pr => `  #${pr.number} ${pr.title.slice(0, 60)}: ${pr.parked ? 'parked, ' : ''}${pr.draft ? 'draft, ' : ''}${review(pr.reviewDecision)}, ${mergeWay(pr)}, CI ${ciState(pr)}${branchState(pr.mergeState)}`),
 ]
 
 /** Event keys after which the open PRs are listed. */

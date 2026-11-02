@@ -217,9 +217,15 @@ const stateOf = (value: Json): PrState => {
 export const prStates = async (prs: readonly number[], fresh = false): Promise<Map<number, PrState>> =>
   perPr(prs, { fields: PR_FIELDS, fresh, parse: stateOf, size: 50 })
 
+/**
+ * WORKFLOW's run on `head` (#342); null when unreadable. The same question each look asks about an open
+ * PR's head, so the shared answer costs no call of its own.
+ */
+const headRunOf = async (head: string): Promise<Run | null> => hasText(head) ? runOf(head).catch(() => null) : null
+
 export const openPrs = async (): Promise<OpenPr[]> => {
   const [listed, queue] = await Promise.all([
-    gh(['pr', 'list', '--repo', REPO, '--state', 'open', '--limit', '100', '--json', 'number,title,isDraft,autoMergeRequest,labels,statusCheckRollup,mergeStateStatus']),
+    gh(['pr', 'list', '--repo', REPO, '--state', 'open', '--limit', '100', '--json', 'number,title,isDraft,autoMergeRequest,labels,statusCheckRollup,mergeStateStatus,headRefOid']),
     // An unreadable queue lists the PRs as not queued (#251), rather than leaving out the list and its reminders.
     queueEntries().catch((): Map<number, QueueEntry> => new Map()),
   ])
@@ -227,12 +233,14 @@ export const openPrs = async (): Promise<OpenPr[]> => {
   // whose state couldn't be read: it is then simply not approved yet this round, rather than the
   // whole listing failing.
   const states = await prStates(records(listed).map(pr => count(pr.number)))
+  const headRuns = await Promise.all(records(listed).map(async pr => headRunOf(textOf(pr.headRefOid))))
   return records(listed)
-    .map(pr => ({
+    .map((pr, index) => ({
       autoMerge: Boolean(pr.autoMergeRequest),
       bot: states.get(count(pr.number))?.bot ?? NO_BOT_REVIEW,
       checks: records(pr.statusCheckRollup).map(check => textOf(check.conclusion) || textOf(check.state) || 'pending'),
       draft: pr.isDraft === true,
+      headRun: headRuns[index] ?? null,
       mergeState: textOf(pr.mergeStateStatus),
       number: count(pr.number),
       parked: records(pr.labels).some(label => label.name === 'parked'),
