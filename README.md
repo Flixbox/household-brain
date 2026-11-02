@@ -167,3 +167,11 @@ delivery errors retry, and usage/IDLE output never wakes an agent. Keep the inst
 current using `codex plugin marketplace upgrade household-brain`, and re-run the launcher after an
 upgrade; unchanged supervisors are singletons per project and thread. Claude's monitor setup is
 unchanged. See the plugin's `babysit-prs` skill for the event routine.
+
+For an implementation agent, set `WATCHER_SUBSCRIPTIONS=pr:123,issue:45` on its watcher command;
+leave it unset for the main session. Issue subscriptions follow GitHub closing-PR references.
+Keep selectors out of the shared `.claude/watcher.env`. Scoped watchers exit with status `3` after
+all subjects finish and durable notifications are acknowledged; this is completion, not a failure
+that needs rearming. The same polling, event parser, state and API-answer cache serve every host.
+Native Codex children that reject direct input rely on their parent root's relevant collaboration
+messages; the parent's all-events watcher stays active. See `babysit-prs` for the full routine.

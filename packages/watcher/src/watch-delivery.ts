@@ -29,3 +29,6 @@ if (outbox) {
   await drain()
   setInterval(() => { drain().catch(ignoreFailure) }, 15_000)
 }
+
+/** A terminal subscription must not strand a pending owner comment when its supervisor exits. */
+export const deliveryPending = (): boolean => outbox?.pending ?? false

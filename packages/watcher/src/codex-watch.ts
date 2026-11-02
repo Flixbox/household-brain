@@ -1,5 +1,6 @@
 /* oxlint-disable import/no-nodejs-modules, eslint/no-await-in-loop -- the supervisor writes its log and waits for each watcher to stop before rearming */
 /** Codex lifecycle adapter. It supervises the existing watcher, never a second event classifier. */
+import { SUBSCRIPTIONS_COMPLETE, selectionKey } from './watch-subscription-model'
 import { openSync } from 'node:fs'
 import { WATCHERS_DIR } from './watch-files'
 import { hasText, isRecord } from './read'
@@ -16,7 +17,9 @@ const hookTarget = async (): Promise<string> => {
 const target = process.argv.includes('--hook') ? await hookTarget() : process.env.CODEX_THREAD_ID
 if (!hasText(target)) { throw new Error('Start the watcher in the intended Codex root thread') }
 const directSettings = `${process.cwd()}/.claude/watcher.env`
-const identity = `${process.cwd()}:${target}`
+const selection = selectionKey(process.env.WATCHER_SUBSCRIPTIONS ?? '')
+const baseIdentity = `${process.cwd()}:${target}`
+const identity = selection === '' ? baseIdentity : `${baseIdentity}:${selection}`
 const stopFile = `${WATCHERS_DIR}/codex-${Bun.hash(identity).toString(36)}.stop`
 if (process.argv.includes('--stop')) {
   await Bun.write(stopFile, 'stop')
@@ -40,25 +43,27 @@ const stopOnSessionEnd = (watcher: Bun.Subprocess) => setInterval(() => {
   }).catch(() => null)
 }, 1000)
 
-const watchOnce = async (): Promise<void> => {
+const watchOnce = async (): Promise<number> => {
   const watcher = Bun.spawn([process.execPath, `--env-file=${settings}`, `${import.meta.dir}/watch-project.ts`, '--follow'], {
     cwd: checkout,
     env: { ...process.env, CODEX_THREAD_ID: target, CODEX_WATCH_CWD: process.cwd(), CODEX_WATCH_THREAD: target, WATCHER_ID: `codex-${target}` },
     stderr: 'inherit', stdin: 'ignore', stdout: 'inherit',
   })
   const ended = stopOnSessionEnd(watcher)
-  await watcher.exited
+  const code = await watcher.exited
   clearInterval(ended)
+  return code
 }
 
 const supervise = async (): Promise<never> => {
   // The same thread/project can start this from a hook and a skill, or after compaction. One wins.
-  const port = 20_000 + Number(Bun.hash(`${process.cwd()}:${target}`) % 30_000n)
+  const port = 20_000 + Number(Bun.hash(identity) % 30_000n)
   const lock = Bun.listen({ exclusive: true, hostname: '127.0.0.1', port, socket: { data: socket => { socket.end() } } })
   process.on('exit', () => { lock.stop() })
   await Bun.file(stopFile).delete().catch(() => null)
   for (;;) {
-    await watchOnce()
+    const code = await watchOnce()
+    if (code === SUBSCRIPTIONS_COMPLETE) { process.exit(0) }
     process.stderr.write('project-watcher: watcher stopped; rearming\n')
     await Bun.sleep(1000)
   }

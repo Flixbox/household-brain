@@ -54,6 +54,8 @@ export class DeliveryOutbox {
     this.save(entries)
   }
 
+  public get pending(): boolean { return entriesFrom(this.file).some(entry => !entry.delivered) }
+
   public async drain(send: (entry: Notification) => Promise<void>): Promise<void> {
     for (const entry of entriesFrom(this.file).filter(item => !item.delivered)) {
       await send(entry)

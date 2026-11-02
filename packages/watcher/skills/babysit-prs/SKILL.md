@@ -42,6 +42,32 @@ default branch's CI, new issues, the owner's comments on issues, and issues clos
   A `Monitor` stops after 30 minutes at most: re-arm it when its expiry notice comes; the watcher
   remembers what it reported and picks up where it left off. Without `--follow` it exits after one
   look, with every event that look found: start it again after handling them.
+- **Implementation agents subscribe to their work** using a per-process setting, for example:
+
+  ```sh
+  WATCHER_ID=issue-45 WATCHER_SUBSCRIPTIONS=issue:45 bun --env-file=.claude/watcher.env <watcher>/src/watch-project.ts --follow
+  ```
+
+  Use `pr:123`, `issue:45`, or a comma-separated list. An issue also follows PRs that name it in
+  GitHub's structured closing references. Keep the main session's setting unset: it receives all
+  owner comments, including those outside every agent subscription. Do not put an agent's selection
+  in the shared project settings file. Changing a selection gets its own session state; keep a
+  stable `WATCHER_ID` for restarts. Invalid selections fail closed.
+
+  Scoped events use explicit PR/issue fields, never a grep of event text. They retain selected CI,
+  conflicts and owner comments/reviews, but omit unrelated repository events, global summaries,
+  usage/IDLE, reminders and non-conflicting main movement. Existing event identities suppress
+  repeated state notifications. System errors still reach the affected watcher.
+
+  A terminal PR or issue gets a final fresh activity read before its subscription ends. Failed
+  lookups or unacknowledged durable Codex deliveries keep it alive. When every selected subject is
+  finished, exit code `3` means successful subscription completion: **do not re-arm it**. The Codex
+  supervisor recognizes this exit. The main all-events watcher continues following deployment.
+
+  Claude monitors and directly addressable Codex root/agent threads use this same path. Native
+  Codex child threads that cannot accept direct input still receive relevant alerts through their
+  parent root's collaboration messages; do not bypass that host restriction or claim that shell
+  stdout wakes them. The main session must keep its all-events monitor active.
 - **Any number of watchers can watch the same repository at once**, one per Claude Code session, and
   each gets every event: each remembers what it reported on its own, under the session's id. **A
   subagent shares its session's id**: when it runs a watcher of its own beside its session's, it

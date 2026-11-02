@@ -46,6 +46,9 @@ repository), never with the owner's account.
 - **The project watcher supports Claude Code and Codex** (owner, #340): reuse its event parser,
   state and polling core for both hosts, with only small delivery/lifecycle adapters. A Codex queue
   acknowledgement alone never proves an agent was alerted: verify active steering and idle wakeup.
+- **Watcher subscriptions are shared core behavior** (owner, #349): implementation agents select
+  their PRs/issues per process; the main session stays on all events. Never replace structured
+  subscription routing with agent-specific text filters, and never re-arm a completed subscription.
 - **Abstract only when it pays:** a shared helper only when it makes the code simpler or two places
   need the same logic.
 - **Rules live in this file**, not in an agent's memory. A rule the owner states goes in here, in the

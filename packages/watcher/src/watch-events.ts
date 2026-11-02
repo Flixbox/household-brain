@@ -3,6 +3,8 @@ import { isRecord } from './read'
 import { ciState } from './watch-ci-state'
 
 export interface Event {
+  /** Scoped agents do not wake for housekeeping such as non-conflicting main movement. */
+  quiet?: boolean
   /** Remembered once reported, so the same event is never reported twice. */
   key: string
   lines: string[]

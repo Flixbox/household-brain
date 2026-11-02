@@ -2,7 +2,7 @@
 import { type Activity, newActivity } from './watch-events'
 import { ACTIVITY_FIELDS, activityFrom } from './watch-comment-lines'
 import { ACTIVITY_GH, IGNORED, OWNER, SELF, openPrNumbers, perPr, recentlyMerged } from './watch-github'
-import { appendLines, exists, oneAtATime, readLines, writeLines } from './watch-state'
+import { appendLines, exists, oneAtATime, readLines, subscriptions, writeLines } from './watch-state'
 import { allSettled } from './read'
 import { queue } from './watch-output'
 
@@ -12,8 +12,8 @@ import { queue } from './watch-output'
  * a query, so a reviewed PR's hundred reviews of a hundred line comments each stay within GitHub's
  * limits; a PR that couldn't be read is missing.
  */
-export const activitiesOf = async (prs: readonly number[]): Promise<Map<number, Activity[]>> =>
-  perPr(prs, { cli: ACTIVITY_GH, fields: ACTIVITY_FIELDS, parse: value => activityFrom(value, { ignored: IGNORED, owner: OWNER, self: SELF }), size: 20 })
+export const activitiesOf = async (prs: readonly number[], fresh = false): Promise<Map<number, Activity[]>> =>
+  perPr(prs, { cli: ACTIVITY_GH, fields: ACTIVITY_FIELDS, fresh, parse: value => activityFrom(value, { ignored: IGNORED, owner: OWNER, self: SELF }), size: 20 })
 
 /** The comments of a PR already reported. On the very first round, the ones already there are old news. */
 const seenActivity = async (pr: number, items: Activity[]): Promise<Set<string>> => {
@@ -38,7 +38,7 @@ export const checkActivity = async (pr: number, items: Activity[] | undefined): 
   const fresh = newActivity(await seenActivity(pr, items), items)
   if (fresh.length > 0) {
     await appendLines(`pr-${pr}-seen`, fresh.map(item => item.id))
-    queue([`PR #${pr}: ACTIVITY:`, ...fresh.flatMap(item => item.lines)], null, `activity:${pr}:${fresh.map(item => item.id).join(',')}`)
+    queue([`PR #${pr}: ACTIVITY:`, ...fresh.flatMap(item => item.lines)], { key: `activity:${pr}:${fresh.map(item => item.id).join(',')}`, pr })
   }
   return true
 })
@@ -71,5 +71,5 @@ export const watchedPrs = async (): Promise<number[] | null> => {
   // closed once and then reopened and merged still has its deploy to report.
   const settled = (pr: number) => reported.some(line => line.startsWith(`pr-${pr} deployed `))
   const unsettled = merged.filter(pr => followed.includes(pr) || !settled(pr))
-  return [...new Set([...open, ...unsettled, ...followed])].toSorted(byNumber)
+  return [...new Set([...open, ...unsettled, ...followed, ...subscriptions.prs])].filter(pr => !subscriptions.scoped || !subscriptions.isClosedPr(pr) || open.includes(pr)).toSorted(byNumber)
 }

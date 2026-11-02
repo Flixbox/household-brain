@@ -37,13 +37,16 @@ const MODEL = `
   const stillIssue = selected.accepts({ issue: 4 })
   selected.closePr(9)
   const closedLinked = selected.accepts({ pr: 9 })
+  selected.rememberPr(9, [4], true)
+  const reopenedLinked = selected.accepts({ pr: 9 })
+  selected.closePr(9)
   const notComplete = selected.complete
   const saved = JSON.parse(JSON.stringify(selected.snapshot()))
   const resumed = new Subscription('pr:7,issue:4')
   resumed.restore(saved)
   const resumedClosed = resumed.accepts({ pr: 7 })
   resumed.closeIssue(4)
-  console.log(JSON.stringify({ closedLinked, closedPr, complete: resumed.complete, linked, notComplete, pendingBlocksStop: resumed.canStop(true), readyToStop: resumed.canStop(false), resumedClosed, stillIssue, unrelated }))
+  console.log(JSON.stringify({ closedLinked, closedPr, complete: resumed.complete, linked, notComplete, pendingBlocksStop: resumed.canStop(true), readyToStop: resumed.canStop(false), reopenedLinked, resumedClosed, stillIssue, unrelated }))
 `
 
 const run = async (script: string, selection: string) => {
@@ -85,7 +88,7 @@ test('an issue subscription gets its structured issue comments and no unrelated 
 
 test('issue-linked PRs, terminal subjects and restart recovery share one subscription model (#349)', async () => {
   const output = await run(MODEL, 'pr:7,issue:4')
-  expect(JSON.parse(output)).toEqual({ closedLinked: false, closedPr: false, complete: true, linked: true, notComplete: false, pendingBlocksStop: false, readyToStop: true, resumedClosed: false, stillIssue: true, unrelated: false })
+  expect(JSON.parse(output)).toEqual({ closedLinked: false, closedPr: false, complete: true, linked: true, notComplete: false, pendingBlocksStop: false, readyToStop: true, reopenedLinked: true, resumedClosed: false, stillIssue: true, unrelated: false })
 })
 
 test('invalid selections fail closed instead of silently watching the repository (#349)', async () => {
