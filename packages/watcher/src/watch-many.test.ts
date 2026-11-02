@@ -13,6 +13,9 @@ const REPORTER = `
 const ASKER = `
   import { ghText } from '${import.meta.dir}/watch-gh'
   console.log(await ghText(['pr', 'list', '--repo', 'owner/repo'], process.env.GH, process.env.FRESH === '1'))`
+const LISTER = `
+  import { watchedPrs } from '${import.meta.dir}/watch-prs'
+  console.log(JSON.stringify(await watchedPrs()))`
 
 const dirs: string[] = []
 afterEach(async () => {
@@ -60,5 +63,27 @@ describe('many watchers on one repository (#264)', () => {
     expect(Number(later.output)).toBeLessThanOrEqual(2)
     // `fresh` asks GitHub all the same.
     expect(Number((await run(ASKER, home, { FRESH: '1', GH: gh })).output)).toBe(Number(later.output) + 1)
+  }, 30_000)
+})
+
+describe('watchedPrs (#345)', () => {
+  it('lists the PRs to look at without asking for a run: a slow lookup would hold up the whole round', async () => {
+    const home = await stateHome()
+    const gh = `${home}/gh`
+    await Bun.write(gh, `#!/bin/sh
+echo "$*" >> "${home}/calls"
+case "$*" in
+  "pr list"*"--state open"*) echo '[{"headRefOid":"abc1234","number":7}]' ;;
+  *) echo '[]' ;;
+esac
+`)
+    await Bun.spawn(['chmod', '+x', gh]).exited
+    const listed = await run(LISTER, home, { GH: gh })
+    expect(listed.output.trim()).toBe('[7]')
+    expect(await Bun.file(`${home}/calls`).text()).not.toContain('run list')
+  }, 30_000)
+
+  it('gives nothing when a listing failed, so the round is skipped rather than run with PRs missing', async () => {
+    expect((await run(LISTER, await stateHome(), {})).output.trim()).toBe('null')
   }, 30_000)
 })
