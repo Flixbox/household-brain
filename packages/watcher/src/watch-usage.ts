@@ -1,5 +1,5 @@
 /**
- * When a watcher's notification ends with the owner's Claude usage line (#318). Posted with nearly
+ * When a watcher's notification ends with the active agent's usage line (#318). Posted with nearly
  * every notification, it mostly repeated the numbers before it, so a notification carries it only:
  *
  * - **on a step:** the session's or the week's use is in another 2.5% step (2.5%, 5%, 7.5% …) than in

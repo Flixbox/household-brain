@@ -116,13 +116,32 @@ The Firebase project is a Google Cloud project; everything below happens in it.
   label was last put on: after a later one, take the label off and put it on again to clear it.
 - Create the label in that repository once (`gh label create subagent-cleared`).
 
-**The `claude-usage` command, for agents on a machine** (#260)
-- It shares its cache with the watcher. Install it as a wrapper around this repository's copy, e.g.
-  the watcher plugin's clone (which the watcher's run command keeps pulled):
+**The `agent-usage` command, for Claude and Codex agents** (#338)
+- Install a wrapper around the watcher plugin's clone (which the watcher's run command keeps pulled):
 
   ```sh
-  printf '#!/usr/bin/env bash\nexec bun "$HOME/.claude/plugins/marketplaces/household-brain/packages/watcher/src/claude-usage.ts" "$@"\n' > ~/.local/bin/claude-usage
-  chmod +x ~/.local/bin/claude-usage
+  printf '#!/usr/bin/env bash\nexec bun "$HOME/.claude/plugins/marketplaces/household-brain/packages/watcher/src/agent-usage.ts" "$@"\n' > ~/.local/bin/agent-usage
+  chmod +x ~/.local/bin/agent-usage
   ```
+
+- Run `agent-usage --reset`: a provider-labelled usage line, then the weekly reset's ISO time (or
+  `unknown`). It selects Codex when `CODEX_THREAD_ID` is present, even inside a Claude-launched
+  process; otherwise Claude. Override this for a command or watcher started outside the agent:
+  `AGENT_USAGE_PROVIDER=codex agent-usage --reset` or
+  `AGENT_USAGE_PROVIDER=claude agent-usage --reset`. Other provider values are rejected.
+- Codex must be installed and signed in with `codex login`. The command reads
+  [`account/rateLimits/read`](https://learn.chatgpt.com/docs/app-server) through the local app-server;
+  Codex manages the login. It does not run a model or print account identity or credentials.
+  An API-key login without ChatGPT rate-limit windows reports unknown usage.
+- The watcher uses the same provider setting and cache. Its default remains Claude outside a
+  Codex session; set `AGENT_USAGE_PROVIDER=codex` in its environment when it should follow Codex.
+  Budget decisions use that provider's allowance; Claude usage never determines Codex's cutoff.
+- Codex's cache is separate, named `codex-usage-<config-path-hash>.json` under
+  `$XDG_STATE_HOME` (default `~/.local/state`), keyed by `CODEX_HOME` (default `~/.codex`).
+  `CODEX_USAGE_CACHE` and `CODEX_USAGE_LOCK_PORT` override its cache and local lock. Claude retains
+  `claude-usage.json`, `CLAUDE_CONFIG_DIR`, `CLAUDE_USAGE_CACHE` and `CLAUDE_USAGE_LOCK_PORT`.
+  Both providers debounce reads, back off on failures, and mark old answers with `(as of …)`.
+- Existing `claude-usage` wrappers continue to read Claude regardless of the calling agent. They
+  keep their output and cache compatible; new agent instructions should use `agent-usage`.
 
 Licence: Unlicense.

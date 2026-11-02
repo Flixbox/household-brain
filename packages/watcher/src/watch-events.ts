@@ -267,7 +267,7 @@ export const stamped = (lines: readonly string[], found: string, written: string
 export const answerFirst = (events: readonly (readonly string[])[]): (readonly string[])[] =>
   events.toSorted((first, second) => Number(!ANSWER_FIRST.test(first[0] ?? '')) - Number(!ANSWER_FIRST.test(second[0] ?? '')))
 
-/** The owner's Claude usage line when it can't be read (#233). */
+/** The active agent's usage line when it can't be read (#233). */
 export const UNKNOWN_USAGE = 'Usage: unknown'
 
 /** When a window resets, on this machine's clock (`2026-10-17 14:10`); null when it doesn't say. */
