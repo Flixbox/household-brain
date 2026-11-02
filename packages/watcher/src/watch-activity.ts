@@ -38,7 +38,7 @@ export const checkActivity = async (pr: number, items: Activity[] | undefined): 
   const fresh = newActivity(await seenActivity(pr, items), items)
   if (fresh.length > 0) {
     await appendLines(`pr-${pr}-seen`, fresh.map(item => item.id))
-    queue([`PR #${pr}: ACTIVITY:`, ...fresh.flatMap(item => item.lines)])
+    queue([`PR #${pr}: ACTIVITY:`, ...fresh.flatMap(item => item.lines)], null, `activity:${pr}:${fresh.map(item => item.id).join(',')}`)
   }
   return true
 })

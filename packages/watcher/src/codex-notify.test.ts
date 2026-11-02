@@ -26,7 +26,7 @@ const fixture = (status: string, fail = false) => {
 
 test('active delivery steers only the intended current turn with a stable message id', async () => {
   const { calls, request } = fixture('active')
-  await notifyCodex(request, threadId, cwd, event)
+  await notifyCodex(request, { cwd, threadId }, event)
   expect(calls.at(-1)).toEqual({ method: 'turn/steer', params: {
     clientUserMessageId: event.id, expectedTurnId: 'active-turn',
     input: [{ text: notificationText(event.lines), type: 'text' }], threadId,
@@ -35,7 +35,7 @@ test('active delivery steers only the intended current turn with a stable messag
 
 test('idle delivery starts a turn without overriding the thread model or sandbox', async () => {
   const { calls, request } = fixture('idle')
-  await notifyCodex(request, threadId, cwd, event)
+  await notifyCodex(request, { cwd, threadId }, event)
   expect(calls.at(-1)).toEqual({ method: 'turn/start', params: {
     clientUserMessageId: event.id,
     input: [{ text: notificationText(event.lines), type: 'text' }], threadId,
@@ -44,13 +44,16 @@ test('idle delivery starts a turn without overriding the thread model or sandbox
 
 test('delivery failures propagate so durable pending events are not acknowledged', async () => {
   const { request } = fixture('active', true)
-  await expect(notifyCodex(request, threadId, cwd, event)).rejects.toThrow('delivery refused')
+  await expect(notifyCodex(request, { cwd, threadId }, event)).rejects.toThrow('delivery refused')
 })
 
 test('another project and a subagent cannot receive direct watcher input', async () => {
-  const { request } = fixture('idle')
-  await expect(notifyCodex(request, threadId, '/elsewhere', event)).rejects.toThrow()
-  await expect(notifyCodex(async () => ({ thread: { canAcceptDirectInput: false, cwd, id: threadId, status: { type: 'idle' } } }), threadId, cwd, event)).rejects.toThrow()
+  const { calls, request } = fixture('idle')
+  await expect(notifyCodex(request, { cwd: '/elsewhere', threadId }, event)).rejects.toThrow()
+  expect(calls.some(call => call.method.startsWith('turn/'))).toBe(false)
+  const denied: string[] = []
+  await expect(notifyCodex(async method => { denied.push(method); return { thread: { canAcceptDirectInput: false, cwd, id: threadId, status: { type: 'idle' } } } }, { cwd, threadId }, event)).rejects.toThrow()
+  expect(denied).toEqual(['thread/read'])
 })
 
 test('external event text is explicitly data and does not gain owner authority', () => {

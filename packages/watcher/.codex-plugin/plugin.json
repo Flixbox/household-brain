@@ -1,0 +1,30 @@
+{
+  "name": "project-watcher",
+  "version": "0.1.0",
+  "description": "Shared GitHub project watcher with direct active and idle Codex notifications.",
+  "skills": "./skills/",
+  "hooks": {
+    "hooks": {
+      "SessionStart": [
+        {
+          "hooks": [
+            {
+              "type": "command",
+              "command": "bun \"${PLUGIN_ROOT}/src/codex-watch.ts\" --hook"
+            }
+          ]
+        }
+      ],
+      "SessionEnd": [
+        {
+          "hooks": [
+            {
+              "type": "command",
+              "command": "bun \"${PLUGIN_ROOT}/src/codex-watch.ts\" --hook --stop"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
