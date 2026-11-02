@@ -1,5 +1,6 @@
 /** What the project watcher reports, decided from what GitHub answered (pure, so it is tested). */
 import { isRecord } from './read'
+import { ciState } from './watch-ci-state'
 
 export interface Event {
   /** Remembered once reported, so the same event is never reported twice. */
@@ -112,6 +113,9 @@ export const mainRunEvent = ({ run, limitSeconds, repo }: { run: Run, limitSecon
     : null
 }
 
+/** Whether a commit's CI run finished and passed; no run, or one still pending, hasn't (#342). */
+export const runPassed = (run: Run | null): boolean => run?.status === 'completed' && run.conclusion === 'success'
+
 export interface OpenPr {
   number: number
   title: string
@@ -128,19 +132,6 @@ export interface OpenPr {
   mergeState: string
   /** In the merge queue (#251): auto-merge shows as off there, and enabling it only says "already queued". */
   queued: boolean
-}
-
-/** Whether a commit's CI run finished and passed; no run, or one still pending, hasn't (#342). */
-export const runPassed = (run: Run | null): boolean => run?.status === 'completed' && run.conclusion === 'success'
-
-const FAILED = new Set(['FAILURE', 'ERROR', 'TIMED_OUT', 'CANCELLED', 'STARTUP_FAILURE', 'ACTION_REQUIRED'])
-const DONE = new Set(['SUCCESS', 'SKIPPED', 'NEUTRAL'])
-
-const ciState = (checks: string[]) => {
-  if (checks.some(check => FAILED.has(check))) {
-    return 'failed'
-  }
-  return checks.every(check => DONE.has(check)) ? 'green' : 'running'
 }
 
 /** A branch that can't merge as it is (#226): behind the base branch, or in conflict with it. */
