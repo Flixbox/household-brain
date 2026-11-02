@@ -199,7 +199,7 @@ approved one whose auto-merge is still off and that isn't in the merge queue, no
 | `LOOKUPS_RECOVERED` | Calls succeed again; the events held back come next. |
 | `WATCHER_ERROR` | A look failed (for example a state file another program held locked); the watcher carries on with the next look. Repeated, it needs a look: tell the owner. |
 | `WATCHER_OUTDATED` | The watcher's checkout moved to other watcher code after it started (a pull, or a restart that raced another one's pull), so it exits: start it again right away, alone, so its pull finishes before it starts. |
-| `REMINDER` | Comes after every notification while a PR waits on you: its branch is behind main or in conflict (rebase it, run the checks, push once), or it is approved with CI green and auto-merge off (enable it, after reading its comments) or with CI failed (fix it). None comes for a PR in the merge queue: there, `DEQUEUED` says when it needs you. It repeats until that is done. |
+| `REMINDER` | Comes after every notification while a PR waits on you: its branch is behind main or in conflict (rebase it, run the checks, push once), or it is approved with CI green and auto-merge off (enable it, after reading its comments) or with CI failed (fix it). None comes for a PR in the merge queue: there, `DEQUEUED` says when it needs you. It repeats until that is done. None comes for `CI not reported` in the open-PR list either (#342): `WORKFLOW` has no run on the head, its run can't be read, or its run ran nothing (skipped or neutral). That is not green and may never turn green, so if it lasts, check that the workflow runs on this branch and that `WORKFLOW` names it. |
 
 ## Before enabling auto-merge
 

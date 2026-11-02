@@ -223,6 +223,10 @@ export const prStates = async (prs: readonly number[], fresh = false): Promise<M
  */
 const headRunOf = async (head: string): Promise<Run | null> => hasText(head) ? runOf(head).catch(() => null) : null
 
+/** Only the open PRs' numbers (#345): `openPrs` waits for a run lookup per PR, which a round's list doesn't need. */
+export const openPrNumbers = async (): Promise<number[]> =>
+  records(await gh(['pr', 'list', '--repo', REPO, '--state', 'open', '--limit', '100', '--json', 'number'])).map(pr => count(pr.number))
+
 export const openPrs = async (): Promise<OpenPr[]> => {
   const [listed, queue] = await Promise.all([
     gh(['pr', 'list', '--repo', REPO, '--state', 'open', '--limit', '100', '--json', 'number,title,isDraft,autoMergeRequest,labels,statusCheckRollup,mergeStateStatus,headRefOid']),
