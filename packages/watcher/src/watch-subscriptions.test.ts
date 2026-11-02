@@ -92,3 +92,49 @@ test('invalid selections fail closed instead of silently watching the repository
   const script = `const { Subscription } = await import('${import.meta.dir}/watch-subscription-model'); let rejected = 0; for (const raw of ['pr:0', 'pr:no', 'other:7', 'pr:7,']) { try { new Subscription(raw) } catch { rejected += 1 } } console.log(rejected)`
   expect((await run(script, '')).trim()).toBe('4')
 })
+
+const TERMINAL_GH = String.raw`
+  import { appendFileSync, writeFileSync } from 'node:fs'
+  const args = process.argv.slice(2).join(' ')
+  const home = process.env.FIXTURE_HOME
+  if (args.includes('mergeQueue{id}')) { console.log('queue'); process.exit(0) }
+  if (args.includes('pullRequest(number: 7)')) {
+    if (args.includes('comments(last:100)')) {
+      appendFileSync(home + '/activity', 'look\n')
+      try { writeFileSync(home + '/failed-once', '', { flag: 'wx' }); process.exit(1) } catch {}
+      console.log(JSON.stringify({ data: { repository: { pr7: { comments: { nodes: [{ author: { login: 'owner' }, body: 'FINAL_OWNER_COMMENT', createdAt: Temporal.Now.instant().toString(), databaseId: 1 }] }, reviews: { nodes: [] } } } } }))
+    } else {
+      console.log(JSON.stringify({ data: { repository: { pr7: { closingIssuesReferences: { nodes: [] }, headRefOid: 'abc', mergeCommit: { oid: 'merged' }, state: 'MERGED' } } } }))
+    }
+    process.exit(0)
+  }
+  if (args.startsWith('pr list') || args.startsWith('run list')) { console.log('[]'); process.exit(0) }
+  console.log(JSON.stringify({ data: { repository: { issues: { nodes: [], pageInfo: { hasNextPage: false } } } } }))
+`
+
+const TERMINAL = `
+  process.argv.push('--follow')
+  const sleep = Bun.sleep
+  Bun.sleep = ms => sleep(Math.min(ms, 20))
+  await import('${import.meta.dir}/watch-project')
+`
+
+test('the existing core retries final activity, delivers owner comments before completion, and does not replay after restart (#349)', async () => {
+  const home = await mkdtemp(`${tmpdir()}/watch-terminal-`)
+  dirs.push(home)
+  await Bun.write(`${home}/fake.ts`, TERMINAL_GH)
+  await Bun.write(`${home}/gh`, `#!/bin/sh\nexec "${process.execPath}" "${home}/fake.ts" "$@"\n`)
+  await Bun.spawn(['chmod', '+x', `${home}/gh`]).exited
+  await Bun.write(`${home}/state/initialized`, '')
+  await Bun.write(`${home}/state/tracked`, '7\n')
+  const env = { ...process.env, ACTIVITY_GH: `${home}/gh`, AGENT_USAGE_PROVIDER: 'claude', CLAUDE_CONFIG_DIR: home, CODEX_THREAD_ID: '', CODEX_WATCH_THREAD: '', FIXTURE_HOME: home, GH: `${home}/gh`, GH_SHARE_SECONDS: '0', OWNER: 'owner', REPO: 'owner/repo', STATE_DIR: `${home}/state`, WATCHER_SUBSCRIPTIONS: 'pr:7', XDG_STATE_HOME: home }
+  const first = Bun.spawn([process.execPath, '-e', TERMINAL], { env, stderr: 'pipe', stdout: 'pipe', timeout: 3000 })
+  const [output, error, code] = await Promise.all([new Response(first.stdout).text(), new Response(first.stderr).text(), first.exited])
+  expect({ code, error }).toEqual({ code: 3, error: '' })
+  expect(output).toContain('FINAL_OWNER_COMMENT')
+  expect(output.indexOf('FINAL_OWNER_COMMENT')).toBeLessThan(output.indexOf('MERGED:'))
+  expect((await Bun.file(`${home}/activity`).text()).trim().split('\n').length).toBeGreaterThan(1)
+  const second = Bun.spawn([process.execPath, '-e', TERMINAL], { env, stderr: 'pipe', stdout: 'pipe', timeout: 3000 })
+  expect(await new Response(second.stdout).text()).toBe('')
+  expect(await second.exited).toBe(3)
+})
