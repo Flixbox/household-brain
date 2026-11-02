@@ -1,12 +1,20 @@
 import { describe, expect, it } from 'bun:test'
-import { usageProvider } from './agent-usage'
+import { codexCache, usageProvider } from './agent-usage'
 import { codexAnswer } from './codex-usage'
 
 describe('the active agent usage provider (#338)', () => {
   it('selects Codex in Codex and keeps Claude as the default outside it', () => {
     expect(usageProvider({ CODEX_THREAD_ID: 'thread' })).toBe('codex')
+    expect(usageProvider({ CLAUDECODE: '1', CODEX_THREAD_ID: 'thread' })).toBe('codex')
     expect(usageProvider({ CLAUDECODE: '1' })).toBe('claude')
     expect(usageProvider({})).toBe('claude')
+  })
+
+  it('isolates Codex homes and honours a Codex-only cache override', () => {
+    const first = codexCache({ CODEX_HOME: '/one', HOME: '/user' })
+    expect(codexCache({ CODEX_HOME: '/two', HOME: '/user' })).not.toBe(first)
+    expect(codexCache({ CLAUDE_USAGE_CACHE: '/claude', CODEX_HOME: '/one', HOME: '/user' })).toBe(first)
+    expect(codexCache({ CODEX_USAGE_CACHE: '/chosen' })).toBe('/chosen')
   })
 
   it('lets an explicit provider override the calling agent, rejecting typos', () => {
@@ -30,6 +38,7 @@ describe('Codex rate limit windows (#338)', () => {
 
   it('does not turn an absent or malformed allowance into zero usage', () => {
     expect(codexAnswer({})).toBeNull()
+    expect(codexAnswer({ rateLimits: { primary: { usedPercent: 20, windowDurationMins: 300 } } })).toBeNull()
     expect(codexAnswer({ rateLimits: { primary: { usedPercent: 0, windowDurationMins: 60 } } })).toBeNull()
     expect(codexAnswer({ rateLimits: { secondary: { usedPercent: '0', windowDurationMins: 10_080 } } })).toBeNull()
   })

@@ -136,6 +136,7 @@ const now = (): number => Temporal.Now.instant().epochMilliseconds
 interface Options {
   ask?: () => Promise<Asked>
   file?: string
+  lockPort?: number
 }
 
 /** Asks the endpoint, holding the lock, unless the caller before has answered since; keeps the outcome. */
@@ -159,19 +160,19 @@ const askHolding = async (release: () => void, ask: () => Promise<Asked>, file: 
  * The usage, asked again only when the cache allows it. Never fails: anything going wrong leaves the
  * last numbers known, or none.
  */
-export const readUsage = async ({ ask = askEndpoint, file = CACHE_FILE }: Options = {}, waitedMs = 0): Promise<Usage> => {
+export const readUsage = async ({ ask = askEndpoint, file = CACHE_FILE, lockPort = Number(process.env.CLAUDE_USAGE_LOCK_PORT ?? 10_000 + (Bun.hash.crc32(file) % 10_000)) }: Options = {}, waitedMs = 0): Promise<Usage> => {
   const cached = await readCache(file)
   if (now() < nextAskAt(cached) || waitedMs >= LONGEST_WAIT_MS) {
     return cached
   }
   // CLAUDE_USAGE_LOCK_PORT: set it only if another program listens on the port picked from the cache's path.
-  const release = takeLock(Number(process.env.CLAUDE_USAGE_LOCK_PORT ?? 10_000 + (Bun.hash.crc32(file) % 10_000)))
+  const release = takeLock(lockPort)
   if (release !== null) {
     return askHolding(release, ask, file)
   }
   // Another caller is asking: wait for its answer instead of asking too.
   await Bun.sleep(WAIT_STEP_MS)
-  return readUsage({ ask, file }, waitedMs + WAIT_STEP_MS)
+  return readUsage({ ask, file, lockPort }, waitedMs + WAIT_STEP_MS)
 }
 
 /** When the numbers were read: the time today, else the date and time, on this machine's clock. */

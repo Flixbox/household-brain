@@ -5,6 +5,7 @@
   "type": "module",
   "license": "Unlicense",
   "bin": {
+    "agent-usage": "./src/agent-usage.ts",
     "claude-usage": "./src/claude-usage.ts",
     "reply-review-thread": "./src/reply-review-thread.ts",
     "watch-project": "./src/watch-project.ts"

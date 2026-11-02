@@ -5,7 +5,7 @@
  * is the notification). With `--follow`, each event comes out the moment it is found, ending with a
  * `---` line, so one slow call never holds back an event found before it (#240), and it goes on (#196).
  */
-import { readUsage, usageText } from './claude-usage'
+import { agentUsageText, readAgentUsage } from './agent-usage'
 import { type Event, type OpenPr, answerFirst, clockTime, listsOpenPrs, openPrLines, reminderLines, stamped } from './watch-events'
 import { lookupNews, lookups } from './watch-gh'
 import { openPrs } from './watch-github'
@@ -71,22 +71,22 @@ const reminders = async (prs: OpenPr[]): Promise<string[]> => {
 }
 
 /**
- * The owner's Claude usage line (#233), only when it is due (#318): on a 2.5% step, or 10 minutes
+ * The active agent's usage line (#233), only when it is due (#318): on a 2.5% step, or 10 minutes
  * after this watcher's last one. Decided and recorded in one step, so two pollers post it once.
  */
 const dueUsage = async (): Promise<string[]> => oneAtATime('usage-due', async () => {
-  const usage = await readUsage()
+  const usage = await readAgentUsage()
   const at = Temporal.Now.instant().epochMilliseconds
   const shown = shownUsage(usage.answer, at)
-  const [last = ''] = await readLines('usage')
+  const [last = ''] = await readLines(`usage-${usage.provider}`)
   if (!usageDue(postedFrom(last), shown)) {
     return []
   }
-  await writeLines('usage', [JSON.stringify(shown)])
-  return [usageText(usage, at)]
+  await writeLines(`usage-${usage.provider}`, [JSON.stringify(shown)])
+  return [agentUsageText(usage, at)]
 })
 
-/** The reminders, and the owner's Claude usage when it is due (#233, #318); nothing when neither has a line. */
+/** The reminders, and the active agent's usage when it is due (#233, #318); nothing when neither has a line. */
 const sayClosing = async (): Promise<void> => {
   const closing = [...await openPrs().then(reminders, () => []), ...await dueUsage()]
   if (closing.length > 0) {

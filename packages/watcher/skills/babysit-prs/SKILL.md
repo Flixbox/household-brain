@@ -116,12 +116,18 @@ default branch's CI, new issues, the owner's comments on issues, and issues clos
     to settle its own change request, not for a new review: it never counts as the one ask of
     `BOT_REVIEW_LABEL`, and the bot's approval after it never counts as the review asked for (it only
     follows an earlier review).
+  - `AGENT_USAGE_PROVIDER`: `codex` or `claude`, selecting the allowance reported in notifications
+    and by `agent-usage --reset`. By default, `CODEX_THREAD_ID` selects Codex (also when a Claude
+    marker is inherited); otherwise Claude. Set it explicitly for watchers launched outside the
+    agent. Unknown values are rejected. Codex uses its signed-in local app-server, never a model
+    request. Its cache is separate, keyed by `CODEX_HOME`, and can be overridden with
+    `CODEX_USAGE_CACHE` and `CODEX_USAGE_LOCK_PORT`.
   - `CLAUDE_CONFIG_DIR`: where the Claude login lives (`~/.claude` by default). A notification
-    ends with the owner's Claude usage (`Usage: session 12% used (88% left, resets 2026-10-17 14:10), week 66% used (34% left, resets …)`,
+    ends with the selected provider's usage (`Usage (claude): session 12% used (88% left, resets 2026-10-17 14:10), week 66% used (34% left, resets …)`,
     the windows `/usage` shows: how much is used and left, and when each resets),
-    from the cache it shares with the `claude-usage` command (`packages/watcher/src/claude-usage.ts`,
+    from the per-provider cache it shares with `agent-usage` (`packages/watcher/src/agent-usage.ts`,
     #260): the endpoint is asked at most once a minute and backed off after a refusal; meanwhile the
-    last numbers read come with their time (`(as of 12:04)`), and `Usage: unknown` only when none
+    last numbers read come with their time (`(as of 12:04)`), and `Usage (<provider>): unknown` only when none
     ever were. Only when it is due (#318): when the session's or the week's use is in another 2.5%
     step (2.5%, 5%, 7.5% …) than in this watcher's last usage line, at most once a minute, or 10
     minutes after that line as a heartbeat; a notification in between leaves it out. With `--follow`
