@@ -83,7 +83,7 @@ esac
 
   it('lists the PRs to look at without asking for a run: a slow lookup would hold up the whole round', async () => {
     const home = await stateHome()
-    const gh = await listingGh(home, `echo '[{"headRefOid":"abc1234","number":7}]'`)
+    const gh = await listingGh(home, 'echo \'[{"headRefOid":"abc1234","number":7}]\'')
     const listed = await run(LISTER, home, { GH: gh })
     expect(listed.output.trim()).toBe('[7]')
     expect(await Bun.file(`${home}/calls`).text()).not.toContain('run list')
