@@ -148,8 +148,7 @@ const approvalProblem = (pr: OpenPr, awaitingBot: boolean): string | null => {
   if (pr.reviewDecision !== 'APPROVED' || pr.queued) {
     return null
   }
-  // No checks at all means CI hasn't reported yet, not that it passed.
-  const ci = pr.checks.length > 0 ? ciState(pr.checks) : 'running'
+  const ci = ciState(pr)
   if (ci === 'failed') {
     return `REMINDER: PR #${pr.number} is approved and CI failed: fix it.`
   }
@@ -215,7 +214,7 @@ const mergeWay = (pr: OpenPr) => {
 
 export const openPrLines = (prs: OpenPr[]): string[] => [
   'Open PRs:',
-  ...prs.map(pr => `  #${pr.number} ${pr.title.slice(0, 60)}: ${pr.parked ? 'parked, ' : ''}${pr.draft ? 'draft, ' : ''}${review(pr.reviewDecision)}, ${mergeWay(pr)}, CI ${ciState(pr.checks)}${branchState(pr.mergeState)}`),
+  ...prs.map(pr => `  #${pr.number} ${pr.title.slice(0, 60)}: ${pr.parked ? 'parked, ' : ''}${pr.draft ? 'draft, ' : ''}${review(pr.reviewDecision)}, ${mergeWay(pr)}, CI ${ciState(pr)}${branchState(pr.mergeState)}`),
 ]
 
 /** Event keys after which the open PRs are listed. */
