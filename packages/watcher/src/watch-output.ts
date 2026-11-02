@@ -5,6 +5,7 @@
  * is the notification). With `--follow`, each event comes out the moment it is found, ending with a
  * `---` line, so one slow call never holds back an event found before it (#240), and it goes on (#196).
  */
+import { deliver } from './watch-delivery'
 import { agentUsageText, readAgentUsage } from './agent-usage'
 import { type Event, type OpenPr, answerFirst, clockTime, listsOpenPrs, openPrLines, reminderLines, stamped } from './watch-events'
 import { lookupNews, lookups } from './watch-gh'
@@ -18,10 +19,14 @@ export const FOLLOW = process.argv.includes('--follow')
 
 /** When the last event (or, following, the last heartbeat) was printed. */
 export const quiet = { since: Temporal.Now.instant() }
-const say = (lines: readonly string[]) => process.stdout.write(`${lines.join('\n')}\n`)
+const say = (lines: readonly string[], key: string = crypto.randomUUID()) => {
+  deliver(key, lines)
+  process.stdout.write(`${lines.join('\n')}\n`)
+}
 
 /** The events found so far in this round, printed together by `flush` (not following). */
 const found: (readonly string[])[] = []
+const eventKeys = new WeakMap<readonly string[], string>()
 /** Whether this round printed an event already (following), so `flush` closes it. */
 const printed = { any: false }
 
@@ -32,7 +37,7 @@ const printed = { any: false }
  */
 const printFound = () => {
   for (const lines of answerFirst(found)) {
-    say(FOLLOW ? [...lines, '---'] : lines)
+    say(FOLLOW ? [...lines, '---'] : lines, eventKeys.get(lines))
   }
   found.length = 0
 }
@@ -42,13 +47,14 @@ process.on('exit', printFound)
  * Prints an event at once when following, or keeps it for this round's `flush`. `written` is when
  * GitHub says it happened, for a comment or an issue.
  */
-export const queue = (lines: readonly string[], written: unknown = null): void => {
+export const queue = (lines: readonly string[], written: unknown = null, key: string = crypto.randomUUID()): void => {
   const event = stamped(lines, clockTime(Temporal.Now.instant()) ?? '?', clockTime(written))
   if (FOLLOW) {
-    say([...event, '---'])
+    say([...event, '---'], key)
     printed.any = true
     return
   }
+  eventKeys.set(event, key)
   found.push(event)
 }
 
@@ -61,7 +67,7 @@ export const report = async (event: Event | null, pr: number | null = null): Pro
   const [first = '', ...rest] = event.lines
   // Every CI result comes with where each open PR stands, so no approval goes unnoticed.
   const prs = listsOpenPrs(event.key) ? await openPrs().then(openPrLines, () => ['Open PRs: (listing failed)']) : []
-  queue([pr === null ? first : `PR #${pr}: ${first}`, ...rest, ...prs])
+  queue([pr === null ? first : `PR #${pr}: ${first}`, ...rest, ...prs], null, `event:${pr}:${event.key}`)
 }
 
 /** The reminders for the open PRs, holding auto-merge for those that wait on a review bot asked for or reviewing (#299, #324). */

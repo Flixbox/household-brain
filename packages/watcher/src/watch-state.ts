@@ -32,13 +32,13 @@ import { bare } from './watch-review-events'
 // in another session keeps a record of its own. Without either, the repository's own folder, shared
 // by every watcher without an id: those would split the events between them. STATE_DIR names the
 // folder outright.
-const WATCHER_ID = [process.env.WATCHER_ID, process.env.CLAUDE_CODE_SESSION_ID].find(id => hasText(id))
+const WATCHER_ID = [process.env.WATCHER_ID, process.env.CODEX_THREAD_ID, process.env.CLAUDE_CODE_SESSION_ID].find(id => hasText(id))
 const REPO_DIR = `${WATCHERS_DIR}/${REPO.replace('/', '_')}`
 const SESSIONS_DIR = `${REPO_DIR}/sessions`
 /** A folder name for an id: a hash, so no two ids meet, also where case doesn't count (Windows). */
 const folderOf = (id: string) => Bun.hash(id).toString(36)
 const watcherDir = hasText(WATCHER_ID) ? `${SESSIONS_DIR}/${folderOf(WATCHER_ID)}` : REPO_DIR
-const DIR = hasText(process.env.STATE_DIR) ? process.env.STATE_DIR : watcherDir
+export const DIR = hasText(process.env.STATE_DIR) ? process.env.STATE_DIR : watcherDir
 
 const stateFile = (name: string) => `${DIR}/${name}`
 

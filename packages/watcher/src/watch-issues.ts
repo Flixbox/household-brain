@@ -28,8 +28,8 @@ export const checkIssues = async (): Promise<void> => {
   const fresh = lines.filter(({ key }) => !seen.has(key))
   await appendLines('issue-events', fresh.map(({ key }) => key))
   // Each its own event, with when it was written (#240): several comments are several answers.
-  for (const { at, lines: event } of fresh) {
-    queue(event, at)
+  for (const { at, key, lines: event } of fresh) {
+    queue(event, at, `issue:${key}`)
   }
 }
 

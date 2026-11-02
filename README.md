@@ -145,3 +145,25 @@ The Firebase project is a Google Cloud project; everything below happens in it.
   keep their output and cache compatible; new agent instructions should use `agent-usage`.
 
 Licence: Unlicense.
+
+### Project watcher in Codex
+
+The same project-watcher core serves Claude Code and Codex. Install it with:
+
+```sh
+codex plugin marketplace add Flixbox/household-brain
+codex plugin add project-watcher@household-brain
+```
+
+Review and trust the plugin's SessionStart hook in `/hooks`, then resume the session. In an existing
+root session, run `bun <installed-plugin>/src/codex-watch.ts` once. Keep the project's settings in
+`.claude/watcher.env`; no secrets belong there. The Codex adapter requires a running local daemon
+with a Unix control socket (Linux or WSL). It delivers external events as untrusted data to that
+session's active turn, or wakes it when idle, without changing its model or permissions.
+
+The supervisor rearms a stopped watcher and writes the diagnostic log named on startup. Pending
+notifications remain in the session's `codex-delivery-*.json` outbox until the daemon accepts them;
+delivery errors retry, and usage/IDLE output never wakes an agent. Keep the installed marketplace
+current using `codex plugin marketplace upgrade household-brain`, and re-run the launcher after an
+upgrade; unchanged supervisors are singletons per project and thread. Claude's monitor setup is
+unchanged. See the plugin's `babysit-prs` skill for the event routine.
