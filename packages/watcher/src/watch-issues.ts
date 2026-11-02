@@ -1,9 +1,11 @@
 /** The project watcher's issue checks (watch-project.ts): new issues, the owner's comments, closings, cycles in their links. */
 import { MAX_CYCLES, type OpenIssue, linkCycles, newCycles } from './watch-link-cycles'
-import { issueLine, openIssues } from './watch-github'
+import { graphql, issueLine, openIssues } from './watch-github'
+import { at } from './watch-text'
+import type { IssueEvent } from './watch-issue-events'
 import { issueEventLines } from './watch-comments'
 import { queue } from './watch-output'
-import { appendLines, exists, readLines, writeLines } from './watch-state'
+import { appendLines, endIssue, exists, oneAtATime, readLines, subscriptions, writeLines } from './watch-state'
 
 const byNumber = (first: number, second: number) => first - second
 
@@ -16,32 +18,37 @@ const firstRun = async (name: string, lines: string[]): Promise<boolean> => {
   return true
 }
 
+const unseenIssues = async (lines: IssueEvent[]): Promise<IssueEvent[]> => {
+  const seen = new Set(await readLines('issue-events'))
+  const unseen = lines.filter(({ key }) => !seen.has(key))
+  await appendLines('issue-events', unseen.map(({ key }) => key))
+  return unseen
+}
+
 /** Issues and the owner's comments on them not reported yet; the ones from before the first run aren't news. */
-export const checkIssues = async (): Promise<void> => {
-  const lines = await issueEventLines().catch(() => null)
+export const checkIssues = async (fresh = false): Promise<boolean> => oneAtATime('issue-activity', async () => {
+  const lines = await issueEventLines(fresh).catch(() => null)
   // A new state file for the id keys (#247): on its first run what is there is old news, so nothing
   // already reported under the old text keys (`issues`) comes back.
-  if (!lines || await firstRun('issue-events', lines.map(({ key }) => key))) {
-    return
-  }
-  const seen = new Set(await readLines('issue-events'))
-  const fresh = lines.filter(({ key }) => !seen.has(key))
-  await appendLines('issue-events', fresh.map(({ key }) => key))
+  if (!lines) { return false }
+  if (await firstRun('issue-events', lines.map(({ key }) => key))) { return true }
+  const unseen = await unseenIssues(lines)
   // Each its own event, with when it was written (#240): several comments are several answers.
-  for (const { at, key, lines: event } of fresh) {
-    queue(event, at, `issue:${key}`)
+  for (const { at: written, issue, key, lines: event } of unseen) {
+    queue(event, { issue, key: `issue:${key}`, written })
   }
-}
+  return true
+})
 
 /**
  * Issue lines for what was closed or reopened between `before` and `now`; null when a lookup failed.
  * An issue that is gone (deleted or transferred) doesn't fail it (#263): it would fail every round.
  */
-const issueChanges = async (before: string[], now: string[]): Promise<string[] | null> =>
+const issueChanges = async (before: string[], now: string[]): Promise<{ closed: boolean, issue: number, line: string }[] | null> =>
   Promise.all([
-    ...before.filter(issue => !now.includes(issue)).map(async issue => issueLine(Number(issue), 'closed')),
-    ...now.filter(issue => !before.includes(issue)).map(async issue => issueLine(Number(issue), 'reopened')),
-  ]).then(lines => lines.filter(line => line !== null), () => null)
+    ...before.filter(issue => !now.includes(issue)).map(async issue => ({ closed: true, issue: Number(issue), line: await issueLine(Number(issue), 'closed') })),
+    ...now.filter(issue => !before.includes(issue)).map(async issue => ({ closed: false, issue: Number(issue), line: await issueLine(Number(issue), 'reopened') })),
+  ]).then(lines => lines.flatMap(item => item.line === null ? [] : [{ closed: item.closed, issue: item.issue, line: item.line }]), () => null)
 
 /**
  * Cycles in the blocked-by links between open issues that weren't there on the last look (#335),
@@ -70,8 +77,8 @@ const checkOpenList = async (now: string[]): Promise<void> => {
     return
   }
   await writeLines('open-issues', now)
-  if (lines.length > 0) {
-    queue(lines)
+  for (const { closed, issue, line } of lines) {
+    if (!closed || !subscriptions.scoped) { queue([line], { issue }) }
   }
 }
 
@@ -88,4 +95,17 @@ export const checkIssueStates = async (): Promise<void> => {
   }
   await checkLinkCycles(issues)
   await checkOpenList(issues.map(({ number }) => number).toSorted(byNumber).map(String))
+}
+
+export const checkSubscribedIssues = async (): Promise<void> => {
+  const { issues } = subscriptions
+  if (issues.length === 0) { return }
+  const value = await graphql(issues.map(issue => `issue${issue}:issue(number:${issue}){state}`).join(' '))
+  const closed = issues.filter(issue => at(value, `issue${issue}`, 'state') === 'CLOSED')
+  // A failed final activity lookup cannot close a subscription or discard an owner's comment.
+  if (closed.length === 0 || !await checkIssues(true)) { return }
+  await Promise.all(closed.map(async issue => {
+    queue([`ISSUE_CLOSED #${issue}: subscription completed`], { issue, key: `subscription-issue-closed:${issue}` })
+    await endIssue(issue)
+  }))
 }

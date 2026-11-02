@@ -21,6 +21,7 @@
  * Any number of watchers can watch one repository at once, and each reports every event (#264): each
  * remembers in a folder of its own, by its WATCHER_ID.
  */
+import { Subscription } from './watch-subscription-model'
 import { REPO } from './watch-github'
 import { WATCHERS_DIR, removeOlder, writeWhole } from './watch-files'
 import { hasText, ignoreFailure } from './read'
@@ -37,7 +38,10 @@ const REPO_DIR = `${WATCHERS_DIR}/${REPO.replace('/', '_')}`
 const SESSIONS_DIR = `${REPO_DIR}/sessions`
 /** A folder name for an id: a hash, so no two ids meet, also where case doesn't count (Windows). */
 const folderOf = (id: string) => Bun.hash(id).toString(36)
-const watcherDir = hasText(WATCHER_ID) ? `${SESSIONS_DIR}/${folderOf(WATCHER_ID)}` : REPO_DIR
+export const subscriptions = new Subscription(process.env.WATCHER_SUBSCRIPTIONS ?? '')
+const { selection } = subscriptions
+const identity = selection === '' ? WATCHER_ID : `${WATCHER_ID ?? 'scoped'}:${selection}`
+const watcherDir = hasText(identity) ? `${SESSIONS_DIR}/${folderOf(identity)}` : REPO_DIR
 export const DIR = hasText(process.env.STATE_DIR) ? process.env.STATE_DIR : watcherDir
 
 const stateFile = (name: string) => `${DIR}/${name}`
@@ -120,3 +124,21 @@ export const start = async (): Promise<void> => {
   process.on('SIGTERM', () => { process.exit(143) })
   process.on('SIGINT', () => { process.exit(130) })
 }
+
+const save = async (): Promise<void> => {
+  if (subscriptions.scoped) {
+    await oneAtATime('subscription-snapshot', async () => writeLines('subscriptions', [JSON.stringify(subscriptions.snapshot())]))
+  }
+}
+
+export const startSubscriptions = async (): Promise<void> => {
+  const [saved] = await readLines('subscriptions')
+  if (typeof saved === 'string') { subscriptions.restore(JSON.parse(saved)) }
+}
+
+export const rememberPr = async (pr: number, issues: number[], open = false): Promise<void> => {
+  subscriptions.rememberPr(pr, issues, open)
+  await save()
+}
+export const endPr = async (pr: number): Promise<void> => { subscriptions.closePr(pr); await save() }
+export const endIssue = async (issue: number): Promise<void> => { subscriptions.closeIssue(issue); await save() }

@@ -5,12 +5,13 @@
  * is the notification). With `--follow`, each event comes out the moment it is found, ending with a
  * `---` line, so one slow call never holds back an event found before it (#240), and it goes on (#196).
  */
-import { deliver } from './watch-delivery'
+import { type Audience, SUBSCRIPTIONS_COMPLETE } from './watch-subscription-model'
+import { deliver, deliveryPending } from './watch-delivery'
 import { agentUsageText, readAgentUsage } from './agent-usage'
 import { type Event, type OpenPr, answerFirst, clockTime, listsOpenPrs, openPrLines, reminderLines, stamped } from './watch-events'
 import { lookupNews, lookups } from './watch-gh'
 import { openPrs } from './watch-github'
-import { addLine, askedBots, oneAtATime, readLines, writeLines } from './watch-state'
+import { addLine, askedBots, oneAtATime, readLines, subscriptions, writeLines } from './watch-state'
 import { awaitsBotReview } from './watch-bot-review-events'
 import { codeVersion, outdatedLine, startedOn } from './watch-version'
 import { postedFrom, shownUsage, usageDue } from './watch-usage'
@@ -47,8 +48,11 @@ process.on('exit', printFound)
  * Prints an event at once when following, or keeps it for this round's `flush`. `written` is when
  * GitHub says it happened, for a comment or an issue.
  */
-export const queue = (lines: readonly string[], written: unknown = null, key: string = crypto.randomUUID()): void => {
-  const event = stamped(lines, clockTime(Temporal.Now.instant()) ?? '?', clockTime(written))
+interface QueueOptions extends Audience { key?: string, written?: unknown }
+export const queue = (lines: readonly string[], options: QueueOptions = {}): void => {
+  if (!subscriptions.accepts(options)) { return }
+  const key = options.key ?? crypto.randomUUID()
+  const event = stamped(lines, clockTime(Temporal.Now.instant()) ?? '?', clockTime(options.written))
   if (FOLLOW) {
     say([...event, '---'], key)
     printed.any = true
@@ -61,13 +65,14 @@ export const queue = (lines: readonly string[], written: unknown = null, key: st
 /** Keeps the event for this round's `flush`, unless there is none or it was reported before. */
 export const report = async (event: Event | null, pr: number | null = null): Promise<void> => {
   // Checked and recorded in one step: two pollers finding the same event report it once.
-  if (!event || !await addLine('reported', event.key)) {
+  const audience = pr === null ? {} : { pr }
+  if (!event || !subscriptions.accepts({ ...audience, quiet: event.quiet === true }) || !await addLine('reported', event.key)) {
     return
   }
   const [first = '', ...rest] = event.lines
   // Every CI result comes with where each open PR stands, so no approval goes unnoticed.
-  const prs = listsOpenPrs(event.key) ? await openPrs().then(openPrLines, () => ['Open PRs: (listing failed)']) : []
-  queue([pr === null ? first : `PR #${pr}: ${first}`, ...rest, ...prs], null, `event:${pr}:${event.key}`)
+  const prs = !subscriptions.scoped && listsOpenPrs(event.key) ? await openPrs().then(openPrLines, () => ['Open PRs: (listing failed)']) : []
+  queue([pr === null ? first : `PR #${pr}: ${first}`, ...rest, ...prs], { ...audience, key: `event:${pr}:${event.key}`, quiet: event.quiet === true })
 }
 
 /** The reminders for the open PRs, holding auto-merge for those that wait on a review bot asked for or reviewing (#299, #324). */
@@ -94,6 +99,7 @@ const dueUsage = async (): Promise<string[]> => oneAtATime('usage-due', async ()
 
 /** The reminders, and the active agent's usage when it is due (#233, #318); nothing when neither has a line. */
 const sayClosing = async (): Promise<void> => {
+  if (subscriptions.scoped) { return }
   const closing = [...await openPrs().then(reminders, () => []), ...await dueUsage()]
   if (closing.length > 0) {
     say(FOLLOW ? [...closing, '---'] : closing)
@@ -125,7 +131,7 @@ export const flush = async (): Promise<boolean> => {
  * or the heartbeat in a quiet repository. A one-shot watcher exits only on events, so not there.
  */
 export const reportUsage = async (): Promise<void> => {
-  const lines = FOLLOW ? await dueUsage() : []
+  const lines = FOLLOW && !subscriptions.scoped ? await dueUsage() : []
   if (lines.length > 0) {
     say([...lines, '---'])
   }
@@ -138,7 +144,7 @@ export const reportUsage = async (): Promise<void> => {
 export const reportLookups = async (): Promise<void> => {
   const { failing, line } = lookupNews(lookups, Temporal.Now.instant(), clockTime(lookups.lastSuccess) ?? '?')
   if (line !== null) {
-    queue([line])
+    queue([line], { system: true })
     await flush()
   }
   // Only once the line is out: if printing failed, the next look says it again, LOOKUPS_RECOVERED too.
@@ -149,8 +155,13 @@ export const reportLookups = async (): Promise<void> => {
 export const checkCode = async (): Promise<void> => {
   const line = outdatedLine(startedOn(), await codeVersion())
   if (line !== null) {
-    queue([line])
+    queue([line], { system: true })
     await flush()
     process.exit(0)
   }
+}
+
+/** A completed selection stops only after the durable host outbox is acknowledged. */
+export const finishSubscriptions = (): void => {
+  if (subscriptions.canStop(deliveryPending())) { process.exit(SUBSCRIPTIONS_COMPLETE) }
 }

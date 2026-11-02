@@ -30,7 +30,7 @@ const stateHome = async () => {
 
 const run = async (script: string, home: string, env: Record<string, string>) => {
   const watcher = Bun.spawn([process.execPath, '-e', script], {
-    env: { ...process.env, CLAUDE_CODE_SESSION_ID: '', CLAUDE_CONFIG_DIR: home, GH: 'false', REPO: 'owner/repo', STATE_DIR: '', WATCHER_ID: '', XDG_STATE_HOME: home, ...env },
+    env: { ...process.env, CLAUDE_CODE_SESSION_ID: '', CLAUDE_CONFIG_DIR: home, CODEX_THREAD_ID: '', CODEX_WATCH_THREAD: '', GH: 'false', REPO: 'owner/repo', STATE_DIR: '', WATCHER_ID: '', WATCHER_SUBSCRIPTIONS: '', XDG_STATE_HOME: home, ...env },
     stderr: 'ignore',
     stdout: 'pipe',
   })

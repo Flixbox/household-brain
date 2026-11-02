@@ -143,6 +143,7 @@ export const dequeueReason = async (pr: number): Promise<string> => {
 }
 
 export interface PrState {
+  closingIssues?: number[]
   state: string
   mergeable: string
   /** GitHub's `mergeStateStatus`: `BLOCKED` while a rule (a review, an open thread) holds it back. */
@@ -172,7 +173,7 @@ export const threadsFrom = (value: unknown): ReviewThread[] => records(at(value,
   const review = count(at(records(at(thread, 'first', 'nodes'))[0], 'pullRequestReview', 'databaseId'))
   return { id: textOf(thread.id), lastAuthor: actor(last.author), lastBody: textOf(last.body), resolved: thread.isResolved === true, review, url: textOf(last.url) }
 })
-const PR_FIELDS = 'isDraft isInMergeQueue state mergeable mergeStateStatus headRefOid mergeCommit { oid } reviewDecision autoMergeRequest { enabledAt } title'
+const PR_FIELDS = 'closingIssuesReferences(first:100){nodes{number}} isDraft isInMergeQueue state mergeable mergeStateStatus headRefOid mergeCommit { oid } reviewDecision autoMergeRequest { enabledAt } title'
   + ` labels(first: 100) { nodes { name } } author { login kind: __typename } reviews(last: 100) { nodes { state commit { oid } author { login kind: __typename } } } ${THREAD_FIELDS}`
   // The last hundred comments' text, for a `@<bot> review` ask from any machine (#325), and the head's
   // check suites, for a review bot's check run still going (#324).
@@ -190,6 +191,7 @@ const stateOf = (value: Json): PrState => {
     autoMerge: isRecord(value.autoMergeRequest),
     bot: botReviewStateOf({ bots: REVIEW_BOTS, comments: records(record(value.comments).nodes), labels, reviews: records(record(value.reviews).nodes), suites }),
     cleared: labels.includes(CLEARED_LABEL),
+    closingIssues: records(at(value, 'closingIssuesReferences', 'nodes')).map(issue => count(issue.number)),
     // GitHub leaves `reviewDecision` empty under a ruleset (#197), and counts anyone's approval: the
     // reviews decide, an approval counting only from the owner (#277).
     decision: decisionFrom(textOf(value.reviewDecision), reviews, OWNER),
@@ -209,7 +211,6 @@ const stateOf = (value: Json): PrState => {
     toResolve: threadsToResolve(threadsFrom(value)),
   }
 }
-
 /**
  * The state of every PR asked about, fifty to a query (see `perPr`); one whose state couldn't be read
  * is missing. `fresh` asks GitHub even when another watcher just did (#264).

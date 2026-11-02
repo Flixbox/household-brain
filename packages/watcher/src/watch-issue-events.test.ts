@@ -95,7 +95,7 @@ describe('new issues and the owner\'s issue comments (#314)', () => {
 
   it('reports new issues, not the agent\'s own, keyed by number', () => {
     expect(issueEventsFrom(answer({ created: [issue(2, 'someone'), issue(1, 'helper[bot]')] }), people))
-      .toEqual([{ at: '2026-10-02T09:00:00Z', key: 'issue #2', lines: ['NEW_ISSUE #2 Issue 2'] }])
+      .toEqual([{ at: '2026-10-02T09:00:00Z', issue: 2, key: 'issue #2', lines: ['NEW_ISSUE #2 Issue 2'] }])
     // A PR among the newest is never a new issue, also without SELF.
     expect(issueEventsFrom(answer({ created: [issue(2, 'someone')], createdPrs: later(1) }), { owner: 'someone', self: '' })).toHaveLength(1)
   })
@@ -108,7 +108,7 @@ describe('new issues and the owner\'s issue comments (#314)', () => {
   it('reports the owner\'s comments whole, with their issue, keyed by id', () => {
     const updated = [{ comments: { nodes: [comment(11, 'someone', '2026-10-05T09:00:00Z'), comment(12, 'other', '2026-10-05T10:00:00Z')] }, number: 7 }]
     expect(issueEventsFrom(answer({ updated }), people)).toEqual([
-      { at: '2026-10-05T09:00:00Z', key: 'issue-comment 11', lines: ['ISSUE_COMMENT 11 #7:', '    Do it.', '    Then this.'] },
+      { at: '2026-10-05T09:00:00Z', issue: 7, key: 'issue-comment 11', lines: ['ISSUE_COMMENT 11 #7:', '    Do it.', '    Then this.'] },
     ])
   })
 

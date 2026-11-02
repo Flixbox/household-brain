@@ -86,6 +86,7 @@ export const goneIssueLine = (issue: number, change: 'closed' | 'reopened'): str
 
 /** A new issue or an owner's issue comment: when it was written, the key it is remembered by, and its lines. */
 export interface IssueEvent {
+  issue: number
   at: unknown
   key: string
   lines: string[]
@@ -127,7 +128,7 @@ const newest = (onIssues: Json[], onPrs: Json[]): Json[] => {
 const newIssues = (repository: Json, self: string): IssueEvent[] =>
   newest(records(at(repository, 'created', 'nodes')), records(at(repository, 'createdPrs', 'nodes')))
     .filter(issue => actor(issue.author) !== self)
-    .map(issue => ({ at: issue.createdAt, key: `issue #${count(issue.number)}`, lines: [`NEW_ISSUE #${count(issue.number)} ${oneLine(issue.title, 200)}`] }))
+    .map(issue => ({ at: issue.createdAt, issue: count(issue.number), key: `issue #${count(issue.number)}`, lines: [`NEW_ISSUE #${count(issue.number)} ${oneLine(issue.title, 200)}`] }))
 
 /** Each comment on the issues read, with its issue's number. */
 const issueOfComments = (repository: Json): Map<Json, number> => {
@@ -142,6 +143,7 @@ const ownerComments = (repository: Json, owner: string): IssueEvent[] => {
   return newest([...issueOf.keys()], onPrs).filter(comment => actor(comment.author) === owner)
     .map(comment => ({
       at: comment.createdAt,
+      issue: issueOf.get(comment) ?? 0,
       key: `issue-comment ${count(comment.databaseId)}`,
       lines: [`ISSUE_COMMENT ${count(comment.databaseId)} #${issueOf.get(comment) ?? 0}:`, ...commentText(comment, { author: owner, owner })],
     }))

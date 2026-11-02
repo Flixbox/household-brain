@@ -4,11 +4,11 @@ import { type Activity, FOLLOW_NEWER, type MainRun, type Run, cancelledDeployEve
 import { type PrState, REPO, containsCommit, jobLines, mainAhead, mainHead, mainRuns, mergeCommand, newestMainRun, prStates, resolveThread, runOf } from './watch-github'
 import { APPROVED_DRAFT_NOTE, checkApproval } from './watch-approval'
 import { resolvedThreadEvent } from './watch-review-events'
-import { FOLLOW, checkCode, flush, queue, quiet, report, reportLookups, reportUsage } from './watch-output'
-import { addLine, readLines, start, updateLines, writeLines } from './watch-state'
+import { FOLLOW, checkCode, finishSubscriptions, flush, queue, quiet, report, reportLookups, reportUsage } from './watch-output'
+import { addLine, endPr, readLines, rememberPr, start, startSubscriptions, subscriptions, updateLines, writeLines } from './watch-state'
 import { activitiesOf, checkActivity as checkPrActivity, checkTrackedActivity, watchedPrs } from './watch-activity'
 import { checkNotQueued, checkQueue } from './watch-queue'
-import { checkIssueStates, checkIssues } from './watch-issues'
+import { checkIssueStates, checkIssues, checkSubscribedIssues } from './watch-issues'
 import { allSettled, hasText, ignoreFailure } from './read'
 
 const [limitMinutes = '20', maxHours = '12'] = process.argv.slice(2).filter(arg => arg !== '--follow')
@@ -109,15 +109,25 @@ const checkMoved = async (pr: number, head: string): Promise<void> => {
   const key = `pr-${pr} main-moved ${newest}`
   const news = ahead > 0 && !(await readLines('reported')).includes(key)
   const stillOpen = news && await prStates([pr], true).then(states => states.get(pr)?.state === 'OPEN', () => false)
-  await report(stillOpen ? { key, lines: [`MAIN_MOVED: main is ${ahead} commit(s) ahead of the branch: rebase on main and run the checks again`] } : null, pr)
+  await report(stillOpen ? { key, lines: [`MAIN_MOVED: main is ${ahead} commit(s) ahead of the branch: rebase on main and run the checks again`], quiet: true } : null, pr)
 }
 
 const untrack = async (pr: number) => updateLines('tracked', lines => lines.filter(line => line !== String(pr)))
 const tracked = async (pr: number) => (await readLines('tracked')).includes(String(pr))
 
+/** Terminal activity is fresh: a shared answer from before the merge must not hide a final comment. */
+const terminalActivity = async (pr: number, items: Activity[] | undefined) => subscriptions.scoped
+  ? (await activitiesOf([pr], true).catch(() => new Map<number, Activity[]>())).get(pr) : items
+
 /** A merged PR: its comments while followed (#129), then its deploy until that is reported. */
 const checkMerged = async (pr: number, mergeSha: string, items: Activity[] | undefined): Promise<void> => {
-  if (await tracked(pr) && !await checkActivity(pr, items)) {
+  if ((subscriptions.scoped || await tracked(pr)) && !await checkActivity(pr, await terminalActivity(pr, items))) {
+    return
+  }
+  if (subscriptions.scoped) {
+    await report({ key: `pr-${pr} merged ${mergeSha}`, lines: [`MERGED: ${short(mergeSha)}; subscription completed`] }, pr)
+    await endPr(pr)
+    await untrack(pr)
     return
   }
   const deployed = (await readLines('reported')).some(line => line.startsWith(`pr-${pr} deployed `))
@@ -125,11 +135,12 @@ const checkMerged = async (pr: number, mergeSha: string, items: Activity[] | und
 }
 
 const checkClosed = async (pr: number, items: Activity[] | undefined): Promise<void> => {
-  if (await tracked(pr) && !await checkActivity(pr, items)) {
+  if ((subscriptions.scoped || await tracked(pr)) && !await checkActivity(pr, await terminalActivity(pr, items))) {
     return
   }
   await untrack(pr)
   await report({ key: `pr-${pr} closed`, lines: ['CLOSED without merging'] }, pr)
+  await endPr(pr)
 }
 
 /** Conflicts and approvals, which a parked PR (left open on purpose) doesn't report. */
@@ -165,7 +176,14 @@ const checkOpen = async (pr: number, state: PrState, items: Activity[] | undefin
   await resolveAsked(pr, state)
   await (reviewNews ? checkReview(pr, state) : Promise.resolve())
   await checkRun(pr, state.head, 'pr')
-  await (reviewNews ? checkApproval(pr, state).then(async () => checkMoved(pr, state.head)) : Promise.resolve())
+  await (reviewNews ? checkApproval(pr, state).then(async () => { if (!subscriptions.scoped) { await checkMoved(pr, state.head) } }) : Promise.resolve())
+}
+
+const preparePr = async (pr: number, state: PrState): Promise<boolean> => {
+  await rememberPr(pr, state.closingIssues ?? [], state.state === 'OPEN')
+  const selected = subscriptions.accepts({ pr })
+  if (selected) { await checkNotQueued(pr, state) }
+  return selected
 }
 
 const checkPr = async (pr: number, state: PrState | undefined, items: Activity[] | undefined): Promise<void> => {
@@ -173,7 +191,7 @@ const checkPr = async (pr: number, state: PrState | undefined, items: Activity[]
     round.complete = false
     return
   }
-  await checkNotQueued(pr, state)
+  if (!await preparePr(pr, state)) { return }
   if (state.state === 'MERGED') {
     await checkMerged(pr, state.mergeSha, items)
     return
@@ -196,12 +214,13 @@ const checkPrs = async (): Promise<void> => {
   await (roundComplete() ? writeLines('initialized', []) : Promise.resolve())
 }
 
-type Check = () => Promise<void>
+type Check = () => Promise<unknown>
 
 /** What someone waits for an answer to: issues, the owner's comments on them and on the PRs followed. */
 const ANSWER_CHECKS: Check[] = [checkIssues, checkIssueStates, checkTrackedActivity]
 /** The rest: the watcher's own code, main, the merge queue, and each PR's CI, reviews and deploy. */
-const PROJECT_CHECKS: Check[] = [checkCode, checkMain, checkMainHead, checkQueue, checkPrs]
+// PR relationships precede queue events, so first-look issue subscriptions route their closing PRs.
+const PROJECT_CHECKS: Check[] = [checkCode, checkMain, checkMainHead, checkPrs, checkQueue, checkSubscribedIssues]
 
 interface Poller {
   checks: readonly Check[]
@@ -213,12 +232,12 @@ interface Poller {
 /** One look; true when it printed events, so the next look comes at once. */
 const lookOnce = async ({ checks, heartbeat }: Poller): Promise<boolean> => {
   await inOrder(checks, async check => check())
-  if (await flush()) {
-    return true
-  }
+  const busy = await flush()
+  finishSubscriptions()
+  if (busy) { return true }
   // After a heartbeat the next look waits like after an empty round.
   if (heartbeat && Temporal.Instant.compare(Temporal.Now.instant(), quiet.since.add({ hours: Number(maxHours) })) > 0) {
-    queue([`IDLE: nothing happened for ${maxHours} h`])
+    queue([`IDLE: nothing happened for ${maxHours} h`], { quiet: true })
     await flush()
   }
   return false
@@ -229,7 +248,7 @@ const lookOnce = async ({ checks, heartbeat }: Poller): Promise<boolean> => {
  * the watcher goes on with the next look instead of stopping: events would otherwise end unnoticed.
  */
 const lookSafely = async (poller: Poller): Promise<boolean> => lookOnce(poller).catch(async (error: unknown) => {
-  queue([`WATCHER_ERROR: ${error instanceof Error ? error.message : 'the look failed'}; still watching`])
+  queue([`WATCHER_ERROR: ${error instanceof Error ? error.message : 'the look failed'}; still watching`], { system: true })
   await flush()
   return false
 })
@@ -249,6 +268,8 @@ const poll = async (poller: Poller): Promise<never> => {
 }
 
 await start()
+await startSubscriptions()
+finishSubscriptions()
 // Following, two pollers run side by side (#240): the answers every 30 s, never waiting for a slow
 // look at CI and deploys. Without `--follow`, one look at everything, the answers first (#235).
 await (FOLLOW
