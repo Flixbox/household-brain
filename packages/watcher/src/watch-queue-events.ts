@@ -1,6 +1,6 @@
 /** What the watcher reports about the merge queue (#251), decided from what GitHub answered (pure, so it is tested). */
 import type { Event, Run } from './watch-events'
-import { ciState } from './watch-ci-state'
+import { checksPassed, ciState } from './watch-ci-state'
 import { type Json, at, records } from './watch-text'
 import { isRecord, textOf } from './read'
 
@@ -59,17 +59,23 @@ export const unqueuedLines = ({ head, lines, now, pr, waiting }: { head: string,
 }
 
 /**
- * The PR's node id if a fresh look (`value`) finds it still waiting at `head` with CI green; null
- * otherwise. Green as the open-PR list means it (#344): WORKFLOW's run on the head passed, and every
- * check passed as GitHub sums them up now (a re-run that failed undoes an earlier pass).
+ * The PR's node id if the fresh GraphQL state still waits at `head` and its rollup has finished
+ * without failure; null otherwise. WORKFLOW's run on the head is checked separately before reporting.
  */
-export const waitingId = ({ head, headRun, value }: { head: string, headRun: Run | null, value: Json }): string | null => {
+export const waitingValueId = ({ head, value }: { head: string, value: Json }): string | null => {
   const newest = records(at(value, 'commits', 'nodes')).at(-1)
   const rollup = textOf(at(newest, 'commit', 'statusCheckRollup', 'state'))
   const waits = value.state === 'OPEN' && value.isDraft !== true && value.isInMergeQueue !== true && value.mergeStateStatus === 'CLEAN'
-    && isRecord(value.autoMergeRequest) && textOf(value.headRefOid) === head && ciState({ checks: [rollup], headRun }) === 'green'
+    && isRecord(value.autoMergeRequest) && textOf(value.headRefOid) === head && checksPassed([rollup])
   return waits ? textOf(value.id) : null
 }
+
+/** The workflow run is checked only after the rest of the fresh look still holds. */
+export const waitingId = ({ head, headRun, value }: { head: string, headRun: Run | null, value: Json }): string | null =>
+  ciState({ checks: [], headRun }) === 'green' ? waitingValueId({ head, value }) : null
+
+/** The same once-per-head identity is used before fresh lookups and when reporting. */
+export const notQueuedKey = (pr: number, head: string): string => `pr-${pr} not-queued ${head}`
 
 /**
  * Approved, green, CLEAN and auto-merge on, yet GitHub never put it into the merge queue (#305): seen
@@ -77,6 +83,6 @@ export const waitingId = ({ head, headRun, value }: { head: string, headRun: Run
  * again doesn't help; the `enqueuePullRequest` mutation queues it at once. Once per head commit.
  */
 export const notQueuedEvent = ({ gh, head, id, pr }: { gh: string, head: string, id: string, pr: number }): Event => ({
-  key: `pr-${pr} not-queued ${head}`,
+  key: notQueuedKey(pr, head),
   lines: [`NOT_QUEUED: approved, CI green, merge state CLEAN and auto-merge on at ${head.slice(0, 7)}, but not in the merge queue after ${NOT_QUEUED_MINUTES} min: queue it with ${gh} api graphql -f query='mutation{enqueuePullRequest(input:{pullRequestId:"${id}"}){mergeQueueEntry{position}}}'`],
 })

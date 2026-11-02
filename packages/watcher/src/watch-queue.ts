@@ -3,7 +3,7 @@
  * and who should be in it but never joined (#305).
  */
 import { MERGE_QUEUE, type PrState, dequeueReason, graphql, prStates, queueEntries, runOf } from './watch-github'
-import { type QueueEntry, dequeuedEvent, notQueuedEvent, queueChanges, queueLine, queuedEvent, unqueuedLines, waitingId } from './watch-queue-events'
+import { type QueueEntry, dequeuedEvent, notQueuedEvent, notQueuedKey, queueChanges, queueLine, queuedEvent, unqueuedLines, waitingId, waitingValueId } from './watch-queue-events'
 import { exists, readLines, updateLines, writeLines } from './watch-state'
 import { GH } from './watch-gh'
 import { report } from './watch-output'
@@ -49,8 +49,8 @@ const FRESH_FIELDS = 'id state isDraft isInMergeQueue mergeStateStatus headRefOi
 
 /** The PR's node id if, asked fresh, it still waits at `head`; null otherwise (waitingId). */
 const stillWaiting = async (pr: number, head: string): Promise<string | null> => {
-  const [value, headRun] = await Promise.all([graphql(`pullRequest(number:${pr}){${FRESH_FIELDS}}`, true), runOf(head, true)])
-  return waitingId({ head, headRun, value: record(at(value, 'pullRequest')) })
+  const value = record(at(await graphql(`pullRequest(number:${pr}){${FRESH_FIELDS}}`, true), 'pullRequest'))
+  return waitingValueId({ head, value }) === null ? null : waitingId({ head, headRun: await runOf(head, true), value })
 }
 
 /**
@@ -67,6 +67,7 @@ export const checkNotQueued = async (pr: number, state: PrState): Promise<void> 
     return after.lines
   })
   // A fresh state that can't be read reports nothing: the next look asks again.
-  const id = found.overdue ? await stillWaiting(pr, state.head).catch(() => null) : null
+  const reported = (await readLines('reported')).includes(notQueuedKey(pr, state.head))
+  const id = found.overdue && !reported ? await stillWaiting(pr, state.head).catch(() => null) : null
   await report(id === null ? null : notQueuedEvent({ gh: GH, head: state.head, id, pr }), pr)
 }

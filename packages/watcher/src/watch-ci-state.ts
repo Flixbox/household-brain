@@ -10,6 +10,9 @@ const DONE = new Set(['SUCCESS', 'SKIPPED', 'NEUTRAL'])
 
 const NO_RESULT = new Set(['neutral', 'skipped'])
 
+/** Whether GitHub has finished every check without a failing result. */
+export const checksPassed = (checks: string[]): boolean => checks.every(check => DONE.has(check))
+
 /** What WORKFLOW's run on the head says on its own: none, or one that ran nothing, reports no result. */
 const headRunState = (run: HeadRun | null) => {
   if (!run) {
@@ -34,5 +37,5 @@ export const ciState = ({ checks, headRun }: { checks: string[], headRun: HeadRu
     return 'failed'
   }
   const state = headRunState(headRun)
-  return state === 'green' && !checks.every(check => DONE.has(check)) ? 'running' : state
+  return state === 'green' && !checksPassed(checks) ? 'running' : state
 }
