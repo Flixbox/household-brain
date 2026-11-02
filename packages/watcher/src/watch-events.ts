@@ -113,9 +113,6 @@ export const mainRunEvent = ({ run, limitSeconds, repo }: { run: Run, limitSecon
     : null
 }
 
-/** Whether a commit's CI run finished and passed; no run, or one still pending, hasn't (#342). */
-export const runPassed = (run: Run | null): boolean => run?.status === 'completed' && run.conclusion === 'success'
-
 export interface OpenPr {
   number: number
   title: string
@@ -126,8 +123,8 @@ export interface OpenPr {
   parked: boolean
   /** Every check GitHub's rollup holds for the head, other apps' too: says what failed, never on its own that CI passed. */
   checks: string[]
-  /** WORKFLOW's newest run on the head commit finished and passed (`runPassed`, #342). */
-  headRunPassed: boolean
+  /** WORKFLOW's newest run on the head commit (#342); null when there is none or it can't be read. */
+  headRun: Run | null
   /** GitHub's `mergeStateStatus`: `BEHIND` (out of date with the base branch), `DIRTY` (conflicts), … */
   mergeState: string
   /** In the merge queue (#251): auto-merge shows as off there, and enabling it only says "already queued". */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { FOLLOW_NEWER, type OpenPr, type Run, answerFirst, approvedBy, cancelledDeployEvent, clockTime, decisionFrom, listsOpenPrs, mainRunEvent, newActivity, openPrLines, reminderLines, replacementCandidates, runEvent, runPassed, stamped, usageFrom } from './watch-events'
+import { FOLLOW_NEWER, type OpenPr, type Run, answerFirst, approvedBy, cancelledDeployEvent, clockTime, decisionFrom, listsOpenPrs, mainRunEvent, newActivity, openPrLines, reminderLines, replacementCandidates, runEvent, stamped, usageFrom } from './watch-events'
 
 const SHA = 'abcdef1234567890abcdef1234567890abcdef12'
 const run = (changes: Partial<Run> = {}): Run => ({ ageSeconds: 60, attempt: 1, conclusion: 'success', id: 7, status: 'completed', ...changes })
@@ -103,11 +103,11 @@ describe('mainRunEvent', () => {
 describe('openPrLines', () => {
   it('says where each PR stands', () => {
     expect(openPrLines([
-      { autoMerge: false, bot: { asked: [], requested: false, reviewed: [], reviewing: false }, checks: ['SUCCESS', 'SKIPPED'], draft: false, headRunPassed: true, mergeState: 'CLEAN', number: 3, parked: true, queued: false, reviewDecision: '', title: 'Bump a tool' },
-      { autoMerge: true, bot: { asked: [], requested: false, reviewed: [], reviewing: false }, checks: ['SUCCESS', 'IN_PROGRESS'], draft: false, headRunPassed: true, mergeState: 'CLEAN', number: 4, parked: false, queued: false, reviewDecision: 'APPROVED', title: 'Add a page' },
-      { autoMerge: false, bot: { asked: [], requested: false, reviewed: [], reviewing: false }, checks: ['FAILURE'], draft: false, headRunPassed: true, mergeState: 'CLEAN', number: 5, parked: false, queued: false, reviewDecision: 'CHANGES_REQUESTED', title: 'Fix a bug' },
-      { autoMerge: false, bot: { asked: [], requested: false, reviewed: [], reviewing: false }, checks: ['SUCCESS'], draft: true, headRunPassed: true, mergeState: 'CLEAN', number: 7, parked: false, queued: false, reviewDecision: 'APPROVED', title: 'Show a model' },
-      { autoMerge: false, bot: { asked: [], requested: false, reviewed: [], reviewing: false }, checks: ['SUCCESS'], draft: false, headRunPassed: true, mergeState: 'CLEAN', number: 6, parked: false, queued: true, reviewDecision: 'APPROVED', title: 'Ship it' },
+      { autoMerge: false, bot: { asked: [], requested: false, reviewed: [], reviewing: false }, checks: ['SUCCESS', 'SKIPPED'], draft: false, headRun: run(), mergeState: 'CLEAN', number: 3, parked: true, queued: false, reviewDecision: '', title: 'Bump a tool' },
+      { autoMerge: true, bot: { asked: [], requested: false, reviewed: [], reviewing: false }, checks: ['SUCCESS', 'IN_PROGRESS'], draft: false, headRun: run(), mergeState: 'CLEAN', number: 4, parked: false, queued: false, reviewDecision: 'APPROVED', title: 'Add a page' },
+      { autoMerge: false, bot: { asked: [], requested: false, reviewed: [], reviewing: false }, checks: ['FAILURE'], draft: false, headRun: run(), mergeState: 'CLEAN', number: 5, parked: false, queued: false, reviewDecision: 'CHANGES_REQUESTED', title: 'Fix a bug' },
+      { autoMerge: false, bot: { asked: [], requested: false, reviewed: [], reviewing: false }, checks: ['SUCCESS'], draft: true, headRun: run(), mergeState: 'CLEAN', number: 7, parked: false, queued: false, reviewDecision: 'APPROVED', title: 'Show a model' },
+      { autoMerge: false, bot: { asked: [], requested: false, reviewed: [], reviewing: false }, checks: ['SUCCESS'], draft: false, headRun: run(), mergeState: 'CLEAN', number: 6, parked: false, queued: true, reviewDecision: 'APPROVED', title: 'Ship it' },
     ])).toEqual([
       'Open PRs:',
       '  #3 Bump a tool: parked, awaiting approval, auto-merge off, CI green',
@@ -119,31 +119,26 @@ describe('openPrLines', () => {
   })
 
   it("says green only once the workflow's run on the head passed, whatever else the rollup holds (#342)", () => {
-    const line = (changes: Partial<OpenPr>) => openPrLines([{ autoMerge: false, bot: { asked: [], requested: false, reviewed: [], reviewing: false }, checks: ['SKIPPED'], draft: false, headRunPassed: false, mergeState: 'CLEAN', number: 8, parked: false, queued: false, reviewDecision: '', title: 'x', ...changes }])[1]
-    const running = '  #8 x: awaiting approval, auto-merge off, CI running'
-    expect(line({})).toBe(running)
-    expect(line({ checks: [] })).toBe(running)
-    expect(line({ checks: ['SUCCESS'] })).toBe(running)
-    expect(line({ headRunPassed: true })).toBe('  #8 x: awaiting approval, auto-merge off, CI green')
-    expect(line({ checks: ['FAILURE'] })).toBe('  #8 x: awaiting approval, auto-merge off, CI failed')
-    expect(line({ checks: ['SUCCESS', 'IN_PROGRESS'], headRunPassed: true })).toBe(running)
+    const pending = run({ conclusion: '', status: 'pending' })
+    const state = (changes: Partial<OpenPr>) => openPrLines([{ autoMerge: false, bot: { asked: [], requested: false, reviewed: [], reviewing: false }, checks: ['SKIPPED'], draft: false, headRun: pending, mergeState: 'CLEAN', number: 8, parked: false, queued: false, reviewDecision: '', title: 'x', ...changes }])[1]?.split('auto-merge off, ')[1]
+    expect(state({})).toBe('CI running')
+    expect(state({ checks: [] })).toBe('CI running')
+    expect(state({ checks: ['SUCCESS'] })).toBe('CI running')
+    expect(state({ headRun: run({ conclusion: '', status: 'in_progress' }) })).toBe('CI running')
+    expect(state({ headRun: run() })).toBe('CI green')
+    expect(state({ checks: ['SUCCESS', 'IN_PROGRESS'], headRun: run() })).toBe('CI running')
+    expect(state({ checks: ['FAILURE'] })).toBe('CI failed')
+    // A run that failed without a check of its own, such as a workflow that doesn't start.
+    expect(state({ checks: [], headRun: run({ conclusion: 'startup_failure' }) })).toBe('CI failed')
+    // Nothing that will ever pass: no run on the head, or one that ran nothing.
+    expect(state({ checks: ['SUCCESS'], headRun: null })).toBe('CI not reported')
+    expect(state({ headRun: run({ conclusion: 'skipped' }) })).toBe('CI not reported')
   })
 
   it('comes with every CI result, and only with those', () => {
     expect(listsOpenPrs(`pr-12 ci-passed ${SHA}`)).toBe(true)
     expect(listsOpenPrs('main-failed 7 1')).toBe(true)
     expect(listsOpenPrs('pr-12 approved')).toBe(false)
-  })
-})
-
-describe('runPassed (#342)', () => {
-  it('holds only for a completed, successful run', () => {
-    expect(runPassed(run())).toBe(true)
-    expect(runPassed(null)).toBe(false)
-    expect(runPassed(run({ conclusion: '', status: 'pending' }))).toBe(false)
-    expect(runPassed(run({ conclusion: '', status: 'in_progress' }))).toBe(false)
-    expect(runPassed(run({ conclusion: 'failure' }))).toBe(false)
-    expect(runPassed(run({ conclusion: 'skipped' }))).toBe(false)
   })
 })
 
@@ -166,13 +161,14 @@ describe('answerFirst (#222)', () => {
 })
 
 describe('reminderLines (#224)', () => {
-  const pr = (changes: Partial<OpenPr>): OpenPr => ({ autoMerge: false, bot: { asked: [], requested: false, reviewed: [], reviewing: false }, checks: ['SUCCESS'], draft: false, headRunPassed: true, mergeState: 'CLEAN', number: 1, parked: false, queued: false, reviewDecision: 'APPROVED', title: 'x', ...changes })
+  const pr = (changes: Partial<OpenPr>): OpenPr => ({ autoMerge: false, bot: { asked: [], requested: false, reviewed: [], reviewing: false }, checks: ['SUCCESS'], draft: false, headRun: run(), mergeState: 'CLEAN', number: 1, parked: false, queued: false, reviewDecision: 'APPROVED', title: 'x', ...changes })
 
   it('reminds of an approved PR with green CI and auto-merge off, and of one whose CI failed', () => {
     expect(reminderLines([pr({ number: 284 }), pr({ checks: ['SUCCESS', 'FAILURE'], number: 290 })])).toEqual([
       'REMINDER: PR #284 is approved and CI is green, but auto-merge is off: enable it.',
       'REMINDER: PR #290 is approved and CI failed: fix it.',
     ])
+    expect(reminderLines([pr({ checks: [], headRun: run({ conclusion: 'startup_failure' }), number: 291 })])).toEqual(['REMINDER: PR #291 is approved and CI failed: fix it.'])
   })
 
   it('stays quiet about running or unreported CI, auto-merge already on, parked or unapproved PRs', () => {
@@ -181,9 +177,9 @@ describe('reminderLines (#224)', () => {
       pr({ autoMerge: true }),
       pr({ parked: true }),
       pr({ reviewDecision: 'REVIEW_REQUIRED' }),
-      pr({ checks: [], headRunPassed: false }),
+      pr({ checks: [], headRun: null }),
       // The rollup holds only another app's skipped check, and the head's run hasn't passed (#342).
-      pr({ checks: ['SKIPPED'], headRunPassed: false }),
+      pr({ checks: ['SKIPPED'], headRun: run({ conclusion: '', status: 'pending' }) }),
       // In the merge queue: auto-merge shows as off there, and the queue does the merging (#251).
       pr({ queued: true }),
       pr({ checks: ['FAILURE'], queued: true }),
@@ -198,7 +194,7 @@ describe('reminderLines (#224)', () => {
 })
 
 describe('reminders for branches that can\'t merge (#226)', () => {
-  const pr = (changes: Partial<OpenPr>): OpenPr => ({ autoMerge: true, bot: { asked: [], requested: false, reviewed: [], reviewing: false }, checks: ['SUCCESS'], draft: false, headRunPassed: true, mergeState: 'CLEAN', number: 314, parked: false, queued: false, reviewDecision: 'APPROVED', title: 'x', ...changes })
+  const pr = (changes: Partial<OpenPr>): OpenPr => ({ autoMerge: true, bot: { asked: [], requested: false, reviewed: [], reviewing: false }, checks: ['SUCCESS'], draft: false, headRun: run(), mergeState: 'CLEAN', number: 314, parked: false, queued: false, reviewDecision: 'APPROVED', title: 'x', ...changes })
 
   it('reminds of a branch behind main or in conflict, approved or not', () => {
     expect(reminderLines([pr({ mergeState: 'BEHIND' }), pr({ mergeState: 'DIRTY', number: 9, reviewDecision: '' })])).toEqual([
