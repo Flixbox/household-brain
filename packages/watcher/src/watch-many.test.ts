@@ -14,7 +14,7 @@ const ASKER = `
   import { ghText } from '${import.meta.dir}/watch-gh'
   console.log(await ghText(['pr', 'list', '--repo', 'owner/repo'], process.env.GH, process.env.FRESH === '1'))`
 const LISTER = `
-  import { watchedPrs } from '${import.meta.dir}/watch-prs'
+  import { watchedPrs } from '${import.meta.dir}/watch-activity'
   console.log(JSON.stringify(await watchedPrs()))`
 
 const dirs: string[] = []

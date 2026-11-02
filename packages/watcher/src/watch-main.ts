@@ -6,10 +6,9 @@ import { APPROVED_DRAFT_NOTE, checkApproval } from './watch-approval'
 import { resolvedThreadEvent } from './watch-review-events'
 import { FOLLOW, checkCode, flush, queue, quiet, report, reportLookups, reportUsage } from './watch-output'
 import { addLine, readLines, start, updateLines, writeLines } from './watch-state'
-import { activitiesOf, checkActivity as checkPrActivity, checkTrackedActivity } from './watch-activity'
+import { activitiesOf, checkActivity as checkPrActivity, checkTrackedActivity, watchedPrs } from './watch-activity'
 import { checkNotQueued, checkQueue } from './watch-queue'
 import { checkIssueStates, checkIssues } from './watch-issues'
-import { watchedPrs } from './watch-prs'
 import { allSettled, hasText, ignoreFailure } from './read'
 
 const [limitMinutes = '20', maxHours = '12'] = process.argv.slice(2).filter(arg => arg !== '--follow')
