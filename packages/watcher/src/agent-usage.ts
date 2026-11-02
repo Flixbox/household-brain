@@ -1,6 +1,7 @@
 /** Select the current agent's allowance; Claude and Codex never share cached answers (#338). */
 import { type Usage, readUsage, usageText, weekReset } from './claude-usage'
 import { askCodex } from './codex-usage'
+import { hasText } from './read'
 
 export type Provider = 'claude' | 'codex'
 type Environment = Record<string, string | undefined>
@@ -14,7 +15,7 @@ export const usageProvider = (env: Environment = process.env): Provider => {
     }
     throw new Error('AGENT_USAGE_PROVIDER must be claude or codex')
   }
-  return env.CODEX_THREAD_ID ? 'codex' : 'claude'
+  return hasText(env.CODEX_THREAD_ID) ? 'codex' : 'claude'
 }
 
 export const codexCache = (env: Environment = process.env): string => {

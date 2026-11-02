@@ -1,5 +1,5 @@
 /** Codex windows normalized to the watcher's shared session/week format (#338). */
-import { type Asked } from './claude-usage'
+import type { Asked } from './claude-usage'
 import { codexRateLimits } from './codex-rpc'
 import { isRecord } from './read'
 
