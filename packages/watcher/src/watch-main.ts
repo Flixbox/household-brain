@@ -1,12 +1,12 @@
 /* oxlint-disable eslint/no-await-in-loop -- each poller's looks run one after another, on purpose */
 /** The project watcher's looks, started by watch-project.ts once it has read which code it runs (#265). */
 import { type Activity, FOLLOW_NEWER, type MainRun, type Run, cancelledDeployEvent, mainRunEvent, replacementCandidates, runEvent } from './watch-events'
-import { type PrState, REPO, containsCommit, jobLines, mainAhead, mainHead, mainRuns, mergeCommand, newestMainRun, openPrs, prStates, recentlyMerged, resolveThread, runOf } from './watch-github'
+import { type PrState, REPO, containsCommit, jobLines, mainAhead, mainHead, mainRuns, mergeCommand, newestMainRun, prStates, resolveThread, runOf } from './watch-github'
 import { APPROVED_DRAFT_NOTE, checkApproval } from './watch-approval'
 import { resolvedThreadEvent } from './watch-review-events'
 import { FOLLOW, checkCode, flush, queue, quiet, report, reportLookups, reportUsage } from './watch-output'
 import { addLine, readLines, start, updateLines, writeLines } from './watch-state'
-import { activitiesOf, checkActivity as checkPrActivity, checkTrackedActivity } from './watch-activity'
+import { activitiesOf, checkActivity as checkPrActivity, checkTrackedActivity, watchedPrs } from './watch-activity'
 import { checkNotQueued, checkQueue } from './watch-queue'
 import { checkIssueStates, checkIssues } from './watch-issues'
 import { allSettled, hasText, ignoreFailure } from './read'
@@ -17,13 +17,11 @@ if (!/^\d+$/u.test(limitMinutes) || !/^\d+$/u.test(maxHours)) {
   process.exit(64)
 }
 const LIMIT_SECONDS = Number(limitMinutes) * 60
-const MERGED_HOURS = Number(process.env.MERGED_HOURS ?? 3)
 const round = { complete: true }
 /** Read through a function: the checks of a round reset `round.complete`, which TypeScript can't see. */
 const roundComplete = () => round.complete
 
 const short = (sha: string) => sha.slice(0, 7)
-const byNumber = (first: number, second: number) => first - second
 
 const inOrder = async <Item>(items: readonly Item[], each: (item: Item) => Promise<unknown>): Promise<void> =>
   items.reduce<Promise<void>>(async (previous, item) => {
@@ -181,26 +179,6 @@ const checkPr = async (pr: number, state: PrState | undefined, items: Activity[]
     return
   }
   await (state.state === 'CLOSED' ? checkClosed(pr, items) : checkOpen(pr, state, items))
-}
-
-/** Open PRs, the ones followed until their deploy, and recently merged ones; null when a listing failed. */
-const watchedPrs = async (): Promise<number[] | null> => {
-  const lists = await Promise.all([
-    openPrs().then(prs => prs.map(pr => pr.number)),
-    recentlyMerged(MERGED_HOURS),
-    readLines('tracked').then(lines => lines.map(Number)),
-    readLines('reported'),
-  ]).catch(() => null)
-  if (!lists) {
-    return null
-  }
-  const [open, merged, followed, reported] = lists
-  // A merged PR whose deploy was reported, and that is no longer followed, needs no look: on a slow
-  // `gh` each look costs seconds, all of it before the rest (#235). Only the deploy settles it: a PR
-  // closed once and then reopened and merged still has its deploy to report.
-  const settled = (pr: number) => reported.some(line => line.startsWith(`pr-${pr} deployed `))
-  const unsettled = merged.filter(pr => followed.includes(pr) || !settled(pr))
-  return [...new Set([...open, ...unsettled, ...followed])].toSorted(byNumber)
 }
 
 const checkPrs = async (): Promise<void> => {

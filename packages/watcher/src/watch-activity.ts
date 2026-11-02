@@ -1,7 +1,7 @@
-/** The project watcher's look at a pull request's comments and reviews (watch-project.ts). */
+/** The project watcher's look at a pull request's comments and reviews (watch-project.ts), and which pull requests a round looks at. */
 import { type Activity, newActivity } from './watch-events'
 import { ACTIVITY_FIELDS, activityFrom } from './watch-comment-lines'
-import { ACTIVITY_GH, IGNORED, OWNER, SELF, perPr } from './watch-github'
+import { ACTIVITY_GH, IGNORED, OWNER, SELF, openPrNumbers, perPr, recentlyMerged } from './watch-github'
 import { appendLines, exists, oneAtATime, readLines, writeLines } from './watch-state'
 import { allSettled } from './read'
 import { queue } from './watch-output'
@@ -48,4 +48,28 @@ export const checkTrackedActivity = async (): Promise<void> => {
   const prs = (await readLines('tracked')).map(Number)
   const activities = await activitiesOf(prs)
   await allSettled(prs.map(async pr => checkActivity(pr, activities.get(pr))))
+}
+
+const MERGED_HOURS = Number(process.env.MERGED_HOURS ?? 3)
+
+const byNumber = (first: number, second: number) => first - second
+
+/** Open PRs, the ones followed until their deploy, and recently merged ones; null when a listing failed. */
+export const watchedPrs = async (): Promise<number[] | null> => {
+  const lists = await Promise.all([
+    openPrNumbers(),
+    recentlyMerged(MERGED_HOURS),
+    readLines('tracked').then(lines => lines.map(Number)),
+    readLines('reported'),
+  ]).catch(() => null)
+  if (!lists) {
+    return null
+  }
+  const [open, merged, followed, reported] = lists
+  // A merged PR whose deploy was reported, and that is no longer followed, needs no look: on a slow
+  // `gh` each look costs seconds, all of it before the rest (#235). Only the deploy settles it: a PR
+  // closed once and then reopened and merged still has its deploy to report.
+  const settled = (pr: number) => reported.some(line => line.startsWith(`pr-${pr} deployed `))
+  const unsettled = merged.filter(pr => followed.includes(pr) || !settled(pr))
+  return [...new Set([...open, ...unsettled, ...followed])].toSorted(byNumber)
 }
