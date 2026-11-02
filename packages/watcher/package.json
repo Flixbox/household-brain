@@ -8,7 +8,8 @@
     "agent-usage": "./src/agent-usage.ts",
     "claude-usage": "./src/claude-usage.ts",
     "reply-review-thread": "./src/reply-review-thread.ts",
-    "watch-project": "./src/watch-project.ts"
+    "watch-project": "./src/watch-project.ts",
+    "watch-project-codex": "./src/codex-watch.ts"
   },
   "scripts": {
     "typecheck": "tsc",
