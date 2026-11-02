@@ -2,13 +2,12 @@
  * The project watcher's look at the merge queue (watch-project.ts, #251): who entered it, who fell off,
  * and who should be in it but never joined (#305).
  */
-import { MERGE_QUEUE, type PrState, dequeueReason, graphql, prStates, queueEntries } from './watch-github'
-import { type QueueEntry, dequeuedEvent, notQueuedEvent, queueChanges, queueLine, queuedEvent, unqueuedLines } from './watch-queue-events'
+import { MERGE_QUEUE, type PrState, dequeueReason, graphql, prStates, queueEntries, runOf } from './watch-github'
+import { type QueueEntry, dequeuedEvent, notQueuedEvent, queueChanges, queueLine, queuedEvent, unqueuedLines, waitingId } from './watch-queue-events'
 import { exists, readLines, updateLines, writeLines } from './watch-state'
 import { GH } from './watch-gh'
 import { report } from './watch-output'
-import { isRecord, textOf } from './read'
-import { at, record, records } from './watch-text'
+import { at, record } from './watch-text'
 
 /** A PR that left the queue: nothing to say when it merged; still open, it fell off. */
 const checkLeft = async (lines: string[]): Promise<void> => {
@@ -48,16 +47,10 @@ const waitsForQueue = (state: PrState): boolean => MERGE_QUEUE && state.state ==
 
 const FRESH_FIELDS = 'id state isDraft isInMergeQueue mergeStateStatus headRefOid autoMergeRequest{enabledAt} commits(last:1){nodes{commit{statusCheckRollup{state}}}}'
 
-/**
- * The PR's node id if, asked fresh, it still waits at `head` with every check passed, as GitHub sums
- * them up now (a re-run that failed undoes an earlier pass); null otherwise.
- */
+/** The PR's node id if, asked fresh, it still waits at `head`; null otherwise (waitingId). */
 const stillWaiting = async (pr: number, head: string): Promise<string | null> => {
-  const value = record(at(await graphql(`pullRequest(number:${pr}){${FRESH_FIELDS}}`, true), 'pullRequest'))
-  const checks = at(records(at(value, 'commits', 'nodes')).at(-1), 'commit', 'statusCheckRollup', 'state')
-  const waits = value.state === 'OPEN' && value.isDraft !== true && value.isInMergeQueue !== true && value.mergeStateStatus === 'CLEAN'
-    && isRecord(value.autoMergeRequest) && textOf(value.headRefOid) === head && checks === 'SUCCESS'
-  return waits ? textOf(value.id) : null
+  const [value, headRun] = await Promise.all([graphql(`pullRequest(number:${pr}){${FRESH_FIELDS}}`, true), runOf(head, true)])
+  return waitingId({ head, headRun, value: record(at(value, 'pullRequest')) })
 }
 
 /**

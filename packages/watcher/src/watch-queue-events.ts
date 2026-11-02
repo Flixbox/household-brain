@@ -1,5 +1,7 @@
 /** What the watcher reports about the merge queue (#251), decided from what GitHub answered (pure, so it is tested). */
-import type { Event } from './watch-events'
+import type { Event, Run } from './watch-events'
+import { type Json, at, records } from './watch-text'
+import { isRecord, textOf } from './read'
 
 /** A PR's place in the merge queue (#251). */
 export interface QueueEntry {
@@ -53,6 +55,18 @@ export const unqueuedLines = ({ head, lines, now, pr, waiting }: { head: string,
   const seen = kept[3] ?? ''
   const start = seen !== '' && minutesAgo(seen) < NOT_QUEUED_MINUTES ? since : now.toString()
   return { lines: [...others, `${pr} ${head} ${start} ${now.toString()}`], overdue: minutesAgo(start) >= NOT_QUEUED_MINUTES }
+}
+
+/**
+ * The PR's node id if a fresh look (`value`) finds it still waiting at `head` with every check passed,
+ * as GitHub sums them up now (a re-run that failed undoes an earlier pass); null otherwise.
+ */
+export const waitingId = ({ head, value }: { head: string, headRun: Run | null, value: Json }): string | null => {
+  const newest = records(at(value, 'commits', 'nodes')).at(-1)
+  const rollup = at(newest, 'commit', 'statusCheckRollup', 'state')
+  const waits = value.state === 'OPEN' && value.isDraft !== true && value.isInMergeQueue !== true && value.mergeStateStatus === 'CLEAN'
+    && isRecord(value.autoMergeRequest) && textOf(value.headRefOid) === head && rollup === 'SUCCESS'
+  return waits ? textOf(value.id) : null
 }
 
 /**

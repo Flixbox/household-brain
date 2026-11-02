@@ -70,8 +70,8 @@ const runFrom = (value: Json): Run => ({
 const RUN_FIELDS = 'databaseId,attempt,startedAt,status,conclusion'
 
 /** The CI run of a commit; null when there is none yet. */
-export const runOf = async (sha: string): Promise<Run | null> => {
-  const [run] = records(await gh(['run', 'list', '--repo', REPO, '--workflow', WORKFLOW, '--commit', sha, '--json', RUN_FIELDS]))
+export const runOf = async (sha: string, fresh = false): Promise<Run | null> => {
+  const [run] = records(await gh(['run', 'list', '--repo', REPO, '--workflow', WORKFLOW, '--commit', sha, '--json', RUN_FIELDS], GH, fresh))
   return run ? runFrom(run) : null
 }
 

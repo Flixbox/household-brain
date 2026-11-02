@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { NOT_QUEUED_MINUTES, dequeuedEvent, notQueuedEvent, queueChanges, queuedEvent, unqueuedLines } from './watch-queue-events'
+import { NOT_QUEUED_MINUTES, dequeuedEvent, notQueuedEvent, queueChanges, queuedEvent, unqueuedLines, waitingId } from './watch-queue-events'
 
 describe('merge queue events (#251)', () => {
   it('reports a PR entering the queue, keyed by when it entered so a second time is news again', () => {
@@ -46,5 +46,33 @@ describe('a PR that never joins the merge queue (#305)', () => {
     expect(event.key).toBe('pr-7 not-queued abcdef1234')
     expect(event.lines[0]).toStartWith('NOT_QUEUED: ')
     expect(event.lines[0]).toContain('agent-gh api graphql -f query=\'mutation{enqueuePullRequest(input:{pullRequestId:"PR_kw1"}){mergeQueueEntry{position}}}\'')
+  })
+})
+
+describe('the fresh look before NOT_QUEUED (#305)', () => {
+  const passed = { ageSeconds: 60, attempt: 1, conclusion: 'success', id: 7, status: 'completed' }
+  const value = { autoMergeRequest: { enabledAt: 't0' }, commits: { nodes: [{ commit: { statusCheckRollup: { state: 'SUCCESS' } } }] }, headRefOid: 'abc', id: 'PR_kw1', isDraft: false, isInMergeQueue: false, mergeStateStatus: 'CLEAN', state: 'OPEN' }
+  const look = ({ headRun = passed, ...changes }: { headRun?: typeof passed | null, [field: string]: unknown }) => waitingId({ head: 'abc', headRun, value: { ...value, ...changes } })
+  const rollup = (state: unknown) => ({ commits: { nodes: [{ commit: { statusCheckRollup: { state } } }] } })
+
+  it('still waits only while everything GitHub says now agrees', () => {
+    expect(look({})).toBe('PR_kw1')
+    expect(look({ isInMergeQueue: true })).toBeNull()
+    expect(look({ headRefOid: 'new' })).toBeNull()
+    expect(look({ autoMergeRequest: null })).toBeNull()
+    expect(look({ mergeStateStatus: 'BLOCKED' })).toBeNull()
+    // A re-run that failed undoes an earlier pass, and a rollup that isn't there says nothing.
+    expect(look(rollup('FAILURE'))).toBeNull()
+    expect(look(rollup('PENDING'))).toBeNull()
+    expect(look(rollup(null))).toBeNull()
+  })
+
+  it("doesn't take the rollup's word for CI: the workflow's run on the head must have passed (#344)", () => {
+    // The rollup holds other apps' checks too: a lone passed or skipped one reads SUCCESS on its own.
+    expect(look({ headRun: { ...passed, conclusion: '', status: 'in_progress' } })).toBeNull()
+    expect(look({ headRun: { ...passed, conclusion: '', status: 'pending' } })).toBeNull()
+    expect(look({ headRun: null })).toBeNull()
+    expect(look({ headRun: { ...passed, conclusion: 'failure' } })).toBeNull()
+    expect(look({ headRun: { ...passed, conclusion: 'skipped' } })).toBeNull()
   })
 })
