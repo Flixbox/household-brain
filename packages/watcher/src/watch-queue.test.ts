@@ -32,7 +32,7 @@ const CHECK = `
   console.log('REPORTED', JSON.stringify(await readLines('reported')))
 `
 
-const FAKE = `
+const FAKE = String.raw`
   import { appendFileSync } from 'node:fs'
   const args = process.argv.slice(2).join(' ')
   const home = process.env.FIXTURE_HOME
