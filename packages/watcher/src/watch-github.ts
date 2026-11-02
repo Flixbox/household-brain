@@ -1,5 +1,5 @@
 /** The project watcher's questions to GitHub, through the `gh` CLI, answered as plain data. */
-import { type MainRun, type OpenPr, type Run, approvedBy, decisionFrom } from './watch-events'
+import { type MainRun, type OpenPr, type Run, approvedBy, decisionFrom, runPassed } from './watch-events'
 import type { QueueEntry } from './watch-queue-events'
 import { type BotReviewState, NO_BOT_REVIEW, REVIEW_BOTS, botReviewStateOf } from './watch-bot-review-events'
 import { type ReviewThread, threadsToResolve } from './watch-review-events'
@@ -217,9 +217,15 @@ const stateOf = (value: Json): PrState => {
 export const prStates = async (prs: readonly number[], fresh = false): Promise<Map<number, PrState>> =>
   perPr(prs, { fields: PR_FIELDS, fresh, parse: stateOf, size: 50 })
 
+/**
+ * Whether WORKFLOW's run on `head` passed (#342); unreadable counts as not yet. The same question each
+ * look asks about an open PR's head, so the shared answer costs no call of its own.
+ */
+const headRunPassed = async (head: string): Promise<boolean> => runOf(head).then(runPassed, () => false)
+
 export const openPrs = async (): Promise<OpenPr[]> => {
   const [listed, queue] = await Promise.all([
-    gh(['pr', 'list', '--repo', REPO, '--state', 'open', '--limit', '100', '--json', 'number,title,isDraft,autoMergeRequest,labels,statusCheckRollup,mergeStateStatus']),
+    gh(['pr', 'list', '--repo', REPO, '--state', 'open', '--limit', '100', '--json', 'number,title,isDraft,autoMergeRequest,labels,statusCheckRollup,mergeStateStatus,headRefOid']),
     // An unreadable queue lists the PRs as not queued (#251), rather than leaving out the list and its reminders.
     queueEntries().catch((): Map<number, QueueEntry> => new Map()),
   ])
@@ -227,12 +233,14 @@ export const openPrs = async (): Promise<OpenPr[]> => {
   // whose state couldn't be read: it is then simply not approved yet this round, rather than the
   // whole listing failing.
   const states = await prStates(records(listed).map(pr => count(pr.number)))
+  const passed = await Promise.all(records(listed).map(async pr => headRunPassed(textOf(pr.headRefOid))))
   return records(listed)
-    .map(pr => ({
+    .map((pr, index) => ({
       autoMerge: Boolean(pr.autoMergeRequest),
       bot: states.get(count(pr.number))?.bot ?? NO_BOT_REVIEW,
       checks: records(pr.statusCheckRollup).map(check => textOf(check.conclusion) || textOf(check.state) || 'pending'),
       draft: pr.isDraft === true,
+      headRunPassed: passed[index] === true,
       mergeState: textOf(pr.mergeStateStatus),
       number: count(pr.number),
       parked: records(pr.labels).some(label => label.name === 'parked'),

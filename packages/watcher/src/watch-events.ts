@@ -120,12 +120,18 @@ export interface OpenPr {
   draft: boolean
   bot: { asked: string[], requested: boolean, reviewed: string[], reviewing: boolean }
   parked: boolean
+  /** Every check GitHub's rollup holds for the head, other apps' too: says what failed, never on its own that CI passed. */
   checks: string[]
+  /** WORKFLOW's newest run on the head commit finished and passed (`runPassed`, #342). */
+  headRunPassed: boolean
   /** GitHub's `mergeStateStatus`: `BEHIND` (out of date with the base branch), `DIRTY` (conflicts), … */
   mergeState: string
   /** In the merge queue (#251): auto-merge shows as off there, and enabling it only says "already queued". */
   queued: boolean
 }
+
+/** Whether a commit's CI run finished and passed; no run, or one still pending, hasn't (#342). */
+export const runPassed = (run: Run | null): boolean => run?.status === 'completed' && run.conclusion === 'success'
 
 const FAILED = new Set(['FAILURE', 'ERROR', 'TIMED_OUT', 'CANCELLED', 'STARTUP_FAILURE', 'ACTION_REQUIRED'])
 const DONE = new Set(['SUCCESS', 'SKIPPED', 'NEUTRAL'])
