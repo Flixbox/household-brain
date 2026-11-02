@@ -1,4 +1,4 @@
-/** What a PR's CI comes to, for the open-PR list and its reminders (watch-events.ts). */
+/** What a PR's CI comes to, for the open-PR list and its reminders (watch-events.ts), and NOT_QUEUED (watch-queue-events.ts). */
 
 interface HeadRun {
   conclusion: string
