@@ -49,7 +49,7 @@ export const unqueuedLines = ({ head, lines, now, pr, waiting }: { head: string,
   if (!waiting) {
     return { lines: others, overdue: false }
   }
-  const minutesAgo = (at: string) => Temporal.Instant.from(at).until(now).total('minutes')
+  const minutesAgo = (time: string) => Temporal.Instant.from(time).until(now).total('minutes')
   const kept = lines.find(line => mine(line) && line.split(' ')[1] === head)?.split(' ') ?? []
   const since = kept[2] ?? now.toString()
   const seen = kept[3] ?? ''
