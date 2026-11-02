@@ -1,5 +1,6 @@
 /** What the watcher reports about the merge queue (#251), decided from what GitHub answered (pure, so it is tested). */
 import type { Event, Run } from './watch-events'
+import { ciState } from './watch-ci-state'
 import { type Json, at, records } from './watch-text'
 import { isRecord, textOf } from './read'
 
@@ -58,14 +59,15 @@ export const unqueuedLines = ({ head, lines, now, pr, waiting }: { head: string,
 }
 
 /**
- * The PR's node id if a fresh look (`value`) finds it still waiting at `head` with every check passed,
- * as GitHub sums them up now (a re-run that failed undoes an earlier pass); null otherwise.
+ * The PR's node id if a fresh look (`value`) finds it still waiting at `head` with CI green; null
+ * otherwise. Green as the open-PR list means it (#344): WORKFLOW's run on the head passed, and every
+ * check passed as GitHub sums them up now (a re-run that failed undoes an earlier pass).
  */
-export const waitingId = ({ head, value }: { head: string, headRun: Run | null, value: Json }): string | null => {
+export const waitingId = ({ head, headRun, value }: { head: string, headRun: Run | null, value: Json }): string | null => {
   const newest = records(at(value, 'commits', 'nodes')).at(-1)
-  const rollup = at(newest, 'commit', 'statusCheckRollup', 'state')
+  const rollup = textOf(at(newest, 'commit', 'statusCheckRollup', 'state'))
   const waits = value.state === 'OPEN' && value.isDraft !== true && value.isInMergeQueue !== true && value.mergeStateStatus === 'CLEAN'
-    && isRecord(value.autoMergeRequest) && textOf(value.headRefOid) === head && rollup === 'SUCCESS'
+    && isRecord(value.autoMergeRequest) && textOf(value.headRefOid) === head && ciState({ checks: [rollup], headRun }) === 'green'
   return waits ? textOf(value.id) : null
 }
 
