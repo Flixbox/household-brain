@@ -67,8 +67,8 @@
  *                                    start it again
  *   LOOKUPS_FAILING / LOOKUPS_RECOVERED  no `gh` call has succeeded for minutes (on every look while it
  *                                    lasts), or they succeed again (#253)
- *   Usage: session <n>% used (<m>% left, resets …), week <n>% used (<m>% left, resets …)
- *                                    last on a notification: the owner's Claude usage (#233), only when the
+ *   Usage (<provider>): session <n>% used (<m>% left, resets …), week <n>% used (<m>% left, resets …)
+ *                                    last on a notification: the active agent's usage (#233), only when the
  *                                    session's or the week's use crossed a 2.5% step since this watcher's
  *                                    last one (at most once a minute), or 10 minutes after it (#318); with
  *                                    --follow also on its own when no event brought it; old numbers end
