@@ -43,7 +43,7 @@ const MODEL = `
   resumed.restore(saved)
   const resumedClosed = resumed.accepts({ pr: 7 })
   resumed.closeIssue(4)
-  console.log(JSON.stringify({ closedLinked, closedPr, complete: resumed.complete, linked, notComplete, resumedClosed, stillIssue, unrelated }))
+  console.log(JSON.stringify({ closedLinked, closedPr, complete: resumed.complete, linked, notComplete, pendingBlocksStop: resumed.canStop(true), readyToStop: resumed.canStop(false), resumedClosed, stillIssue, unrelated }))
 `
 
 const run = async (script: string, selection: string) => {
@@ -85,11 +85,11 @@ test('an issue subscription gets its structured issue comments and no unrelated 
 
 test('issue-linked PRs, terminal subjects and restart recovery share one subscription model (#349)', async () => {
   const output = await run(MODEL, 'pr:7,issue:4')
-  expect(JSON.parse(output)).toEqual({ closedLinked: false, closedPr: false, complete: true, linked: true, notComplete: false, resumedClosed: false, stillIssue: true, unrelated: false })
+  expect(JSON.parse(output)).toEqual({ closedLinked: false, closedPr: false, complete: true, linked: true, notComplete: false, pendingBlocksStop: false, readyToStop: true, resumedClosed: false, stillIssue: true, unrelated: false })
 })
 
 test('invalid selections fail closed instead of silently watching the repository (#349)', async () => {
-  const script = `const { Subscription } = await import('${import.meta.dir}/watch-subscription-model'); let rejected = 0; for (const raw of ['pr:0', 'pr:no', 'other:7', 'pr:7,']) { try { new Subscription(raw) } catch { rejected += 1 } } console.log(rejected)`
+  const script = `const { Subscription } = await import('${import.meta.dir}/watch-subscription-model'); let rejected = 0; for (const raw of ['pr:0', 'pr:no', 'other:7', 'pr:7,']) { try { new Subscription(raw) } catch { rejected += 1 } } console.log(String(rejected))`
   expect((await run(script, '')).trim()).toBe('4')
 })
 

@@ -19,11 +19,13 @@ test('delivery failure survives restart, retries the same id, and acknowledges o
     const file = `${dir}/pending.json`
     const first = new DeliveryOutbox(file)
     first.enqueue('comment-1', lines)
+    expect(first.pending).toBe(true)
     first.enqueue('comment-1', lines)
     const attempted: string[] = []
     await expect(first.drain(async event => { attempted.push(event.id); throw new Error('offline') })).rejects.toThrow('offline')
     const restarted = new DeliveryOutbox(file)
     await restarted.drain(async event => { attempted.push(event.id) })
+    expect(restarted.pending).toBe(false)
     expect(attempted).toHaveLength(2)
     expect(attempted[0]).toBe(attempted[1])
     restarted.enqueue('comment-1', lines)
