@@ -17,8 +17,8 @@
  * answered every list whole (over a hundred checks, labels, reviews or threads stops it); it is cleared, by the owner's
  * approval (their latest approval or change request is an approval: it stays through later pushes)
  * or by the `subagent-cleared` label the main session puts on after a clean review (#327); no review
- * thread is open; no reviewer's latest review requests changes; and no review bot's review asked for
- * with the `bot-review` label is still to start (#324). Otherwise it prints what blocks it and exits 1.
+ * thread is open; no reviewer's latest review requests changes; and no review bot's review asked for,
+ * with the `bot-review` label or a `@<bot> review` comment, is still to come (#324, #325). Otherwise it prints what blocks it and exits 1.
  * A PR with auto-merge on, or in the merge queue, is left as it is (exit 0). Whether a PR is
  * user-facing it can't tell: an agent queues a user-facing PR only after the owner's approval, as
  * before, and the label goes only on PRs that aren't.
@@ -30,7 +30,9 @@
  */
 import { type Json, actor, at, record, records } from './watch-text'
 import { hasText, isRecord, textOf } from './read'
+import { BOT_REVIEW_LABEL } from './watch-bot-review-events'
 import { CLEARED_LABEL } from './watch-cleared-events'
+import { bare } from './watch-review-events'
 import { checksPassed } from './watch-ci-state'
 import { defaultOwner } from './watch-owner'
 
@@ -49,6 +51,8 @@ export interface Review {
 
 /** What decides whether a PR may be queued. */
 export interface PrFacts {
+  /** The bots someone asked with a `@<bot> review` comment (#324, #325), in `bare` form, from the last hundred comments as the watcher reads them. */
+  asked: readonly string[]
   autoMerge: boolean
   checks: readonly Check[]
   draft: boolean
@@ -60,7 +64,6 @@ export interface PrFacts {
   truncated: boolean
 }
 
-const BOT_REVIEW_LABEL = process.env.BOT_REVIEW_LABEL ?? 'bot-review'
 const STILL_RUNNING = new Set(['EXPECTED', 'IN_PROGRESS', 'PENDING', 'QUEUED', 'REQUESTED', 'WAITING'])
 const STANCES = new Set(['APPROVED', 'CHANGES_REQUESTED'])
 
@@ -72,6 +75,12 @@ const checkFrom = (node: Json): Check => {
   const result = node.status === 'COMPLETED' ? textOf(node.conclusion, 'PENDING') : 'PENDING'
   return { name: textOf(node.name), result, workflow: isRecord(at(node, 'checkSuite', 'workflowRun')) }
 }
+
+/** The bots a `@<bot> review` comment asked (CodeRabbit's documented trigger, as the watcher posts it), in `bare` form. */
+const askedBots = (comments: readonly Json[]): string[] => [...new Set(comments
+  .map(comment => /^@(?<bot>[\w-]+(?:\[bot\])?) review$/iu.exec(textOf(comment.body).trim())?.groups?.bot ?? '')
+  .filter(bot => bot !== '')
+  .map(bot => bare(bot)))]
 
 /** Whether one of the lists GitHub answered with has more than it sent: then a check, review or thread may be missing. */
 const truncatedIn = (pr: unknown, contexts: unknown): boolean => [
@@ -87,6 +96,7 @@ export const factsFrom = (pr: unknown): PrFacts => {
   const contexts = at(head, 'commit', 'statusCheckRollup', 'contexts')
   const fields = record(pr)
   return {
+    asked: askedBots(records(at(pr, 'comments', 'nodes'))),
     autoMerge: isRecord(fields.autoMergeRequest),
     checks: records(at(contexts, 'nodes')).map(node => checkFrom(node)),
     draft: fields.isDraft === true,
@@ -124,6 +134,19 @@ const clearanceBlockers = (facts: PrFacts, owner: string): string[] => {
   return cleared ? [] : [`Not cleared: no approval of ${owner}'s and no ${CLEARED_LABEL} label.`]
 }
 
+/**
+ * Bot reviews still to come: asked with the label and not yet asked on the PR, or asked with a comment
+ * and not yet given. The watcher asks a bot only while it never reviewed the PR, so any review of its
+ * is the one asked for (watch-bot-review-events.ts). One in progress shows as its check still running.
+ */
+const botReviewBlockers = (facts: PrFacts): string[] => {
+  const reviewed = new Set(facts.reviews.map(review => bare(review.login)))
+  return [
+    ...facts.labels.includes(BOT_REVIEW_LABEL) ? [`A review bot's review was asked for (${BOT_REVIEW_LABEL}) and hasn't started.`] : [],
+    ...facts.asked.filter(bot => !reviewed.has(bot)).map(bot => `${bot} was asked to review (@${bot} review) and hasn't yet.`),
+  ]
+}
+
 /** Open threads, change requests still standing, and a bot review still to come. */
 const reviewBlockers = (facts: PrFacts): string[] => {
   const requesters = [...latestStances(facts.reviews)].filter(([, state]) => state === 'CHANGES_REQUESTED')
@@ -132,7 +155,7 @@ const reviewBlockers = (facts: PrFacts): string[] => {
   return [
     ...facts.openThreads > 0 ? [threads] : [],
     ...requesters.map(([login]) => `${loginOf(login)} requests changes.`),
-    ...facts.labels.includes(BOT_REVIEW_LABEL) ? [`A review bot's review was asked for (${BOT_REVIEW_LABEL}) and hasn't started.`] : [],
+    ...botReviewBlockers(facts),
   ]
 }
 
@@ -165,7 +188,7 @@ const gh = async (args: readonly string[]): Promise<string> => {
 
 const PR_QUERY = `query($owner:String!,$name:String!,$pr:Int!){repository(owner:$owner,name:$name){pullRequest(number:$pr){
   state isDraft isInMergeQueue autoMergeRequest{enabledAt} labels(first:100){nodes{name} pageInfo{hasNextPage}}
-  reviews(last:100){nodes{author{login} state} pageInfo{hasPreviousPage}} reviewThreads(first:100){nodes{isResolved} pageInfo{hasNextPage}}
+  reviews(last:100){nodes{author{login} state} pageInfo{hasPreviousPage}} comments(last:100){nodes{body}} reviewThreads(first:100){nodes{isResolved} pageInfo{hasNextPage}}
   commits(last:1){nodes{commit{statusCheckRollup{contexts(first:100){pageInfo{hasNextPage} nodes{
     ... on CheckRun{name status conclusion checkSuite{workflowRun{databaseId}}} ... on StatusContext{context state}}}}}}}}}}`
 

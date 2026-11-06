@@ -4,6 +4,7 @@ import { type PrFacts, blockersOf, factsFrom } from './agent-queue'
 const OWNER = 'owner-login'
 
 const READY: PrFacts = {
+  asked: [],
   autoMerge: false,
   checks: [{ name: 'checks', result: 'SUCCESS', workflow: true }, { name: 'CodeRabbit', result: 'SUCCESS', workflow: false }],
   draft: false,
@@ -52,6 +53,11 @@ describe('blockersOf (#354)', () => {
     expect(blockers({ labels: ['bot-review'] })).toEqual(["A review bot's review was asked for (bot-review) and hasn't started."])
   })
 
+  it('waits for a bot asked with a review comment until it has reviewed (the label is gone by then)', () => {
+    expect(blockers({ asked: ['coderabbitai'] })).toEqual(['coderabbitai was asked to review (@coderabbitai review) and hasn\'t yet.'])
+    expect(blockers({ asked: ['coderabbitai'], reviews: [...READY.reviews, { login: 'coderabbitai', state: 'COMMENTED' }] })).toEqual([])
+  })
+
   it('refuses a PR whose answer GitHub cut off, since a check, review or thread may be missing', () => {
     expect(blockers({ truncated: true })).toEqual(["GitHub's answer was cut off (over a hundred checks, labels, reviews or threads): check it by hand."])
   })
@@ -66,6 +72,7 @@ describe('factsFrom (#354)', () => {
   it("reads GitHub's answer: checks of workflows and other apps, labels, reviews, open threads and a list cut off", () => {
     const facts = factsFrom({
       autoMergeRequest: null,
+      comments: { nodes: [{ body: 'Looks fine.' }, { body: '@coderabbitai review' }, { body: ' @CodeRabbitAI[bot] review\n' }, { body: '@coderabbitai resolve' }] },
       commits: { nodes: [{ commit: { statusCheckRollup: { contexts: { nodes: [
         { checkSuite: { workflowRun: { databaseId: 7 } }, conclusion: null, name: 'checks', status: 'IN_PROGRESS' },
         { checkSuite: { workflowRun: null }, conclusion: 'SUCCESS', name: 'CodeRabbit', status: 'COMPLETED' },
@@ -79,6 +86,7 @@ describe('factsFrom (#354)', () => {
       state: 'OPEN',
     })
     expect(facts).toEqual({
+      asked: ['coderabbitai'],
       autoMerge: false,
       checks: [
         { name: 'checks', result: 'PENDING', workflow: true },
