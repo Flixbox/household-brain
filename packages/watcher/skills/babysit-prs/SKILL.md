@@ -235,3 +235,29 @@ approved one whose auto-merge is still off and that isn't in the merge queue, no
   queueing or merging (in `AGENTS.md` or elsewhere), or one you can't place, only with the owner's
   approval; any other PR as the repository's `AGENTS.md` says (e.g. once CI is green, every thread
   is settled and a review subagent finds nothing blocking).
+
+## Queueing: `agent-queue`, alone in its call
+
+Queue with `agent-queue <owner/name> <pr>` (#354), never with `gh pr merge --auto` yourself. It
+checks the rules first (open, no draft; CI on the head finished and passed, with a workflow's check
+that succeeded among them; cleared by `OWNER`'s approval, or by the `CLEARED_LABEL` label put on by
+`OWNER` or the bot after the last push; no open review thread, no change request standing, no bot
+review asked for, by label or `@<bot> [full] review`, and not yet given), queues only then (one
+`enablePullRequestAutoMerge` mutation pinned to the head it checked, #357), and otherwise prints
+what blocks it and exits 1. A PR already set to auto-merge or in the merge queue it leaves alone. It
+can't tell whether a PR is user-facing: that stays yours to judge, as above.
+
+- **Exactly that form, alone in its own Bash call:** no `cd … &&` before it, no `| tail` or
+  `2>&1` after it, no second command after `;`, no variable set in front of it. Claude Code's
+  allow rule `Bash(agent-queue *)` matches the command's whole text; a chained or prefixed call
+  falls to auto mode's classifier, which refused queue commands at times ("Merge Without Review",
+  #354). Read the PR's comments in an earlier call.
+- **Install once**, beside `agent-usage` (`~/.local/bin` is on the `PATH`):
+
+  ```sh
+  printf '#!/usr/bin/env bash\nexec bun "$HOME/.claude/plugins/marketplaces/household-brain/packages/watcher/src/agent-queue.ts" "$@"\n' > ~/.local/bin/agent-queue
+  chmod +x ~/.local/bin/agent-queue
+  ```
+
+  It asks GitHub with `agent-gh` (the bot) unless `GH` says otherwise. The allow rule is the owner's
+  to add in their Claude Code user settings; agents never change their own permissions.

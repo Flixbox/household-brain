@@ -5,6 +5,7 @@
   "type": "module",
   "license": "Unlicense",
   "bin": {
+    "agent-queue": "./src/agent-queue.ts",
     "agent-usage": "./src/agent-usage.ts",
     "claude-usage": "./src/claude-usage.ts",
     "reply-review-thread": "./src/reply-review-thread.ts",
