@@ -11,12 +11,14 @@
  * needs no pipe, and checks the rules itself, so one allow rule (`Bash(agent-queue *)`) can let it
  * through without a judgement. Run it alone in its own call, with nothing before or after it.
  *
- * It queues (`pr merge --auto --squash`, which also enters a merge queue) only when the PR is open
+ * It queues (one `enablePullRequestAutoMerge` mutation, squash, pinned to the head it checked, #357;
+ * a merge queue takes it from there) only when the PR is open
  * and no draft; CI on the head has finished and passed, with at least one GitHub Actions workflow's
  * check that succeeded (another app's check, or a workflow that skipped, isn't CI, #342); GitHub
  * answered every list whole (over a hundred checks, labels, reviews or threads stops it); it is cleared, by the owner's
  * approval (their latest approval, change request or dismissal is an approval: it stays through later pushes)
- * or by the `subagent-cleared` label the main session puts on after a clean review (#327); no review
+ * or by the `subagent-cleared` label the owner or the bot put on after a clean review, since the last
+ * push (#327, #331); no review
  * thread is open; no reviewer's latest review requests changes; and no review bot's review asked for,
  * with the `bot-review` label or a `@<bot> review` comment, is still to come (#324, #325). Otherwise it prints what blocks it and exits 1.
  * A PR with auto-merge on, or in the merge queue, is left as it is (exit 0). Whether a PR is
@@ -29,7 +31,8 @@
  * the allow rule from matching, so the defaults are what agents use.
  */
 import { type Ask, type Check, type PrFacts, type ReviewStance, factsFrom } from './agent-queue-facts'
-import { CLEARED_LABEL } from './watch-cleared-events'
+import { CLEARED_LABEL, clearedAt } from './watch-cleared-events'
+import { answerFrom, rateLimitWait } from './reply-review-thread'
 import { at, record, records } from './watch-text'
 import { hasText, textOf } from './read'
 import { BOT_REVIEW_LABEL } from './watch-bot-review-events'
@@ -58,11 +61,22 @@ const latestStances = (reviews: readonly ReviewStance[]): Map<string, string> =>
   .filter(review => STANCES.has(review.state) || review.state === 'DISMISSED')
   .map(review => [review.login.toLowerCase(), review.state]))
 
-/** Whether the owner's approval or the cleared label lets it be queued; the reason when neither does. */
+/**
+ * Whether the owner's approval or the cleared label lets it be queued; the reason when neither does.
+ * The label counts only as the watcher counts it (#327, #331): put on by the owner or the bot asking
+ * (`self`), and not taken off since; and, unlike the owner's approval, only when it went on after the
+ * head's last push, since nothing takes it off when a commit comes.
+ */
 const clearanceBlockers = (facts: PrFacts, owner: string): string[] => {
   const ownerStance = facts.reviews.findLast(review => review.login.toLowerCase() === owner.toLowerCase() && (STANCES.has(review.state) || review.state === 'DISMISSED'))
-  const cleared = ownerStance?.state === 'APPROVED' || facts.labels.includes(CLEARED_LABEL)
-  return cleared ? [] : [`Not cleared: no approval of ${owner}'s and no ${CLEARED_LABEL} label.`]
+  if (ownerStance?.state === 'APPROVED') {
+    return []
+  }
+  const labelledAt = facts.labels.includes(CLEARED_LABEL) ? clearedAt(facts.labelEvents, [owner, facts.self]) : ''
+  if (labelledAt === '') {
+    return [`Not cleared: no approval of ${owner}'s, and no ${CLEARED_LABEL} label put on by ${owner} or ${facts.self}.`]
+  }
+  return labelledAt > facts.lastPush ? [] : [`Cleared (${CLEARED_LABEL}) before the last push: clear it again.`]
 }
 
 /**
@@ -105,6 +119,13 @@ export const blockersOf = (facts: PrFacts, owner: string): string[] => {
 
 const GH = process.env.GH ?? 'agent-gh'
 
+/** What `gh api -i` prints for `args`, whatever its exit code: the answer says what went wrong. */
+const ghAnswer = async (args: readonly string[]): Promise<string> => {
+  const call = Bun.spawn([GH, ...args], { stderr: 'pipe', stdout: 'pipe' })
+  const [out] = await Promise.all([new Response(call.stdout).text(), call.exited])
+  return out
+}
+
 /** What `gh` prints for `args`; throws with its exit code when it fails. Its stderr goes straight through. */
 const gh = async (args: readonly string[]): Promise<string> => {
   const call = Bun.spawn([GH, ...args], { stderr: 'inherit', stdout: 'pipe' })
@@ -119,7 +140,7 @@ const gh = async (args: readonly string[]): Promise<string> => {
 // `kind: __typename` aliases GraphQL's type name to the name clearedAt reads (actors too: `Bot`).
 const LABEL_FIELDS = 'createdAt actor{kind: __typename login} label{name}'
 const PR_QUERY = `query($owner:String!,$name:String!,$pr:Int!){viewer{login} repository(owner:$owner,name:$name){pullRequest(number:$pr){
-  headRefOid timelineItems(itemTypes:[LABELED_EVENT,UNLABELED_EVENT,HEAD_REF_FORCE_PUSHED_EVENT],last:100){pageInfo{hasPreviousPage} nodes{kind: __typename
+  id headRefOid isMergeQueueEnabled timelineItems(itemTypes:[LABELED_EVENT,UNLABELED_EVENT,HEAD_REF_FORCE_PUSHED_EVENT],last:100){pageInfo{hasPreviousPage} nodes{kind: __typename
     ... on LabeledEvent{${LABEL_FIELDS}} ... on UnlabeledEvent{${LABEL_FIELDS}} ... on HeadRefForcePushedEvent{createdAt}}}
   state isDraft isInMergeQueue autoMergeRequest{enabledAt} labels(first:100){nodes{name} pageInfo{hasNextPage}}
   reviews(last:100){nodes{author{login} state submittedAt} pageInfo{hasPreviousPage}} comments(last:100){nodes{body createdAt} pageInfo{hasPreviousPage startCursor}} reviewThreads(first:100){nodes{isResolved} pageInfo{hasNextPage}}
@@ -183,6 +204,46 @@ const argsOf = (): { pr: number, repo: string } => {
   return { pr, repo }
 }
 
+/** A GraphQL mutation's answer; on a rate limit (as reply-review-thread.ts tells it) its limit headers go to stderr and it is tried once more after waiting. */
+const mutate = async (mutation: string, variables: readonly string[], retried = false): Promise<{ data: unknown, errors: string }> => {
+  const answer = answerFrom(await ghAnswer(['api', 'graphql', '-i', '-f', `query=${mutation}`, ...variables.flatMap(variable => ['-f', variable])]))
+  const wait = rateLimitWait(answer, Math.floor(Temporal.Now.instant().epochMilliseconds / 1000))
+  if (wait !== null && !retried) {
+    const limits = ['x-ratelimit-remaining', 'x-ratelimit-reset', 'x-ratelimit-resource', 'retry-after'].map(name => `${name}: ${answer.headers.get(name) ?? '-'}`)
+    process.stderr.write(`Rate limited (HTTP ${answer.status}; ${limits.join(', ')}); trying once more in ${Math.ceil(wait / 1000)} s\n`)
+    await Bun.sleep(wait)
+    return mutate(mutation, variables, true)
+  }
+  const errors = records(record(answer.body).errors).map(error => textOf(error.message)).join('; ')
+  return { data: at(answer.body, 'data'), errors: answer.status === 200 ? errors : `HTTP ${answer.status}: ${errors || textOf(record(answer.body).message)}` }
+}
+
+// One mutation each (#357): `gh pr merge --auto` reads the PR again first and kept running into the
+// rate limit. `expectedHeadOid` pins the head that was checked: a push since makes GitHub refuse it.
+const autoMergeMutation = (method: string) => `mutation($id:ID!,$head:GitObjectID!){enablePullRequestAutoMerge(input:{pullRequestId:$id,expectedHeadOid:$head${method}}){clientMutationId}}`
+const MERGE_NOW = 'mutation($id:ID!,$head:GitObjectID!){mergePullRequest(input:{pullRequestId:$id,expectedHeadOid:$head,mergeMethod:SQUASH}){clientMutationId}}'
+
+/**
+ * Turns on auto-merge (squash; a merge queue's own method where the branch has one), and says what it
+ * did. A PR GitHub would merge at once can't get auto-merge ("clean status"): it is merged, squashed,
+ * as `gh pr merge --auto` does. Throws with GitHub's reasons when it refuses.
+ */
+const queue = async (facts: PrFacts): Promise<string> => {
+  const variables = [`id=${facts.id}`, `head=${facts.head}`]
+  const auto = await mutate(autoMergeMutation(facts.mergeQueue ? '' : ',mergeMethod:SQUASH'), variables)
+  if (auto.errors === '') {
+    return facts.mergeQueue ? 'Set to join the merge queue:' : 'Auto-merge (squash) is on for'
+  }
+  if (!/clean status/iu.test(auto.errors)) {
+    throw new Error(`GitHub refused auto-merge: ${auto.errors}`)
+  }
+  const now = await mutate(MERGE_NOW, variables)
+  if (now.errors !== '') {
+    throw new Error(`GitHub refused the merge: ${now.errors}`)
+  }
+  return 'Merged (squash, it was ready):'
+}
+
 /** Says why it isn't queued, and exits 1, when `blockers` holds anything. */
 const refuseFor = (name: string, blockers: readonly string[]): void => {
   if (blockers.length > 0) {
@@ -201,8 +262,7 @@ const main = async (): Promise<void> => {
     return
   }
   refuseFor(`${repo}#${pr}`, blockersOf(facts, owner))
-  await gh(['pr', 'merge', String(pr), '--repo', repo, '--auto', '--squash'])
-  process.stdout.write(`Queued ${repo}#${pr}: auto-merge (squash) is on.\n`)
+  process.stdout.write(`${await queue(facts)} ${repo}#${pr} at ${facts.head.slice(0, 7)}.\n`)
 }
 
 if (import.meta.main) {

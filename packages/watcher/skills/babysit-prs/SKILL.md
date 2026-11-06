@@ -240,11 +240,12 @@ approved one whose auto-merge is still off and that isn't in the merge queue, no
 
 Queue with `agent-queue <owner/name> <pr>` (#354), never with `gh pr merge --auto` yourself. It
 checks the rules first (open, no draft; CI on the head finished and passed, with a workflow's check
-that succeeded among them; cleared by `OWNER`'s approval or the `CLEARED_LABEL` label; no open
-review thread, no change request standing, no bot review asked for, by label or `@<bot> review`, and
-not yet given), queues only then, and otherwise prints what blocks it and exits 1. A PR already set
-to auto-merge or in the merge queue it leaves alone. It can't tell whether a PR is user-facing: that
-stays yours to judge, as above.
+that succeeded among them; cleared by `OWNER`'s approval, or by the `CLEARED_LABEL` label put on by
+`OWNER` or the bot after the last push; no open review thread, no change request standing, no bot
+review asked for, by label or `@<bot> [full] review`, and not yet given), queues only then (one
+`enablePullRequestAutoMerge` mutation pinned to the head it checked, #357), and otherwise prints
+what blocks it and exits 1. A PR already set to auto-merge or in the merge queue it leaves alone. It
+can't tell whether a PR is user-facing: that stays yours to judge, as above.
 
 - **Exactly that form, alone in its own Bash call:** no `cd … &&` before it, no `| tail` or
   `2>&1` after it, no second command after `;`, no variable set in front of it. Claude Code's

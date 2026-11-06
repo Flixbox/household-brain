@@ -34,6 +34,8 @@ export interface PrFacts {
   autoMerge: boolean
   checks: readonly Check[]
   draft: boolean
+  /** The PR's node id, for the mutation that queues it. */
+  id: string
   /** The head commit's id: the merge is pinned to it, so what was checked is what gets queued. */
   head: string
   /** The `LabeledEvent`s and `UnlabeledEvent`s, oldest first, as `clearedAt` (watch-cleared-events.ts) reads them. */
@@ -44,6 +46,8 @@ export interface PrFacts {
    * commit's date, a force push, and the earliest workflow check suite on the head, which a push starts.
    */
   lastPush: string
+  /** Whether the base branch merges through a merge queue (it takes its own merge method). */
+  mergeQueue: boolean
   openThreads: number
   queued: boolean
   reviews: readonly ReviewStance[]
@@ -62,11 +66,11 @@ const checkFrom = (node: Json): Check => {
   return { name: textOf(node.name), result, workflow: isRecord(at(node, 'checkSuite', 'workflowRun')) }
 }
 
-/** The bots a `@<bot> review` comment asked (CodeRabbit's documented trigger, as the watcher posts it), each with its latest ask; comments oldest first. */
+/** The bots a `@<bot> review` or `@<bot> full review` comment asked (CodeRabbit's documented triggers; the watcher posts the first), each with its latest ask; comments oldest first. */
 const asksIn = (comments: readonly Json[]): Ask[] => {
   const latest = new Map<string, string>()
   for (const comment of comments) {
-    const bot = /^@(?<bot>[\w-]+(?:\[bot\])?) review$/iu.exec(textOf(comment.body).trim())?.groups?.bot
+    const bot = /^@(?<bot>[\w-]+(?:\[bot\])?) (?:full )?review$/iu.exec(textOf(comment.body).trim())?.groups?.bot
     if (hasText(bot)) {
       latest.set(bare(bot), textOf(comment.createdAt))
     }
@@ -108,9 +112,11 @@ export const factsFrom = (pr: unknown, self: string): PrFacts => {
     checks: records(at(contexts, 'nodes')).map(node => checkFrom(node)),
     draft: fields.isDraft === true,
     head: textOf(fields.headRefOid),
+    id: textOf(fields.id),
     labelEvents: events.filter(event => LABEL_EVENTS.has(textOf(event.kind))),
     labels: records(at(pr, 'labels', 'nodes')).map(label => textOf(label.name)),
     lastPush: lastPushOf({ contexts, events, head }),
+    mergeQueue: fields.isMergeQueueEnabled === true,
     openThreads: records(at(pr, 'reviewThreads', 'nodes')).filter(thread => thread.isResolved !== true).length,
     queued: fields.isInMergeQueue === true,
     reviews: records(at(pr, 'reviews', 'nodes')).map(review => ({ at: textOf(review.submittedAt), login: actor(review.author), state: textOf(review.state) })),
