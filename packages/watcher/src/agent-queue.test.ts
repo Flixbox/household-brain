@@ -55,6 +55,7 @@ describe('blockersOf (#354)', () => {
     const early = { labelEvents: [labelled('agent-bot', T1)], labels: ['subagent-cleared'], lastPush: T2 }
     expect(blockers({ ...early, reviews: [] })).toEqual(['Cleared (subagent-cleared) before the last push: clear it again.'])
     expect(blockers(early)).toEqual([])
+    expect(blockers({ ...early, lastPush: '', reviews: [] })).toEqual(["Can't tell when the head was last pushed (no CI run for its branch on it), so subagent-cleared doesn't clear it."])
   })
 
   it('keeps the approval once the owner gave it, and counts only their latest stance', () => {
@@ -111,10 +112,13 @@ describe('factsFrom (#354)', () => {
         { body: '@other-bot full review', createdAt: T2 },
       ] },
       commits: { nodes: [{ commit: { committedDate: T0, statusCheckRollup: { contexts: { nodes: [
-        { checkSuite: { createdAt: T3, workflowRun: { databaseId: 7 } }, conclusion: null, name: 'checks', status: 'IN_PROGRESS' },
+        { checkSuite: { branch: { name: 'feature' }, createdAt: T2, workflowRun: { event: 'pull_request' } }, conclusion: null, name: 'checks', status: 'IN_PROGRESS' },
+        { checkSuite: { branch: { name: 'other' }, createdAt: T3, workflowRun: { event: 'push' } }, conclusion: 'SUCCESS', name: 'elsewhere', status: 'COMPLETED' },
+        { checkSuite: { branch: { name: 'feature' }, createdAt: T3, workflowRun: { event: 'workflow_dispatch' } }, conclusion: 'SUCCESS', name: 'by hand', status: 'COMPLETED' },
         { checkSuite: { createdAt: T0, workflowRun: null }, conclusion: 'SUCCESS', name: 'CodeRabbit', status: 'COMPLETED' },
         { context: 'deploy/preview', state: 'FAILURE' },
       ], pageInfo: { hasNextPage: false } } } } }] },
+      headRefName: 'feature',
       headRefOid: 'c0ffee',
       id: 'PR_one',
       isDraft: false,
@@ -124,13 +128,15 @@ describe('factsFrom (#354)', () => {
       reviewThreads: { nodes: [{ isResolved: true }, { isResolved: false }], pageInfo: { hasNextPage: false } },
       reviews: { nodes: [{ author: { login: OWNER }, state: 'APPROVED', submittedAt: T1 }], pageInfo: { hasPreviousPage: true } },
       state: 'OPEN',
-      timelineItems: { nodes: [labelled('agent-bot', T1), { createdAt: T2, kind: 'HeadRefForcePushedEvent' }], pageInfo: { hasPreviousPage: false } },
+      timelineItems: { nodes: [labelled('agent-bot', T1), { createdAt: T1, kind: 'HeadRefForcePushedEvent' }], pageInfo: { hasPreviousPage: false } },
     }, SELF)
     expect(facts).toEqual({
       asked: [{ at: T1, bot: 'coderabbitai' }, { at: T2, bot: 'other-bot' }],
       autoMerge: false,
       checks: [
         { name: 'checks', result: 'PENDING', workflow: true },
+        { name: 'elsewhere', result: 'SUCCESS', workflow: true },
+        { name: 'by hand', result: 'SUCCESS', workflow: true },
         { name: 'CodeRabbit', result: 'SUCCESS', workflow: false },
         { name: 'deploy/preview', result: 'FAILURE', workflow: false },
       ],
@@ -139,7 +145,7 @@ describe('factsFrom (#354)', () => {
       id: 'PR_one',
       labelEvents: [labelled('agent-bot', T1)],
       labels: ['subagent-cleared'],
-      lastPush: T3,
+      lastPush: T2,
       mergeQueue: true,
       openThreads: 1,
       queued: true,

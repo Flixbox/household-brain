@@ -42,8 +42,10 @@ export interface PrFacts {
   labelEvents: readonly Json[]
   labels: readonly string[]
   /**
-   * When the head was last pushed, as near as GitHub tells (ISO 8601, UTC): the latest of the head
-   * commit's date, a force push, and the earliest workflow check suite on the head, which a push starts.
+   * When the head was last pushed to this PR's branch, as near as GitHub tells (ISO 8601, UTC): the
+   * latest of the head commit's date, a force push, and the latest workflow check suite on the head
+   * that ran for this branch (a push to it starts one; one from another branch or run proves nothing).
+   * '' when no such suite is there: then it can't be told, and a label doesn't clear the PR.
    */
   lastPush: string
   /** Whether the base branch merges through a merge queue (it takes its own merge method). */
@@ -92,12 +94,18 @@ const LABEL_EVENTS = new Set(['LabeledEvent', 'UnlabeledEvent'])
 /** The latest of the times given; '' when none is. ISO 8601 times in UTC compare as text. */
 const latest = (times: readonly string[]): string => times.filter(time => time !== '').toSorted().at(-1) ?? ''
 
+const PUSH_EVENTS = new Set(['pull_request', 'push'])
+
 /** When the head was last pushed, as `PrFacts.lastPush` says. */
-const lastPushOf = ({ contexts, events, head }: { contexts: unknown, events: readonly Json[], head: unknown }): string => {
-  const suites = records(at(contexts, 'nodes')).filter(node => isRecord(at(node, 'checkSuite', 'workflowRun')))
-    .map(node => textOf(at(node, 'checkSuite', 'createdAt'))).filter(time => time !== '').toSorted()
+const lastPushOf = ({ branch, contexts, events, head }: { branch: string, contexts: unknown, events: readonly Json[], head: unknown }): string => {
+  const pushed = latest(records(at(contexts, 'nodes'))
+    .filter(node => textOf(at(node, 'checkSuite', 'branch', 'name')) === branch && PUSH_EVENTS.has(textOf(at(node, 'checkSuite', 'workflowRun', 'event'))))
+    .map(node => textOf(at(node, 'checkSuite', 'createdAt'))))
+  if (pushed === '' || branch === '') {
+    return ''
+  }
   const forced = events.filter(event => event.kind === 'HeadRefForcePushedEvent').map(event => textOf(event.createdAt))
-  return latest([textOf(at(head, 'commit', 'committedDate')), ...forced, suites[0] ?? ''])
+  return latest([textOf(at(head, 'commit', 'committedDate')), ...forced, pushed])
 }
 
 /** The facts in GitHub's answer for one `pullRequest` (`PR_QUERY`), asked as `self`. */
@@ -115,7 +123,7 @@ export const factsFrom = (pr: unknown, self: string): PrFacts => {
     id: textOf(fields.id),
     labelEvents: events.filter(event => LABEL_EVENTS.has(textOf(event.kind))),
     labels: records(at(pr, 'labels', 'nodes')).map(label => textOf(label.name)),
-    lastPush: lastPushOf({ contexts, events, head }),
+    lastPush: lastPushOf({ branch: textOf(fields.headRefName), contexts, events, head }),
     mergeQueue: fields.isMergeQueueEnabled === true,
     openThreads: records(at(pr, 'reviewThreads', 'nodes')).filter(thread => thread.isResolved !== true).length,
     queued: fields.isInMergeQueue === true,

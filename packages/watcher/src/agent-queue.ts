@@ -76,6 +76,9 @@ const clearanceBlockers = (facts: PrFacts, owner: string): string[] => {
   if (labelledAt === '') {
     return [`Not cleared: no approval of ${owner}'s, and no ${CLEARED_LABEL} label put on by ${owner} or ${facts.self}.`]
   }
+  if (facts.lastPush === '') {
+    return [`Can't tell when the head was last pushed (no CI run for its branch on it), so ${CLEARED_LABEL} doesn't clear it.`]
+  }
   return labelledAt > facts.lastPush ? [] : [`Cleared (${CLEARED_LABEL}) before the last push: clear it again.`]
 }
 
@@ -140,12 +143,12 @@ const gh = async (args: readonly string[]): Promise<string> => {
 // `kind: __typename` aliases GraphQL's type name to the name clearedAt reads (actors too: `Bot`).
 const LABEL_FIELDS = 'createdAt actor{kind: __typename login} label{name}'
 const PR_QUERY = `query($owner:String!,$name:String!,$pr:Int!){viewer{login} repository(owner:$owner,name:$name){pullRequest(number:$pr){
-  id headRefOid isMergeQueueEnabled timelineItems(itemTypes:[LABELED_EVENT,UNLABELED_EVENT,HEAD_REF_FORCE_PUSHED_EVENT],last:100){pageInfo{hasPreviousPage} nodes{kind: __typename
+  id headRefOid headRefName isMergeQueueEnabled timelineItems(itemTypes:[LABELED_EVENT,UNLABELED_EVENT,HEAD_REF_FORCE_PUSHED_EVENT],last:100){pageInfo{hasPreviousPage} nodes{kind: __typename
     ... on LabeledEvent{${LABEL_FIELDS}} ... on UnlabeledEvent{${LABEL_FIELDS}} ... on HeadRefForcePushedEvent{createdAt}}}
   state isDraft isInMergeQueue autoMergeRequest{enabledAt} labels(first:100){nodes{name} pageInfo{hasNextPage}}
   reviews(last:100){nodes{author{login} state submittedAt} pageInfo{hasPreviousPage}} comments(last:100){nodes{body createdAt} pageInfo{hasPreviousPage startCursor}} reviewThreads(first:100){nodes{isResolved} pageInfo{hasNextPage}}
   commits(last:1){nodes{commit{committedDate statusCheckRollup{contexts(first:100){pageInfo{hasNextPage} nodes{
-    ... on CheckRun{name status conclusion checkSuite{createdAt workflowRun{databaseId}}} ... on StatusContext{context state}}}}}}}}}}`
+    ... on CheckRun{name status conclusion checkSuite{createdAt branch{name} workflowRun{event}}} ... on StatusContext{context state}}}}}}}}}}`
 
 const COMMENTS_QUERY = `query($owner:String!,$name:String!,$pr:Int!,$before:String!){repository(owner:$owner,name:$name){pullRequest(number:$pr){
   comments(last:100,before:$before){nodes{body createdAt} pageInfo{hasPreviousPage startCursor}}}}}`
