@@ -15,7 +15,7 @@
  * and no draft; CI on the head has finished and passed, with at least one GitHub Actions workflow's
  * check that succeeded (another app's check, or a workflow that skipped, isn't CI, #342); GitHub
  * answered every list whole (over a hundred checks, labels, reviews or threads stops it); it is cleared, by the owner's
- * approval (their latest approval or change request is an approval: it stays through later pushes)
+ * approval (their latest approval, change request or dismissal is an approval: it stays through later pushes)
  * or by the `subagent-cleared` label the main session puts on after a clean review (#327); no review
  * thread is open; no reviewer's latest review requests changes; and no review bot's review asked for,
  * with the `bot-review` label or a `@<bot> review` comment, is still to come (#324, #325). Otherwise it prints what blocks it and exits 1.
@@ -45,14 +45,22 @@ export interface Check {
 
 /** One review, oldest first. */
 export interface Review {
+  /** When it was submitted (ISO 8601, UTC), as GitHub gives it. */
+  at: string
   login: string
   state: string
 }
 
+/** A `@<bot> review` comment: the bot it asks and when it was posted (ISO 8601, UTC). */
+export interface Ask {
+  at: string
+  bot: string
+}
+
 /** What decides whether a PR may be queued. */
 export interface PrFacts {
-  /** The bots someone asked with a `@<bot> review` comment (#324, #325), in `bare` form, from all its comments. */
-  asked: readonly string[]
+  /** The bots someone asked with a `@<bot> review` comment (#324, #325), in `bare` form, each with its latest ask's time, from all the PR's comments. */
+  asked: readonly Ask[]
   autoMerge: boolean
   checks: readonly Check[]
   draft: boolean
@@ -76,11 +84,17 @@ const checkFrom = (node: Json): Check => {
   return { name: textOf(node.name), result, workflow: isRecord(at(node, 'checkSuite', 'workflowRun')) }
 }
 
-/** The bots a `@<bot> review` comment asked (CodeRabbit's documented trigger, as the watcher posts it), in `bare` form. */
-const askedBots = (comments: readonly Json[]): string[] => [...new Set(comments
-  .map(comment => /^@(?<bot>[\w-]+(?:\[bot\])?) review$/iu.exec(textOf(comment.body).trim())?.groups?.bot ?? '')
-  .filter(bot => bot !== '')
-  .map(bot => bare(bot)))]
+/** The bots a `@<bot> review` comment asked (CodeRabbit's documented trigger, as the watcher posts it), each with its latest ask; comments oldest first. */
+const asksIn = (comments: readonly Json[]): Ask[] => {
+  const latest = new Map<string, string>()
+  for (const comment of comments) {
+    const bot = /^@(?<bot>[\w-]+(?:\[bot\])?) review$/iu.exec(textOf(comment.body).trim())?.groups?.bot
+    if (hasText(bot)) {
+      latest.set(bare(bot), textOf(comment.createdAt))
+    }
+  }
+  return [...latest].map(([bot, when]) => ({ at: when, bot }))
+}
 
 /** Whether one of the lists GitHub answered with has more than it sent: then a check, review or thread may be missing. */
 const truncatedIn = (pr: unknown, contexts: unknown): boolean => [
@@ -96,14 +110,14 @@ export const factsFrom = (pr: unknown): PrFacts => {
   const contexts = at(head, 'commit', 'statusCheckRollup', 'contexts')
   const fields = record(pr)
   return {
-    asked: askedBots(records(at(pr, 'comments', 'nodes'))),
+    asked: asksIn(records(at(pr, 'comments', 'nodes'))),
     autoMerge: isRecord(fields.autoMergeRequest),
     checks: records(at(contexts, 'nodes')).map(node => checkFrom(node)),
     draft: fields.isDraft === true,
     labels: records(at(pr, 'labels', 'nodes')).map(label => textOf(label.name)),
     openThreads: records(at(pr, 'reviewThreads', 'nodes')).filter(thread => thread.isResolved !== true).length,
     queued: fields.isInMergeQueue === true,
-    reviews: records(at(pr, 'reviews', 'nodes')).map(review => ({ login: actor(review.author), state: textOf(review.state) })),
+    reviews: records(at(pr, 'reviews', 'nodes')).map(review => ({ at: textOf(review.submittedAt), login: actor(review.author), state: textOf(review.state) })),
     state: textOf(fields.state),
     truncated: truncatedIn(pr, contexts),
   }
@@ -129,21 +143,20 @@ const latestStances = (reviews: readonly Review[]): Map<string, string> => new M
 
 /** Whether the owner's approval or the cleared label lets it be queued; the reason when neither does. */
 const clearanceBlockers = (facts: PrFacts, owner: string): string[] => {
-  const ownerStance = facts.reviews.findLast(review => review.login.toLowerCase() === owner.toLowerCase() && STANCES.has(review.state))
+  const ownerStance = facts.reviews.findLast(review => review.login.toLowerCase() === owner.toLowerCase() && (STANCES.has(review.state) || review.state === 'DISMISSED'))
   const cleared = ownerStance?.state === 'APPROVED' || facts.labels.includes(CLEARED_LABEL)
   return cleared ? [] : [`Not cleared: no approval of ${owner}'s and no ${CLEARED_LABEL} label.`]
 }
 
 /**
  * Bot reviews still to come: asked with the label and not yet asked on the PR, or asked with a comment
- * and not yet given. The watcher asks a bot only while it never reviewed the PR, so any review of its
- * is the one asked for (watch-bot-review-events.ts). One in progress shows as its check still running.
+ * that no review of the bot's has followed. One in progress shows as its check still running.
  */
 const botReviewBlockers = (facts: PrFacts): string[] => {
-  const reviewed = new Set(facts.reviews.map(review => bare(review.login)))
+  const answered = (ask: Ask) => facts.reviews.some(review => bare(review.login) === ask.bot && review.at > ask.at)
   return [
     ...facts.labels.includes(BOT_REVIEW_LABEL) ? [`A review bot's review was asked for (${BOT_REVIEW_LABEL}) and hasn't started.`] : [],
-    ...facts.asked.filter(bot => !reviewed.has(bot)).map(bot => `${bot} was asked to review (@${bot} review) and hasn't yet.`),
+    ...facts.asked.filter(ask => !answered(ask)).map(({ bot }) => `${bot} was asked to review (@${bot} review) and hasn't yet.`),
   ]
 }
 
@@ -188,12 +201,12 @@ const gh = async (args: readonly string[]): Promise<string> => {
 
 const PR_QUERY = `query($owner:String!,$name:String!,$pr:Int!){repository(owner:$owner,name:$name){pullRequest(number:$pr){
   state isDraft isInMergeQueue autoMergeRequest{enabledAt} labels(first:100){nodes{name} pageInfo{hasNextPage}}
-  reviews(last:100){nodes{author{login} state} pageInfo{hasPreviousPage}} comments(last:100){nodes{body} pageInfo{hasPreviousPage startCursor}} reviewThreads(first:100){nodes{isResolved} pageInfo{hasNextPage}}
+  reviews(last:100){nodes{author{login} state submittedAt} pageInfo{hasPreviousPage}} comments(last:100){nodes{body createdAt} pageInfo{hasPreviousPage startCursor}} reviewThreads(first:100){nodes{isResolved} pageInfo{hasNextPage}}
   commits(last:1){nodes{commit{statusCheckRollup{contexts(first:100){pageInfo{hasNextPage} nodes{
     ... on CheckRun{name status conclusion checkSuite{workflowRun{databaseId}}} ... on StatusContext{context state}}}}}}}}}}`
 
 const COMMENTS_QUERY = `query($owner:String!,$name:String!,$pr:Int!,$before:String!){repository(owner:$owner,name:$name){pullRequest(number:$pr){
-  comments(last:100,before:$before){nodes{body} pageInfo{hasPreviousPage startCursor}}}}}`
+  comments(last:100,before:$before){nodes{body createdAt} pageInfo{hasPreviousPage startCursor}}}}}`
 
 /** The `pullRequest` of a GraphQL answer to `query` for the PR, with `extra` variables (strings). */
 const askPr = async ({ extra = [], pr, query, repo }: { extra?: readonly string[], pr: number, query: string, repo: string }): Promise<unknown> => {
