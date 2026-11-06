@@ -1,10 +1,11 @@
 /** The project watcher's look at a pull request's comments and reviews (watch-project.ts), and which pull requests a round looks at. */
 import { type Activity, newActivity } from './watch-events'
 import { ACTIVITY_FIELDS, activityFrom } from './watch-comment-lines'
-import { ACTIVITY_GH, IGNORED, OWNER, SELF, graphql, openPrNumbers, perPr, recentlyMerged } from './watch-github'
-import { at, count, records } from './watch-text'
+import { ACTIVITY_GH, IGNORED, OWNER, SELF, openPrNumbers, perPr, recentlyMerged } from './watch-github'
+import { type Json, at, count, records } from './watch-text'
+import { perIssue } from './watch-per-issue'
 import { appendLines, exists, oneAtATime, readLines, subscriptions, writeLines } from './watch-state'
-import { allSettled } from './read'
+import { allSettled, hasText, textOf } from './read'
 import { queue } from './watch-output'
 
 /**
@@ -55,19 +56,20 @@ const MERGED_HOURS = Number(process.env.MERGED_HOURS ?? 3)
 
 const byNumber = (first: number, second: number) => first - second
 
+/** Whether a closing reference's PR merged within MERGED_HOURS. */
+const mergedLately = (pr: Json): boolean => pr.state === 'MERGED' && hasText(pr.mergedAt)
+  && Temporal.Instant.compare(Temporal.Instant.from(textOf(pr.mergedAt)), Temporal.Now.instant().subtract({ hours: MERGED_HOURS })) > 0
+
 /**
- * The open PRs whose closing references name one of `issues` (#357), in one query, without listing
- * every open PR. GitHub's list also holds the merged ones, which closed the issue once before it was
- * reopened: not this subscription's news. A linked PR that merges now stays followed (`tracked`). The
- * first hundred, one page: more PRs closing one issue are beyond an issue an agent works on.
+ * The PRs whose closing references name one of `issues` (#357), without listing every open PR: the
+ * open ones, and the ones merged within MERGED_HOURS, so one opened and merged between two looks is
+ * still reported. An older merge closed the issue before it was reopened: not this subscription's
+ * news. The first hundred, one page: more PRs closing one issue are beyond an issue an agent works on.
  */
-const closingPrs = async (issues: readonly number[]): Promise<number[]> => {
-  if (issues.length === 0) {
-    return []
-  }
-  const repository = await graphql(issues.map(issue => `issue${issue}: issue(number:${issue}){closedByPullRequestsReferences(first:100){nodes{number state}}}`).join(' '))
-  return issues.flatMap(issue => records(at(repository, `issue${issue}`, 'closedByPullRequestsReferences', 'nodes'))
-    .filter(pr => pr.state === 'OPEN').map(pr => count(pr.number)))
+const closingPrs = async (issues: readonly number[]): Promise<{ merged: number[], open: number[] }> => {
+  const nodes = [...(await perIssue(issues, 'closedByPullRequestsReferences(first:100){nodes{number state mergedAt}}')).values()]
+    .flatMap(issue => records(at(issue, 'closedByPullRequestsReferences', 'nodes')))
+  return { merged: nodes.filter(mergedLately).map(pr => count(pr.number)), open: nodes.filter(pr => pr.state === 'OPEN').map(pr => count(pr.number)) }
 }
 
 /**
@@ -81,8 +83,9 @@ const subscribedPrs = async (): Promise<number[] | null> => {
   if (!lists) {
     return null
   }
-  const [linked, followed] = lists
-  return [...new Set([...subscriptions.prs, ...linked, ...followed])].filter(pr => !subscriptions.isClosedPr(pr) || linked.includes(pr)).toSorted(byNumber)
+  const [{ merged, open }, followed] = lists
+  // A closed linked PR is looked at again only once it is reopened.
+  return [...new Set([...subscriptions.prs, ...open, ...merged, ...followed])].filter(pr => !subscriptions.isClosedPr(pr) || open.includes(pr)).toSorted(byNumber)
 }
 
 /** Open PRs, the ones followed until their deploy, and recently merged ones; null when a listing failed. */

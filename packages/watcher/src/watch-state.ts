@@ -63,6 +63,9 @@ export const askedBots = async (pr: number): Promise<string[]> =>
 
 export const exists = async (name: string): Promise<boolean> => Bun.file(stateFile(name)).exists()
 
+/** When a state file was last written, in epoch milliseconds; null when it isn't there. */
+export const writtenAt = async (name: string): Promise<number | null> => (await exists(name)) ? Bun.file(stateFile(name)).lastModified : null
+
 /**
  * Windows briefly locks a file just written (an antivirus scan, the search indexer: `EUNKNOWN` on
  * open, #231), which stopped the whole watcher. A state read or write tries again a few times first.

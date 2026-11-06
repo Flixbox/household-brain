@@ -1,5 +1,6 @@
 /** The project watcher's questions to GitHub about new issues and the owner's comments on them. */
-import { ISSUE_EVENT_FIELDS, type IssueEvent, issueEventsFrom, subscribedIssueEventsFrom, subscribedIssueFields } from './watch-issue-events'
+import { ISSUE_EVENT_FIELDS, type IssueEvent, SUBSCRIBED_ISSUE_FIELDS, issueEventsFrom, subscribedIssueEventsFrom } from './watch-issue-events'
+import { perIssue } from './watch-per-issue'
 import { OWNER, SELF, graphql } from './watch-github'
 
 /**
@@ -9,8 +10,8 @@ import { OWNER, SELF, graphql } from './watch-github'
 export const issueEventLines = async (fresh = false): Promise<IssueEvent[]> => issueEventsFrom(await graphql(ISSUE_EVENT_FIELDS, fresh), { owner: OWNER, self: SELF })
 
 /**
- * The owner's comments on a scoped watcher's subscribed issues (#357), read from those issues alone;
- * none asked for, none read.
+ * The owner's comments on a scoped watcher's subscribed issues (#357), read from those issues alone
+ * (one that can't be read is left out this look); none asked for, none read.
  */
 export const subscribedIssueEvents = async (issues: readonly number[], fresh = false): Promise<IssueEvent[]> =>
-  issues.length === 0 ? [] : subscribedIssueEventsFrom(await graphql(subscribedIssueFields(issues), fresh), issues, OWNER)
+  subscribedIssueEventsFrom(await perIssue(issues, SUBSCRIBED_ISSUE_FIELDS, fresh), OWNER)

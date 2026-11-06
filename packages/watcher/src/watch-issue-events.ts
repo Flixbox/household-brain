@@ -162,14 +162,13 @@ export const issueEventsFrom = (repository: Json, { owner, self }: { owner: stri
   [...newIssues(repository, self), ...ownerComments(repository, owner)]
 
 /**
- * A scoped watcher's question about its subscribed `issues` (#357): each one's last twenty comments,
- * instead of the repository's newest issues and comments.
+ * What a scoped watcher reads of each subscribed issue (#357): its last twenty comments, instead of
+ * the repository's newest issues and comments.
  */
-export const subscribedIssueFields = (issues: readonly number[]): string =>
-  issues.map(issue => `issue${issue}: issue(number:${issue}){${ISSUE_COMMENTS}}`).join(' ')
+export const SUBSCRIBED_ISSUE_FIELDS = ISSUE_COMMENTS
 
-/** The owner's comments on the subscribed `issues`, from `subscribedIssueFields`. */
-export const subscribedIssueEventsFrom = (repository: Json, issues: readonly number[], owner: string): IssueEvent[] =>
-  issues.flatMap(issue => records(at(repository, `issue${issue}`, 'comments', 'nodes'))
+/** The owner's comments on the subscribed issues, from each one's `SUBSCRIBED_ISSUE_FIELDS`. */
+export const subscribedIssueEventsFrom = (issues: ReadonlyMap<number, Json>, owner: string): IssueEvent[] =>
+  [...issues].flatMap(([issue, value]) => records(at(value, 'comments', 'nodes'))
     .filter(comment => actor(comment.author) === owner)
     .map(comment => commentEvent(comment, issue, owner)))
