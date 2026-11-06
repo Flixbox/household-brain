@@ -3,7 +3,7 @@ import { MAX_CYCLES, type OpenIssue, linkCycles, newCycles } from './watch-link-
 import { graphql, issueLine, openIssues } from './watch-github'
 import { at } from './watch-text'
 import type { IssueEvent } from './watch-issue-events'
-import { issueEventLines } from './watch-comments'
+import { issueEventLines, subscribedIssueEvents } from './watch-comments'
 import { queue } from './watch-output'
 import { appendLines, endIssue, exists, oneAtATime, readLines, subscriptions, writeLines } from './watch-state'
 
@@ -18,20 +18,29 @@ const firstRun = async (name: string, lines: string[]): Promise<boolean> => {
   return true
 }
 
+/**
+ * A scoped watcher reads only its subscribed issues' comments (#357), and remembers them in a file of
+ * its own: the repository-wide reads before it never saw an issue's older comments, which would
+ * otherwise all come up as news once.
+ */
+const SEEN_FILE = subscriptions.scoped ? 'subscribed-issue-events' : 'issue-events'
+const issueEvents = async (fresh: boolean): Promise<IssueEvent[]> =>
+  subscriptions.scoped ? subscribedIssueEvents(subscriptions.issues, fresh) : issueEventLines(fresh)
+
 const unseenIssues = async (lines: IssueEvent[]): Promise<IssueEvent[]> => {
-  const seen = new Set(await readLines('issue-events'))
+  const seen = new Set(await readLines(SEEN_FILE))
   const unseen = lines.filter(({ key }) => !seen.has(key))
-  await appendLines('issue-events', unseen.map(({ key }) => key))
+  await appendLines(SEEN_FILE, unseen.map(({ key }) => key))
   return unseen
 }
 
 /** Issues and the owner's comments on them not reported yet; the ones from before the first run aren't news. */
 export const checkIssues = async (fresh = false): Promise<boolean> => oneAtATime('issue-activity', async () => {
-  const lines = await issueEventLines(fresh).catch(() => null)
+  const lines = await issueEvents(fresh).catch(() => null)
   // A new state file for the id keys (#247): on its first run what is there is old news, so nothing
   // already reported under the old text keys (`issues`) comes back.
   if (!lines) { return false }
-  if (await firstRun('issue-events', lines.map(({ key }) => key))) { return true }
+  if (await firstRun(SEEN_FILE, lines.map(({ key }) => key))) { return true }
   const unseen = await unseenIssues(lines)
   // Each its own event, with when it was written (#240): several comments are several answers.
   for (const { at: written, issue, key, lines: event } of unseen) {
@@ -77,8 +86,8 @@ const checkOpenList = async (now: string[]): Promise<void> => {
     return
   }
   await writeLines('open-issues', now)
-  for (const { closed, issue, line } of lines) {
-    if (!closed || !subscriptions.scoped) { queue([line], { issue }) }
+  for (const { issue, line } of lines) {
+    queue([line], { issue })
   }
 }
 
@@ -89,6 +98,11 @@ const checkOpenList = async (now: string[]): Promise<void> => {
  * with either, every issue would look closed or reopened.
  */
 export const checkIssueStates = async (): Promise<void> => {
+  // A scoped watcher reports no cycles and no other issue's closing (#357), and its own issues'
+  // closings come from `checkSubscribedIssues`: the open list is not its question.
+  if (subscriptions.scoped) {
+    return
+  }
   const issues = await openIssues().catch(() => null)
   if (!issues || issues.length === 0) {
     return

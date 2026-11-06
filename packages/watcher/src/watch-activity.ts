@@ -1,7 +1,7 @@
 /** The project watcher's look at a pull request's comments and reviews (watch-project.ts), and which pull requests a round looks at. */
 import { type Activity, newActivity } from './watch-events'
 import { ACTIVITY_FIELDS, activityFrom } from './watch-comment-lines'
-import { ACTIVITY_GH, IGNORED, OWNER, SELF, openPrNumbers, perPr, recentlyMerged } from './watch-github'
+import { ACTIVITY_GH, IGNORED, OWNER, SELF, closingPrs, openPrNumbers, perPr, recentlyMerged } from './watch-github'
 import { appendLines, exists, oneAtATime, readLines, subscriptions, writeLines } from './watch-state'
 import { allSettled } from './read'
 import { queue } from './watch-output'
@@ -54,8 +54,26 @@ const MERGED_HOURS = Number(process.env.MERGED_HOURS ?? 3)
 
 const byNumber = (first: number, second: number) => first - second
 
+/**
+ * A scoped watcher's PRs (#357): the subscribed ones, the open ones closing a subscribed issue, and the
+ * ones it follows already (a linked PR that merged stays followed until its merge is reported). It
+ * never lists the repository's PRs: every watcher asking about every PR ran out the app's GraphQL
+ * points. Null when the lookup failed.
+ */
+const subscribedPrs = async (): Promise<number[] | null> => {
+  const lists = await Promise.all([closingPrs(subscriptions.issues), readLines('tracked').then(lines => lines.map(Number))]).catch(() => null)
+  if (!lists) {
+    return null
+  }
+  const [linked, followed] = lists
+  return [...new Set([...subscriptions.prs, ...linked, ...followed])].filter(pr => !subscriptions.isClosedPr(pr) || linked.includes(pr)).toSorted(byNumber)
+}
+
 /** Open PRs, the ones followed until their deploy, and recently merged ones; null when a listing failed. */
 export const watchedPrs = async (): Promise<number[] | null> => {
+  if (subscriptions.scoped) {
+    return subscribedPrs()
+  }
   const lists = await Promise.all([
     openPrNumbers(),
     recentlyMerged(MERGED_HOURS),
@@ -71,5 +89,5 @@ export const watchedPrs = async (): Promise<number[] | null> => {
   // closed once and then reopened and merged still has its deploy to report.
   const settled = (pr: number) => reported.some(line => line.startsWith(`pr-${pr} deployed `))
   const unsettled = merged.filter(pr => followed.includes(pr) || !settled(pr))
-  return [...new Set([...open, ...unsettled, ...followed, ...subscriptions.prs])].filter(pr => !subscriptions.scoped || !subscriptions.isClosedPr(pr) || open.includes(pr)).toSorted(byNumber)
+  return [...new Set([...open, ...unsettled, ...followed])].toSorted(byNumber)
 }
