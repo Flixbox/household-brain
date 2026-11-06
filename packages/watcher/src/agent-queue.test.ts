@@ -12,6 +12,7 @@ const READY: PrFacts = {
   queued: false,
   reviews: [{ login: OWNER, state: 'APPROVED' }],
   state: 'OPEN',
+  truncated: false,
 }
 
 const blockers = (change: Partial<PrFacts>) => blockersOf({ ...READY, ...change }, OWNER)
@@ -41,6 +42,7 @@ describe('blockersOf (#354)', () => {
     expect(blockers({ checks: [...READY.checks, { name: 'e2e', result: 'PENDING', workflow: true }] })).toEqual(['CI still runs: e2e.'])
     expect(blockers({ checks: [...READY.checks, { name: 'e2e', result: 'FAILURE', workflow: true }] })).toEqual(['CI failed: e2e.'])
     expect(blockers({ checks: [...READY.checks, { name: 'e2e', result: 'SKIPPED', workflow: true }] })).toEqual([])
+    expect(blockers({ checks: [{ name: 'checks', result: 'SKIPPED', workflow: true }] })).toEqual(["CI hasn't reported on the head yet."])
   })
 
   it('waits for open review threads, change requests and an asked-for bot review', () => {
@@ -50,6 +52,10 @@ describe('blockersOf (#354)', () => {
     expect(blockers({ labels: ['bot-review'] })).toEqual(["A review bot's review was asked for (bot-review) and hasn't started."])
   })
 
+  it('refuses a PR whose answer GitHub cut off, since a check, review or thread may be missing', () => {
+    expect(blockers({ truncated: true })).toEqual(["GitHub's answer was cut off (over a hundred checks, labels, reviews or threads): check it by hand."])
+  })
+
   it('refuses a draft and a PR that is no longer open', () => {
     expect(blockers({ draft: true })).toEqual(['It is a draft.'])
     expect(blockers({ state: 'MERGED' })).toEqual(['It is merged, not open.'])
@@ -57,19 +63,19 @@ describe('blockersOf (#354)', () => {
 })
 
 describe('factsFrom (#354)', () => {
-  it("reads GitHub's answer: checks of workflows and other apps, labels, reviews and open threads", () => {
+  it("reads GitHub's answer: checks of workflows and other apps, labels, reviews, open threads and a list cut off", () => {
     const facts = factsFrom({
       autoMergeRequest: null,
       commits: { nodes: [{ commit: { statusCheckRollup: { contexts: { nodes: [
-        { __typename: 'CheckRun', checkSuite: { workflowRun: { databaseId: 7 } }, conclusion: null, name: 'checks', status: 'IN_PROGRESS' },
-        { __typename: 'CheckRun', checkSuite: { workflowRun: null }, conclusion: 'SUCCESS', name: 'CodeRabbit', status: 'COMPLETED' },
-        { __typename: 'StatusContext', context: 'deploy/preview', state: 'FAILURE' },
-      ] } } } }] },
+        { checkSuite: { workflowRun: { databaseId: 7 } }, conclusion: null, name: 'checks', status: 'IN_PROGRESS' },
+        { checkSuite: { workflowRun: null }, conclusion: 'SUCCESS', name: 'CodeRabbit', status: 'COMPLETED' },
+        { context: 'deploy/preview', state: 'FAILURE' },
+      ], pageInfo: { hasNextPage: false } } } } }] },
       isDraft: false,
       isInMergeQueue: true,
       labels: { nodes: [{ name: 'subagent-cleared' }] },
-      reviewThreads: { nodes: [{ isResolved: true }, { isResolved: false }] },
-      reviews: { nodes: [{ author: { login: OWNER }, state: 'APPROVED' }] },
+      reviewThreads: { nodes: [{ isResolved: true }, { isResolved: false }], pageInfo: { hasNextPage: false } },
+      reviews: { nodes: [{ author: { login: OWNER }, state: 'APPROVED' }], pageInfo: { hasPreviousPage: true } },
       state: 'OPEN',
     })
     expect(facts).toEqual({
@@ -85,6 +91,7 @@ describe('factsFrom (#354)', () => {
       queued: true,
       reviews: [{ login: OWNER, state: 'APPROVED' }],
       state: 'OPEN',
+      truncated: true,
     })
   })
 })

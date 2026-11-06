@@ -12,8 +12,9 @@
  * through without a judgement. Run it alone in its own call, with nothing before or after it.
  *
  * It queues (`pr merge --auto --squash`, which also enters a merge queue) only when the PR is open
- * and no draft; CI on the head has finished, passed, and includes at least one GitHub Actions
- * workflow's check (another app's check alone isn't CI, #342); it is cleared, by the owner's
+ * and no draft; CI on the head has finished and passed, with at least one GitHub Actions workflow's
+ * check that succeeded (another app's check, or a workflow that skipped, isn't CI, #342); GitHub
+ * answered every list whole (over a hundred checks, labels, reviews or threads stops it); it is cleared, by the owner's
  * approval (their latest approval or change request is an approval: it stays through later pushes)
  * or by the `subagent-cleared` label the main session puts on after a clean review (#327); no review
  * thread is open; no reviewer's latest review requests changes; and no review bot's review asked for
@@ -56,6 +57,7 @@ export interface PrFacts {
   queued: boolean
   reviews: readonly Review[]
   state: string
+  truncated: boolean
 }
 
 const BOT_REVIEW_LABEL = process.env.BOT_REVIEW_LABEL ?? 'bot-review'
@@ -64,37 +66,47 @@ const STANCES = new Set(['APPROVED', 'CHANGES_REQUESTED'])
 
 /** A check run's or commit status's part of the rollup, as a `Check`. */
 const checkFrom = (node: Json): Check => {
-  if (node.__typename === 'StatusContext') {
+  if (hasText(textOf(node.context))) {
     return { name: textOf(node.context), result: textOf(node.state, 'PENDING'), workflow: false }
   }
   const result = node.status === 'COMPLETED' ? textOf(node.conclusion, 'PENDING') : 'PENDING'
   return { name: textOf(node.name), result, workflow: isRecord(at(node, 'checkSuite', 'workflowRun')) }
 }
 
+/** Whether one of the lists GitHub answered with has more than it sent: then a check, review or thread may be missing. */
+const truncatedIn = (pr: unknown, contexts: unknown): boolean => [
+  at(contexts, 'pageInfo', 'hasNextPage'),
+  at(pr, 'labels', 'pageInfo', 'hasNextPage'),
+  at(pr, 'reviewThreads', 'pageInfo', 'hasNextPage'),
+  at(pr, 'reviews', 'pageInfo', 'hasPreviousPage'),
+].some(more => more === true)
+
 /** The facts in GitHub's answer for one `pullRequest` (`PR_QUERY`). */
 export const factsFrom = (pr: unknown): PrFacts => {
   const [head] = records(at(pr, 'commits', 'nodes'))
-  const p = record(pr)
+  const contexts = at(head, 'commit', 'statusCheckRollup', 'contexts')
+  const fields = record(pr)
   return {
-    autoMerge: isRecord(p.autoMergeRequest),
-    checks: records(at(head, 'commit', 'statusCheckRollup', 'contexts', 'nodes')).map(node => checkFrom(node)),
-    draft: p.isDraft === true,
+    autoMerge: isRecord(fields.autoMergeRequest),
+    checks: records(at(contexts, 'nodes')).map(node => checkFrom(node)),
+    draft: fields.isDraft === true,
     labels: records(at(pr, 'labels', 'nodes')).map(label => textOf(label.name)),
     openThreads: records(at(pr, 'reviewThreads', 'nodes')).filter(thread => thread.isResolved !== true).length,
-    queued: p.isInMergeQueue === true,
+    queued: fields.isInMergeQueue === true,
     reviews: records(at(pr, 'reviews', 'nodes')).map(review => ({ login: actor(review.author), state: textOf(review.state) })),
-    state: textOf(p.state),
+    state: textOf(fields.state),
+    truncated: truncatedIn(pr, contexts),
   }
 }
 
 const names = (checks: readonly Check[]) => checks.map(check => check.name).join(', ')
 
-/** What CI on the head still lacks: a workflow's check at all, checks still running, or failed ones. */
+/** What CI on the head still lacks: a workflow's check that passed (one that ran nothing proves nothing), checks still running, or failed ones. */
 const ciBlockers = (checks: readonly Check[]): string[] => {
   const running = checks.filter(check => STILL_RUNNING.has(check.result))
   const failed = checks.filter(check => !STILL_RUNNING.has(check.result) && !checksPassed([check.result]))
   return [
-    ...checks.some(check => check.workflow) ? [] : ["CI hasn't reported on the head yet."],
+    ...checks.some(check => check.workflow && check.result === 'SUCCESS') ? [] : ["CI hasn't reported on the head yet."],
     ...running.length > 0 ? [`CI still runs: ${names(running)}.`] : [],
     ...failed.length > 0 ? [`CI failed: ${names(failed)}.`] : [],
   ]
@@ -130,6 +142,7 @@ export const blockersOf = (facts: PrFacts, owner: string): string[] => {
     return [`It is ${facts.state.toLowerCase()}, not open.`]
   }
   return [
+    ...facts.truncated ? ["GitHub's answer was cut off (over a hundred checks, labels, reviews or threads): check it by hand."] : [],
     ...facts.draft ? ['It is a draft.'] : [],
     ...ciBlockers(facts.checks),
     ...clearanceBlockers(facts, owner),
@@ -151,9 +164,9 @@ const gh = async (args: readonly string[]): Promise<string> => {
 }
 
 const PR_QUERY = `query($owner:String!,$name:String!,$pr:Int!){repository(owner:$owner,name:$name){pullRequest(number:$pr){
-  state isDraft isInMergeQueue autoMergeRequest{enabledAt} labels(first:100){nodes{name}}
-  reviews(last:100){nodes{author{login} state}} reviewThreads(first:100){nodes{isResolved}}
-  commits(last:1){nodes{commit{statusCheckRollup{contexts(first:100){nodes{__typename
+  state isDraft isInMergeQueue autoMergeRequest{enabledAt} labels(first:100){nodes{name} pageInfo{hasNextPage}}
+  reviews(last:100){nodes{author{login} state} pageInfo{hasPreviousPage}} reviewThreads(first:100){nodes{isResolved} pageInfo{hasNextPage}}
+  commits(last:1){nodes{commit{statusCheckRollup{contexts(first:100){pageInfo{hasNextPage} nodes{
     ... on CheckRun{name status conclusion checkSuite{workflowRun{databaseId}}} ... on StatusContext{context state}}}}}}}}}}`
 
 /** The PR's facts, asked of GitHub in one GraphQL call. */
@@ -192,18 +205,24 @@ const argsOf = (): { pr: number, repo: string } => {
   return { pr, repo }
 }
 
+/** Says why it isn't queued, and exits 1, when `blockers` holds anything. */
+const refuseFor = (name: string, blockers: readonly string[]): void => {
+  if (blockers.length > 0) {
+    const lines = blockers.map(line => `- ${line}`)
+    process.stdout.write([`Not queued: ${name} may not be queued yet.`, ...lines, ''].join('\n'))
+    process.exit(1)
+  }
+}
+
 const main = async (): Promise<void> => {
   const { pr, repo } = argsOf()
   const [facts, owner] = await Promise.all([readFacts(repo, pr), ownerOf(repo)])
   if (facts.state === 'OPEN' && (facts.autoMerge || facts.queued)) {
-    process.stdout.write(`${repo}#${pr} is already ${facts.queued ? 'in the merge queue' : 'set to auto-merge'}.\n`)
+    const where = facts.queued ? 'in the merge queue' : 'set to auto-merge'
+    process.stdout.write(`${repo}#${pr} is already ${where}.\n`)
     return
   }
-  const blockers = blockersOf(facts, owner)
-  if (blockers.length > 0) {
-    process.stdout.write(`Not queued: ${repo}#${pr} may not be queued yet.\n${blockers.map(line => `- ${line}\n`).join('')}`)
-    process.exit(1)
-  }
+  refuseFor(`${repo}#${pr}`, blockersOf(facts, owner))
   await gh(['pr', 'merge', String(pr), '--repo', repo, '--auto', '--squash'])
   process.stdout.write(`Queued ${repo}#${pr}: auto-merge (squash) is on.\n`)
 }

@@ -240,7 +240,7 @@ approved one whose auto-merge is still off and that isn't in the merge queue, no
 
 Queue with `agent-queue <owner/name> <pr>` (#354), never with `gh pr merge --auto` yourself. It
 checks the rules first (open, no draft; CI on the head finished and passed, with a workflow's check
-among them; cleared by `OWNER`'s approval or the `CLEARED_LABEL` label; no open review thread, no
+that succeeded among them; cleared by `OWNER`'s approval or the `CLEARED_LABEL` label; no open review thread, no
 change request standing, no bot review asked for and not yet started), queues only then, and
 otherwise prints what blocks it and exits 1. A PR already set to auto-merge or in the merge queue
 it leaves alone. It can't tell whether a PR is user-facing: that stays yours to judge, as above.
