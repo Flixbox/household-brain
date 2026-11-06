@@ -1,20 +1,31 @@
 import { describe, expect, it } from 'bun:test'
-import { type PrFacts, blockersOf, factsFrom } from './agent-queue'
+import { type PrFacts, factsFrom } from './agent-queue-facts'
+import { blockersOf } from './agent-queue'
 
 const OWNER = 'owner-login'
 const T0 = '2026-11-01T09:00:00Z'
 const T1 = '2026-11-01T10:00:00Z'
 const T2 = '2026-11-01T11:00:00Z'
+const T3 = '2026-11-01T12:00:00Z'
+const SELF = 'agent-bot[bot]'
+const NOT_CLEARED = "Not cleared: no approval of owner-login's, and no subagent-cleared label put on by owner-login or agent-bot[bot]."
+
+/** The cleared label put on at `at` by `login` (GraphQL names a bot without `[bot]`, and its kind `Bot`). */
+const labelled = (login: string, when: string, kind = 'Bot') => ({ actor: { kind, login }, createdAt: when, kind: 'LabeledEvent', label: { name: 'subagent-cleared' } })
 
 const READY: PrFacts = {
   asked: [],
   autoMerge: false,
   checks: [{ name: 'checks', result: 'SUCCESS', workflow: true }, { name: 'CodeRabbit', result: 'SUCCESS', workflow: false }],
   draft: false,
+  head: 'c0ffee',
+  labelEvents: [],
   labels: [],
+  lastPush: T0,
   openThreads: 0,
   queued: false,
   reviews: [{ at: T1, login: OWNER, state: 'APPROVED' }],
+  self: SELF,
   state: 'OPEN',
   truncated: false,
 }
@@ -27,21 +38,30 @@ describe('blockersOf (#354)', () => {
   })
 
   it('queues a PR labelled subagent-cleared without the owner, but not one cleared by nobody', () => {
-    expect(blockers({ labels: ['subagent-cleared'], reviews: [] })).toEqual([])
-    expect(blockers({ reviews: [{ at: T1, login: 'someone-else', state: 'APPROVED' }] })).toEqual([
-      "Not cleared: no approval of owner-login's and no subagent-cleared label.",
-    ])
+    const cleared = { labelEvents: [labelled('agent-bot', T1)], labels: ['subagent-cleared'], reviews: [] }
+    expect(blockers(cleared)).toEqual([])
+    expect(blockers({ ...cleared, labelEvents: [labelled(OWNER, T1, 'User')] })).toEqual([])
+    expect(blockers({ reviews: [{ at: T1, login: 'someone-else', state: 'APPROVED' }] })).toEqual([NOT_CLEARED])
+  })
+
+  it('counts the label only when the owner or the bot asking put it on (#327, #331)', () => {
+    expect(blockers({ labelEvents: [labelled('someone-else', T1, 'User')], labels: ['subagent-cleared'], reviews: [] })).toEqual([NOT_CLEARED])
+    expect(blockers({ labelEvents: [labelled('other-app', T1)], labels: ['subagent-cleared'], reviews: [] })).toEqual([NOT_CLEARED])
+  })
+
+  it('counts the label only when it went on after the last push', () => {
+    const early = { labelEvents: [labelled('agent-bot', T1)], labels: ['subagent-cleared'], lastPush: T2 }
+    expect(blockers({ ...early, reviews: [] })).toEqual(['Cleared (subagent-cleared) before the last push: clear it again.'])
+    expect(blockers(early)).toEqual([])
   })
 
   it('keeps the approval once the owner gave it, and counts only their latest stance', () => {
     expect(blockers({ reviews: [{ at: T1, login: OWNER, state: 'APPROVED' }, { at: T1, login: OWNER, state: 'COMMENTED' }] })).toEqual([])
     expect(blockers({ reviews: [{ at: T1, login: OWNER, state: 'APPROVED' }, { at: T1, login: OWNER, state: 'CHANGES_REQUESTED' }] })).toEqual([
-      "Not cleared: no approval of owner-login's and no subagent-cleared label.",
+      NOT_CLEARED,
       'owner-login requests changes.',
     ])
-    expect(blockers({ reviews: [{ at: T0, login: OWNER, state: 'APPROVED' }, { at: T1, login: OWNER, state: 'DISMISSED' }] })).toEqual([
-      "Not cleared: no approval of owner-login's and no subagent-cleared label.",
-    ])
+    expect(blockers({ reviews: [{ at: T0, login: OWNER, state: 'APPROVED' }, { at: T1, login: OWNER, state: 'DISMISSED' }] })).toEqual([NOT_CLEARED])
   })
 
   it('waits for CI on the head: reported by a workflow, finished, and passed', () => {
@@ -78,7 +98,7 @@ describe('blockersOf (#354)', () => {
 })
 
 describe('factsFrom (#354)', () => {
-  it("reads GitHub's answer: checks of workflows and other apps, labels, reviews, open threads and a list cut off", () => {
+  it("reads GitHub's answer: checks of workflows and other apps, labels and their events, the last push, reviews, review asks, open threads and a list cut off", () => {
     const facts = factsFrom({
       autoMergeRequest: null,
       comments: { nodes: [
@@ -86,21 +106,24 @@ describe('factsFrom (#354)', () => {
         { body: '@coderabbitai review', createdAt: T0 },
         { body: ' @CodeRabbitAI[bot] review\n', createdAt: T1 },
         { body: '@coderabbitai resolve', createdAt: T2 },
+        { body: '@other-bot full review', createdAt: T2 },
       ] },
-      commits: { nodes: [{ commit: { statusCheckRollup: { contexts: { nodes: [
-        { checkSuite: { workflowRun: { databaseId: 7 } }, conclusion: null, name: 'checks', status: 'IN_PROGRESS' },
-        { checkSuite: { workflowRun: null }, conclusion: 'SUCCESS', name: 'CodeRabbit', status: 'COMPLETED' },
+      commits: { nodes: [{ commit: { committedDate: T0, statusCheckRollup: { contexts: { nodes: [
+        { checkSuite: { createdAt: T3, workflowRun: { databaseId: 7 } }, conclusion: null, name: 'checks', status: 'IN_PROGRESS' },
+        { checkSuite: { createdAt: T0, workflowRun: null }, conclusion: 'SUCCESS', name: 'CodeRabbit', status: 'COMPLETED' },
         { context: 'deploy/preview', state: 'FAILURE' },
       ], pageInfo: { hasNextPage: false } } } } }] },
+      headRefOid: 'c0ffee',
       isDraft: false,
       isInMergeQueue: true,
       labels: { nodes: [{ name: 'subagent-cleared' }] },
       reviewThreads: { nodes: [{ isResolved: true }, { isResolved: false }], pageInfo: { hasNextPage: false } },
       reviews: { nodes: [{ author: { login: OWNER }, state: 'APPROVED', submittedAt: T1 }], pageInfo: { hasPreviousPage: true } },
       state: 'OPEN',
-    })
+      timelineItems: { nodes: [labelled('agent-bot', T1), { createdAt: T2, kind: 'HeadRefForcePushedEvent' }], pageInfo: { hasPreviousPage: false } },
+    }, SELF)
     expect(facts).toEqual({
-      asked: [{ at: T1, bot: 'coderabbitai' }],
+      asked: [{ at: T1, bot: 'coderabbitai' }, { at: T2, bot: 'other-bot' }],
       autoMerge: false,
       checks: [
         { name: 'checks', result: 'PENDING', workflow: true },
@@ -108,10 +131,14 @@ describe('factsFrom (#354)', () => {
         { name: 'deploy/preview', result: 'FAILURE', workflow: false },
       ],
       draft: false,
+      head: 'c0ffee',
+      labelEvents: [labelled('agent-bot', T1)],
       labels: ['subagent-cleared'],
+      lastPush: T3,
       openThreads: 1,
       queued: true,
       reviews: [{ at: T1, login: OWNER, state: 'APPROVED' }],
+      self: SELF,
       state: 'OPEN',
       truncated: true,
     })

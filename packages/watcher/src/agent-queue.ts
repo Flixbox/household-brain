@@ -28,100 +28,17 @@
  * `CLEARED_LABEL` and `BOT_REVIEW_LABEL` as for the watcher. A variable set before the command keeps
  * the allow rule from matching, so the defaults are what agents use.
  */
-import { type Json, actor, at, record, records } from './watch-text'
-import { hasText, isRecord, textOf } from './read'
-import { BOT_REVIEW_LABEL } from './watch-bot-review-events'
+import { type Ask, type Check, type PrFacts, type ReviewStance, factsFrom } from './agent-queue-facts'
 import { CLEARED_LABEL } from './watch-cleared-events'
+import { at, record, records } from './watch-text'
+import { hasText, textOf } from './read'
+import { BOT_REVIEW_LABEL } from './watch-bot-review-events'
 import { bare } from './watch-review-events'
 import { checksPassed } from './watch-ci-state'
 import { defaultOwner } from './watch-owner'
 
-/** One check on the PR's head: its name, its result (a conclusion, or PENDING while it runs), and whether a workflow ran it. */
-export interface Check {
-  name: string
-  result: string
-  workflow: boolean
-}
-
-/** One review, oldest first. */
-export interface Review {
-  /** When it was submitted (ISO 8601, UTC), as GitHub gives it. */
-  at: string
-  login: string
-  state: string
-}
-
-/** A `@<bot> review` comment: the bot it asks and when it was posted (ISO 8601, UTC). */
-export interface Ask {
-  at: string
-  bot: string
-}
-
-/** What decides whether a PR may be queued. */
-export interface PrFacts {
-  /** The bots someone asked with a `@<bot> review` comment (#324, #325), in `bare` form, each with its latest ask's time, from all the PR's comments. */
-  asked: readonly Ask[]
-  autoMerge: boolean
-  checks: readonly Check[]
-  draft: boolean
-  labels: readonly string[]
-  openThreads: number
-  queued: boolean
-  reviews: readonly Review[]
-  state: string
-  truncated: boolean
-}
-
 const STILL_RUNNING = new Set(['EXPECTED', 'IN_PROGRESS', 'PENDING', 'QUEUED', 'REQUESTED', 'WAITING'])
 const STANCES = new Set(['APPROVED', 'CHANGES_REQUESTED'])
-
-/** A check run's or commit status's part of the rollup, as a `Check`. */
-const checkFrom = (node: Json): Check => {
-  if (hasText(textOf(node.context))) {
-    return { name: textOf(node.context), result: textOf(node.state, 'PENDING'), workflow: false }
-  }
-  const result = node.status === 'COMPLETED' ? textOf(node.conclusion, 'PENDING') : 'PENDING'
-  return { name: textOf(node.name), result, workflow: isRecord(at(node, 'checkSuite', 'workflowRun')) }
-}
-
-/** The bots a `@<bot> review` comment asked (CodeRabbit's documented trigger, as the watcher posts it), each with its latest ask; comments oldest first. */
-const asksIn = (comments: readonly Json[]): Ask[] => {
-  const latest = new Map<string, string>()
-  for (const comment of comments) {
-    const bot = /^@(?<bot>[\w-]+(?:\[bot\])?) review$/iu.exec(textOf(comment.body).trim())?.groups?.bot
-    if (hasText(bot)) {
-      latest.set(bare(bot), textOf(comment.createdAt))
-    }
-  }
-  return [...latest].map(([bot, when]) => ({ at: when, bot }))
-}
-
-/** Whether one of the lists GitHub answered with has more than it sent: then a check, review or thread may be missing. */
-const truncatedIn = (pr: unknown, contexts: unknown): boolean => [
-  at(contexts, 'pageInfo', 'hasNextPage'),
-  at(pr, 'labels', 'pageInfo', 'hasNextPage'),
-  at(pr, 'reviewThreads', 'pageInfo', 'hasNextPage'),
-  at(pr, 'reviews', 'pageInfo', 'hasPreviousPage'),
-].some(more => more === true)
-
-/** The facts in GitHub's answer for one `pullRequest` (`PR_QUERY`). */
-export const factsFrom = (pr: unknown): PrFacts => {
-  const [head] = records(at(pr, 'commits', 'nodes'))
-  const contexts = at(head, 'commit', 'statusCheckRollup', 'contexts')
-  const fields = record(pr)
-  return {
-    asked: asksIn(records(at(pr, 'comments', 'nodes'))),
-    autoMerge: isRecord(fields.autoMergeRequest),
-    checks: records(at(contexts, 'nodes')).map(node => checkFrom(node)),
-    draft: fields.isDraft === true,
-    labels: records(at(pr, 'labels', 'nodes')).map(label => textOf(label.name)),
-    openThreads: records(at(pr, 'reviewThreads', 'nodes')).filter(thread => thread.isResolved !== true).length,
-    queued: fields.isInMergeQueue === true,
-    reviews: records(at(pr, 'reviews', 'nodes')).map(review => ({ at: textOf(review.submittedAt), login: actor(review.author), state: textOf(review.state) })),
-    state: textOf(fields.state),
-    truncated: truncatedIn(pr, contexts),
-  }
-}
 
 const names = (checks: readonly Check[]) => checks.map(check => check.name).join(', ')
 
@@ -137,7 +54,7 @@ const ciBlockers = (checks: readonly Check[]): string[] => {
 }
 
 /** Each reviewer's latest review that takes a stance (approves, requests changes or was dismissed). */
-const latestStances = (reviews: readonly Review[]): Map<string, string> => new Map(reviews
+const latestStances = (reviews: readonly ReviewStance[]): Map<string, string> => new Map(reviews
   .filter(review => STANCES.has(review.state) || review.state === 'DISMISSED')
   .map(review => [review.login.toLowerCase(), review.state]))
 
@@ -199,20 +116,24 @@ const gh = async (args: readonly string[]): Promise<string> => {
   return out
 }
 
-const PR_QUERY = `query($owner:String!,$name:String!,$pr:Int!){repository(owner:$owner,name:$name){pullRequest(number:$pr){
+// `kind: __typename` aliases GraphQL's type name to the name clearedAt reads (actors too: `Bot`).
+const LABEL_FIELDS = 'createdAt actor{kind: __typename login} label{name}'
+const PR_QUERY = `query($owner:String!,$name:String!,$pr:Int!){viewer{login} repository(owner:$owner,name:$name){pullRequest(number:$pr){
+  headRefOid timelineItems(itemTypes:[LABELED_EVENT,UNLABELED_EVENT,HEAD_REF_FORCE_PUSHED_EVENT],last:100){pageInfo{hasPreviousPage} nodes{kind: __typename
+    ... on LabeledEvent{${LABEL_FIELDS}} ... on UnlabeledEvent{${LABEL_FIELDS}} ... on HeadRefForcePushedEvent{createdAt}}}
   state isDraft isInMergeQueue autoMergeRequest{enabledAt} labels(first:100){nodes{name} pageInfo{hasNextPage}}
   reviews(last:100){nodes{author{login} state submittedAt} pageInfo{hasPreviousPage}} comments(last:100){nodes{body createdAt} pageInfo{hasPreviousPage startCursor}} reviewThreads(first:100){nodes{isResolved} pageInfo{hasNextPage}}
-  commits(last:1){nodes{commit{statusCheckRollup{contexts(first:100){pageInfo{hasNextPage} nodes{
-    ... on CheckRun{name status conclusion checkSuite{workflowRun{databaseId}}} ... on StatusContext{context state}}}}}}}}}}`
+  commits(last:1){nodes{commit{committedDate statusCheckRollup{contexts(first:100){pageInfo{hasNextPage} nodes{
+    ... on CheckRun{name status conclusion checkSuite{createdAt workflowRun{databaseId}}} ... on StatusContext{context state}}}}}}}}}}`
 
 const COMMENTS_QUERY = `query($owner:String!,$name:String!,$pr:Int!,$before:String!){repository(owner:$owner,name:$name){pullRequest(number:$pr){
   comments(last:100,before:$before){nodes{body createdAt} pageInfo{hasPreviousPage startCursor}}}}}`
 
-/** The `pullRequest` of a GraphQL answer to `query` for the PR, with `extra` variables (strings). */
-const askPr = async ({ extra = [], pr, query, repo }: { extra?: readonly string[], pr: number, query: string, repo: string }): Promise<unknown> => {
+/** The `data` of a GraphQL answer to `query` for the PR, with `extra` variables (strings). */
+const ask = async ({ extra = [], pr, query, repo }: { extra?: readonly string[], pr: number, query: string, repo: string }): Promise<unknown> => {
   const [owner = '', name = ''] = repo.split('/')
   const args = ['api', 'graphql', '-f', `query=${query}`, '-f', `owner=${owner}`, '-f', `name=${name}`, '-F', `pr=${pr}`, ...extra.flatMap(variable => ['-f', variable])]
-  return at(JSON.parse(await gh(args)), 'data', 'repository', 'pullRequest')
+  return at(JSON.parse(await gh(args)), 'data')
 }
 
 /** The PR's comments before the page `comments` (oldest first), a hundred at a time, so no `@<bot> review` is missed. */
@@ -221,15 +142,16 @@ const earlierComments = async (repo: string, pr: number, comments: unknown): Pro
     return []
   }
   const before = textOf(at(comments, 'pageInfo', 'startCursor'))
-  const page = at(await askPr({ extra: [`before=${before}`], pr, query: COMMENTS_QUERY, repo }), 'comments')
+  const page = at(await ask({ extra: [`before=${before}`], pr, query: COMMENTS_QUERY, repo }), 'repository', 'pullRequest', 'comments')
   return [...await earlierComments(repo, pr, page), ...records(at(page, 'nodes'))]
 }
 
 /** The PR's facts, asked of GitHub in one GraphQL call, and more for comments past the first hundred. */
 const readFacts = async (repo: string, pr: number): Promise<PrFacts> => {
-  const answer = record(await askPr({ pr, query: PR_QUERY, repo }))
+  const data = await ask({ pr, query: PR_QUERY, repo })
+  const answer = record(at(data, 'repository', 'pullRequest'))
   const nodes = [...await earlierComments(repo, pr, answer.comments), ...records(at(answer, 'comments', 'nodes'))]
-  return factsFrom({ ...answer, comments: { nodes } })
+  return factsFrom({ ...answer, comments: { nodes } }, textOf(at(data, 'viewer', 'login')))
 }
 
 /** OWNER, else `defaultOwner` for the repository (its note goes to stderr). */
