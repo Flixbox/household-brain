@@ -82,10 +82,10 @@ describe.each(['bash', 'windows'] as const)('agent-gh (%s)', wrapper => {
     expect(readFileSync(path.join(home, 'token-repo'), 'utf8')).toBe('Owner/repo')
   })
 
-  test('takes the repository from -R written together with its value', () => {
+  test('takes no repository from another option\'s value or from after --', () => {
     tokenStub('echo bot-token')
-    expect(run(wrapper, ['issue', 'list', '-ROwner/repo']).code).toBe(0)
-    expect(readFileSync(path.join(home, 'token-repo'), 'utf8')).toBe('Owner/repo')
+    expect(run(wrapper, ['issue', 'create', '--title', '-ROwner/other', '--', '-R', 'Owner/other']).code).toBe(0)
+    expect(readFileSync(path.join(home, 'token-repo'), 'utf8')).toBe('')
   })
 
   test('finds an api endpoint after the flags', () => {

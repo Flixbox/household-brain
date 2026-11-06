@@ -6,11 +6,13 @@
 set -euo pipefail
 args=("$@")
 repo=''
+# Only the exact forms: -R<value> could be another option's value, such as a title (#358). gh takes
+# nothing after -- as a flag.
 for ((i = 0; i < ${#args[@]}; i++)); do
   case ${args[i]} in
+    --) break ;;
     -R | --repo) repo=${args[i + 1]:-} ;;
     --repo=*) repo=${args[i]#--repo=} ;;
-    -R?*) repo=${args[i]#-R} ;;
   esac
 done
 if [[ -z $repo && ${1:-} == api ]]; then

@@ -8,15 +8,14 @@ import { file, spawnSync, which } from 'bun'
 
 const args = process.argv.slice(2)
 
-// The repository -R/--repo names (the last one, as gh takes it), or null.
+// The repository -R/--repo names (the last one, as gh takes it), or null. Only the exact forms, as
+// in agent-gh; gh takes nothing after -- as a flag.
+const flags = args.includes('--') ? args.slice(0, args.indexOf('--')) : args
 const flagRepo = (arg: string, next: string) => {
   if (arg === '-R' || arg === '--repo') {
     return next
   }
-  if (arg.startsWith('--repo=')) {
-    return arg.slice('--repo='.length)
-  }
-  return arg.startsWith('-R') ? arg.slice('-R'.length) : null
+  return arg.startsWith('--repo=') ? arg.slice('--repo='.length) : null
 }
 
 // An api call's endpoint, repos/<owner>/<repo>/…, with or without a leading slash, wherever it is
@@ -31,7 +30,7 @@ const endpointRepo = () => {
   return ''
 }
 
-const repoOf = () => args.reduce<string | null>((found, arg, index) => flagRepo(arg, args[index + 1] ?? '') ?? found, null) ?? endpointRepo()
+const repoOf = () => flags.reduce<string | null>((found, arg, index) => flagRepo(arg, flags[index + 1] ?? '') ?? found, null) ?? endpointRepo()
 
 const repo = repoOf()
 const env = repo ? { ...process.env, GH_REPO: repo } : { ...process.env }
