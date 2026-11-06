@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# Prints a GitHub App installation token for the repository's agent bot, valid 1 hour, cached for 50
+# minutes. The repository is $GH_REPO, else the current folder's origin remote; its owner picks the bot:
+#   Coarisfinia/*  the app "Coarisfinia [AI Agent]"  ~/.config/coarisfinia-agent/
+#   Flixbox/*      the app "Flixbox [AI Agent]"      ~/.config/household-brain-agent/
+# Each folder holds the app's private key (app.pem) and its App ID (app-id).
+# Never print or send the key anywhere except GitHub's token endpoint.
+set -euo pipefail
+
+repo=${GH_REPO:-}
+if [[ -z $repo ]]; then
+  url=$(git remote get-url origin 2>/dev/null) || {
+    echo "agent-gh-token: set GH_REPO=owner/repo, or run it inside a clone" >&2
+    exit 1
+  }
+  repo=$(sed -E 's#^(https://|ssh://git@|git@)##; s#^github\.com[:/]##; s#\.git$##' <<<"$url")
+fi
+repo=${repo#github.com/}
+owner=${repo%%/*}
+name=${repo#*/}
+
+case $owner in
+  Coarisfinia)
+    conf=coarisfinia-agent
+    permissions='{"contents":"write","pull_requests":"write","issues":"write","workflows":"write","actions":"write","merge_queues":"write","checks":"read","statuses":"read","metadata":"read"}'
+    ;;
+  Flixbox)
+    conf=household-brain-agent
+    permissions=''
+    ;;
+  *)
+    echo "agent-gh-token: no agent bot for $repo" >&2
+    exit 1
+    ;;
+esac
+CONF="$HOME/.config/$conf"
+CACHE="$HOME/.cache/agent-gh/${owner}_${name}"
+
+if [[ -f "$CACHE" ]] && (( $(date +%s) - $(stat -c %Y "$CACHE") < 3000 )); then
+  cat "$CACHE"
+  exit 0
+fi
+
+b64url() { openssl base64 -A | tr '+/' '-_' | tr -d '='; }
+
+app_id=$(tr -d '[:space:]' < "$CONF/app-id")
+now=$(date +%s)
+header=$(printf '{"alg":"RS256","typ":"JWT"}' | b64url)
+payload=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' $((now - 60)) $((now + 540)) "$app_id" | b64url)
+signature=$(printf '%s.%s' "$header" "$payload" | openssl dgst -sha256 -sign "$CONF/app.pem" -binary | b64url)
+jwt="$header.$payload.$signature"
+
+# The JWT goes in through stdin, so it never shows up in the process list.
+api() {
+  printf 'Authorization: Bearer %s\n' "$jwt" | curl -fsS -H @- -H "Accept: application/vnd.github+json" \
+    -H "X-GitHub-Api-Version: 2022-11-28" "$@"
+}
+
+installation=$(api "https://api.github.com/repos/$owner/$name/installation" | jq -r '.id // empty')
+if [[ -z "$installation" ]]; then
+  echo "agent-gh-token: the app is not installed on $owner/$name" >&2
+  exit 1
+fi
+
+body="{\"repositories\":[\"$name\"]${permissions:+,\"permissions\":$permissions}}"
+token=$(api -X POST -d "$body" "https://api.github.com/app/installations/$installation/access_tokens" \
+  | jq -r '.token // empty')
+if [[ -z "$token" ]]; then
+  echo "agent-gh-token: GitHub returned no token" >&2
+  exit 1
+fi
+
+mkdir -p "$(dirname "$CACHE")"
+( umask 077; printf '%s\n' "$token" > "$CACHE" )
+printf '%s\n' "$token"

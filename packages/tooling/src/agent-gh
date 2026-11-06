@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# gh as the repository's agent bot instead of the owner's account (see agent-gh-token). A -R/--repo
+# argument names the repository; otherwise it is $GH_REPO or the current folder's origin remote.
+set -euo pipefail
+args=("$@")
+for ((i = 0; i < ${#args[@]}; i++)); do
+  case ${args[i]} in
+    -R | --repo) export GH_REPO=${args[i + 1]:-} ;;
+    --repo=*) export GH_REPO=${args[i]#--repo=} ;;
+  esac
+done
+GH_TOKEN=$(agent-gh-token) exec gh "$@"
