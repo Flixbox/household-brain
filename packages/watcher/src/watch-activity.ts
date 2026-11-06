@@ -1,7 +1,8 @@
 /** The project watcher's look at a pull request's comments and reviews (watch-project.ts), and which pull requests a round looks at. */
 import { type Activity, newActivity } from './watch-events'
 import { ACTIVITY_FIELDS, activityFrom } from './watch-comment-lines'
-import { ACTIVITY_GH, IGNORED, OWNER, SELF, closingPrs, openPrNumbers, perPr, recentlyMerged } from './watch-github'
+import { ACTIVITY_GH, IGNORED, OWNER, SELF, graphql, openPrNumbers, perPr, recentlyMerged } from './watch-github'
+import { at, count, records } from './watch-text'
 import { appendLines, exists, oneAtATime, readLines, subscriptions, writeLines } from './watch-state'
 import { allSettled } from './read'
 import { queue } from './watch-output'
@@ -53,6 +54,20 @@ export const checkTrackedActivity = async (): Promise<void> => {
 const MERGED_HOURS = Number(process.env.MERGED_HOURS ?? 3)
 
 const byNumber = (first: number, second: number) => first - second
+
+/**
+ * The open PRs whose closing references name one of `issues` (#357), in one query, without listing
+ * every open PR. GitHub's list also holds the merged ones, which closed the issue once before it was
+ * reopened: not this subscription's news. A linked PR that merges now stays followed (`tracked`).
+ */
+const closingPrs = async (issues: readonly number[]): Promise<number[]> => {
+  if (issues.length === 0) {
+    return []
+  }
+  const repository = await graphql(issues.map(issue => `issue${issue}: issue(number:${issue}){closedByPullRequestsReferences(first:20){nodes{number state}}}`).join(' '))
+  return issues.flatMap(issue => records(at(repository, `issue${issue}`, 'closedByPullRequestsReferences', 'nodes'))
+    .filter(pr => pr.state === 'OPEN').map(pr => count(pr.number)))
+}
 
 /**
  * A scoped watcher's PRs (#357): the subscribed ones, the open ones closing a subscribed issue, and the

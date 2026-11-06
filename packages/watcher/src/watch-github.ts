@@ -228,18 +228,6 @@ const headRunOf = async (head: string): Promise<Run | null> => hasText(head) ? r
 export const openPrNumbers = async (): Promise<number[]> =>
   records(await gh(['pr', 'list', '--repo', REPO, '--state', 'open', '--limit', '100', '--json', 'number'])).map(pr => count(pr.number))
 
-/**
- * The open PRs whose closing references name one of `issues` (#357): a scoped watcher's PRs for its
- * issue subscriptions, in one query, without listing every open PR. None asked for, none read.
- */
-export const closingPrs = async (issues: readonly number[]): Promise<number[]> => {
-  if (issues.length === 0) {
-    return []
-  }
-  const repository = await graphql(issues.map(issue => `issue${issue}: issue(number:${issue}){closedByPullRequestsReferences(first:20){nodes{number}}}`).join(' '))
-  return issues.flatMap(issue => records(at(repository, `issue${issue}`, 'closedByPullRequestsReferences', 'nodes')).map(pr => count(pr.number)))
-}
-
 export const openPrs = async (): Promise<OpenPr[]> => {
   const [listed, queue] = await Promise.all([
     gh(['pr', 'list', '--repo', REPO, '--state', 'open', '--limit', '100', '--json', 'number,title,isDraft,autoMergeRequest,labels,statusCheckRollup,mergeStateStatus,headRefOid']),

@@ -8,8 +8,9 @@ afterEach(async () => { await Promise.all(dirs.splice(0).map(async dir => rm(dir
 
 /**
  * A `gh` for a repository with three open PRs: 7 (subscribed, merged), 8 (unrelated) and 9 (closes the
- * subscribed issue 4). It keeps every call in `calls`. Issue 4 gets the owner's answer from its second
- * comment read on, and is closed from its third, so the subscription completes.
+ * subscribed issue 4; the merged 3 closed it once before). It keeps every call in `calls`. Issue 4
+ * gets the owner's answer from its second comment read on, and is closed from its third, so the
+ * subscription completes.
  */
 const FAKE_GH = String.raw`
   import { appendFileSync, readFileSync, writeFileSync } from 'node:fs'
@@ -40,7 +41,7 @@ const FAKE_GH = String.raw`
   if (issues.length > 0) {
     if (text.includes('comments(')) { writeFileSync(home + '/comment-reads', String(reads() + 1)) }
     const comments = reads() >= 2 ? [{ author: { login: 'owner' }, body: 'OWNER_ISSUE_ANSWER', createdAt: Temporal.Now.instant().toString(), databaseId: 41, url: 'https://comments.test/41' }] : []
-    const issue = { closedByPullRequestsReferences: { nodes: [{ number: 9 }] }, comments: { nodes: comments }, number: 4, state: reads() >= 3 ? 'CLOSED' : 'OPEN' }
+    const issue = { closedByPullRequestsReferences: { nodes: [{ number: 3, state: 'MERGED' }, { number: 9, state: 'OPEN' }] }, comments: { nodes: comments }, number: 4, state: reads() >= 3 ? 'CLOSED' : 'OPEN' }
     answer({ data: { repository: Object.fromEntries(issues.map(number => ['issue' + number, issue])) } })
   }
   answer({ data: { repository: { issues: { nodes: [], pageInfo: { hasNextPage: false } } } } })
