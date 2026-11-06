@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The repository's one shell script: it installs Bun, so it can't be a Bun program (#142).
+# A shell script, not a Bun program (#142): it installs Bun.
 #
 # Installs the Bun that package.json names (`packageManager`) from its official GitHub release and
 # checks the download against the checksum pinned below (#140). CI uses this instead of

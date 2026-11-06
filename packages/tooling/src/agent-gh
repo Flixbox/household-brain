@@ -1,12 +1,30 @@
 #!/usr/bin/env bash
-# gh as the repository's agent bot instead of the owner's account (see agent-gh-token). A -R/--repo
-# argument names the repository; otherwise it is $GH_REPO or the current folder's origin remote.
+# gh as the repository's agent bot instead of the owner's account (see agent-gh-token). The repository
+# is the one -R/--repo names, else the repos/<owner>/<repo>/… endpoint of an api call, else $GH_REPO
+# or the current folder's origin remote. Without a token it stops before gh runs: gh would fall back
+# to the owner's stored login and post as the owner (#358). agent-gh.ts is its twin for Windows.
 set -euo pipefail
 args=("$@")
+repo=''
 for ((i = 0; i < ${#args[@]}; i++)); do
   case ${args[i]} in
-    -R | --repo) export GH_REPO=${args[i + 1]:-} ;;
-    --repo=*) export GH_REPO=${args[i]#--repo=} ;;
+    -R | --repo) repo=${args[i + 1]:-} ;;
+    --repo=*) repo=${args[i]#--repo=} ;;
   esac
 done
-GH_TOKEN=$(agent-gh-token) exec gh "$@"
+if [[ -z $repo && ${1:-} == api && ${2:-} =~ ^/?repos/([^/]+)/([^/?]+) ]]; then
+  repo=${BASH_REMATCH[1]}/${BASH_REMATCH[2]}
+fi
+if [[ -n $repo ]]; then
+  export GH_REPO=$repo
+fi
+
+if ! token=$(agent-gh-token); then
+  echo "agent-gh: agent-gh-token failed, so gh does not run (it would act as your own login)" >&2
+  exit 1
+fi
+if [[ -z $token ]]; then
+  echo "agent-gh: agent-gh-token printed no token, so gh does not run (it would act as your own login)" >&2
+  exit 1
+fi
+GH_TOKEN=$token exec gh "$@"

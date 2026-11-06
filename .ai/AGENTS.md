@@ -10,7 +10,8 @@ holds what a human does by hand. Add a rule here when something bites.
 The agent works on GitHub only as **`flixbox-ai-agent[bot]`** (a GitHub App installed on this
 repository), never with the owner's account.
 
-- **`agent-gh`** is `gh` with the app's token; `agent-gh-token` (in `~/.local/bin`) prints one,
+- **`agent-gh`** is `gh` with the app's token; `agent-gh-token` (in `~/.local/bin`, from
+  `packages/tooling/src/`, installed as the README says) prints one,
   signed with `~/.config/household-brain-agent/app.pem`. The key is never committed, pasted or sent
   anywhere but GitHub's token endpoint. To revoke: suspend or uninstall the app; to rotate: a new
   key on the app's page, replace `app.pem`, delete the old key.

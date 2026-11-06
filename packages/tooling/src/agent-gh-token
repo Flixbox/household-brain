@@ -36,7 +36,7 @@ esac
 CONF="$HOME/.config/$conf"
 CACHE="$HOME/.cache/agent-gh/${owner}_${name}"
 
-if [[ -f "$CACHE" ]] && (( $(date +%s) - $(stat -c %Y "$CACHE") < 3000 )); then
+if [[ -s "$CACHE" ]] && (( $(date +%s) - $(stat -c %Y "$CACHE") < 3000 )); then
   cat "$CACHE"
   exit 0
 fi
