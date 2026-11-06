@@ -51,7 +51,7 @@ export interface Review {
 
 /** What decides whether a PR may be queued. */
 export interface PrFacts {
-  /** The bots someone asked with a `@<bot> review` comment (#324, #325), in `bare` form, from the last hundred comments as the watcher reads them. */
+  /** The bots someone asked with a `@<bot> review` comment (#324, #325), in `bare` form, from all its comments. */
   asked: readonly string[]
   autoMerge: boolean
   checks: readonly Check[]
@@ -188,15 +188,35 @@ const gh = async (args: readonly string[]): Promise<string> => {
 
 const PR_QUERY = `query($owner:String!,$name:String!,$pr:Int!){repository(owner:$owner,name:$name){pullRequest(number:$pr){
   state isDraft isInMergeQueue autoMergeRequest{enabledAt} labels(first:100){nodes{name} pageInfo{hasNextPage}}
-  reviews(last:100){nodes{author{login} state} pageInfo{hasPreviousPage}} comments(last:100){nodes{body}} reviewThreads(first:100){nodes{isResolved} pageInfo{hasNextPage}}
+  reviews(last:100){nodes{author{login} state} pageInfo{hasPreviousPage}} comments(last:100){nodes{body} pageInfo{hasPreviousPage startCursor}} reviewThreads(first:100){nodes{isResolved} pageInfo{hasNextPage}}
   commits(last:1){nodes{commit{statusCheckRollup{contexts(first:100){pageInfo{hasNextPage} nodes{
     ... on CheckRun{name status conclusion checkSuite{workflowRun{databaseId}}} ... on StatusContext{context state}}}}}}}}}}`
 
-/** The PR's facts, asked of GitHub in one GraphQL call. */
-const readFacts = async (repo: string, pr: number): Promise<PrFacts> => {
+const COMMENTS_QUERY = `query($owner:String!,$name:String!,$pr:Int!,$before:String!){repository(owner:$owner,name:$name){pullRequest(number:$pr){
+  comments(last:100,before:$before){nodes{body} pageInfo{hasPreviousPage startCursor}}}}}`
+
+/** The `pullRequest` of a GraphQL answer to `query` for the PR, with `extra` variables (strings). */
+const askPr = async ({ extra = [], pr, query, repo }: { extra?: readonly string[], pr: number, query: string, repo: string }): Promise<unknown> => {
   const [owner = '', name = ''] = repo.split('/')
-  const answer: unknown = JSON.parse(await gh(['api', 'graphql', '-f', `query=${PR_QUERY}`, '-f', `owner=${owner}`, '-f', `name=${name}`, '-F', `pr=${pr}`]))
-  return factsFrom(at(answer, 'data', 'repository', 'pullRequest'))
+  const args = ['api', 'graphql', '-f', `query=${query}`, '-f', `owner=${owner}`, '-f', `name=${name}`, '-F', `pr=${pr}`, ...extra.flatMap(variable => ['-f', variable])]
+  return at(JSON.parse(await gh(args)), 'data', 'repository', 'pullRequest')
+}
+
+/** The PR's comments before the page `comments` (oldest first), a hundred at a time, so no `@<bot> review` is missed. */
+const earlierComments = async (repo: string, pr: number, comments: unknown): Promise<unknown[]> => {
+  if (at(comments, 'pageInfo', 'hasPreviousPage') !== true) {
+    return []
+  }
+  const before = textOf(at(comments, 'pageInfo', 'startCursor'))
+  const page = at(await askPr({ extra: [`before=${before}`], pr, query: COMMENTS_QUERY, repo }), 'comments')
+  return [...await earlierComments(repo, pr, page), ...records(at(page, 'nodes'))]
+}
+
+/** The PR's facts, asked of GitHub in one GraphQL call, and more for comments past the first hundred. */
+const readFacts = async (repo: string, pr: number): Promise<PrFacts> => {
+  const answer = record(await askPr({ pr, query: PR_QUERY, repo }))
+  const nodes = [...await earlierComments(repo, pr, answer.comments), ...records(at(answer, 'comments', 'nodes'))]
+  return factsFrom({ ...answer, comments: { nodes } })
 }
 
 /** OWNER, else `defaultOwner` for the repository (its note goes to stderr). */
