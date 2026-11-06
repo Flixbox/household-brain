@@ -76,7 +76,7 @@ const runScoped = async (selection: string, { commentFrom = '2', timeout = 10_00
   await Bun.write(`${home}/gh`, `#!/bin/sh\nexec "${process.execPath}" "${home}/fake.ts" "$@"\n`)
   await Bun.spawn(['chmod', '+x', `${home}/gh`]).exited
   await (upgraded ? Bun.write(`${home}/state/issue-events`, 'issue #1\n') : Promise.resolve())
-  const env = { ...process.env, ACTIVITY_GH: `${home}/gh`, AGENT_USAGE_PROVIDER: 'claude', COMMENT_FROM: commentFrom, CLAUDE_CODE_SESSION_ID: '', CLAUDE_CONFIG_DIR: home, CODEX_THREAD_ID: '', CODEX_WATCH_THREAD: '', FIXTURE_HOME: home, GH: `${home}/gh`, GH_SHARE_SECONDS: '0', OWNER: 'owner', REPO: 'owner/repo', SELF: 'agent', STATE_DIR: `${home}/state`, WATCHER_SUBSCRIPTIONS: selection, XDG_STATE_HOME: home }
+  const env = { ...process.env, ACTIVITY_GH: `${home}/gh`, AGENT_USAGE_PROVIDER: 'claude', CLAUDE_CODE_SESSION_ID: '', CLAUDE_CONFIG_DIR: home, CODEX_THREAD_ID: '', CODEX_WATCH_THREAD: '', COMMENT_FROM: commentFrom, FIXTURE_HOME: home, GH: `${home}/gh`, GH_SHARE_SECONDS: '0', OWNER: 'owner', REPO: 'owner/repo', SELF: 'agent', STATE_DIR: `${home}/state`, WATCHER_SUBSCRIPTIONS: selection, XDG_STATE_HOME: home }
   const watcher = Bun.spawn([process.execPath, '-e', WATCHER], { env, stderr: 'pipe', stdout: 'pipe', timeout })
   const [output, code] = await Promise.all([new Response(watcher.stdout).text(), watcher.exited])
   const calls = (await Bun.file(`${home}/calls`).text()).split('\n').filter(Boolean)
