@@ -4,29 +4,43 @@
 // before gh runs: gh would fall back to the owner's stored login and post as the owner (#358).
 //
 //   bun build --compile packages/tooling/src/agent-gh.ts --outfile ~/.local/bin/agent-gh.exe
-import { spawnSync, which } from 'bun'
+import { file, spawnSync, which } from 'bun'
 
 const args = process.argv.slice(2)
 
-const repoOf = () => {
-  const flag = args.findIndex(arg => arg === '-R' || arg === '--repo')
-  const joined = args.find(arg => arg.startsWith('--repo='))
-  if (flag !== -1) {
-    return args[flag + 1] ?? ''
+// The repository -R/--repo names (the last one, as gh takes it), or null.
+const flagRepo = (arg: string, next: string) => {
+  if (arg === '-R' || arg === '--repo') {
+    return next
   }
-  if (typeof joined === 'string') {
-    return joined.slice('--repo='.length)
+  if (arg.startsWith('--repo=')) {
+    return arg.slice('--repo='.length)
   }
-  // An api call's endpoint: repos/<owner>/<repo>/…, with or without a leading slash.
-  const [repos, owner = '', name = ''] = (args[0] === 'api' ? args[1] ?? '' : '').replace(/^\//u, '').split(/[/?]/u)
-  return repos === 'repos' && owner !== '' && name !== '' ? `${owner}/${name}` : ''
+  return arg.startsWith('-R') ? arg.slice('-R'.length) : null
 }
+
+// An api call's endpoint, repos/<owner>/<repo>/…, with or without a leading slash, wherever it is
+// among the call's flags.
+const endpointRepo = () => {
+  for (const arg of args[0] === 'api' ? args.slice(1) : []) {
+    const [repos, owner = '', name = ''] = arg.replace(/^\//u, '').split(/[/?]/u)
+    if (repos === 'repos' && owner !== '' && name !== '') {
+      return `${owner}/${name}`
+    }
+  }
+  return ''
+}
+
+const repoOf = () => args.reduce<string | null>((found, arg, index) => flagRepo(arg, args[index + 1] ?? '') ?? found, null) ?? endpointRepo()
 
 const repo = repoOf()
 const env = repo ? { ...process.env, GH_REPO: repo } : { ...process.env }
 const home = process.env.USERPROFILE ?? process.env.HOME ?? ''
 const bash = which('bash') ?? `${home}/scoop/apps/git/current/bin/bash.exe`
-const minted = spawnSync([bash, `${home}/.local/bin/agent-gh-token`], { env, stderr: 'inherit' })
+// The agent-gh-token beside the executable (where install-agent-gh.sh puts both), else in ~/.local/bin.
+const beside = process.execPath.replace(/[^\\/]+$/u, 'agent-gh-token')
+const helper = (await file(beside).exists()) ? beside : `${home}/.local/bin/agent-gh-token`
+const minted = spawnSync([bash, helper], { env, stderr: 'inherit' })
 const token = minted.stdout.toString().trim()
 if (minted.exitCode !== 0) {
   process.stderr.write('agent-gh: agent-gh-token failed, so gh does not run (it would act as your own login)\n')

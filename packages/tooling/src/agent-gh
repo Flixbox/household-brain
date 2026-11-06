@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # gh as the repository's agent bot instead of the owner's account (see agent-gh-token). The repository
-# is the one -R/--repo names, else the repos/<owner>/<repo>/… endpoint of an api call, else $GH_REPO
+# is the one -R/--repo names, else an api call's repos/<owner>/<repo>/… endpoint, else $GH_REPO
 # or the current folder's origin remote. Without a token it stops before gh runs: gh would fall back
 # to the owner's stored login and post as the owner (#358). agent-gh.ts is its twin for Windows.
 set -euo pipefail
@@ -10,10 +10,16 @@ for ((i = 0; i < ${#args[@]}; i++)); do
   case ${args[i]} in
     -R | --repo) repo=${args[i + 1]:-} ;;
     --repo=*) repo=${args[i]#--repo=} ;;
+    -R?*) repo=${args[i]#-R} ;;
   esac
 done
-if [[ -z $repo && ${1:-} == api && ${2:-} =~ ^/?repos/([^/]+)/([^/?]+) ]]; then
-  repo=${BASH_REMATCH[1]}/${BASH_REMATCH[2]}
+if [[ -z $repo && ${1:-} == api ]]; then
+  for arg in "${args[@]:1}"; do
+    if [[ $arg =~ ^/?repos/([^/?]+)/([^/?]+) ]]; then
+      repo=${BASH_REMATCH[1]}/${BASH_REMATCH[2]}
+      break
+    fi
+  done
 fi
 if [[ -n $repo ]]; then
   export GH_REPO=$repo

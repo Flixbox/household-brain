@@ -81,4 +81,16 @@ describe.each(['bash', 'windows'] as const)('agent-gh (%s)', wrapper => {
     expect(ghCall()).toBe('bot-token|api repos/Owner/repo/issues/7/comments -f body=hi')
     expect(readFileSync(path.join(home, 'token-repo'), 'utf8')).toBe('Owner/repo')
   })
+
+  test('takes the repository from -R written together with its value', () => {
+    tokenStub('echo bot-token')
+    expect(run(wrapper, ['issue', 'list', '-ROwner/repo']).code).toBe(0)
+    expect(readFileSync(path.join(home, 'token-repo'), 'utf8')).toBe('Owner/repo')
+  })
+
+  test('finds an api endpoint after the flags', () => {
+    tokenStub('echo bot-token')
+    expect(run(wrapper, ['api', '-X', 'POST', '/repos/Owner/repo/issues', '-f', 'title=hi']).code).toBe(0)
+    expect(readFileSync(path.join(home, 'token-repo'), 'utf8')).toBe('Owner/repo')
+  })
 })
