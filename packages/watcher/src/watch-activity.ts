@@ -58,13 +58,14 @@ const byNumber = (first: number, second: number) => first - second
 /**
  * The open PRs whose closing references name one of `issues` (#357), in one query, without listing
  * every open PR. GitHub's list also holds the merged ones, which closed the issue once before it was
- * reopened: not this subscription's news. A linked PR that merges now stays followed (`tracked`).
+ * reopened: not this subscription's news. A linked PR that merges now stays followed (`tracked`). The
+ * first hundred, one page: more PRs closing one issue are beyond an issue an agent works on.
  */
 const closingPrs = async (issues: readonly number[]): Promise<number[]> => {
   if (issues.length === 0) {
     return []
   }
-  const repository = await graphql(issues.map(issue => `issue${issue}: issue(number:${issue}){closedByPullRequestsReferences(first:20){nodes{number state}}}`).join(' '))
+  const repository = await graphql(issues.map(issue => `issue${issue}: issue(number:${issue}){closedByPullRequestsReferences(first:100){nodes{number state}}}`).join(' '))
   return issues.flatMap(issue => records(at(repository, `issue${issue}`, 'closedByPullRequestsReferences', 'nodes'))
     .filter(pr => pr.state === 'OPEN').map(pr => count(pr.number)))
 }
