@@ -2,7 +2,10 @@
  * The guard against GitHub writes under the owner's own `gh` login (#368). Agents may read with plain
  * `gh` (only the owner's login sees the owner's pending reviews), but write only through `agent-gh`,
  * as the bot: a comment once fell back to `gh` when the bot was rate-limited, and posted as the owner
- * (`Coarisfinia/khovax#2136`). This is the plugin's PreToolUse hook on Bash (hooks/hooks.json): it
+ * (`Coarisfinia/khovax#2136`). This is the plugin's PreToolUse hook on Bash, in Claude Code
+ * (hooks/hooks.json) and in Codex (the same entry in .codex-plugin/plugin.json, #370; Codex's source maps its
+ * `exec_command` tool's `cmd` to `Bash` with a string `tool_input.command`, and takes the same deny
+ * answer, but whether the hook fires for calls code mode makes is unconfirmed until #377): it
  * refuses a command that writes through plain `gh`, and lets everything else run.
  *
  * `ownerWrite` reads the command as a shell would, closely enough: every simple command of a

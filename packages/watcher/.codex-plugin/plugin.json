@@ -5,12 +5,13 @@
   "skills": "./skills/",
   "hooks": {
     "hooks": {
-      "SessionStart": [
+      "PreToolUse": [
         {
+          "matcher": "Bash",
           "hooks": [
             {
               "type": "command",
-              "command": "bun \"${PLUGIN_ROOT}/src/codex-watch.ts\" --hook"
+              "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/owner-write-guard.sh\""
             }
           ]
         }
@@ -21,6 +22,16 @@
             {
               "type": "command",
               "command": "bun \"${PLUGIN_ROOT}/src/codex-watch.ts\" --hook --stop"
+            }
+          ]
+        }
+      ],
+      "SessionStart": [
+        {
+          "hooks": [
+            {
+              "type": "command",
+              "command": "bun \"${PLUGIN_ROOT}/src/codex-watch.ts\" --hook"
             }
           ]
         }
