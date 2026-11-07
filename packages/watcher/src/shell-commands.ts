@@ -94,19 +94,20 @@ const closingParen = (text: string, from: number) => {
   return text.length
 }
 
-/** The text of `$((…))` arithmetic, where `<<` is a shift and opens no here-document; other text as it is. */
-const arithmeticSafe = (text: string, at: number, inner: string) =>
-  text.startsWith('$((', at) ? inner.replaceAll('<<', '  ') : inner
-
 /**
  * A `$(…)` or backtick substitution starting at `at`: its text is kept to be read as a command line
- * of its own, and the word gets it, marked as dynamic. Returns that text and where the next thing starts.
+ * of its own, and the word gets it, marked as dynamic. `$((…))` arithmetic is data, but for the
+ * substitutions in it (#373). Returns that text and where the next thing starts.
  */
 const substitution = (scan: Scan, text: string, at: number): [string, number] => {
   const backtick = text[at] === '`'
   const from = at + (backtick ? 1 : 2)
   const end = backtick ? indexOrEnd(text, '`', from) : closingParen(text, from)
-  scan.nested.push(arithmeticSafe(text, at, text.slice(from, end)))
+  if (text.startsWith('$((', at)) {
+    substitutionsIn(scan, text.slice(from, end))
+  } else {
+    scan.nested.push(text.slice(from, end))
+  }
   return [dynamic + text.slice(at, end + 1), end + 1]
 }
 
@@ -201,10 +202,10 @@ const redirect: Reader = (scan, text, at) => {
   return at + 1
 }
 
-/** `((…))` arithmetic: data, but for the substitutions in it; a `<<` there is a shift. */
+/** `((…))` arithmetic: data, but for the substitutions in it, so a `<<` there opens no here-document (#373). */
 const arithmetic: Reader = (scan, text, at) => {
   const end = closingParen(text, at + 1)
-  scan.nested.push(text.slice(at + 2, end - 1).replaceAll('<<', '  '))
+  substitutionsIn(scan, text.slice(at + 2, end - 1))
   return end + 1
 }
 
