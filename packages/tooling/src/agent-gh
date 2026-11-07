@@ -10,16 +10,12 @@ repo=''
 # (#361): the arguments are read like gh reads them, with the command's flag table from gh's own
 # `gh help <command>` (which prints help and never runs the command). That is only asked for when an
 # argument looks like -R/--repo. gh takes nothing after -- as a flag.
-declare -A long=() short=()
-repo_short=''
-looks_like_repo=' -[^- ]*R| --repo'
-if [[ " $* " =~ $looks_like_repo ]]; then
-  command=()
-  for arg in "$@"; do
-    [[ $arg == -* ]] && break
-    command+=("$arg")
-  done
-  flag_line='^[[:space:]]+(-([^[:space:]]),[[:space:]])?--([A-Za-z0-9-]+)([[:space:]]([^[:space:]]+))?([[:space:]]{2,}|$)'
+
+# Loads the flag table of the command the arguments name: whether each long flag and letter takes a
+# value, and the letter of --repo.
+flag_line='^[[:space:]]+(-([^[:space:]]),[[:space:]])?--([A-Za-z0-9-]+)([[:space:]]([^[:space:]]+))?([[:space:]]{2,}|$)'
+load_flags() {
+  long=() short=() repo_short=''
   while IFS= read -r line; do
     [[ $line =~ $flag_line ]] || continue
     letter=${BASH_REMATCH[2]} name=${BASH_REMATCH[3]} type=${BASH_REMATCH[5]}
@@ -29,24 +25,38 @@ if [[ " $* " =~ $looks_like_repo ]]; then
     long[$name]=$takes
     [[ -n $letter ]] && short[$letter]=$takes
     [[ $name == repo && -n $letter ]] && repo_short=$letter
-  done < <(gh help "${command[@]}" 2>/dev/null || true)
-fi
-if [[ -n ${long[repo]+set} ]]; then
+  done < <(gh help "$@" 2>/dev/null || true)
+}
+
+# Reads the arguments with the loaded table: the repository a real -R/--repo names (the last one,
+# as gh takes it), and the arguments that are no flag or flag value. With `lookup`, it reads them as
+# cobra does to find the command: a flag the table doesn't know (one of the subcommand's) takes the
+# next argument unless it is bundled or has its value attached.
+read_args() {
+  flag_repo='' positional=()
+  local lookup=${1:-}
+  local i j arg letter value
   for ((i = 0; i < ${#args[@]}; i++)); do
     arg=${args[i]}
     case $arg in
       --) break ;;
       --*=*)
-        [[ ${arg%%=*} == --repo ]] && repo=${arg#--repo=}
+        [[ ${arg%%=*} == --repo ]] && flag_repo=${arg#--repo=}
         ;;
       --?*)
         if [[ $arg == --repo ]]; then
-          repo=${args[i + 1]:-}
+          flag_repo=${args[i + 1]:-}
           i=$((i + 1))
-        elif [[ -n ${long[${arg#--}]:-} ]]; then
+        elif [[ -n ${long[${arg#--}]:-} || (-n $lookup && -z ${long[${arg#--}]+set}) ]]; then
           i=$((i + 1))
         fi
         ;;
+      -?)
+        if [[ -n $lookup && -z ${short[${arg:1}]+set} ]]; then
+          i=$((i + 1))
+          continue
+        fi
+        ;;&
       -?*)
         # Short flags, possibly bundled (-wR Owner/repo); one that takes a value takes the rest of
         # the argument (after an optional =), or else the next argument.
@@ -59,13 +69,33 @@ if [[ -n ${long[repo]+set} ]]; then
               value=${args[i + 1]:-}
               i=$((i + 1))
             fi
-            [[ $letter == "$repo_short" ]] && repo=$value
+            [[ $letter == "$repo_short" ]] && flag_repo=$value
             break
           fi
         done
         ;;
+      *) positional+=("$arg") ;;
     esac
   done
+}
+
+declare -A long=() short=()
+looks_like_repo=' -[^- ]*R| --repo'
+if [[ " $* " =~ $looks_like_repo ]]; then
+  # The command is first taken as the leading words. A flag before its last word (gh -R x issue
+  # create) belongs to it or a parent, so the arguments read with that table name the command.
+  command=()
+  for arg in "$@"; do
+    [[ $arg == -* ]] && break
+    command+=("$arg")
+  done
+  load_flags "${command[@]}"
+  read_args lookup
+  if [[ ${#positional[@]} -gt ${#command[@]} ]]; then
+    load_flags "${positional[@]}"
+    read_args
+  fi
+  [[ -n ${long[repo]+set} ]] && repo=$flag_repo
 fi
 if [[ -z $repo && ${1:-} == api ]]; then
   for arg in "${args[@]:1}"; do

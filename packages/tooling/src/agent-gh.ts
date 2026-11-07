@@ -8,69 +8,110 @@ import { file, spawnSync, which } from 'bun'
 
 const args = process.argv.slice(2)
 
-// The flags of the command gh would run, from gh's own `gh help <command>` (which prints help and
-// never runs it), as agent-gh reads them (#361): whether each long flag and letter takes a value, and
-// the letter of --repo. Only asked for when an argument looks like -R/--repo.
+// Only a real -R/--repo counts, never another option's value such as --title '--repo=Owner/other'
+// (#361): the arguments are read like gh reads them, as agent-gh does, with the command's flag table
+// from gh's own `gh help <command>` (which prints help and never runs the command). gh takes nothing
+// after -- as a flag.
 const flags = args.includes('--') ? args.slice(0, args.indexOf('--')) : args
-const flagTable = () => {
-  const long = new Map<string, boolean>()
-  const short = new Map<string, boolean>()
-  let repoLetter = ''
+
+interface FlagTable {
+  long: Map<string, boolean>
+  repoLetter: string
+  short: Map<string, boolean>
+}
+
+// One flag of gh's help, and whether it takes a value: only when gh prints its type, and not an
+// optional one (--name type[=default]).
+const flagLine = /^\s+(?:-(?<letter>\S), )?--(?<name>[A-Za-z0-9-]+)(?: (?<type>\S+))?(?:\s{2,}|$)/u
+const flagOf = (line: string) => {
+  const { letter = '', name = '', type = '' } = flagLine.exec(line)?.groups ?? {}
+  return name === '' ? [] : [{ letter, name, takes: type !== '' && !type.includes('[=') }]
+}
+
+// The flag table of the command the arguments name.
+const loadFlags = (command: string[]): FlagTable => {
+  const help = spawnSync(['gh', 'help', ...command], { stderr: 'ignore' }).stdout.toString()
+  const entries = help.split('\n').flatMap(line => flagOf(line))
+  return {
+    long: new Map(entries.map(entry => [entry.name, entry.takes])),
+    repoLetter: entries.find(entry => entry.name === 'repo')?.letter ?? '',
+    short: new Map(entries.filter(entry => entry.letter !== '').map(entry => [entry.letter, entry.takes])),
+  }
+}
+
+// What one argument does, read with the table: the repository it names, if it is -R/--repo, and how
+// many of the following arguments it takes. With `lookup`, it is read as cobra does to find the
+// command: a flag the table doesn't know (one of the subcommand's) takes the next argument unless it
+// is bundled or has its value attached.
+interface Step {
+  repo: string | null
+  skip: number
+}
+
+interface Reading {
+  lookup: boolean
+  table: FlagTable
+}
+
+const longStep = ({ lookup, table }: Reading, arg: string, next: string): Step => {
+  const [name = '', ...value] = arg.slice(2).split('=')
+  if (value.length > 0) {
+    return { repo: name === 'repo' ? value.join('=') : null, skip: 0 }
+  }
+  const takes = name === 'repo' || (table.long.get(name) ?? lookup)
+  return { repo: name === 'repo' ? next : null, skip: takes ? 1 : 0 }
+}
+
+// Short flags, possibly bundled (-wR Owner/repo); one that takes a value takes the rest of the
+// argument (after an optional =), or else the next argument.
+const shortStep = ({ lookup, table }: Reading, arg: string, next: string): Step => {
+  const letters = arg.slice(1).split('')
+  if (lookup && letters.length === 1 && !table.short.has(arg.slice(1))) {
+    return { repo: null, skip: 1 }
+  }
+  const at = letters.findIndex(letter => table.short.get(letter) === true)
+  const rest = arg.slice(at + 2)
+  const value = rest === '' ? next : rest.replace(/^=/u, '')
+  const repo = at !== -1 && letters[at] === table.repoLetter ? value : null
+  return { repo, skip: at !== -1 && rest === '' ? 1 : 0 }
+}
+
+const stepOf = (reading: Reading, arg: string, next: string): Step | null => {
+  if (arg.startsWith('--')) {
+    return longStep(reading, arg, next)
+  }
+  return arg.startsWith('-') && arg.length > 1 ? shortStep(reading, arg, next) : null
+}
+
+// The repository a real -R/--repo names (the last one, as gh takes it), and the arguments that are
+// no flag or flag value.
+const readArgs = (reading: Reading) => {
+  let repo: string | null = null
+  const positional: string[] = []
+  for (let index = 0; index < flags.length; index += 1) {
+    const arg = flags[index] ?? ''
+    const step = stepOf(reading, arg, flags[index + 1] ?? '')
+    positional.push(...(step ? [] : [arg]))
+    repo = step?.repo ?? repo
+    index += step?.skip ?? 0
+  }
+  return { positional, repo }
+}
+
+// The table is only asked for when an argument looks like -R/--repo. The command is first taken as
+// the leading words. A flag before its last word (gh -R x issue create) belongs to it or a parent, so
+// the arguments read with that table name the command.
+const flagRepo = () => {
   if (!flags.some(arg => /^-[^-]*R|^--repo/u.test(arg))) {
-    return { long, repoLetter, short }
+    return null
   }
   const firstFlag = flags.findIndex(arg => arg.startsWith('-'))
   const command = firstFlag === -1 ? flags : flags.slice(0, firstFlag)
-  const help = spawnSync(['gh', 'help', ...command], { stderr: 'ignore' }).stdout.toString()
-  for (const line of help.split('\n')) {
-    const match = /^\s+(?:-(\S), )?--([A-Za-z0-9-]+)(?: (\S+))?(?:\s{2,}|$)/u.exec(line)
-    if (match) {
-      const [, letter, name = '', type] = match
-      // A value only when gh prints its type, and not an optional one (--name type[=default]).
-      const takes = type !== undefined && !type.includes('[=')
-      long.set(name, takes)
-      if (letter !== undefined) {
-        short.set(letter, takes)
-        repoLetter = name === 'repo' ? letter : repoLetter
-      }
-    }
-  }
-  return { long, repoLetter, short }
-}
-
-// The repository a real -R/--repo names (the last one, as gh takes it), never another option's
-// value such as --title '--repo=Owner/other' (#361), or null.
-const flagRepo = () => {
-  const { long, repoLetter, short } = flagTable()
-  if (!long.has('repo')) {
-    return null
-  }
-  let repo: string | null = null
-  for (let index = 0; index < flags.length; index += 1) {
-    const arg = flags[index] ?? ''
-    if (arg.startsWith('--')) {
-      const [name = '', ...value] = arg.slice(2).split('=')
-      if (value.length > 0) {
-        repo = name === 'repo' ? value.join('=') : repo
-      } else if (long.get(name) === true) {
-        index += 1
-        repo = name === 'repo' ? (flags[index] ?? '') : repo
-      }
-    } else if (arg.startsWith('-') && arg.length > 1) {
-      // Short flags, possibly bundled (-wR Owner/repo); one that takes a value takes the rest of
-      // the argument (after an optional =), or else the next argument.
-      const at = [...arg.slice(1)].findIndex(letter => short.get(letter) === true) + 1
-      if (at > 0) {
-        let value = arg.slice(at + 1).replace(/^=/u, '')
-        if (arg.length === at + 1) {
-          index += 1
-          value = flags[index] ?? ''
-        }
-        repo = arg[at] === repoLetter ? value : repo
-      }
-    }
-  }
-  return repo
+  const group = loadFlags(command)
+  const found = readArgs({ lookup: true, table: group })
+  const leaf = found.positional.length > command.length ? loadFlags(found.positional) : group
+  const read = leaf === group ? found : readArgs({ lookup: false, table: leaf })
+  return leaf.long.has('repo') ? read.repo : null
 }
 
 // An api call's endpoint, repos/<owner>/<repo>/…, with or without a leading slash, wherever it is

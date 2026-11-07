@@ -34,13 +34,18 @@ const run = (wrapper: keyof typeof wrappers, args: string[]) => {
   return { code: result.exitCode, stderr: result.stderr.toString() }
 }
 
-// The gh stub answers `gh help <command>` with a flag table in gh's own format (api has no -R), and
+// The gh stub answers `gh help <command>` with a flag table in gh's own format, as gh's levels have
+// them: the root none, a group (gh issue) only -R, a command its own flags and -R, api no -R. It
 // records every other call.
 const ghStub = `if [[ $1 == help ]]; then
   if [[ $2 == api ]]; then
     printf 'FLAGS\\n  -X, --method string          The HTTP method for the request\\n  -f, --raw-field key=value    Add a string parameter\\n'
-  else
+    exit 0
+  fi
+  if [[ $# -ge 3 ]]; then
     printf 'FLAGS\\n  -t, --title string   Supply a title\\n  -w, --web            Open the browser\\n\\n'
+  fi
+  if [[ $# -ge 2 ]]; then
     printf 'INHERITED FLAGS\\n      --help                     Show help for command\\n'
     printf '  -R, --repo [HOST/]OWNER/REPO   Select another repository using the [HOST/]OWNER/REPO format\\n'
   fi
@@ -118,6 +123,14 @@ describe.each(['bash', 'windows'] as const)('agent-gh (%s)', wrapper => {
     expect(readFileSync(path.join(home, 'token-repo'), 'utf8')).toBe('Owner/bundled')
     expect(run(wrapper, ['issue', 'create', '--repo=Owner/attached']).code).toBe(0)
     expect(readFileSync(path.join(home, 'token-repo'), 'utf8')).toBe('Owner/attached')
+  })
+
+  test('reads a value that looks like -R with the command\'s flags when -R comes before the command', () => {
+    tokenStub('echo bot-token')
+    expect(run(wrapper, ['issue', '-R', 'Owner/repo', 'create', '--title', '--repo=Owner/other']).code).toBe(0)
+    expect(readFileSync(path.join(home, 'token-repo'), 'utf8')).toBe('Owner/repo')
+    expect(run(wrapper, ['-R', 'Owner/repo', 'issue', 'create', '--title', '-R', 'Owner/other']).code).toBe(0)
+    expect(readFileSync(path.join(home, 'token-repo'), 'utf8')).toBe('Owner/repo')
   })
 
   test('finds an api endpoint after the flags', () => {
