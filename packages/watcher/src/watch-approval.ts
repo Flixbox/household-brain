@@ -49,7 +49,7 @@ const checkAutoMergeOff = async ({ green, pr, state }: { green: boolean, pr: num
   if (!waits || await readyApprovedDraft(pr, state)) {
     return
   }
-  await report(approvedEvent({ botAsked: asked.length > 0, draft: state.draft, green, head: state.head, repo: REPO, pr, ready: readyCommand(pr) }), pr)
+  await report(approvedEvent({ botAsked: asked.length > 0, draft: state.draft, green, head: state.head, pr, ready: readyCommand(pr), repo: REPO }), pr)
 }
 
 /**
