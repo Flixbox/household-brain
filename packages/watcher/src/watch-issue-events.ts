@@ -95,6 +95,7 @@ export interface IssueEvent {
 const AUTHOR = 'author{login kind:__typename}'
 const NEWEST = 'orderBy:{field:CREATED_AT,direction:DESC}'
 const UPDATED = 'orderBy:{field:UPDATED_AT,direction:DESC}'
+const ISSUE_COMMENTS = `comments(last:20){nodes{databaseId body url createdAt ${AUTHOR}}}`
 /**
  * New issues and issue comments, as GraphQL names them (#314), in one query instead of two
  * repository-wide REST lists, sparing the REST quota agents share (#306): the fifty newest issues and
@@ -105,7 +106,7 @@ const UPDATED = 'orderBy:{field:UPDATED_AT,direction:DESC}'
  */
 export const ISSUE_EVENT_FIELDS = `created: issues(first:50,${NEWEST}){nodes{number title createdAt ${AUTHOR}}}`
   + ` createdPrs: pullRequests(first:50,${NEWEST}){nodes{createdAt}}`
-  + ` updated: issues(first:50,${UPDATED}){nodes{number comments(last:20){nodes{databaseId body url createdAt ${AUTHOR}}}}}`
+  + ` updated: issues(first:50,${UPDATED}){nodes{number ${ISSUE_COMMENTS}}}`
   + ` updatedPrs: pullRequests(first:50,${UPDATED}){nodes{comments(last:50){nodes{createdAt}}}}`
 
 /**
@@ -136,17 +137,20 @@ const issueOfComments = (repository: Json): Map<Json, number> => {
   return new Map(issues.flatMap(issue => records(at(issue, 'comments', 'nodes')).map((comment): [Json, number] => [comment, count(issue.number)])))
 }
 
+/** The event for the owner's `comment` on `issue`, remembered by its id. */
+const commentEvent = (comment: Json, issue: number, owner: string): IssueEvent => ({
+  at: comment.createdAt,
+  issue,
+  key: `issue-comment ${count(comment.databaseId)}`,
+  lines: [`ISSUE_COMMENT ${count(comment.databaseId)} #${issue}:`, ...commentText(comment, { author: owner, owner })],
+})
+
 /** The owner's comments on issues, among the fifty newest comments on issues and PRs. */
 const ownerComments = (repository: Json, owner: string): IssueEvent[] => {
   const issueOf = issueOfComments(repository)
   const onPrs = records(at(repository, 'updatedPrs', 'nodes')).flatMap(pr => records(at(pr, 'comments', 'nodes')))
   return newest([...issueOf.keys()], onPrs).filter(comment => actor(comment.author) === owner)
-    .map(comment => ({
-      at: comment.createdAt,
-      issue: issueOf.get(comment) ?? 0,
-      key: `issue-comment ${count(comment.databaseId)}`,
-      lines: [`ISSUE_COMMENT ${count(comment.databaseId)} #${issueOf.get(comment) ?? 0}:`, ...commentText(comment, { author: owner, owner })],
-    }))
+    .map(comment => commentEvent(comment, issueOf.get(comment) ?? 0, owner))
 }
 
 /**
@@ -156,3 +160,15 @@ const ownerComments = (repository: Json, owner: string): IssueEvent[] => {
  */
 export const issueEventsFrom = (repository: Json, { owner, self }: { owner: string, self: string }): IssueEvent[] =>
   [...newIssues(repository, self), ...ownerComments(repository, owner)]
+
+/**
+ * What a scoped watcher reads of each subscribed issue (#357): its last twenty comments, instead of
+ * the repository's newest issues and comments.
+ */
+export const SUBSCRIBED_ISSUE_FIELDS = ISSUE_COMMENTS
+
+/** The owner's comments on the subscribed issues, from each one's `SUBSCRIBED_ISSUE_FIELDS`. */
+export const subscribedIssueEventsFrom = (issues: ReadonlyMap<number, Json>, owner: string): IssueEvent[] =>
+  [...issues].flatMap(([issue, value]) => records(at(value, 'comments', 'nodes'))
+    .filter(comment => actor(comment.author) === owner)
+    .map(comment => commentEvent(comment, issue, owner)))

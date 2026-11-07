@@ -1,11 +1,11 @@
 /** The project watcher's issue checks (watch-project.ts): new issues, the owner's comments, closings, cycles in their links. */
 import { MAX_CYCLES, type OpenIssue, linkCycles, newCycles } from './watch-link-cycles'
-import { graphql, issueLine, openIssues } from './watch-github'
-import { at } from './watch-text'
+import { issueLine, openIssues } from './watch-github'
+import { perIssue } from './watch-per-issue'
 import type { IssueEvent } from './watch-issue-events'
-import { issueEventLines } from './watch-comments'
+import { issueEventLines, subscribedIssueEvents } from './watch-comments'
 import { queue } from './watch-output'
-import { appendLines, endIssue, exists, oneAtATime, readLines, subscriptions, writeLines } from './watch-state'
+import { appendLines, endIssue, exists, oneAtATime, readLines, subscriptions, writeLines, writtenAt } from './watch-state'
 
 const byNumber = (first: number, second: number) => first - second
 
@@ -18,20 +18,49 @@ const firstRun = async (name: string, lines: string[]): Promise<boolean> => {
   return true
 }
 
+/**
+ * A scoped watcher reads only its subscribed issues' comments (#357), and remembers them in a file of
+ * its own: the repository-wide reads before it never saw an issue's older comments, which would
+ * otherwise all come up as news once.
+ */
+const SEEN_FILE = subscriptions.scoped ? 'subscribed-issue-events' : 'issue-events'
+const issueEvents = async (fresh: boolean): Promise<IssueEvent[]> =>
+  subscriptions.scoped ? subscribedIssueEvents(subscriptions.issues, fresh) : issueEventLines(fresh)
+
 const unseenIssues = async (lines: IssueEvent[]): Promise<IssueEvent[]> => {
-  const seen = new Set(await readLines('issue-events'))
+  const seen = new Set(await readLines(SEEN_FILE))
   const unseen = lines.filter(({ key }) => !seen.has(key))
-  await appendLines('issue-events', unseen.map(({ key }) => key))
+  await appendLines(SEEN_FILE, unseen.map(({ key }) => key))
   return unseen
+}
+
+/** Whether `written` (GitHub's timestamp) is after `since` (epoch milliseconds); an unreadable one isn't. */
+const writtenAfter = (written: unknown, since: number): boolean => {
+  try {
+    return typeof written === 'string' && Temporal.Instant.from(written).epochMilliseconds > since
+  } catch {
+    return false
+  }
+}
+
+/**
+ * What the first look takes for old news: all it finds. A scoped watcher that ran before #357 kept
+ * its record in `issue-events`; for it, only what was written before that file's last write is old
+ * news, and an owner's comment written while it was restarted still comes.
+ */
+const oldNews = async (lines: IssueEvent[]): Promise<IssueEvent[]> => {
+  const since = subscriptions.scoped ? await writtenAt('issue-events') : null
+  return since === null ? lines : lines.filter(({ at: written }) => !writtenAfter(written, since))
 }
 
 /** Issues and the owner's comments on them not reported yet; the ones from before the first run aren't news. */
 export const checkIssues = async (fresh = false): Promise<boolean> => oneAtATime('issue-activity', async () => {
-  const lines = await issueEventLines(fresh).catch(() => null)
+  const lines = await issueEvents(fresh).catch(() => null)
   // A new state file for the id keys (#247): on its first run what is there is old news, so nothing
   // already reported under the old text keys (`issues`) comes back.
   if (!lines) { return false }
-  if (await firstRun('issue-events', lines.map(({ key }) => key))) { return true }
+  // A scoped watcher goes on to report what isn't old news (`oldNews`); for the others that is nothing.
+  if (await firstRun(SEEN_FILE, (await oldNews(lines)).map(({ key }) => key)) && !subscriptions.scoped) { return true }
   const unseen = await unseenIssues(lines)
   // Each its own event, with when it was written (#240): several comments are several answers.
   for (const { at: written, issue, key, lines: event } of unseen) {
@@ -77,8 +106,8 @@ const checkOpenList = async (now: string[]): Promise<void> => {
     return
   }
   await writeLines('open-issues', now)
-  for (const { closed, issue, line } of lines) {
-    if (!closed || !subscriptions.scoped) { queue([line], { issue }) }
+  for (const { issue, line } of lines) {
+    queue([line], { issue })
   }
 }
 
@@ -89,6 +118,11 @@ const checkOpenList = async (now: string[]): Promise<void> => {
  * with either, every issue would look closed or reopened.
  */
 export const checkIssueStates = async (): Promise<void> => {
+  // A scoped watcher reports no cycles and no other issue's closing (#357), and its own issues'
+  // closings come from `checkSubscribedIssues`: the open list is not its question.
+  if (subscriptions.scoped) {
+    return
+  }
   const issues = await openIssues().catch(() => null)
   if (!issues || issues.length === 0) {
     return
@@ -100,8 +134,9 @@ export const checkIssueStates = async (): Promise<void> => {
 export const checkSubscribedIssues = async (): Promise<void> => {
   const { issues } = subscriptions
   if (issues.length === 0) { return }
-  const value = await graphql(issues.map(issue => `issue${issue}:issue(number:${issue}){state}`).join(' '))
-  const closed = issues.filter(issue => at(value, `issue${issue}`, 'state') === 'CLOSED')
+  // An issue that can't be read (gone, #357) isn't closed, and doesn't hold back the others.
+  const states = await perIssue(issues, 'state')
+  const closed = issues.filter(issue => states.get(issue)?.state === 'CLOSED')
   // A failed final activity lookup cannot close a subscription or discard an owner's comment.
   if (closed.length === 0 || !await checkIssues(true)) { return }
   await Promise.all(closed.map(async issue => {
