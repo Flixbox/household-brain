@@ -34,6 +34,25 @@ const run = (wrapper: keyof typeof wrappers, args: string[]) => {
   return { code: result.exitCode, stderr: result.stderr.toString() }
 }
 
+// The gh stub answers `gh help <command>` with a flag table in gh's own format, as gh's levels have
+// them: the root none, a group (gh issue) only -R, a command its own flags and -R, api no -R. It
+// records every other call.
+const ghStub = `if [[ $1 == help ]]; then
+  if [[ $2 == api ]]; then
+    printf 'FLAGS\\n  -X, --method string          The HTTP method for the request\\n  -f, --raw-field key=value    Add a string parameter\\n'
+    exit 0
+  fi
+  if [[ $# -ge 3 ]]; then
+    printf 'FLAGS\\n  -t, --title string   Supply a title\\n  -w, --web            Open the browser\\n\\n'
+  fi
+  if [[ $# -ge 2 ]]; then
+    printf 'INHERITED FLAGS\\n      --help                     Show help for command\\n'
+    printf '  -R, --repo [HOST/]OWNER/REPO   Select another repository using the [HOST/]OWNER/REPO format\\n'
+  fi
+  exit 0
+fi
+echo -n "$GH_TOKEN|$*" > "$HOME/gh-called"`
+
 const ghCall = () => {
   const file = path.join(home, 'gh-called')
   return existsSync(file) ? readFileSync(file, 'utf8') : null
@@ -44,7 +63,7 @@ beforeEach(() => {
   bin = path.join(home, 'stubs')
   mkdirSync(bin)
   mkdirSync(path.join(home, '.local', 'bin'), { recursive: true })
-  script(path.join(bin, 'gh'), 'echo -n "$GH_TOKEN|$*" > "$HOME/gh-called"')
+  script(path.join(bin, 'gh'), ghStub)
 })
 
 afterEach(() => {
@@ -86,6 +105,34 @@ describe.each(['bash', 'windows'] as const)('agent-gh (%s)', wrapper => {
     tokenStub('echo bot-token')
     expect(run(wrapper, ['issue', 'create', '--title', '-ROwner/other', '--', '-R', 'Owner/other']).code).toBe(0)
     expect(readFileSync(path.join(home, 'token-repo'), 'utf8')).toBe('')
+  })
+
+  test('takes no repository from a value that looks like -R or --repo (#361)', () => {
+    tokenStub('echo bot-token')
+    expect(run(wrapper, ['issue', 'create', '--title', '--repo=Owner/other']).code).toBe(0)
+    expect(readFileSync(path.join(home, 'token-repo'), 'utf8')).toBe('')
+    expect(run(wrapper, ['issue', 'create', '--title', '-R', 'Owner/other']).code).toBe(0)
+    expect(readFileSync(path.join(home, 'token-repo'), 'utf8')).toBe('')
+  })
+
+  test('takes the repository of a real -R after a flag without a value, or bundled (#361)', () => {
+    tokenStub('echo bot-token')
+    expect(run(wrapper, ['issue', 'create', '--web', '-R', 'Owner/repo']).code).toBe(0)
+    expect(readFileSync(path.join(home, 'token-repo'), 'utf8')).toBe('Owner/repo')
+    expect(run(wrapper, ['issue', 'create', '--title', 'hi', '-wR', 'Owner/bundled']).code).toBe(0)
+    expect(readFileSync(path.join(home, 'token-repo'), 'utf8')).toBe('Owner/bundled')
+    expect(run(wrapper, ['issue', 'create', '--repo=Owner/attached']).code).toBe(0)
+    expect(readFileSync(path.join(home, 'token-repo'), 'utf8')).toBe('Owner/attached')
+    expect(run(wrapper, ['issue', 'view', '123', '-R', 'Owner/after-number']).code).toBe(0)
+    expect(readFileSync(path.join(home, 'token-repo'), 'utf8')).toBe('Owner/after-number')
+  })
+
+  test('reads a value that looks like -R with the command\'s flags when -R comes before the command', () => {
+    tokenStub('echo bot-token')
+    expect(run(wrapper, ['issue', '-R', 'Owner/repo', 'create', '--title', '--repo=Owner/other']).code).toBe(0)
+    expect(readFileSync(path.join(home, 'token-repo'), 'utf8')).toBe('Owner/repo')
+    expect(run(wrapper, ['-R', 'Owner/repo', 'issue', 'create', '--title', '-R', 'Owner/other']).code).toBe(0)
+    expect(readFileSync(path.join(home, 'token-repo'), 'utf8')).toBe('Owner/repo')
   })
 
   test('finds an api endpoint after the flags', () => {
