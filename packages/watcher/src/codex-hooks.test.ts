@@ -6,12 +6,11 @@
  * after `pre-tool-use.command.input` in Codex 0.166), and check its answer is one Codex accepts.
  */
 import { describe, expect, it } from 'bun:test'
-import { join } from 'node:path'
 import { isRecord, textOf } from './read'
 
-const pluginRoot = join(import.meta.dir, '..')
+const pluginRoot = `${import.meta.dir}/..`
 
-const readJson = async (path: string): Promise<unknown> => JSON.parse(await Bun.file(join(pluginRoot, path)).text())
+const readJson = async (path: string): Promise<unknown> => JSON.parse(await Bun.file(`${pluginRoot}/${path}`).text())
 
 /** A manifest's PreToolUse entries: `hooks.hooks.PreToolUse` in Codex's plugin.json, `hooks.PreToolUse` in hooks.json. */
 const preToolUse = (hooks: unknown): unknown[] => {
@@ -33,7 +32,7 @@ const claudeHooks = async () => {
 const bashCommands = (entries: readonly unknown[]) =>
   entries
     .filter(entry => isRecord(entry) && new RegExp(textOf(entry.matcher), 'u').test('Bash'))
-    .flatMap(entry => (isRecord(entry) && Array.isArray(entry.hooks) ? entry.hooks : []))
+    .flatMap((entry): unknown[] => (isRecord(entry) && Array.isArray(entry.hooks) ? entry.hooks : []))
     .map(hook => (isRecord(hook) && hook.type === 'command' ? textOf(hook.command) : ''))
 
 /** What Codex sends a PreToolUse hook for a shell command. */
