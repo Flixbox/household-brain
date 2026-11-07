@@ -113,7 +113,8 @@ const graphqlWrites = (flags: ApiFlags) => {
   if (flags.input || typeof query === 'undefined' || isDynamic(query) || query.startsWith('query=@')) {
     return true
   }
-  return /\bmutation\b/u.test(topLevel(graphqlCode(query)))
+  // An operation's type stands first in the document, or after the closing brace of the one before it.
+  return /(?:^|\})\s*mutation\b/u.test(topLevel(graphqlCode(query.slice('query='.length))))
 }
 
 /**
@@ -166,6 +167,10 @@ const leadingLength = (word: string) => {
   }
   return target === '' ? 2 : 1
 }
+
+/** A command's arguments without its redirections (`>out`, `2>&1`, `< in`), which the command never sees. */
+const withoutRedirections = (words: readonly string[]) =>
+  words.filter((word, at) => !redirection.test(word) && redirection.exec(words[at - 1] ?? '')?.groups?.target !== '')
 
 /** Where the command itself starts: after variable assignments, keywords and redirections. */
 const commandStart = (words: readonly string[]) => {
@@ -220,8 +225,10 @@ const runCommands = (text: string): string[][] =>
  * its arguments would be a gh write, or when it has none (`$SCRIPT`, or what `eval "$SCRIPT"` and
  * `bash -c "$SCRIPT"` run), as it may be a whole command line.
  */
-const writes = ([name = '', ...args]: readonly string[]) =>
-  (isGh(name) && ghWrites(args)) || (isDynamic(name) && (args.length === 0 || ghWrites(args)))
+const writes = ([name = '', ...words]: readonly string[]) => {
+  const args = withoutRedirections(words)
+  return (isGh(name) && ghWrites(args)) || (isDynamic(name) && (args.length === 0 || ghWrites(args)))
+}
 
 /** The first command in a Bash command line that writes to GitHub through plain `gh`, as its words joined, or null when there is none. */
 export const ownerWrite = (command: string): string | null => {

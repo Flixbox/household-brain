@@ -153,6 +153,22 @@ describe('ownerWrite (#368)', () => {
     ])).toEqual([])
   })
 
+  it('reads a shift as no here-document, and a redirection as the end of a word (Codex round 3 on #369)', () => {
+    expect(refused([
+      '((1<<1))\ngh issue close 1\n1',
+      'for ((i=0; i<<1; i++)); do :; done\ngh issue close 1\n1',
+      'echo $((1<<1))\ngh issue close 1\n1',
+      'gh<<EOF issue close 1\nEOF',
+      'gh>out issue close 1',
+      "gh api graphql -f query='query Q { viewer { login } } mutation M { x }'",
+    ])).toEqual([])
+    expect(allowed([
+      'cat <<EOF\ngh issue close 1 $(printf x)\nEOF',
+      "gh api graphql -f query='query mutation { viewer { login } }'",
+      'gh pr view 1>out 2>&1',
+    ])).toEqual([])
+  })
+
   it('names the command it found', () => {
     expect(ownerWrite('cd repo && gh pr comment 1 -b "a b" | cat')).toBe('gh pr comment 1 -b a b')
     expect(ownerWrite('gh api x --method "$METHOD"')).toBe('gh api x --method $METHOD')

@@ -6,6 +6,7 @@
  * expands nothing: a `$` the shell would expand (outside single quotes) stays in the word, after a
  * mark, so `isDynamic` tells a word the shell may change from one it takes as written.
  */
+import { type Heredoc, closingLine, heredocOf, heredocOpener } from './shell-heredocs'
 
 /** Put before each `$` the shell expands; a private-use character, so no command text has it. */
 const dynamic = '\u{E000}'
@@ -15,15 +16,6 @@ export const isDynamic = (word: string) => word.includes(dynamic)
 
 /** A word as it reads, without the marks. */
 export const plainWord = (word: string) => word.replaceAll(dynamic, '')
-
-/** A here-document opened on the line being read; its body starts on the next line. */
-interface Heredoc {
-  delimiter: string
-  /** `<<'EOF'` (or `"EOF"`, `\\EOF`): the body is taken as written; else the shell runs its `$(…)`. */
-  quoted: boolean
-  /** `<<-`: tabs before the closing line don't count. */
-  tabs: boolean
-}
 
 /** The scan of a command line: the simple commands found so far, and the one being read. */
 interface Scan {
@@ -102,6 +94,10 @@ const closingParen = (text: string, from: number) => {
   return text.length
 }
 
+/** The text of `$((…))` arithmetic, where `<<` is a shift and opens no here-document; other text as it is. */
+const arithmeticSafe = (text: string, at: number, inner: string) =>
+  text.startsWith('$((', at) ? inner.replaceAll('<<', '  ') : inner
+
 /**
  * A `$(…)` or backtick substitution starting at `at`: its text is kept to be read as a command line
  * of its own, and the word gets it, marked as dynamic. Returns that text and where the next thing starts.
@@ -110,7 +106,7 @@ const substitution = (scan: Scan, text: string, at: number): [string, number] =>
   const backtick = text[at] === '`'
   const from = at + (backtick ? 1 : 2)
   const end = backtick ? indexOrEnd(text, '`', from) : closingParen(text, from)
-  scan.nested.push(text.slice(from, end))
+  scan.nested.push(arithmeticSafe(text, at, text.slice(from, end)))
   return [dynamic + text.slice(at, end + 1), end + 1]
 }
 
@@ -190,52 +186,62 @@ const plain: Reader = (scan, text, at) => {
   return at + 1
 }
 
-/** `<<`, `<<-`, and the delimiter, quoted or not. */
-const heredocOpener = /^<<(?<tabs>-?)[\t ]*(?:'(?<single>[^']*)'|"(?<double>[^"]*)"|(?<escape>\\)?(?<bare>[^\s"&'();<>|-][^\s"&'();<>|]*))/u
-
 const opensHeredoc = (text: string, at: number) => text.startsWith('<<', at) && !text.startsWith('<<<', at)
+
+/** `<` and `>` end the word before them, as in the shell, unless it is the file descriptor (`2>`) or the operator so far (`>>`, `&>`). */
+const endWordBeforeRedirection = (scan: Scan) => {
+  if (!/^\d*[&<>]*$/u.test(scan.word ?? '')) {
+    endWord(scan)
+  }
+}
+
+const redirect: Reader = (scan, text, at) => {
+  endWordBeforeRedirection(scan)
+  append(scan, text[at] ?? '')
+  return at + 1
+}
+
+/** `((…))` arithmetic: data, but for the substitutions in it; a `<<` there is a shift. */
+const arithmetic: Reader = (scan, text, at) => {
+  const end = closingParen(text, at + 1)
+  scan.nested.push(text.slice(at + 2, end - 1).replaceAll('<<', '  '))
+  return end + 1
+}
 
 const heredocOpen: Reader = (scan, text, at) => {
   const match = heredocOpener.exec(text.slice(at))
+  endWordBeforeRedirection(scan)
   if (match === null) {
     append(scan, '<<')
     return at + 2
   }
-  const { bare, double, escape, single, tabs } = match.groups ?? {}
-  scan.heredocs.push({
-    delimiter: single ?? double ?? bare ?? '',
-    quoted: typeof escape === 'string' || typeof bare !== 'string',
-    tabs: tabs === '-',
-  })
+  scan.heredocs.push(heredocOf(match))
   append(scan, match[0])
+  endWord(scan)
   return at + match[0].length
 }
 
-/** Where a here-document's body ends (the start of its closing line) and what follows it starts. */
-const closingLine = (heredoc: Heredoc, text: string, from: number) => {
-  let start = from
-  while (start < text.length) {
-    const end = indexOrEnd(text, '\n', start)
-    const line = text.slice(start, end)
-    if ((heredoc.tabs ? line.replace(/^\t+/u, '') : line) === heredoc.delimiter) {
-      return { after: end + 1, start }
-    }
-    start = end + 1
+/** Reads only the `$(…)` and backtick substitutions of a text the shell otherwise takes as data. */
+const substitutionsIn = (scan: Scan, text: string) => {
+  let at = 0
+  while (at < text.length) {
+    const escape = text[at] === '\\' ? 2 : 1
+    at = startsSubstitution(text, at) ? substitution(scan, text, at)[1] : at + escape
   }
-  return { after: text.length, start: text.length }
 }
 
 /**
- * Where what follows the here-documents opened on a line starts: their bodies are data, not commands.
- * A body the shell runs substitutions in is read as commands after all (`from` is returned), and so
- * is all that follows it.
+ * Where what follows the here-documents opened on a line starts: their bodies are data, not commands,
+ * but for the substitutions the shell runs in an unquoted one.
  */
-const pastHeredocs = (heredocs: readonly Heredoc[], text: string, from: number) => {
+const pastHeredocs = (scan: Scan, text: string, from: number) => {
+  const pending = scan.heredocs
+  scan.heredocs = []
   let at = from
-  for (const heredoc of heredocs) {
+  for (const heredoc of pending) {
     const { after, start } = closingLine(heredoc, text, at)
-    if (!heredoc.quoted && /\$\(|`/u.test(text.slice(at, start))) {
-      return at
+    if (!heredoc.quoted) {
+      substitutionsIn(scan, text.slice(at, start))
     }
     at = after
   }
@@ -244,9 +250,7 @@ const pastHeredocs = (heredocs: readonly Heredoc[], text: string, from: number) 
 
 const newline: Reader = (scan, text, at) => {
   endCommand(scan)
-  const pending = scan.heredocs
-  scan.heredocs = []
-  return pastHeredocs(pending, text, at + 1)
+  return pastHeredocs(scan, text, at + 1)
 }
 
 type Test = (scan: Scan, text: string, at: number) => boolean
@@ -256,6 +260,8 @@ const readerRules: readonly (readonly [Test, Reader])[] = [
   [(_scan, text, at) => text[at] === ' ' || text[at] === '\t', blank],
   [(_scan, text, at) => text[at] === '\n', newline],
   [(_scan, text, at) => opensHeredoc(text, at), heredocOpen],
+  [(_scan, text, at) => text[at] === '<' || text[at] === '>', redirect],
+  [(scan, text, at) => scan.word === null && text.startsWith('((', at), arithmetic],
   [(_scan, text, at) => isSeparator(text, at), separator],
   [(_scan, text, at) => startsSubstitution(text, at), substituted],
   [(scan, text, at) => text[at] === '#' && scan.word === null, comment],
