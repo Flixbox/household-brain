@@ -208,7 +208,7 @@ describe('dismissedReviewEvent', () => {
 describe('approvedEvent (#298)', () => {
   const approved = { botAsked: false, draft: false, green: true, head: HEAD, merge: queueCommand('owner/repo', 7), pr: 7, ready: 'gh pr ready 7' }
 
-  it('asks to enable auto-merge once CI is green', () => {
+  it('asks to queue with agent-queue once CI is green (#356)', () => {
     expect(approvedEvent(approved)).toEqual({ key: `pr-7 ready ${HEAD}`, lines: ['READY_TO_MERGE: approved and CI is green at abcdef1, but auto-merge is off. Queue it, alone in its own call: agent-queue owner/repo 7'] })
     expect(approvedEvent({ ...approved, green: false })).toBeNull()
   })

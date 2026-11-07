@@ -10,7 +10,7 @@
  *   PR #<n>: CI_SLOW                 a CI run (PR or deploy) has been going for more than the limit
  *   PR #<n>: CONFLICT                the PR conflicts with its base branch: rebase it
  *   PR #<n>: MAIN_MOVED              main got commits the PR doesn't have yet: rebase and test again
- *   PR #<n>: APPROVED                the owner approved (enable auto-merge once it is well reviewed)
+ *   PR #<n>: APPROVED                the owner approved (queue with `agent-queue <owner/name> <n>` once it is well reviewed)
  *   PR #<n>: READY_TO_MERGE          approved, CI green for the current head, auto-merge still off
  *   PR #<n>: APPROVED_DRAFT          approved but still a draft (#298): mark it ready, queue (after the review a bot was asked for)
  *   PR #<n>: DRAFT_READIED           with READY_APPROVED_DRAFTS=1 (off by default, #301): the owner's latest review

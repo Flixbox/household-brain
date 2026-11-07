@@ -193,8 +193,8 @@ approved one whose auto-merge is still off and that isn't in the merge queue, no
 | `CI_SLOW` | Something hangs. Cancel the run, read its logs, fix the hang **and** the missing time limit. |
 | `CONFLICT` | Rebase on the default branch, run the checks, push once, reply on the pull request. |
 | `MAIN_MOVED` | The default branch moved under the pull request. Rebase, run the checks, push once, so what gets merged is what was tested. |
-| `APPROVED` | The owner approved: only `OWNER`'s approval counts, never a bot's or anyone else's (#277), here, in the open-PR list, `READY_TO_MERGE` and `REMINDER`. If the review's findings are fixed, read the pull request for unanswered comments, then enable auto-merge with the command the event names (`--squash` unless the branch merges through a merge queue), or as the repository's notes say). A plain approval comes only as this; one with text also comes as `ACTIVITY`: answer it first. For a PR already in the merge queue, the event says so: there is no auto-merge to enable. |
-| `READY_TO_MERGE` | Approved and green, auto-merge still off: enable it the same way, unless review findings are still open. Not reported for a PR in the merge queue, or for a draft (`APPROVED_DRAFT`). |
+| `APPROVED` | The owner approved: only `OWNER`'s approval counts, never a bot's or anyone else's (#277), here, in the open-PR list, `READY_TO_MERGE` and `REMINDER`. If the review's findings are fixed, read the pull request for unanswered comments, then queue it with the command the event names, `agent-queue <owner/name> <n>` (#356), alone in its own call (see "Queueing" below). A plain approval comes only as this; one with text also comes as `ACTIVITY`: answer it first. For a PR already in the merge queue, the event says so: there is no auto-merge to enable. |
+| `READY_TO_MERGE` | Approved and green, auto-merge still off: queue it the same way, with the `agent-queue` command the event names, unless review findings are still open. Not reported for a PR in the merge queue, or for a draft (`APPROVED_DRAFT`). |
 | `APPROVED_DRAFT` | The owner approved a pull request that is still a draft (#298). A draft can't be queued and a review bot skips it, so: mark it ready (`gh pr ready <n>`, the command the event names), then enable auto-merge. Where a review bot was asked (`BOT_REVIEW_ASKED`, #324), wait for its review and settle its threads first: `READY_TO_MERGE` comes only once it has reviewed. Where `READY_APPROVED_DRAFTS=1`, the watcher marks it ready itself once the owner's latest review is an approval, on any commit, and reports `DRAFT_READIED` instead (#301, #317); this event then comes only when marking it ready failed. Neither `READY_TO_MERGE` nor its reminder comes while it is a draft; the open-PR list says `draft`. |
 | `DRAFT_READIED` | With `READY_APPROVED_DRAFTS=1`, the owner's latest review approves a draft, on any commit (it names that commit, and the head where they differ, e.g. after a rebase), and the watcher marked it ready (#301, #317). Enable auto-merge once CI is green, as for `APPROVED_DRAFT`; where a review bot was asked (#324), `READY_TO_MERGE` waits for its review: settle its threads first. |
 | `DRAFT_READY_FAILED` | The watcher couldn't mark the approved draft ready; it tries again on every look, and `APPROVED_DRAFT` asks you to do it meanwhile. Repeated, its `GH` token likely can't write pull requests: tell the owner. |
@@ -225,7 +225,7 @@ approved one whose auto-merge is still off and that isn't in the merge queue, no
 | `LOOKUPS_RECOVERED` | Calls succeed again; the events held back come next. |
 | `WATCHER_ERROR` | A look failed (for example a state file another program held locked); the watcher carries on with the next look. Repeated, it needs a look: tell the owner. |
 | `WATCHER_OUTDATED` | The watcher's checkout moved to other watcher code after it started (a pull, or a restart that raced another one's pull), so it exits: start it again right away, alone, so its pull finishes before it starts. |
-| `REMINDER` | Comes after every notification while a PR waits on you: its branch is behind main or in conflict (rebase it, run the checks, push once), or it is approved with CI green and auto-merge off (enable it, after reading its comments) or with CI failed (fix it). None comes for a PR in the merge queue: there, `DEQUEUED` says when it needs you. It repeats until that is done. No approval reminder comes for `CI not reported` in the open-PR list (#342): `WORKFLOW` has no run on the head, its run can't be read, or its run ran nothing (skipped or neutral). That is not green and may never turn green, so if it lasts, check that the workflow runs on this branch and that `WORKFLOW` names it. |
+| `REMINDER` | Comes after every notification while a PR waits on you: its branch is behind main or in conflict (rebase it, run the checks, push once), or it is approved with CI green and auto-merge off (queue it with the `agent-queue` command the reminder names, after reading its comments) or with CI failed (fix it). None comes for a PR in the merge queue: there, `DEQUEUED` says when it needs you. It repeats until that is done. No approval reminder comes for `CI not reported` in the open-PR list (#342): `WORKFLOW` has no run on the head, its run can't be read, or its run ran nothing (skipped or neutral). That is not green and may never turn green, so if it lasts, check that the workflow runs on this branch and that `WORKFLOW` names it. |
 
 ## Before enabling auto-merge
 
@@ -251,7 +251,12 @@ can't tell whether a PR is user-facing: that stays yours to judge, as above.
   `2>&1` after it, no second command after `;`, no variable set in front of it. Claude Code's
   allow rule `Bash(agent-queue *)` matches the command's whole text; a chained or prefixed call
   falls to auto mode's classifier, which refused queue commands at times ("Merge Without Review",
-  #354). Read the PR's comments in an earlier call.
+  #354). Read the PR's comments in an earlier call. The `APPROVED`, `READY_TO_MERGE` and `REMINDER`
+  events name it in exactly this form (#356): copy it as it is.
+- **From inside a clone, or with `GH_REPO` set:** `agent-gh` picks the bot from the repository it
+  finds there (`-R`/`--repo`, else `GH_REPO`, else the folder's `origin`), and fails without one
+  (#360; before #360 it fell back to the owner's login). Start the session in a worktree or clone of
+  the repository, or set `GH_REPO` in the environment, never in front of the command.
 - **Install once**, beside `agent-usage` (`~/.local/bin` is on the `PATH`):
 
   ```sh

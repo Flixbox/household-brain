@@ -8,9 +8,10 @@
  * `marksReady` (watch-ready-events.ts). The `GH` token must then be allowed to write pull requests.
  */
 import { DISMISS_STALE_BOT_REVIEWS, askBotsToResolve, dismissCleared, dismissStale, reviewBlockers } from './watch-dismiss'
-import { type PrState, REPO, SELF, mergeCommand, readyCommand } from './watch-github'
+import { type PrState, REPO, SELF, readyCommand } from './watch-github'
 import { READY_APPROVED_DRAFTS, draftNote, draftReadiedEvent, marksReady } from './watch-ready-events'
 import { approvedEvent, blockedByReviewEvent } from './watch-review-events'
+import { queueCommand } from './watch-events'
 import { dismissesCleared } from './watch-cleared-events'
 import { askBotReviews } from './watch-bot-review'
 import { awaitsBotReview } from './watch-bot-review-events'
@@ -49,7 +50,7 @@ const checkAutoMergeOff = async ({ green, pr, state }: { green: boolean, pr: num
   if (!waits || await readyApprovedDraft(pr, state)) {
     return
   }
-  await report(approvedEvent({ botAsked: asked.length > 0, draft: state.draft, green, head: state.head, merge: mergeCommand(pr), pr, ready: readyCommand(pr) }), pr)
+  await report(approvedEvent({ botAsked: asked.length > 0, draft: state.draft, green, head: state.head, merge: queueCommand(REPO, pr), pr, ready: readyCommand(pr) }), pr)
 }
 
 /**

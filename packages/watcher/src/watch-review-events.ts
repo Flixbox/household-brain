@@ -229,7 +229,7 @@ export const approvedEvent = ({ botAsked, draft, green, head, merge, pr, ready }
   if (draft) {
     return { key: `pr-${pr} approved-draft ${head}`, lines: [`APPROVED_DRAFT: approved by the owner but still a draft: mark it ready (${ready}), then queue (after the review a bot was asked for, if any)`] }
   }
-  const when = botAsked ? 'Once the review bot\'s threads are settled, enable it' : 'Enable it'
+  const when = botAsked ? 'Once the review bot\'s threads are settled, queue it, alone in its own call' : 'Queue it, alone in its own call'
   return green ? { key: `pr-${pr} ready ${head}`, lines: [`READY_TO_MERGE: approved and CI is green at ${head.slice(0, 7)}, but auto-merge is off. ${when}: ${merge}`] } : null
 }
 
