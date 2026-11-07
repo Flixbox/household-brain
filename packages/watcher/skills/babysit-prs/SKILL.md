@@ -15,8 +15,8 @@ how merging works there, how to check a deploy.
 One watcher for the whole repository: every open pull request, merged ones until their deploy, the
 default branch's CI, new issues, the owner's comments on issues, and issues closed or reopened.
 
-- **In Codex**, install `project-watcher@household-brain` and trust its reviewed SessionStart hook
-  through `/hooks`. The hook starts a detached supervisor in projects with `.claude/watcher.env`.
+- **In Codex**, install `project-watcher@household-brain` and trust its reviewed hooks through
+  `/hooks` (SessionStart, SessionEnd, and the PreToolUse guard against `gh` writes as the owner, #370). The hook starts a detached supervisor in projects with `.claude/watcher.env`.
   For the current root thread (or if hooks are not trusted), run
   `bun "${PLUGIN_ROOT}/src/codex-watch.ts"` once. It uses `CODEX_THREAD_ID`, checks that the thread
   belongs to this folder and accepts direct input, and starts the same watcher used by Claude.
