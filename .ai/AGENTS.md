@@ -151,8 +151,8 @@ Every PR that changes the UI shows it in a GIF in its description (after the
 ### Merge
 
 - **Enable auto-merge** with `agent-queue Flixbox/household-brain <n>`, alone in its own call (#354;
-  the `babysit-prs` skill has why and how to install it; the watcher's events name it so, #356), run
-  from inside a worktree or clone (or with `GH_REPO` set, #360), only once the PR is well reviewed
+  the `babysit-prs` skill has why and how to install it; the watcher's events name it so, #356; it
+  works from any folder, #365), only once the PR is well reviewed
   (Codex's blockers and should-fix items fixed and the fixes looked at, CI green, every thread
   settled) and cleared for its kind. Four review rounds is the soft cap; after it, fix and merge, and
   say what wasn't re-reviewed.
