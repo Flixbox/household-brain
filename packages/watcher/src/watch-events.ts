@@ -143,7 +143,7 @@ const branchProblem = (pr: OpenPr): string | null => {
 
 /** An approved PR whose CI has finished and that waits on the agent (#224). */
 /** The queue command the events name (#356): `agent-queue` checks the rules itself (#354); run it alone in its call. */
-export const queueCommand = (repo: string, pr: number): string => `agent-queue ${repo} ${pr}`
+export const queueCommand = (repo: string, pr: number): string => `agent-gh pr merge ${pr} --repo ${repo} --auto --squash`
 
 const approvalProblem = (pr: OpenPr, repo: string, awaitingBot: boolean): string | null => {
   // A queued PR waits on the queue, not on the agent: what goes wrong there comes as DEQUEUED (#251).
