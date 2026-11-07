@@ -251,8 +251,8 @@ can't tell whether a PR is user-facing: that stays yours to judge, as above.
   `2>&1` after it, no second command after `;`, no variable set in front of it. Claude Code's
   allow rule `Bash(agent-queue *)` matches the command's whole text; a chained or prefixed call
   falls to auto mode's classifier, which refused queue commands at times ("Merge Without Review",
-  #354). Read the PR's comments in an earlier call. The `APPROVED`, `READY_TO_MERGE` and `REMINDER`
-  events name it in exactly this form (#356): copy it as it is.
+  #354). Read the PR's comments in an earlier call. The `APPROVED`, `READY_TO_MERGE`, `APPROVED_DRAFT`,
+  `DRAFT_READIED` and `REMINDER` events name it in exactly this form (#356): copy it as it is.
 - **From inside a clone, or with `GH_REPO` set:** `agent-gh` picks the bot from the repository it
   finds there (`-R`/`--repo`, else `GH_REPO`, else the folder's `origin`), and fails without one
   (#360; before #360 it fell back to the owner's login). Start the session in a worktree or clone of

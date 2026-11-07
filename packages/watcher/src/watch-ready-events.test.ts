@@ -45,17 +45,17 @@ describe('marksReady (#301, #317)', () => {
 
 describe('draftReadiedEvent (#301)', () => {
   it('reports the draft marked ready once per head, and a failure under its own key', () => {
-    expect(draftReadiedEvent({ approved: HEAD, head: HEAD, pr: 7, readied: true })).toEqual({
+    expect(draftReadiedEvent({ approved: HEAD, head: HEAD, pr: 7, readied: true, repo: 'owner/repo' })).toEqual({
       key: `pr-7 draft-readied ${HEAD}`,
-      lines: ["DRAFT_READIED: the owner approved the draft's head (abcdef1), so the watcher marked it ready (READY_APPROVED_DRAFTS): queue once CI is green (after the review a bot was asked for, if any, and its threads settled)"],
+      lines: ["DRAFT_READIED: the owner approved the draft's head (abcdef1), so the watcher marked it ready (READY_APPROVED_DRAFTS): queue once CI is green (after the review a bot was asked for, if any, and its threads settled), alone in its own call: agent-queue owner/repo 7"],
     })
-    expect(draftReadiedEvent({ approved: HEAD, head: HEAD, pr: 7, readied: false }).key).toBe(`pr-7 draft-ready-failed ${HEAD}`)
+    expect(draftReadiedEvent({ approved: HEAD, head: HEAD, pr: 7, readied: false, repo: 'owner/repo' }).key).toBe(`pr-7 draft-ready-failed ${HEAD}`)
   })
 
   it('names the older commit the owner approved, keyed by the head (#317)', () => {
-    expect(draftReadiedEvent({ approved: OLD, head: HEAD, pr: 7, readied: true })).toEqual({
+    expect(draftReadiedEvent({ approved: OLD, head: HEAD, pr: 7, readied: true, repo: 'owner/repo' })).toEqual({
       key: `pr-7 draft-readied ${HEAD}`,
-      lines: ['DRAFT_READIED: the owner approved the draft at 1234567, before its head abcdef1, so the watcher marked it ready (READY_APPROVED_DRAFTS): queue once CI is green (after the review a bot was asked for, if any, and its threads settled)'],
+      lines: ['DRAFT_READIED: the owner approved the draft at 1234567, before its head abcdef1, so the watcher marked it ready (READY_APPROVED_DRAFTS): queue once CI is green (after the review a bot was asked for, if any, and its threads settled), alone in its own call: agent-queue owner/repo 7'],
     })
   })
 })

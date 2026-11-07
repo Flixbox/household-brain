@@ -141,10 +141,10 @@ const branchProblem = (pr: OpenPr): string | null => {
   return pr.mergeState === 'BEHIND' ? `REMINDER: PR #${pr.number} is behind main: rebase it and run the checks again.` : null
 }
 
-/** An approved PR whose CI has finished and that waits on the agent (#224). */
 /** The queue command the events name (#356): `agent-queue` checks the rules itself (#354); run it alone in its call. */
 export const queueCommand = (repo: string, pr: number): string => `agent-queue ${repo} ${pr}`
 
+/** An approved PR whose CI has finished and that waits on the agent (#224). */
 const approvalProblem = (pr: OpenPr, repo: string, awaitingBot: boolean): string | null => {
   // A queued PR waits on the queue, not on the agent: what goes wrong there comes as DEQUEUED (#251).
   if (pr.reviewDecision !== 'APPROVED' || pr.queued) {

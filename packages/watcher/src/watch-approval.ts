@@ -32,7 +32,7 @@ const readyApprovedDraft = async (pr: number, state: PrState): Promise<boolean> 
     return false
   }
   const readied = await ghText(['pr', 'ready', String(pr), '--repo', REPO], GH, true).then(() => true, () => false)
-  await report(draftReadiedEvent({ approved: state.ownerApprovalCommit, head: state.head, pr, readied }), pr)
+  await report(draftReadiedEvent({ approved: state.ownerApprovalCommit, head: state.head, pr, readied, repo: REPO }), pr)
   return readied
 }
 

@@ -218,7 +218,7 @@ export const blockedByReviewEvent = ({ dismiss, head, pr, reviews, self, threads
 
 /**
  * What an approved PR (`OWNER`'s decision) with auto-merge off asks for. With CI green at `head`, it
- * is READY_TO_MERGE with `merge`, the command that enables auto-merge. A draft is APPROVED_DRAFT
+ * is READY_TO_MERGE, naming `repo`'s queue command (`queueCommand`, #356). A draft is APPROVED_DRAFT
  * instead (#298), whatever CI says: it can't be queued and a review bot skips drafts, so it is marked
  * ready (`ready`, the command) first: by the agent, unless READY_APPROVED_DRAFTS has the watcher do it
  * (#301). Once per head.

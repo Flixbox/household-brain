@@ -3,7 +3,7 @@
  * tested). READY_APPROVED_DRAFTS=1 switches it on; off by default, when APPROVED_DRAFT asks the agent
  * to mark it ready instead (#298). The side of it that writes to GitHub is in watch-approval.ts.
  */
-import type { Event } from './watch-events'
+import { type Event, queueCommand } from './watch-events'
 
 export const READY_APPROVED_DRAFTS = process.env.READY_APPROVED_DRAFTS === '1'
 
@@ -33,8 +33,8 @@ const approvedAt = (approved: string, head: string): string => (approved === hea
   : `the draft at ${approved.slice(0, 7)}, before its head ${head.slice(0, 7)}`)
 
 /** The event for a draft the watcher marked ready (`readied`), or failed to: once per head. `approved` is the commit the owner approved. */
-export const draftReadiedEvent = ({ approved, head, pr, readied }: { approved: string, head: string, pr: number, readied: boolean }): Event => readied
-  ? { key: `pr-${pr} draft-readied ${head}`, lines: [`DRAFT_READIED: the owner approved ${approvedAt(approved, head)}, so the watcher marked it ready (READY_APPROVED_DRAFTS): queue once CI is green (after the review a bot was asked for, if any, and its threads settled)`] }
+export const draftReadiedEvent = ({ approved, head, pr, readied, repo }: { approved: string, head: string, pr: number, readied: boolean, repo: string }): Event => readied
+  ? { key: `pr-${pr} draft-readied ${head}`, lines: [`DRAFT_READIED: the owner approved ${approvedAt(approved, head)}, so the watcher marked it ready (READY_APPROVED_DRAFTS): queue once CI is green (after the review a bot was asked for, if any, and its threads settled), alone in its own call: ${queueCommand(repo, pr)}`] }
   : { key: `pr-${pr} draft-ready-failed ${head}`, lines: ['DRAFT_READY_FAILED: couldn\'t mark the approved draft ready (it tries again on every look; see APPROVED_DRAFT); check the GH token may write pull requests'] }
 
 /** What the APPROVED event says about a draft: who marks it ready. */
