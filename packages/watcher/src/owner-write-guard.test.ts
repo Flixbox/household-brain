@@ -69,8 +69,69 @@ describe('ownerWrite (#368)', () => {
     ])).toEqual([])
   })
 
+  it('finds gh behind wrappers whose options take values, and after redirections (Codex on #369)', () => {
+    expect(refused([
+      'sudo -u someone gh issue close 1',
+      'env -u NAME gh issue close 1',
+      'nice -n 10 gh pr close 1',
+      'timeout -s KILL 30 gh pr close 1',
+      "sudo -u someone bash -c 'gh pr close 1'",
+      '>out gh issue close 1',
+      '> out gh issue close 1',
+      '2>/dev/null gh issue close 1',
+      'GH_REPO=o/r 2>&1 gh issue close 1',
+    ])).toEqual([])
+  })
+
+  it('finds gh in a substitution with quoted parentheses (Codex on #369)', () => {
+    expect(refused([
+      "echo \"$(printf ')'; gh issue close 1)\"",
+      "x=$(echo ')' && gh issue close 1)",
+    ])).toEqual([])
+  })
+
+  it('counts what the shell fills in as a write (Codex on #369)', () => {
+    expect(refused([
+      'gh api repos/o/r/issues/1 --method "$METHOD"',
+      'gh api -X $METHOD repos/o/r/issues/1',
+      'gh api -X OPTIONS repos/o/r',
+      'gh api graphql -f query="$(cat mutation.graphql)"',
+      'gh api graphql -f query=`cat mutation.graphql`',
+      'gh api graphql -f "query=$QUERY"',
+      'gh api graphql -F owner=o',
+      'gh api -iX POST repos/o/r/issues/1/comments',
+      '"$GH" pr comment 1 -b x',
+      'gh pr "$ACTION" 1',
+      'gh $GROUP close 1',
+    ])).toEqual([])
+  })
+
+  it('reads a GraphQL operation, not the strings and comments in it (Codex on #369)', () => {
+    expect(allowed([
+      "gh api graphql -f query='{ search(query: \"mutation\", type: ISSUE, first: 1) { issueCount } }'",
+      "gh api graphql -f query='# no mutation here\n{ viewer { login } }'",
+      "gh api graphql -f query='{ viewer { login } }' -f q=mutation",
+    ])).toEqual([])
+    expect(refused(["gh api graphql -f query='# a comment\nmutation { x }'"])).toEqual([])
+  })
+
+  it('lets gh read with what the shell fills in where it decides nothing', () => {
+    expect(allowed([
+      'gh api "repos/$REPO/pulls"',
+      'gh pr view "$N" --comments',
+      'gh api -X GET "repos/$REPO/issues" -f q=x',
+      'gh api --method HEAD repos/o/r',
+      'echo "$(gh pr view 1)"',
+      'timeout 30 gh pr view 1',
+      'sudo -u someone gh pr view 1',
+      '2>/dev/null gh pr view 1',
+      '$PAGER file.txt',
+    ])).toEqual([])
+  })
+
   it('names the command it found', () => {
     expect(ownerWrite('cd repo && gh pr comment 1 -b "a b" | cat')).toBe('gh pr comment 1 -b a b')
+    expect(ownerWrite('gh api x --method "$METHOD"')).toBe('gh api x --method $METHOD')
   })
 
   it('lets agent-gh write', () => {

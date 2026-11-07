@@ -12,7 +12,7 @@
  * `agent-gh` never is.
  */
 import { isRecord, textOf } from './read'
-import { commandsOf } from './shell-commands'
+import { commandsOf, isDynamic, plainWord } from './shell-commands'
 
 /** `gh pr` and `gh issue` subcommands that change something on GitHub. */
 const prIssueWrites = new Set([
@@ -20,18 +20,29 @@ const prIssueWrites = new Set([
   'revert', 'review', 'transfer', 'unlock', 'unpin', 'update-branch',
 ])
 
-const writeMethods = new Set(['DELETE', 'PATCH', 'POST', 'PUT'])
+/** The methods a `gh api` call reads with; any other, or one the shell fills in, counts as a write. */
+const readMethods = new Set(['GET', 'HEAD'])
 
 /** `gh api` flags that send a field, so the call is a POST unless a method says otherwise. */
 const fieldFlags = new Set(['--field', '--raw-field', '-F', '-f'])
 
 const methodFlags = new Set(['--method', '-X'])
 
-/** Words before the command itself: shell keywords, and wrappers that run the words after them. */
-const leadingWords = new Set([
-  '!', 'builtin', 'command', 'do', 'elif', 'else', 'env', 'exec', 'if', 'nice', 'nohup', 'sudo', 'then',
-  'time', 'timeout', 'until', 'while', 'xargs', '{', '}',
+/** Shell keywords that may stand before a command. */
+const keywords = new Set(['!', 'do', 'elif', 'else', 'if', 'then', 'until', 'while', '{', '}'])
+
+/**
+ * Commands that run a command given in their arguments, after options that may take values
+ * (`sudo -u x gh …`, `nice -n 10 gh …`). Their options aren't read: every later word counts as
+ * where the command may start.
+ */
+const wrappers = new Set([
+  'builtin', 'command', 'doas', 'env', 'exec', 'ionice', 'nice', 'nohup', 'setsid', 'stdbuf', 'sudo', 'time',
+  'timeout', 'unbuffer', 'watch', 'xargs',
 ])
+
+/** A redirection: its operator, and its target when attached (`>out`, `2>/dev/null`, `&>log`). */
+const redirection = /^\d*(?:&>>?|>>?|<<{0,2}|>&|<&|>\|)(?<target>.*)$/u
 
 const shells = new Set(['bash', 'dash', 'sh', 'zsh'])
 
@@ -50,14 +61,16 @@ const flagParts = (arg: string): [string, string | null] => {
     const at = arg.indexOf('=')
     return at === -1 ? [arg, null] : [arg.slice(0, at), arg.slice(at + 1)]
   }
-  return arg.length > 2 ? [arg.slice(0, 2), arg.slice(2).replace(/^=/u, '')] : [arg, null]
+  // `-i` (include the headers) is the only short flag of gh api without a value, so the only one bundled before another.
+  const short = arg.replace(/^-i+(?=.)/u, '-')
+  return short.length > 2 ? [short.slice(0, 2), short.slice(2).replace(/^=/u, '')] : [short, null]
 }
 
 const takesValue = (name: string) => methodFlags.has(name) || fieldFlags.has(name) || name === '--input'
 
 const record = (flags: ApiFlags, name: string, value: string) => {
   if (methodFlags.has(name)) {
-    flags.method = value.toUpperCase()
+    flags.method = value
   } else if (name === '--input') {
     flags.input = true
   } else {
@@ -79,18 +92,30 @@ const apiFlagsOf = (args: readonly string[]): ApiFlags => {
   return flags
 }
 
+/** A GraphQL document without its strings and comments, where a word such as "mutation" means nothing. */
+const graphqlCode = (document: string) => document.replaceAll(/"""[\s\S]*?"""|"(?:[^"\\]|\\.)*"|#.*/gu, ' ')
+
+/** Whether a GraphQL call may write: unless its query is written out and holds no mutation, it counts as one. */
+const graphqlWrites = (flags: ApiFlags) => {
+  const query = flags.fields.find(field => field.startsWith('query='))
+  if (flags.input || typeof query === 'undefined' || isDynamic(query) || query.startsWith('query=@')) {
+    return true
+  }
+  return /\bmutation\b/u.test(graphqlCode(query))
+}
+
 /**
- * Whether a `gh api` call writes: a write method, or, without a method, fields or a body (gh then
- * POSTs). A GraphQL call is always a POST, and writes when it sends a mutation, or a query this
- * can't read (from a file or the body).
+ * Whether a `gh api` call writes: unless a method it reads with is written out, it does when it sends
+ * fields or a body (gh then POSTs). A GraphQL call is always a POST, and writes when it may send a
+ * mutation (`graphqlWrites`).
  */
 const apiWrites = (args: readonly string[]) => {
   const flags = apiFlagsOf(args)
   if (args.includes('graphql')) {
-    return flags.input || flags.fields.some(field => /\bmutation\b/u.test(field) || field.startsWith('query=@'))
+    return graphqlWrites(flags)
   }
   if (flags.method !== null) {
-    return writeMethods.has(flags.method)
+    return isDynamic(flags.method) || !readMethods.has(flags.method.toUpperCase())
   }
   return flags.input || flags.fields.length > 0
 }
@@ -99,9 +124,12 @@ const apiWrites = (args: readonly string[]) => {
 const positionals = (args: readonly string[]) =>
   args.filter((arg, at) => !arg.startsWith('-') && args[at - 1] !== '-R' && args[at - 1] !== '--repo')
 
-/** Whether `gh` with these arguments changes something on GitHub. */
+/** Whether `gh` with these arguments changes something on GitHub, or may: a command the shell fills in counts. */
 const ghWrites = (args: readonly string[]) => {
   const [group = '', subcommand = ''] = positionals(args)
+  if (isDynamic(group) || (group !== 'api' && isDynamic(subcommand))) {
+    return true
+  }
   if (group === 'api') {
     return apiWrites(args)
   }
@@ -115,12 +143,32 @@ const isGh = (word: string) => /(?:^|[/\\])gh(?:\.exe)?$/u.test(word)
 
 const baseName = (word: string) => word.replace(/^.*[/\\]/u, '')
 
-/** Where the command itself starts: after variable assignments, keywords, wrappers and their options. */
-const commandStart = (words: readonly string[]) => {
-  const at = words.findIndex(word =>
-    !/^[A-Za-z_]\w*=/u.test(word) && !leadingWords.has(word) && !word.startsWith('-') && !/^\d+[smhd]?$/u.test(word))
-  return at === -1 ? words.length : at
+/** How many words a leading word takes up: an assignment or keyword one, a redirection one or two (with its target), a command none. */
+const leadingLength = (word: string) => {
+  if (/^[A-Za-z_]\w*=/u.test(word) || keywords.has(word)) {
+    return 1
+  }
+  const target = redirection.exec(word)?.groups?.target
+  if (typeof target === 'undefined') {
+    return 0
+  }
+  return target === '' ? 2 : 1
 }
+
+/** Where the command itself starts: after variable assignments, keywords and redirections. */
+const commandStart = (words: readonly string[]) => {
+  let at = 0
+  let length = leadingLength(words[0] ?? '')
+  while (at < words.length && length > 0) {
+    at += length
+    length = leadingLength(words[at] ?? '')
+  }
+  return at
+}
+
+/** Where the command may start in a simple command: at its first word, or at any word after a wrapper. */
+const startsOf = (command: readonly string[]) =>
+  wrappers.has(baseName(command[0] ?? '')) ? command.map((_word, at) => at).slice(1) : [0]
 
 /** The script a command runs as a command line of its own: of `bash -c '…'` (also `-lc`, `-ec`), or of `eval`. */
 const innerScript = (words: readonly string[]) => {
@@ -134,16 +182,18 @@ const innerScript = (words: readonly string[]) => {
 
 /** Every simple command a command line runs, from its command word on, with the scripts of `bash -c` and `eval` read too. */
 const runCommands = (text: string): string[][] =>
-  commandsOf(text).flatMap(words => {
-    const command = words.slice(commandStart(words))
-    const script = innerScript(command)
-    return script === null ? [command] : runCommands(script)
-  })
+  commandsOf(text)
+    .map(words => words.slice(commandStart(words)))
+    .flatMap(command => startsOf(command).map(at => command.slice(at)))
+    .flatMap(command => {
+      const script = innerScript(command)
+      return script === null ? [command] : runCommands(script)
+    })
 
 /** The first command in a Bash command line that writes to GitHub through plain `gh`, as its words joined, or null when there is none. */
 export const ownerWrite = (command: string): string | null => {
-  const found = runCommands(command).find(([name = '', ...args]) => isGh(name) && ghWrites(args))
-  return found ? found.join(' ') : null
+  const found = runCommands(command).find(([name = '', ...args]) => (isGh(name) || isDynamic(name)) && ghWrites(args))
+  return found ? found.map(word => plainWord(word)).join(' ') : null
 }
 
 // --- The hook -------------------------------------------------------------------------------
@@ -157,6 +207,7 @@ export const verdict = (input: unknown) => {
   }
   const reason = [
     `Refused (household-brain #368): \`${found}\` writes to GitHub through plain \`gh\`, the owner's own login, so it would act as the owner.`,
+    'A command the guard cannot read for certain (a command, method or query the shell fills in, as in `"$METHOD"` or `query="$(cat q.graphql)"`) counts as a write.',
     'Write through `agent-gh` (the bot) instead; reads with `gh` stay allowed.',
     'If agent-gh fails or is rate-limited, wait and retry it, or report it: never fall back to `gh`.',
     'Something only the owner may do, the owner runs themselves.',
