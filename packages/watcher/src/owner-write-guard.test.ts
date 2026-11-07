@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { ownerWrite } from './owner-write-guard'
+import { ownerWrite, verdict } from './owner-write-guard'
 
 const refused = (commands: readonly string[]) => commands.filter(command => ownerWrite(command) === null)
 const allowed = (commands: readonly string[]) => commands.filter(command => ownerWrite(command) !== null)
@@ -116,5 +116,23 @@ describe('ownerWrite (#368)', () => {
       'echo hi # gh pr close 1',
       'ls ~/.config/gh',
     ])).toEqual([])
+  })
+})
+
+describe('verdict, the hook\'s answer (#368)', () => {
+  const call = (command: string) => ({ hook_event_name: 'PreToolUse', tool_input: { command }, tool_name: 'Bash' })
+
+  it('denies a write through plain gh, naming agent-gh', () => {
+    const answer = verdict(call('gh issue comment 1 -b x'))
+    expect(answer?.hookSpecificOutput.permissionDecision).toBe('deny')
+    expect(answer?.hookSpecificOutput.permissionDecisionReason).toContain('`gh issue comment 1 -b x`')
+    expect(answer?.hookSpecificOutput.permissionDecisionReason).toContain('agent-gh')
+  })
+
+  it('lets anything else run', () => {
+    expect(verdict(call('agent-gh issue comment 1 -b x'))).toBeNull()
+    expect(verdict(call('gh pr view 1'))).toBeNull()
+    expect(verdict({ tool_input: {}, tool_name: 'Bash' })).toBeNull()
+    expect(verdict(null)).toBeNull()
   })
 })

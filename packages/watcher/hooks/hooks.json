@@ -1,0 +1,16 @@
+{
+  "description": "Refuses GitHub writes through plain gh, the owner's own login (#368); agent-gh and gh reads run.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/owner-write-guard.sh\""
+          }
+        ]
+      }
+    ]
+  }
+}
