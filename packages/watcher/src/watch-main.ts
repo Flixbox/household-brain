@@ -8,6 +8,7 @@ import { FOLLOW, checkCode, finishSubscriptions, flush, queue, quiet, report, re
 import { addLine, endPr, readLines, rememberPr, start, startSubscriptions, subscriptions, updateLines, writeLines } from './watch-state'
 import { activitiesOf, checkActivity as checkPrActivity, checkTrackedActivity, watchedPrs } from './watch-activity'
 import { checkNotQueued, checkQueue } from './watch-queue'
+import { clearQuestion } from './watch-question'
 import { checkIssueStates, checkIssues, checkSubscribedIssues } from './watch-issues'
 import { allSettled, hasText, ignoreFailure } from './read'
 
@@ -193,6 +194,8 @@ const checkPr = async (pr: number, state: PrState | undefined, items: Activity[]
     return
   }
   if (!await preparePr(pr, state)) { return }
+  // Approved, merged or closed: it no longer waits on the owner (#371).
+  await clearQuestion(pr, state)
   if (state.state === 'MERGED') {
     await checkMerged(pr, state.mergeSha, items)
     return

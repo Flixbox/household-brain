@@ -139,6 +139,14 @@ default branch's CI, new issues, the owner's comments on issues, and issues clos
     approved commit, instead of `APPROVED_DRAFT`. Merging still waits for CI and, where a review bot
     was asked (#324), for its review. Off by default, when `APPROVED_DRAFT` asks you to
     mark it ready. The `GH` token must be allowed to write pull requests.
+  - `CLEAR_QUESTION_LABEL`: `1` lets the watcher take `QUESTION_LABEL` off a PR that no longer waits
+    on the owner (#371): once the owner's (never a bot's, nor anyone else's) latest review is an
+    approval, on any commit (the approval is permanent), or once the PR merged or closed. It reports
+    `QUESTION_CLEARED`. Issues keep the label until the owner answers: take it off them yourself.
+    Off by default. It removes the label with the `GH` token, which must be allowed to write pull
+    requests; it acts only once GitHub's `viewer` for that token is a bot (`…[bot]`), so with the
+    owner's own login it does nothing (it fails closed). An approved PR never keeps the label, so a later question for the owner goes on an issue.
+  - `QUESTION_LABEL`: the label for work that waits on the owner (`question` by default, #371).
   - `RESOLVE_BOT_REVIEWS`: the review bots to ask with `@<bot> resolve` (`coderabbitai`, with or
     without `[bot]`; comma-separated) (#303). A bot like CodeRabbit decides on approving only when it
     reviews a new commit, so a settled change request never turns into its approval by itself. Once
@@ -201,6 +209,8 @@ approved one whose auto-merge is still off and that isn't in the merge queue, no
 | `BLOCKED_BY_REVIEW` | The owner approved and CI is green (even while GitHub still says changes requested), but GitHub won't merge it, and the reviews are why. For each thread it names (answered by the agent, still open): check the answer settles it, then reply `Resolved: <reason>` in it with the reply helper (see `ACTIVITY`; the watcher resolves it), or ask the owner. For each change request it names (still counted until dismissed): check its points are dealt with. Where `DISMISS_STALE_BOT_REVIEWS=1`, the watcher dismisses a bot's change request itself (`REVIEW_DISMISSED`): one left on an older commit once no thread is open (resolved, or ending in a `Resolved:` reply, #285), one on the head once you settle it with a `Resolved: <reason>` reply in each of its threads, or on the PR when it has none (#290; a later comment of the owner's that isn't a `Resolved:` reply takes that back until a new `Resolved:` reply follows, #294). Otherwise ask the owner on the PR to dismiss it. |
 | `THREAD_RESOLVED` | The watcher resolved a review thread on a `Resolved: <reason>` reply (anyone's, #279). Nothing to do. |
 | `REVIEW_DISMISSED` | With `DISMISS_STALE_BOT_REVIEWS=1`, the watcher dismissed a bot's change request left on an older commit (the owner approved, no thread open, #285), or on the head once `Resolved:` replies settled it (#290); or the same on a PR labelled `CLEARED_LABEL` without the owner's approval (#327), which the event names. Nothing to do: queue a cleared PR once nothing else blocks it. To clear a PR that waits only on a bot's settled change request, label it `CLEARED_LABEL` (the main session does, after a clean review). |
+| `QUESTION_CLEARED` | With `CLEAR_QUESTION_LABEL=1`, the watcher took `QUESTION_LABEL` off a PR the owner approved (on any commit; it names the commit), or one that merged or closed (#371). Nothing to do. |
+| `QUESTION_CLEAR_FAILED` | The watcher couldn't take that label off; it tries again on every look. Repeated, its `GH` token likely can't write pull requests: tell the owner, and take the label off by hand meanwhile. |
 | `BOT_REVIEW_ASKED` | With `REVIEW_BOTS` set, the PR got the label `BOT_REVIEW_LABEL` and the watcher posted `@<bot> review` on it, the only time it ever will for that PR, and took the label off (#324; the event says when it couldn't yet, and it tries again). Wait for the review: `READY_TO_MERGE` and its reminder hold until the bot has reviewed. Then handle its points and settle its threads with `Resolved:` replies as usual. Agents never post `@<bot>` commands themselves: label the PR instead. |
 | `BOT_REVIEW_SKIPPED` | The PR got the label, but the bot reviewed it already or was asked already (a `@<bot> review` comment), so it isn't asked again (#324): a PR gets at most one bot review. The label came off. Go on without a new bot review. |
 | `BOT_REVIEW_FAILED` | The watcher couldn't post `@<bot> review`; the label stays and it tries again on every look. Repeated, its `GH` token likely can't comment on pull requests: tell the owner. |
