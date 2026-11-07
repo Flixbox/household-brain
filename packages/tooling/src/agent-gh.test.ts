@@ -110,6 +110,16 @@ describe.each(['bash', 'windows'] as const)('agent-gh (%s)', wrapper => {
     expect(readFileSync(path.join(home, 'token-repo'), 'utf8')).toBe('')
   })
 
+  test('takes the repository of a real -R after a flag without a value, or bundled (#361)', () => {
+    tokenStub('echo bot-token')
+    expect(run(wrapper, ['issue', 'create', '--web', '-R', 'Owner/repo']).code).toBe(0)
+    expect(readFileSync(path.join(home, 'token-repo'), 'utf8')).toBe('Owner/repo')
+    expect(run(wrapper, ['issue', 'create', '--title', 'hi', '-wR', 'Owner/bundled']).code).toBe(0)
+    expect(readFileSync(path.join(home, 'token-repo'), 'utf8')).toBe('Owner/bundled')
+    expect(run(wrapper, ['issue', 'create', '--repo=Owner/attached']).code).toBe(0)
+    expect(readFileSync(path.join(home, 'token-repo'), 'utf8')).toBe('Owner/attached')
+  })
+
   test('finds an api endpoint after the flags', () => {
     tokenStub('echo bot-token')
     expect(run(wrapper, ['api', '-X', 'POST', '/repos/Owner/repo/issues', '-f', 'title=hi']).code).toBe(0)

@@ -1,20 +1,72 @@
 #!/usr/bin/env bash
 # gh as the repository's agent bot instead of the owner's account (see agent-gh-token). The repository
-# is the one -R/--repo names, else an api call's repos/<owner>/<repo>/… endpoint, else $GH_REPO
-# or the current folder's origin remote. Without a token it stops before gh runs: gh would fall back
-# to the owner's stored login and post as the owner (#358). agent-gh.ts is its twin for Windows.
+# is the one a real -R/--repo option names (#361), else an api call's repos/<owner>/<repo>/…
+# endpoint, else $GH_REPO or the current folder's origin remote. Without a token it stops before gh
+# runs: gh would fall back to the owner's stored login and post as the owner (#358). agent-gh.ts is its twin for Windows.
 set -euo pipefail
 args=("$@")
 repo=''
-# Only the exact forms: -R<value> could be another option's value, such as a title (#358). gh takes
-# nothing after -- as a flag.
-for ((i = 0; i < ${#args[@]}; i++)); do
-  case ${args[i]} in
-    --) break ;;
-    -R | --repo) repo=${args[i + 1]:-} ;;
-    --repo=*) repo=${args[i]#--repo=} ;;
-  esac
-done
+# Only a real -R/--repo counts, never another option's value such as --title '--repo=Owner/other'
+# (#361): the arguments are read like gh reads them, with the command's flag table from gh's own
+# `gh help <command>` (which prints help and never runs the command). That is only asked for when an
+# argument looks like -R/--repo. gh takes nothing after -- as a flag.
+declare -A long=() short=()
+repo_short=''
+looks_like_repo=' -[^- ]*R| --repo'
+if [[ " $* " =~ $looks_like_repo ]]; then
+  command=()
+  for arg in "$@"; do
+    [[ $arg == -* ]] && break
+    command+=("$arg")
+  done
+  flag_line='^[[:space:]]+(-([^[:space:]]),[[:space:]])?--([A-Za-z0-9-]+)([[:space:]]([^[:space:]]+))?([[:space:]]{2,}|$)'
+  while IFS= read -r line; do
+    [[ $line =~ $flag_line ]] || continue
+    letter=${BASH_REMATCH[2]} name=${BASH_REMATCH[3]} type=${BASH_REMATCH[5]}
+    # A value only when gh prints its type, and not an optional one (--name type[=default]).
+    takes=''
+    [[ -n $type && $type != *'[='* ]] && takes=1
+    long[$name]=$takes
+    [[ -n $letter ]] && short[$letter]=$takes
+    [[ $name == repo && -n $letter ]] && repo_short=$letter
+  done < <(gh help "${command[@]}" 2>/dev/null || true)
+fi
+if [[ -n ${long[repo]+set} ]]; then
+  for ((i = 0; i < ${#args[@]}; i++)); do
+    arg=${args[i]}
+    case $arg in
+      --) break ;;
+      --*=*)
+        [[ ${arg%%=*} == --repo ]] && repo=${arg#--repo=}
+        ;;
+      --?*)
+        if [[ $arg == --repo ]]; then
+          repo=${args[i + 1]:-}
+          i=$((i + 1))
+        elif [[ -n ${long[${arg#--}]:-} ]]; then
+          i=$((i + 1))
+        fi
+        ;;
+      -?*)
+        # Short flags, possibly bundled (-wR Owner/repo); one that takes a value takes the rest of
+        # the argument (after an optional =), or else the next argument.
+        for ((j = 1; j < ${#arg}; j++)); do
+          letter=${arg:j:1}
+          if [[ -n ${short[$letter]:-} ]]; then
+            value=${arg:j+1}
+            value=${value#=}
+            if [[ -z ${arg:j+1} ]]; then
+              value=${args[i + 1]:-}
+              i=$((i + 1))
+            fi
+            [[ $letter == "$repo_short" ]] && repo=$value
+            break
+          fi
+        done
+        ;;
+    esac
+  done
+fi
 if [[ -z $repo && ${1:-} == api ]]; then
   for arg in "${args[@]:1}"; do
     if [[ $arg =~ ^/?repos/([^/?]+)/([^/?]+) ]]; then
