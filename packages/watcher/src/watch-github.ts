@@ -28,9 +28,8 @@ const currentRepo = async (): Promise<string> => {
 }
 export const REPO = hasText(process.env.REPO) ? process.env.REPO : await currentRepo()
 /**
- * Whether the default branch merges through a merge queue (#228). The queue then sets the merge
- * strategy, and `gh pr merge --squash` says so on every call; without one, `gh` needs a strategy.
- * Unknown (the question failed) counts as no queue, as before.
+ * Whether the default branch merges through a merge queue (#228): only then are queue entries read
+ * and waited for. Unknown (the question failed) counts as no queue, as before.
  */
 const mergeQueued = async (): Promise<boolean> => {
   const [owner = '', name = ''] = REPO.split('/')
@@ -39,8 +38,6 @@ const mergeQueued = async (): Promise<boolean> => {
 }
 export const MERGE_QUEUE = await mergeQueued()
 
-/** The command that enables auto-merge for a PR, as the events suggest it. */
-export const mergeCommand = (pr: number): string => `${GH} pr merge ${pr} --auto${MERGE_QUEUE ? '' : ' --squash'}`
 /** The command that marks a draft PR ready for review (#298). */
 export const readyCommand = (pr: number): string => `${GH} pr ready ${pr}`
 // WORKFLOW: the CI workflow file whose runs are followed (a PR's checks, main's deploy).

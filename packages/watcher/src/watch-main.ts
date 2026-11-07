@@ -1,7 +1,7 @@
 /* oxlint-disable eslint/no-await-in-loop -- each poller's looks run one after another, on purpose */
 /** The project watcher's looks, started by watch-project.ts once it has read which code it runs (#265). */
-import { type Activity, FOLLOW_NEWER, type MainRun, type Run, cancelledDeployEvent, mainRunEvent, replacementCandidates, runEvent } from './watch-events'
-import { type PrState, REPO, containsCommit, jobLines, mainAhead, mainHead, mainRuns, mergeCommand, newestMainRun, prStates, resolveThread, runOf } from './watch-github'
+import { type Activity, FOLLOW_NEWER, type MainRun, type Run, cancelledDeployEvent, mainRunEvent, queueCommand, replacementCandidates, runEvent } from './watch-events'
+import { type PrState, REPO, containsCommit, jobLines, mainAhead, mainHead, mainRuns, newestMainRun, prStates, resolveThread, runOf } from './watch-github'
 import { APPROVED_DRAFT_NOTE, checkApproval } from './watch-approval'
 import { resolvedThreadEvent } from './watch-review-events'
 import { FOLLOW, checkCode, finishSubscriptions, flush, queue, quiet, report, reportLookups, reportUsage } from './watch-output'
@@ -147,8 +147,9 @@ const checkClosed = async (pr: number, items: Activity[] | undefined): Promise<v
 const checkReview = async (pr: number, state: PrState): Promise<void> => {
   await report(state.mergeable === 'CONFLICTING' ? { key: `pr-${pr} conflict ${state.head}`, lines: [`CONFLICT at ${short(state.head)}: rebase on main`] } : null, pr)
   // Already in the merge queue, there is no auto-merge to enable (#251).
-  const after = state.queued ? 'It is in the merge queue already.' : `Once it is well reviewed, enable auto-merge: ${mergeCommand(pr)}`
-  const next = state.draft ? APPROVED_DRAFT_NOTE : after
+  const queueIt = `queue it, alone in its own call: ${queueCommand(REPO, pr)}`
+  const after = state.queued ? 'It is in the merge queue already.' : `Once it is well reviewed, ${queueIt}`
+  const next = state.draft ? `${APPROVED_DRAFT_NOTE} Then, once it is well reviewed, ${queueIt}` : after
   await report(state.decision === 'APPROVED' ? { key: `pr-${pr} approved`, lines: [`APPROVED by the owner. ${next}`] } : null, pr)
 }
 

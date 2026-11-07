@@ -8,7 +8,7 @@
  * `marksReady` (watch-ready-events.ts). The `GH` token must then be allowed to write pull requests.
  */
 import { DISMISS_STALE_BOT_REVIEWS, askBotsToResolve, dismissCleared, dismissStale, reviewBlockers } from './watch-dismiss'
-import { type PrState, REPO, SELF, mergeCommand, readyCommand } from './watch-github'
+import { type PrState, REPO, SELF, readyCommand } from './watch-github'
 import { READY_APPROVED_DRAFTS, draftNote, draftReadiedEvent, marksReady } from './watch-ready-events'
 import { approvedEvent, blockedByReviewEvent } from './watch-review-events'
 import { dismissesCleared } from './watch-cleared-events'
@@ -32,7 +32,7 @@ const readyApprovedDraft = async (pr: number, state: PrState): Promise<boolean> 
     return false
   }
   const readied = await ghText(['pr', 'ready', String(pr), '--repo', REPO], GH, true).then(() => true, () => false)
-  await report(draftReadiedEvent({ approved: state.ownerApprovalCommit, head: state.head, pr, readied }), pr)
+  await report(draftReadiedEvent({ approved: state.ownerApprovalCommit, head: state.head, pr, readied, repo: REPO }), pr)
   return readied
 }
 
@@ -49,7 +49,7 @@ const checkAutoMergeOff = async ({ green, pr, state }: { green: boolean, pr: num
   if (!waits || await readyApprovedDraft(pr, state)) {
     return
   }
-  await report(approvedEvent({ botAsked: asked.length > 0, draft: state.draft, green, head: state.head, merge: mergeCommand(pr), pr, ready: readyCommand(pr) }), pr)
+  await report(approvedEvent({ botAsked: asked.length > 0, draft: state.draft, green, head: state.head, pr, ready: readyCommand(pr), repo: REPO }), pr)
 }
 
 /**

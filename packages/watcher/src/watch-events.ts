@@ -141,8 +141,11 @@ const branchProblem = (pr: OpenPr): string | null => {
   return pr.mergeState === 'BEHIND' ? `REMINDER: PR #${pr.number} is behind main: rebase it and run the checks again.` : null
 }
 
+/** The queue command the events name (#356): `agent-queue` checks the rules itself (#354); run it alone in its call. */
+export const queueCommand = (repo: string, pr: number): string => `agent-queue ${repo} ${pr}`
+
 /** An approved PR whose CI has finished and that waits on the agent (#224). */
-const approvalProblem = (pr: OpenPr, awaitingBot: boolean): string | null => {
+const approvalProblem = (pr: OpenPr, repo: string, awaitingBot: boolean): string | null => {
   // A queued PR waits on the queue, not on the agent: what goes wrong there comes as DEQUEUED (#251).
   if (pr.reviewDecision !== 'APPROVED' || pr.queued) {
     return null
@@ -151,17 +154,17 @@ const approvalProblem = (pr: OpenPr, awaitingBot: boolean): string | null => {
   if (ci === 'failed') {
     return `REMINDER: PR #${pr.number} is approved and CI failed: fix it.`
   }
-  return ci === 'green' && !pr.autoMerge && !pr.draft && !awaitingBot ? `REMINDER: PR #${pr.number} is approved and CI is green, but auto-merge is off: enable it.` : null
+  return ci === 'green' && !pr.autoMerge && !pr.draft && !awaitingBot ? `REMINDER: PR #${pr.number} is approved and CI is green, but auto-merge is off: queue it, alone in its own call: ${queueCommand(repo, pr.number)}` : null
 }
 
 /**
  * A reminder for each open PR waiting on the agent, on every notification until dealt with: a branch behind
  * main or in conflict (#226), approved with failed CI, or with green CI and auto-merge off (#224), unless it
- * is `awaitingBot`, a review bot's review (#299). Parked PRs don't count.
+ * is `awaitingBot`, a review bot's review (#299). Parked PRs don't count. `repo` is named in the queue command.
  */
-export const reminderLines = (prs: readonly OpenPr[], awaitingBot: ReadonlySet<number> = new Set()): string[] => prs
+export const reminderLines = (prs: readonly OpenPr[], repo: string, awaitingBot: ReadonlySet<number> = new Set()): string[] => prs
   .filter(pr => !pr.parked)
-  .flatMap(pr => [branchProblem(pr), approvalProblem(pr, awaitingBot.has(pr.number))].filter(line => line !== null))
+  .flatMap(pr => [branchProblem(pr), approvalProblem(pr, repo, awaitingBot.has(pr.number))].filter(line => line !== null))
 
 /** Each reviewer's latest review that counts (a comment doesn't undo an approval, a dismissal does), by login in lower case. */
 const latestReviews = (reviews: readonly { login: string, state: string }[]): Map<string, string> => new Map(reviews

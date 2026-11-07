@@ -10,7 +10,7 @@ import { deliver, deliveryPending } from './watch-delivery'
 import { agentUsageText, readAgentUsage } from './agent-usage'
 import { type Event, type OpenPr, answerFirst, clockTime, listsOpenPrs, openPrLines, reminderLines, stamped } from './watch-events'
 import { lookupNews, lookups } from './watch-gh'
-import { openPrs } from './watch-github'
+import { REPO, openPrs } from './watch-github'
 import { addLine, askedBots, oneAtATime, readLines, subscriptions, writeLines } from './watch-state'
 import { awaitsBotReview } from './watch-bot-review-events'
 import { codeVersion, outdatedLine, startedOn } from './watch-version'
@@ -78,7 +78,7 @@ export const report = async (event: Event | null, pr: number | null = null): Pro
 /** The reminders for the open PRs, holding auto-merge for those that wait on a review bot asked for or reviewing (#299, #324). */
 const reminders = async (prs: OpenPr[]): Promise<string[]> => {
   const waits = await Promise.all(prs.map(async pr => awaitsBotReview({ asked: await askedBots(pr.number), state: pr.bot })))
-  return reminderLines(prs, new Set(prs.filter((_pr, index) => waits[index] === true).map(pr => pr.number)))
+  return reminderLines(prs, REPO, new Set(prs.filter((_pr, index) => waits[index] === true).map(pr => pr.number)))
 }
 
 /**
