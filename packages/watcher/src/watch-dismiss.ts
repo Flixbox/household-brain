@@ -12,9 +12,9 @@
  * labelled CLEARED_LABEL, cleared for queueing without the owner's approval, has its settled bot change
  * requests dismissed as on an approved one (#327): `dismissCleared`.
  */
-import { type PrComment, RESOLVE_BOT_REVIEWS, type Review, type ReviewThread, bare, botsToAskResolve, dismissalMessage, dismissedReviewEvent, resolveAskedEvent, resolveCommand, reviewsToDismiss } from './watch-review-events'
+import { type PrComment, RESOLVE_BOT_REVIEWS, type Review, type ReviewThread, bare, botsToAskResolve, dismissalMessage, dismissedReviewEvent, resolveAskedEvent, resolveCommand, resolvedThreadEvent, reviewsToDismiss } from './watch-review-events'
 import { CLEARED_LABEL, clearedAt, coveredByClearance } from './watch-cleared-events'
-import { OWNER, type PrState, REPO, SELF, gh, graphql, threadsFrom } from './watch-github'
+import { OWNER, type PrState, REPO, SELF, gh, graphql, resolveThread, threadsFrom } from './watch-github'
 import { GH, ghText } from './watch-gh'
 import { report } from './watch-output'
 import { readLines } from './watch-state'
@@ -157,5 +157,16 @@ export const askBotsToResolve = async (pr: number, state: PrState): Promise<void
   await allSettled(toAsk.map(async review => {
     const posted = await askOnce(pr, state.head, review.login)
     await (posted === null ? Promise.resolve() : report(resolveAskedEvent({ asked: posted, head: state.head, pr, review }), pr))
+  }))
+}
+
+/**
+ * Resolves each open thread whose last comment is a `Resolved: <reason>` reply (#279), and says so. A
+ * failed attempt is reported once; the thread is tried again on every look until it is resolved.
+ */
+export const resolveAsked = async (pr: number, state: PrState): Promise<void> => {
+  await allSettled(state.toResolve.map(async thread => {
+    const resolved = await resolveThread(thread.id).catch(() => false)
+    await report(resolvedThreadEvent(pr, thread, resolved), pr)
   }))
 }

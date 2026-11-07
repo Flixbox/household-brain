@@ -116,6 +116,11 @@ The Firebase project is a Google Cloud project; everything below happens in it.
   label was last put on: after a later one, take the label off and put it on again to clear it.
 - Create the label in that repository once (`gh label create subagent-cleared`).
 
+**`question` comes off a PR that no longer needs the owner** (#371)
+- With `CLEAR_QUESTION_LABEL=1` in the watcher's settings, the watcher takes `question`
+  (`QUESTION_LABEL`) off a PR once the owner approved it, on any commit, or once it merged or
+  closed, with the bot's `GH` token (never with the owner's login: it checks the token is a bot's). Issues keep it until answered.
+
 **The `agent-gh` and `agent-gh-token` commands, the agent bots' `gh`** (#358)
 - Their source is `packages/tooling/src/` (`agent-gh.ts` is the Windows `agent-gh.exe`). Install or
   update them from a checkout of `main`, in bash (Git Bash on Windows, where it also builds the exe):

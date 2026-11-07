@@ -146,6 +146,8 @@ export interface PrState {
   /** GitHub's `mergeStateStatus`: `BLOCKED` while a rule (a review, an open thread) holds it back. */
   mergeState: string
   head: string
+  /** Its labels' names, e.g. QUESTION_LABEL (#371). */
+  labels: string[]
   mergeSha: string
   decision: string
   ownerApproved: boolean
@@ -194,6 +196,7 @@ const stateOf = (value: Json): PrState => {
     decision: decisionFrom(textOf(value.reviewDecision), reviews, OWNER),
     draft: value.isDraft === true,
     head: textOf(value.headRefOid),
+    labels,
     mergeSha: textOf(record(value.mergeCommit).oid),
     mergeState: textOf(value.mergeStateStatus),
     mergeable: textOf(value.mergeable),
