@@ -34,6 +34,20 @@ const run = (wrapper: keyof typeof wrappers, args: string[]) => {
   return { code: result.exitCode, stderr: result.stderr.toString() }
 }
 
+// The gh stub answers `gh help <command>` with a flag table in gh's own format (api has no -R), and
+// records every other call.
+const ghStub = `if [[ $1 == help ]]; then
+  if [[ $2 == api ]]; then
+    printf 'FLAGS\\n  -X, --method string          The HTTP method for the request\\n  -f, --raw-field key=value    Add a string parameter\\n'
+  else
+    printf 'FLAGS\\n  -t, --title string   Supply a title\\n  -w, --web            Open the browser\\n\\n'
+    printf 'INHERITED FLAGS\\n      --help                     Show help for command\\n'
+    printf '  -R, --repo [HOST/]OWNER/REPO   Select another repository using the [HOST/]OWNER/REPO format\\n'
+  fi
+  exit 0
+fi
+echo -n "$GH_TOKEN|$*" > "$HOME/gh-called"`
+
 const ghCall = () => {
   const file = path.join(home, 'gh-called')
   return existsSync(file) ? readFileSync(file, 'utf8') : null
@@ -44,7 +58,7 @@ beforeEach(() => {
   bin = path.join(home, 'stubs')
   mkdirSync(bin)
   mkdirSync(path.join(home, '.local', 'bin'), { recursive: true })
-  script(path.join(bin, 'gh'), 'echo -n "$GH_TOKEN|$*" > "$HOME/gh-called"')
+  script(path.join(bin, 'gh'), ghStub)
 })
 
 afterEach(() => {
@@ -85,6 +99,14 @@ describe.each(['bash', 'windows'] as const)('agent-gh (%s)', wrapper => {
   test('takes no repository from another option\'s value or from after --', () => {
     tokenStub('echo bot-token')
     expect(run(wrapper, ['issue', 'create', '--title', '-ROwner/other', '--', '-R', 'Owner/other']).code).toBe(0)
+    expect(readFileSync(path.join(home, 'token-repo'), 'utf8')).toBe('')
+  })
+
+  test('takes no repository from a value that looks like -R or --repo (#361)', () => {
+    tokenStub('echo bot-token')
+    expect(run(wrapper, ['issue', 'create', '--title', '--repo=Owner/other']).code).toBe(0)
+    expect(readFileSync(path.join(home, 'token-repo'), 'utf8')).toBe('')
+    expect(run(wrapper, ['issue', 'create', '--title', '-R', 'Owner/other']).code).toBe(0)
     expect(readFileSync(path.join(home, 'token-repo'), 'utf8')).toBe('')
   })
 
