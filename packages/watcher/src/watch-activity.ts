@@ -57,7 +57,7 @@ const MERGED_HOURS = Number(process.env.MERGED_HOURS ?? 3)
 const byNumber = (first: number, second: number) => first - second
 
 /** Whether a closing reference's PR merged within MERGED_HOURS. */
-const mergedLately = (pr: Json): boolean => pr.state === 'MERGED' && hasText(pr.mergedAt)
+const mergedLately = (pr: Json): boolean => pr.state === 'MERGED' && hasText(textOf(pr.mergedAt))
   && Temporal.Instant.compare(Temporal.Instant.from(textOf(pr.mergedAt)), Temporal.Now.instant().subtract({ hours: MERGED_HOURS })) > 0
 
 /**
