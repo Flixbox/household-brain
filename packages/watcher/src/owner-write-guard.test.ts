@@ -185,8 +185,10 @@ describe('ownerWrite (#368)', () => {
       '(( $(echo 1) <<1 ))\ngh issue close 1\n1',
       'echo $(( $((1<<1)) <<1 ))\ngh issue close 1\n1',
       "echo $(( '$(gh issue close 1)' ))",
+      "(( '$(gh issue close 1)' ))",
+      // Quoting in arithmetic reads it as commands too, failing closed (review on #374).
+      String.raw`echo $(( \$(gh issue close 1) ))`,
     ])).toEqual([])
-    expect(allowed([String.raw`echo $(( \$(gh issue close 1) ))`])).toEqual([])
   })
 
   it('reads ((…) ) as a subshell, not arithmetic, when the second ( closes alone (review on #374)', () => {

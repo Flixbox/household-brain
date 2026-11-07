@@ -94,29 +94,37 @@ const closingParen = (text: string, from: number) => {
   return text.length
 }
 
+/** Quotes and escapes: where they sit, `closingParen` may find a `)` other than the shell's (#378). */
+const quoting = /["'\\`]/u
+
 /**
  * Whether the `((` at `at` is arithmetic: the `)` that closes its second `(` is followed by another.
- * Otherwise the shell reads a subshell in it, as `((gh pr close 1) )` (review on #374). A backtick
- * before that `)` reads it as commands too: `closingParen` counts parentheses in backticks, the shell doesn't.
+ * Otherwise the shell reads a subshell in it, as `((gh pr close 1) )` (review on #374). Any quote or
+ * escape before that `)` reads it as a subshell too, failing closed: `closingParen` reads quoting
+ * (backticks, `$'…'`) other than the shell does.
  */
 const opensArithmetic = (text: string, at: number) => {
   const close = closingParen(text, at + 2)
-  return text.startsWith('((', at) && text[close + 1] === ')' && !text.slice(at, close).includes('`')
+  return text.startsWith('((', at) && text[close + 1] === ')' && !quoting.test(text.slice(at, close))
 }
 
 /**
  * A `$(…)` or backtick substitution starting at `at`: its text is kept to be read as a command line
  * of its own, and the word gets it, marked as dynamic. `$((…))` arithmetic is data, but for the
- * substitutions in it (#373). Returns that text and where the next thing starts.
+ * substitutions in it (#373); text that only looks like it is read both ways, failing closed, as the
+ * shell runs a substitution in quotes in arithmetic. Returns that text and where the next thing starts.
  */
 const substitution = (scan: Scan, text: string, at: number): [string, number] => {
   const backtick = text[at] === '`'
   const from = at + (backtick ? 1 : 2)
   const end = backtick ? indexOrEnd(text, '`', from) : closingParen(text, from)
-  if (text[at] === '$' && opensArithmetic(text, at + 1)) {
-    substitutionsIn(scan, text.slice(from, end))
-  } else {
-    scan.nested.push(text.slice(from, end))
+  const inner = text.slice(from, end)
+  const arithmeticLike = text.startsWith('$((', at)
+  if (!arithmeticLike || !opensArithmetic(text, at + 1)) {
+    scan.nested.push(inner)
+  }
+  if (arithmeticLike) {
+    substitutionsIn(scan, inner)
   }
   return [dynamic + text.slice(at, end + 1), end + 1]
 }
@@ -219,6 +227,18 @@ const arithmetic: Reader = (scan, text, at) => {
   return end + 1
 }
 
+/**
+ * `((`: arithmetic, or else the start of a subshell, whose text is also searched for substitutions,
+ * failing closed, as in `substitution`.
+ */
+const doubleParen: Reader = (scan, text, at) => {
+  if (opensArithmetic(text, at)) {
+    return arithmetic(scan, text, at)
+  }
+  substitutionsIn(scan, text.slice(at + 2, closingParen(text, at + 1)))
+  return separator(scan, text, at)
+}
+
 const heredocOpen: Reader = (scan, text, at) => {
   const match = heredocOpener.exec(text.slice(at))
   endWordBeforeRedirection(scan)
@@ -272,7 +292,7 @@ const readerRules: readonly (readonly [Test, Reader])[] = [
   [(_scan, text, at) => text[at] === '\n', newline],
   [(_scan, text, at) => opensHeredoc(text, at), heredocOpen],
   [(_scan, text, at) => text[at] === '<' || text[at] === '>', redirect],
-  [(scan, text, at) => scan.word === null && opensArithmetic(text, at), arithmetic],
+  [(scan, text, at) => scan.word === null && text.startsWith('((', at), doubleParen],
   [(_scan, text, at) => isSeparator(text, at), separator],
   [(_scan, text, at) => startsSubstitution(text, at), substituted],
   [(scan, text, at) => text[at] === '#' && scan.word === null, comment],
