@@ -32,7 +32,7 @@ const removeLabel = async (pr: number): Promise<'failed' | 'gone' | 'removed'> =
 
 /** Takes the label off PR `pr` where `clearsQuestion` says so, and reports it. */
 export const clearQuestion = async (pr: number, state: PrState): Promise<void> => {
-  const facts = { approvedCommit: state.ownerApprovalCommit, enabled: CLEAR_QUESTION_LABEL, labelled: state.question, state: state.state }
+  const facts = { approvedCommit: state.ownerApprovalCommit, enabled: CLEAR_QUESTION_LABEL, labelled: state.labels.includes(QUESTION_LABEL), state: state.state }
   if (!clearsQuestion(facts) || !await ghIsBot()) {
     return
   }

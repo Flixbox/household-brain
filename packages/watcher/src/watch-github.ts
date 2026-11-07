@@ -9,7 +9,6 @@ import { GH, failedStatus, ghText } from './watch-gh'
 import type { OpenIssue } from './watch-link-cycles'
 import { ownerOfRepo } from './watch-owner'
 import { ownerApprovalCommit } from './watch-ready-events'
-import { QUESTION_LABEL } from './watch-question-events'
 import { hasText, isRecord, textOf } from './read'
 import { type Json, actor, at, count, oneLine, record, records } from './watch-text'
 
@@ -147,6 +146,8 @@ export interface PrState {
   /** GitHub's `mergeStateStatus`: `BLOCKED` while a rule (a review, an open thread) holds it back. */
   mergeState: string
   head: string
+  /** Its labels' names, e.g. QUESTION_LABEL (#371). */
+  labels: string[]
   mergeSha: string
   decision: string
   ownerApproved: boolean
@@ -160,8 +161,6 @@ export interface PrState {
   bot: BotReviewState
   parked: boolean
   queued: boolean
-  /** The PR carries QUESTION_LABEL: it waits on the owner (#371). */
-  question: boolean
   title: string
   toResolve: ReviewThread[]
 }
@@ -197,6 +196,7 @@ const stateOf = (value: Json): PrState => {
     decision: decisionFrom(textOf(value.reviewDecision), reviews, OWNER),
     draft: value.isDraft === true,
     head: textOf(value.headRefOid),
+    labels,
     mergeSha: textOf(record(value.mergeCommit).oid),
     mergeState: textOf(value.mergeStateStatus),
     mergeable: textOf(value.mergeable),
@@ -206,7 +206,6 @@ const stateOf = (value: Json): PrState => {
     ownerApproved: approvedBy(reviews, OWNER),
     parked: labels.includes('parked'),
     queued: value.isInMergeQueue === true,
-    question: labels.includes(QUESTION_LABEL),
     state: textOf(value.state),
     title: `${textOf(value.title)} (by ${author})`,
     toResolve: threadsToResolve(threadsFrom(value)),

@@ -1,9 +1,8 @@
 /* oxlint-disable eslint/no-await-in-loop -- each poller's looks run one after another, on purpose */
 /** The project watcher's looks, started by watch-project.ts once it has read which code it runs (#265). */
 import { type Activity, FOLLOW_NEWER, type MainRun, type Run, cancelledDeployEvent, mainRunEvent, queueCommand, replacementCandidates, runEvent } from './watch-events'
-import { type PrState, REPO, containsCommit, jobLines, mainAhead, mainHead, mainRuns, newestMainRun, prStates, resolveThread, runOf } from './watch-github'
-import { APPROVED_DRAFT_NOTE, checkApproval } from './watch-approval'
-import { resolvedThreadEvent } from './watch-review-events'
+import { type PrState, REPO, containsCommit, jobLines, mainAhead, mainHead, mainRuns, newestMainRun, prStates, runOf } from './watch-github'
+import { APPROVED_DRAFT_NOTE, checkApproval, resolveAsked } from './watch-approval'
 import { FOLLOW, checkCode, finishSubscriptions, flush, queue, quiet, report, reportLookups, reportUsage } from './watch-output'
 import { addLine, endPr, readLines, rememberPr, start, startSubscriptions, subscriptions, updateLines, writeLines } from './watch-state'
 import { activitiesOf, checkActivity as checkPrActivity, checkTrackedActivity, watchedPrs } from './watch-activity'
@@ -152,17 +151,6 @@ const checkReview = async (pr: number, state: PrState): Promise<void> => {
   const after = state.queued ? 'It is in the merge queue already.' : `Once it is well reviewed, ${queueIt}`
   const next = state.draft ? `${APPROVED_DRAFT_NOTE} Then, once it is well reviewed, ${queueIt}` : after
   await report(state.decision === 'APPROVED' ? { key: `pr-${pr} approved`, lines: [`APPROVED by the owner. ${next}`] } : null, pr)
-}
-
-/**
- * Resolves each open thread whose last comment is a `Resolved: <reason>` reply (#279), and says so. A
- * failed attempt is reported once; the thread is tried again on every look until it is resolved.
- */
-const resolveAsked = async (pr: number, state: PrState): Promise<void> => {
-  await allSettled(state.toResolve.map(async thread => {
-    const resolved = await resolveThread(thread.id).catch(() => false)
-    await report(resolvedThreadEvent(pr, thread, resolved), pr)
-  }))
 }
 
 const checkOpen = async (pr: number, state: PrState, items: Activity[] | undefined): Promise<void> => {

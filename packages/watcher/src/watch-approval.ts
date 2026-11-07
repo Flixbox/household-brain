@@ -18,6 +18,9 @@ import { GH, ghText } from './watch-gh'
 import { askedBots, readLines } from './watch-state'
 import { report } from './watch-output'
 
+// Resolving threads on `Resolved:` replies comes before what the approval asks (#279).
+export { resolveAsked } from './watch-dismiss'
+
 /** What the APPROVED event says about a draft: who marks it ready. */
 export const APPROVED_DRAFT_NOTE = draftNote(READY_APPROVED_DRAFTS)
 

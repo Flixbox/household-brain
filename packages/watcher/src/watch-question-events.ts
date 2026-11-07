@@ -38,4 +38,4 @@ const because = (approved: string, state: string): string => {
 /** The event for the label taken off (`removed`), or not: once per head, a failure under its own key. */
 export const questionClearedEvent = ({ approved, head, pr, removed, state }: { approved: string, head: string, pr: number, removed: boolean, state: string }): Event => removed
   ? { key: `pr-${pr} question-cleared ${head}`, lines: [`QUESTION_CLEARED: ${because(approved, state)}, so the watcher took the \`${QUESTION_LABEL}\` label off (CLEAR_QUESTION_LABEL). Nothing to do.`] }
-  : { key: `pr-${pr} question-clear-failed ${head}`, lines: [`QUESTION_CLEAR_FAILED: couldn't take the \`${QUESTION_LABEL}\` label off (it tries again on every look); check the GH token may write pull requests`] }
+  : { key: `pr-${pr} question-clear-failed ${head}`, lines: [`QUESTION_CLEAR_FAILED: couldn't take the \`${QUESTION_LABEL}\` label off (it tries again on every look); check the GH token may write issues (labels are an issue's, also on a PR)`] }
