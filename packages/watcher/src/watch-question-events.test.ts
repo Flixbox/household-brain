@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { clearsQuestion, isBotLogin, questionClearedEvent } from './watch-question-events'
+import { clearsQuestion, isBotLogin, questionClearedEvent, questionUncheckedEvent } from './watch-question-events'
 
 const HEAD = 'abcdef1234567890'
 const OLD = '1234567890abcdef'
@@ -47,5 +47,14 @@ describe('isBotLogin (#371)', () => {
     expect(isBotLogin('flixbox-ai-agent[bot]')).toBe(true)
     expect(isBotLogin('Owner')).toBe(false)
     expect(isBotLogin('')).toBe(false)
+  })
+})
+
+describe('questionUncheckedEvent (#371)', () => {
+  it('says the label stays where the GH token is no bot\'s, or that is unknown, once per head', () => {
+    const person = questionUncheckedEvent({ head: HEAD, person: true, pr: 7 })
+    expect(person.key).toBe(`pr-7 question-unchecked ${HEAD}`)
+    expect(person.lines[0]).toContain("the GH token isn't a bot's")
+    expect(questionUncheckedEvent({ head: HEAD, person: false, pr: 7 }).lines[0]).toContain("couldn't ask GitHub")
   })
 })

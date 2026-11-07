@@ -5,7 +5,7 @@
  * removal another watcher made first (404) is theirs to report; a failed one is reported once per head
  * and tried again on every look.
  */
-import { CLEAR_QUESTION_LABEL, QUESTION_LABEL, clearsQuestion, isBotLogin, questionClearedEvent } from './watch-question-events'
+import { CLEAR_QUESTION_LABEL, QUESTION_LABEL, clearsQuestion, isBotLogin, questionClearedEvent, questionUncheckedEvent } from './watch-question-events'
 import { GH, failedStatus } from './watch-gh'
 import { type PrState, REPO, gh } from './watch-github'
 import { at } from './watch-text'
@@ -16,13 +16,13 @@ import { textOf } from './read'
 const identity: { bot: boolean | null } = { bot: null }
 
 /**
- * Whether `GH` signs in as a bot, by GitHub's `viewer`, asked once; it fails closed: a failed question
- * counts as not, and is asked again on the next look.
+ * Whether `GH` signs in as a bot, by GitHub's `viewer`, asked until it answers; null while it doesn't.
+ * Only `true` lets the label come off: it fails closed.
  */
-const ghIsBot = async (): Promise<boolean> => {
+const ghIsBot = async (): Promise<boolean | null> => {
   identity.bot ??= await gh(['api', 'graphql', '-f', 'query={viewer{login}}'], GH, true)
     .then(answer => isBotLogin(textOf(at(answer, 'data', 'viewer', 'login'))), () => null)
-  return identity.bot === true
+  return identity.bot
 }
 
 /** `removed`, `gone` (off already), or `failed`. */
@@ -33,7 +33,12 @@ const removeLabel = async (pr: number): Promise<'failed' | 'gone' | 'removed'> =
 /** Takes the label off PR `pr` where `clearsQuestion` says so, and reports it. */
 export const clearQuestion = async (pr: number, state: PrState): Promise<void> => {
   const facts = { approvedCommit: state.ownerApprovalCommit, enabled: CLEAR_QUESTION_LABEL, labelled: state.labels.includes(QUESTION_LABEL), state: state.state }
-  if (!clearsQuestion(facts) || !await ghIsBot()) {
+  if (!clearsQuestion(facts)) {
+    return
+  }
+  const bot = await ghIsBot()
+  if (bot !== true) {
+    await report(questionUncheckedEvent({ head: state.head, person: bot === false, pr }), pr)
     return
   }
   const outcome = await removeLabel(pr)
