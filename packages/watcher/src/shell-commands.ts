@@ -1,7 +1,8 @@
 /**
  * A shell command line read into its simple commands (#368), closely enough for the owner-write
  * guard: the commands of a pipeline, list, group or subshell, of `$(…)` and backticks (also inside
- * double quotes), each as its words with quotes and escapes taken off, and comments left out. It
+ * double quotes), each as its words with quotes and escapes taken off, and comments and
+ * here-document bodies left out. It
  * expands nothing: a `$` the shell would expand (outside single quotes) stays in the word, after a
  * mark, so `isDynamic` tells a word the shell may change from one it takes as written.
  */
@@ -15,9 +16,19 @@ export const isDynamic = (word: string) => word.includes(dynamic)
 /** A word as it reads, without the marks. */
 export const plainWord = (word: string) => word.replaceAll(dynamic, '')
 
+/** A here-document opened on the line being read; its body starts on the next line. */
+interface Heredoc {
+  delimiter: string
+  /** `<<'EOF'` (or `"EOF"`, `\\EOF`): the body is taken as written; else the shell runs its `$(…)`. */
+  quoted: boolean
+  /** `<<-`: tabs before the closing line don't count. */
+  tabs: boolean
+}
+
 /** The scan of a command line: the simple commands found so far, and the one being read. */
 interface Scan {
   commands: string[][]
+  heredocs: Heredoc[]
   /** The texts of `$(…)` and backticks, each read as a command line of its own. */
   nested: string[]
   /** The word being read, null between words. */
@@ -147,7 +158,7 @@ const escaped = (scan: Scan, text: string, at: number) => {
 const endsWithAmpersand = (text: string, at: number) =>
   text[at] === '&' && text[at - 1] !== '>' && text[at - 1] !== '<' && text[at + 1] !== '>'
 
-const separators = new Set(['\n', '(', ')', ';', '|'])
+const separators = new Set(['(', ')', ';', '|'])
 
 const isSeparator = (text: string, at: number) => separators.has(text[at] ?? '') || endsWithAmpersand(text, at)
 
@@ -179,27 +190,84 @@ const plain: Reader = (scan, text, at) => {
   return at + 1
 }
 
-/** What reads the thing that starts at `at`; each returns where the next thing starts. */
-const readerAt = (scan: Scan, text: string, at: number): Reader => {
-  const char = text[at] ?? ''
-  if (char === ' ' || char === '\t') {
-    return blank
+/** `<<`, `<<-`, and the delimiter, quoted or not. */
+const heredocOpener = /^<<(?<tabs>-?)[\t ]*(?:'(?<single>[^']*)'|"(?<double>[^"]*)"|(?<escape>\\)?(?<bare>[^\s"&'();<>|-][^\s"&'();<>|]*))/u
+
+const opensHeredoc = (text: string, at: number) => text.startsWith('<<', at) && !text.startsWith('<<<', at)
+
+const heredocOpen: Reader = (scan, text, at) => {
+  const match = heredocOpener.exec(text.slice(at))
+  if (match === null) {
+    append(scan, '<<')
+    return at + 2
   }
-  if (isSeparator(text, at)) {
-    return separator
-  }
-  if (startsSubstitution(text, at)) {
-    return substituted
-  }
-  if (char === '#' && scan.word === null) {
-    return comment
-  }
-  return readers.get(char) ?? plain
+  const { bare, double, escape, single, tabs } = match.groups ?? {}
+  scan.heredocs.push({
+    delimiter: single ?? double ?? bare ?? '',
+    quoted: typeof escape === 'string' || typeof bare !== 'string',
+    tabs: tabs === '-',
+  })
+  append(scan, match[0])
+  return at + match[0].length
 }
+
+/** Where a here-document's body ends (the start of its closing line) and what follows it starts. */
+const closingLine = (heredoc: Heredoc, text: string, from: number) => {
+  let start = from
+  while (start < text.length) {
+    const end = indexOrEnd(text, '\n', start)
+    const line = text.slice(start, end)
+    if ((heredoc.tabs ? line.replace(/^\t+/u, '') : line) === heredoc.delimiter) {
+      return { after: end + 1, start }
+    }
+    start = end + 1
+  }
+  return { after: text.length, start: text.length }
+}
+
+/**
+ * Where what follows the here-documents opened on a line starts: their bodies are data, not commands.
+ * A body the shell runs substitutions in is read as commands after all (`from` is returned), and so
+ * is all that follows it.
+ */
+const pastHeredocs = (heredocs: readonly Heredoc[], text: string, from: number) => {
+  let at = from
+  for (const heredoc of heredocs) {
+    const { after, start } = closingLine(heredoc, text, at)
+    if (!heredoc.quoted && /\$\(|`/u.test(text.slice(at, start))) {
+      return at
+    }
+    at = after
+  }
+  return at
+}
+
+const newline: Reader = (scan, text, at) => {
+  endCommand(scan)
+  const pending = scan.heredocs
+  scan.heredocs = []
+  return pastHeredocs(pending, text, at + 1)
+}
+
+type Test = (scan: Scan, text: string, at: number) => boolean
+
+/** Which reader reads what starts at `at`, first match first; else a quote's or escape's reader, or `plain`. */
+const readerRules: readonly (readonly [Test, Reader])[] = [
+  [(_scan, text, at) => text[at] === ' ' || text[at] === '\t', blank],
+  [(_scan, text, at) => text[at] === '\n', newline],
+  [(_scan, text, at) => opensHeredoc(text, at), heredocOpen],
+  [(_scan, text, at) => isSeparator(text, at), separator],
+  [(_scan, text, at) => startsSubstitution(text, at), substituted],
+  [(scan, text, at) => text[at] === '#' && scan.word === null, comment],
+]
+
+/** What reads the thing that starts at `at`; each returns where the next thing starts. */
+const readerAt = (scan: Scan, text: string, at: number): Reader =>
+  readerRules.find(([test]) => test(scan, text, at))?.[1] ?? readers.get(text[at] ?? '') ?? plain
 
 /** Every simple command of a command line, as its words. */
 export const commandsOf = (text: string): string[][] => {
-  const scan: Scan = { commands: [], nested: [], word: null, words: [] }
+  const scan: Scan = { commands: [], heredocs: [], nested: [], word: null, words: [] }
   let at = 0
   while (at < text.length) {
     at = readerAt(scan, text, at)(scan, text, at)

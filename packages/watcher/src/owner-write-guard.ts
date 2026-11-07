@@ -95,13 +95,25 @@ const apiFlagsOf = (args: readonly string[]): ApiFlags => {
 /** A GraphQL document without its strings and comments, where a word such as "mutation" means nothing. */
 const graphqlCode = (document: string) => document.replaceAll(/"""[\s\S]*?"""|"(?:[^"\\]|\\.)*"|#.*/gu, ' ')
 
+/** The top level of a GraphQL document, where an operation's type stands: what is inside braces (fields, aliases) is blanked. */
+const topLevel = (code: string) => {
+  let depth = 0
+  let level = ''
+  for (const char of code) {
+    depth -= char === '}' ? 1 : 0
+    level += depth === 0 ? char : ' '
+    depth += char === '{' ? 1 : 0
+  }
+  return level
+}
+
 /** Whether a GraphQL call may write: unless its query is written out and holds no mutation, it counts as one. */
 const graphqlWrites = (flags: ApiFlags) => {
   const query = flags.fields.find(field => field.startsWith('query='))
   if (flags.input || typeof query === 'undefined' || isDynamic(query) || query.startsWith('query=@')) {
     return true
   }
-  return /\bmutation\b/u.test(graphqlCode(query))
+  return /\bmutation\b/u.test(topLevel(graphqlCode(query)))
 }
 
 /**
@@ -166,15 +178,28 @@ const commandStart = (words: readonly string[]) => {
   return at
 }
 
-/** Where the command may start in a simple command: at its first word, or at any word after a wrapper. */
+/** Where the command may start in a simple command: at its first word, and after a wrapper at any word. */
 const startsOf = (command: readonly string[]) =>
-  wrappers.has(baseName(command[0] ?? '')) ? command.map((_word, at) => at).slice(1) : [0]
+  wrappers.has(baseName(command[0] ?? '')) ? command.map((_word, at) => at) : [0]
 
-/** The script a command runs as a command line of its own: of `bash -c '…'` (also `-lc`, `-ec`), or of `eval`. */
+/** The command line `env -S '…'` (`--split-string`) splits and runs, if one is given. */
+const envSplitString = (args: readonly string[]) => {
+  const at = args.findIndex(arg => /^(?:-[0iv]*S|--split-string)/u.test(arg))
+  const attached = (args[at] ?? '').replace(/^(?:-[0iv]*S|--split-string)=?/u, '')
+  if (at === -1) {
+    return null
+  }
+  return attached === '' ? (args[at + 1] ?? null) : attached
+}
+
+/** The script a command runs as a command line of its own: of `bash -c '…'` (also `-lc`, `-ec`), `eval` or `env -S`. */
 const innerScript = (words: readonly string[]) => {
   const [name = '', ...args] = words
   if (name === 'eval') {
     return args.join(' ')
+  }
+  if (baseName(name) === 'env') {
+    return envSplitString(args)
   }
   const at = shells.has(baseName(name)) ? args.findIndex(arg => /^-[abd-z]*c[a-z]*$/u.test(arg)) : -1
   return at === -1 ? null : (args[at + 1] ?? null)
@@ -190,9 +215,17 @@ const runCommands = (text: string): string[][] =>
       return script === null ? [command] : runCommands(script)
     })
 
+/**
+ * Whether one command writes through plain gh, or may: a command word the shell fills in counts when
+ * its arguments would be a gh write, or when it has none (`$SCRIPT`, or what `eval "$SCRIPT"` and
+ * `bash -c "$SCRIPT"` run), as it may be a whole command line.
+ */
+const writes = ([name = '', ...args]: readonly string[]) =>
+  (isGh(name) && ghWrites(args)) || (isDynamic(name) && (args.length === 0 || ghWrites(args)))
+
 /** The first command in a Bash command line that writes to GitHub through plain `gh`, as its words joined, or null when there is none. */
 export const ownerWrite = (command: string): string | null => {
-  const found = runCommands(command).find(([name = '', ...args]) => (isGh(name) || isDynamic(name)) && ghWrites(args))
+  const found = runCommands(command).find(words => writes(words))
   return found ? found.map(word => plainWord(word)).join(' ') : null
 }
 

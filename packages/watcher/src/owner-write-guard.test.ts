@@ -129,6 +129,30 @@ describe('ownerWrite (#368)', () => {
     ])).toEqual([])
   })
 
+  it('finds scripts the shell fills in, env -S, and substitutions in a here-document (Codex round 2 on #369)', () => {
+    expect(refused([
+      'bash -c "$SCRIPT"',
+      'eval "$SCRIPT"',
+      'eval $GH issue close 1',
+      "env -S 'gh issue close 1'",
+      "env --split-string='gh issue close 1'",
+      'cat <<EOF\n$(gh issue close 1)\nEOF',
+      "cat <<'EOF'\nonly data\nEOF\ngh issue close 1",
+      'cat <<-EOF >/dev/null\n\tdata\n\tEOF\ngh issue close 1',
+    ])).toEqual([])
+  })
+
+  it('reads a here-document as data, and mutation as an alias as no write (Codex round 2 on #369)', () => {
+    expect(allowed([
+      "cat <<'EOF' > notes.md\ngh issue close 1\nEOF",
+      "agent-gh issue comment 1 --body-file - <<'EOF'\nRun gh pr close 1 later.\nEOF",
+      'cat <<EOF\ngh pr close 1\nEOF',
+      'cat <<-EOF\n\tgh pr close 1\n\tEOF',
+      'bash -c "gh pr view $N"',
+      "gh api graphql -f query='{ mutation: viewer { login } }'",
+    ])).toEqual([])
+  })
+
   it('names the command it found', () => {
     expect(ownerWrite('cd repo && gh pr comment 1 -b "a b" | cat')).toBe('gh pr comment 1 -b a b')
     expect(ownerWrite('gh api x --method "$METHOD"')).toBe('gh api x --method $METHOD')
