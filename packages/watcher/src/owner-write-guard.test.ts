@@ -169,6 +169,24 @@ describe('ownerWrite (#368)', () => {
     ])).toEqual([])
   })
 
+  it('reads arithmetic as data but for its substitutions, whose here-documents stay here-documents (#373)', () => {
+    expect(allowed([
+      "echo $(( $(sed -n '1p' <<'EOF'\n1\ngh issue close 1\nEOF\n) ))",
+      "(( $(sed -n '1p' <<'EOF'\n1\ngh issue close 1\nEOF\n) ))",
+      'echo $(( $(echo 1) ))',
+    ])).toEqual([])
+    expect(refused([
+      'echo $(( $(cat <<EOF\n$(gh issue close 1)\nEOF\n) ))',
+      "echo $(( $(cat <<'EOF'\n1\nEOF\ngh issue close 1) ))",
+      'echo $(( $(gh issue close 1) + 1 ))',
+      'echo "$(( $(gh issue close 1) ))"',
+      '(( `gh issue close 1` ))',
+      'echo $(( $(echo 1) <<1 ))\ngh issue close 1\n1',
+      '(( $(echo 1) <<1 ))\ngh issue close 1\n1',
+      'echo $(( $((1<<1)) <<1 ))\ngh issue close 1\n1',
+    ])).toEqual([])
+  })
+
   it('names the command it found', () => {
     expect(ownerWrite('cd repo && gh pr comment 1 -b "a b" | cat')).toBe('gh pr comment 1 -b a b')
     expect(ownerWrite('gh api x --method "$METHOD"')).toBe('gh api x --method $METHOD')
