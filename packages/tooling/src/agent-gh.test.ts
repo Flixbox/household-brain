@@ -123,6 +123,8 @@ describe.each(['bash', 'windows'] as const)('agent-gh (%s)', wrapper => {
     expect(readFileSync(path.join(home, 'token-repo'), 'utf8')).toBe('Owner/bundled')
     expect(run(wrapper, ['issue', 'create', '--repo=Owner/attached']).code).toBe(0)
     expect(readFileSync(path.join(home, 'token-repo'), 'utf8')).toBe('Owner/attached')
+    expect(run(wrapper, ['issue', 'view', '123', '-R', 'Owner/after-number']).code).toBe(0)
+    expect(readFileSync(path.join(home, 'token-repo'), 'utf8')).toBe('Owner/after-number')
   })
 
   test('reads a value that looks like -R with the command\'s flags when -R comes before the command', () => {
