@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'bun:test'
-import { queueCommand } from './watch-events'
 import { type PrComment, type Review, type ReviewThread, approvedEvent, blockedByReviewEvent, botsToAskResolve, dismissalMessage, dismissedReviewEvent, resolveAskedEvent, resolveCommand, resolvedThreadEvent, reviewsToDismiss, threadsToResolve } from './watch-review-events'
 
 const HEAD = 'abcdef1234567890abcdef1234567890abcdef12'
@@ -206,7 +205,7 @@ describe('dismissedReviewEvent', () => {
 })
 
 describe('approvedEvent (#298)', () => {
-  const approved = { botAsked: false, draft: false, green: true, head: HEAD, merge: queueCommand('owner/repo', 7), pr: 7, ready: 'gh pr ready 7' }
+  const approved = { botAsked: false, draft: false, green: true, head: HEAD, pr: 7, ready: 'gh pr ready 7', repo: 'owner/repo' }
 
   it('asks to queue with agent-queue once CI is green (#356)', () => {
     expect(approvedEvent(approved)).toEqual({ key: `pr-7 ready ${HEAD}`, lines: ['READY_TO_MERGE: approved and CI is green at abcdef1, but auto-merge is off. Queue it, alone in its own call: agent-queue owner/repo 7'] })
@@ -214,7 +213,7 @@ describe('approvedEvent (#298)', () => {
   })
 
   it('asks to mark a draft ready instead, once per head, green or not', () => {
-    const draftEvent = { key: `pr-7 approved-draft ${HEAD}`, lines: ['APPROVED_DRAFT: approved by the owner but still a draft: mark it ready (gh pr ready 7), then queue (after the review a bot was asked for, if any)'] }
+    const draftEvent = { key: `pr-7 approved-draft ${HEAD}`, lines: ['APPROVED_DRAFT: approved by the owner but still a draft: mark it ready (gh pr ready 7), then queue it (after the review a bot was asked for, if any), alone in its own call: agent-queue owner/repo 7'] }
     expect(approvedEvent({ ...approved, draft: true })).toEqual(draftEvent)
     expect(approvedEvent({ ...approved, draft: true, green: false })).toEqual(draftEvent)
   })

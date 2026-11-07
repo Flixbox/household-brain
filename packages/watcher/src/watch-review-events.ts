@@ -7,7 +7,7 @@
  * a PR asked for a review bot's review, that review first (#299, #324; watch-bot-review-events.ts), and
  * which bots to ask with `@<bot> resolve` (#303).
  */
-import type { Event } from './watch-events'
+import { type Event, queueCommand } from './watch-events'
 import { oneLine } from './watch-text'
 
 /** What `BLOCKED_BY_REVIEW` asks for a bot's change request on the head (#290). */
@@ -225,12 +225,13 @@ export const blockedByReviewEvent = ({ dismiss, head, pr, reviews, self, threads
  * For a PR a review bot was asked about (`botAsked`, #324), READY_TO_MERGE comes once it has reviewed,
  * and says to settle its threads first.
  */
-export const approvedEvent = ({ botAsked, draft, green, head, merge, pr, ready }: { botAsked: boolean, draft: boolean, green: boolean, head: string, merge: string, pr: number, ready: string }): Event | null => {
+export const approvedEvent = ({ botAsked, draft, green, head, pr, ready, repo }: { botAsked: boolean, draft: boolean, green: boolean, head: string, pr: number, ready: string, repo: string }): Event | null => {
+  const queue = `alone in its own call: ${queueCommand(repo, pr)}`
   if (draft) {
-    return { key: `pr-${pr} approved-draft ${head}`, lines: [`APPROVED_DRAFT: approved by the owner but still a draft: mark it ready (${ready}), then queue (after the review a bot was asked for, if any)`] }
+    return { key: `pr-${pr} approved-draft ${head}`, lines: [`APPROVED_DRAFT: approved by the owner but still a draft: mark it ready (${ready}), then queue it (after the review a bot was asked for, if any), ${queue}`] }
   }
-  const when = botAsked ? 'Once the review bot\'s threads are settled, queue it, alone in its own call' : 'Queue it, alone in its own call'
-  return green ? { key: `pr-${pr} ready ${head}`, lines: [`READY_TO_MERGE: approved and CI is green at ${head.slice(0, 7)}, but auto-merge is off. ${when}: ${merge}`] } : null
+  const when = botAsked ? 'Once the review bot\'s threads are settled, queue it' : 'Queue it'
+  return green ? { key: `pr-${pr} ready ${head}`, lines: [`READY_TO_MERGE: approved and CI is green at ${head.slice(0, 7)}, but auto-merge is off. ${when}, ${queue}`] } : null
 }
 
 /** A login as GraphQL and `gh` give it, in lower case: a bot without its REST suffix `[bot]`. */

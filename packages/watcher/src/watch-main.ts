@@ -147,8 +147,9 @@ const checkClosed = async (pr: number, items: Activity[] | undefined): Promise<v
 const checkReview = async (pr: number, state: PrState): Promise<void> => {
   await report(state.mergeable === 'CONFLICTING' ? { key: `pr-${pr} conflict ${state.head}`, lines: [`CONFLICT at ${short(state.head)}: rebase on main`] } : null, pr)
   // Already in the merge queue, there is no auto-merge to enable (#251).
-  const after = state.queued ? 'It is in the merge queue already.' : `Once it is well reviewed, queue it, alone in its own call: ${queueCommand(REPO, pr)}`
-  const next = state.draft ? APPROVED_DRAFT_NOTE : after
+  const queue = `queue it, alone in its own call: ${queueCommand(REPO, pr)}`
+  const after = state.queued ? 'It is in the merge queue already.' : `Once it is well reviewed, ${queue}`
+  const next = state.draft ? `${APPROVED_DRAFT_NOTE} Then, once it is well reviewed, ${queue}` : after
   await report(state.decision === 'APPROVED' ? { key: `pr-${pr} approved`, lines: [`APPROVED by the owner. ${next}`] } : null, pr)
 }
 

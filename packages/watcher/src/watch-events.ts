@@ -142,10 +142,7 @@ const branchProblem = (pr: OpenPr): string | null => {
 }
 
 /** An approved PR whose CI has finished and that waits on the agent (#224). */
-/**
- * The command that queues PR `pr` of `repo`, as the events name it (#356): `agent-queue`, which checks
- * the queueing rules itself (#354) and is allowed by one rule only when it runs alone in its own call.
- */
+/** The queue command the events name (#356): `agent-queue` checks the rules itself (#354); run it alone in its call. */
 export const queueCommand = (repo: string, pr: number): string => `agent-queue ${repo} ${pr}`
 
 const approvalProblem = (pr: OpenPr, repo: string, awaitingBot: boolean): string | null => {
