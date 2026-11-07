@@ -25,6 +25,9 @@
  * user-facing it can't tell: an agent queues a user-facing PR only after the owner's approval, as
  * before, and the label goes only on PRs that aren't.
  *
+ * It asks only as a bot: when GitHub's `viewer` isn't a `[bot]` login it stops before queueing (#365).
+ * Every `GH` call gets the repository as `GH_REPO`, so it runs from any folder, not only a clone.
+ *
  * Settings: `GH`, the `gh` to ask with, `agent-gh` (the bot) by default; `OWNER`, whose approval
  * counts, by default the repository's owner or, for an organisation, its one human admin (#295).
  * `CLEARED_LABEL` and `BOT_REVIEW_LABEL` as for the watcher. A variable set before the command keeps
@@ -122,16 +125,22 @@ export const blockersOf = (facts: PrFacts, owner: string): string[] => {
 
 const GH = process.env.GH ?? 'agent-gh'
 
+/**
+ * The environment of every `GH` call: `GH_REPO` is the repository asked about (#365), so `agent-gh`
+ * picks that repository's bot from any folder; without it, outside a clone, it fails (#360).
+ */
+const envFor = (repo: string) => ({ ...process.env, GH_REPO: repo })
+
 /** What `gh api -i` prints for `args`, whatever its exit code: the answer says what went wrong. */
-const ghAnswer = async (args: readonly string[]): Promise<string> => {
-  const call = Bun.spawn([GH, ...args], { stderr: 'pipe', stdout: 'pipe' })
+const ghAnswer = async (repo: string, args: readonly string[]): Promise<string> => {
+  const call = Bun.spawn([GH, ...args], { env: envFor(repo), stderr: 'pipe', stdout: 'pipe' })
   const [out] = await Promise.all([new Response(call.stdout).text(), call.exited])
   return out
 }
 
 /** What `gh` prints for `args`; throws with its exit code when it fails. Its stderr goes straight through. */
-const gh = async (args: readonly string[]): Promise<string> => {
-  const call = Bun.spawn([GH, ...args], { stderr: 'inherit', stdout: 'pipe' })
+const gh = async (repo: string, args: readonly string[]): Promise<string> => {
+  const call = Bun.spawn([GH, ...args], { env: envFor(repo), stderr: 'inherit', stdout: 'pipe' })
   const out = await new Response(call.stdout).text()
   const code = await call.exited
   if (code !== 0) {
@@ -157,7 +166,7 @@ const COMMENTS_QUERY = `query($owner:String!,$name:String!,$pr:Int!,$before:Stri
 const ask = async ({ extra = [], pr, query, repo }: { extra?: readonly string[], pr: number, query: string, repo: string }): Promise<unknown> => {
   const [owner = '', name = ''] = repo.split('/')
   const args = ['api', 'graphql', '-f', `query=${query}`, '-f', `owner=${owner}`, '-f', `name=${name}`, '-F', `pr=${pr}`, ...extra.flatMap(variable => ['-f', variable])]
-  return at(JSON.parse(await gh(args)), 'data')
+  return at(JSON.parse(await gh(repo, args)), 'data')
 }
 
 /** The PR's comments before the page `comments` (oldest first), a hundred at a time, so no `@<bot> review` is missed. */
@@ -184,9 +193,9 @@ const ownerOf = async (repo: string): Promise<string> => {
     return process.env.OWNER
   }
   const [repoOwner = ''] = repo.split('/')
-  const organisation = await gh(['api', `repos/${repo}`, '-q', '.owner.type']).then(text => text.trim() === 'Organization', () => null)
+  const organisation = await gh(repo, ['api', `repos/${repo}`, '-q', '.owner.type']).then(text => text.trim() === 'Organization', () => null)
   const humanAdmins = organisation === true
-    ? await gh(['api', '--paginate', `repos/${repo}/collaborators?permission=admin`, '-q', '.[] | select(.type == "User") | .login'])
+    ? await gh(repo, ['api', '--paginate', `repos/${repo}/collaborators?permission=admin`, '-q', '.[] | select(.type == "User") | .login'])
       .then(text => text.split('\n').filter(line => line !== ''), () => null)
     : []
   const { note, owner } = defaultOwner(repoOwner, organisation, humanAdmins)
@@ -208,14 +217,14 @@ const argsOf = (): { pr: number, repo: string } => {
 }
 
 /** A GraphQL mutation's answer; on a rate limit (as reply-review-thread.ts tells it) its limit headers go to stderr and it is tried once more after waiting. */
-const mutate = async (mutation: string, variables: readonly string[], retried = false): Promise<{ data: unknown, errors: string }> => {
-  const answer = answerFrom(await ghAnswer(['api', 'graphql', '-i', '-f', `query=${mutation}`, ...variables.flatMap(variable => ['-f', variable])]))
+const mutate = async ({ mutation, repo, retried = false, variables }: { mutation: string, repo: string, retried?: boolean, variables: readonly string[] }): Promise<{ data: unknown, errors: string }> => {
+  const answer = answerFrom(await ghAnswer(repo, ['api', 'graphql', '-i', '-f', `query=${mutation}`, ...variables.flatMap(variable => ['-f', variable])]))
   const wait = rateLimitWait(answer, Math.floor(Temporal.Now.instant().epochMilliseconds / 1000))
   if (wait !== null && !retried) {
     const limits = ['x-ratelimit-remaining', 'x-ratelimit-reset', 'x-ratelimit-resource', 'retry-after'].map(name => `${name}: ${answer.headers.get(name) ?? '-'}`)
     process.stderr.write(`Rate limited (HTTP ${answer.status}; ${limits.join(', ')}); trying once more in ${Math.ceil(wait / 1000)} s\n`)
     await Bun.sleep(wait)
-    return mutate(mutation, variables, true)
+    return mutate({ mutation, repo, retried: true, variables })
   }
   const errors = records(record(answer.body).errors).map(error => textOf(error.message)).join('; ')
   return { data: at(answer.body, 'data'), errors: answer.status === 200 ? errors : `HTTP ${answer.status}: ${errors || textOf(record(answer.body).message)}` }
@@ -231,16 +240,16 @@ const MERGE_NOW = 'mutation($id:ID!,$head:GitObjectID!){mergePullRequest(input:{
  * did. A PR GitHub would merge at once can't get auto-merge ("clean status"): it is merged, squashed,
  * as `gh pr merge --auto` does. Throws with GitHub's reasons when it refuses.
  */
-const queue = async (facts: PrFacts): Promise<string> => {
+const queue = async (repo: string, facts: PrFacts): Promise<string> => {
   const variables = [`id=${facts.id}`, `head=${facts.head}`]
-  const auto = await mutate(autoMergeMutation(facts.mergeQueue ? '' : ',mergeMethod:SQUASH'), variables)
+  const auto = await mutate({ mutation: autoMergeMutation(facts.mergeQueue ? '' : ',mergeMethod:SQUASH'), repo, variables })
   if (auto.errors === '') {
     return facts.mergeQueue ? 'Set to join the merge queue:' : 'Auto-merge (squash) is on for'
   }
   if (!/clean status/iu.test(auto.errors)) {
     throw new Error(`GitHub refused auto-merge: ${auto.errors}`)
   }
-  const now = await mutate(MERGE_NOW, variables)
+  const now = await mutate({ mutation: MERGE_NOW, repo, variables })
   if (now.errors !== '') {
     throw new Error(`GitHub refused the merge: ${now.errors}`)
   }
@@ -256,16 +265,27 @@ const refuseFor = (name: string, blockers: readonly string[]): void => {
   }
 }
 
+/**
+ * Stops unless GitHub's `viewer` is a bot (#365): an agent queues as its bot, never with the owner's
+ * login, which `agent-gh` once fell back to outside a clone (#360).
+ */
+const askAsBot = (self: string): void => {
+  if (!self.endsWith('[bot]')) {
+    throw new Error(`Not queued: ${GH} asks as ${self || 'nobody'}, not as a bot (a [bot] login). Fix ${GH}, then try again.`)
+  }
+}
+
 const main = async (): Promise<void> => {
   const { pr, repo } = argsOf()
   const [facts, owner] = await Promise.all([readFacts(repo, pr), ownerOf(repo)])
+  askAsBot(facts.self)
   if (facts.state === 'OPEN' && (facts.autoMerge || facts.queued)) {
     const where = facts.queued ? 'in the merge queue' : 'set to auto-merge'
     process.stdout.write(`${repo}#${pr} is already ${where}.\n`)
     return
   }
   refuseFor(`${repo}#${pr}`, blockersOf(facts, owner))
-  process.stdout.write(`${await queue(facts)} ${repo}#${pr} at ${facts.head.slice(0, 7)}.\n`)
+  process.stdout.write(`${await queue(repo, facts)} ${repo}#${pr} at ${facts.head.slice(0, 7)}.\n`)
 }
 
 if (import.meta.main) {
