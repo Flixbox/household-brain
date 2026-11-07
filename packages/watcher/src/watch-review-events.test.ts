@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test'
+import { queueCommand } from './watch-events'
 import { type PrComment, type Review, type ReviewThread, approvedEvent, blockedByReviewEvent, botsToAskResolve, dismissalMessage, dismissedReviewEvent, resolveAskedEvent, resolveCommand, resolvedThreadEvent, reviewsToDismiss, threadsToResolve } from './watch-review-events'
 
 const HEAD = 'abcdef1234567890abcdef1234567890abcdef12'
@@ -205,10 +206,10 @@ describe('dismissedReviewEvent', () => {
 })
 
 describe('approvedEvent (#298)', () => {
-  const approved = { botAsked: false, draft: false, green: true, head: HEAD, merge: 'gh pr merge 7 --auto', pr: 7, ready: 'gh pr ready 7' }
+  const approved = { botAsked: false, draft: false, green: true, head: HEAD, merge: queueCommand('owner/repo', 7), pr: 7, ready: 'gh pr ready 7' }
 
   it('asks to enable auto-merge once CI is green', () => {
-    expect(approvedEvent(approved)).toEqual({ key: `pr-7 ready ${HEAD}`, lines: ['READY_TO_MERGE: approved and CI is green at abcdef1, but auto-merge is off. Enable it: gh pr merge 7 --auto'] })
+    expect(approvedEvent(approved)).toEqual({ key: `pr-7 ready ${HEAD}`, lines: ['READY_TO_MERGE: approved and CI is green at abcdef1, but auto-merge is off. Queue it, alone in its own call: agent-queue owner/repo 7'] })
     expect(approvedEvent({ ...approved, green: false })).toBeNull()
   })
 

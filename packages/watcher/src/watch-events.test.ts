@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { FOLLOW_NEWER, type OpenPr, type Run, answerFirst, approvedBy, cancelledDeployEvent, clockTime, decisionFrom, listsOpenPrs, mainRunEvent, newActivity, openPrLines, reminderLines, replacementCandidates, runEvent, stamped, usageFrom } from './watch-events'
+import { FOLLOW_NEWER, type OpenPr, type Run, answerFirst, approvedBy, cancelledDeployEvent, clockTime, decisionFrom, listsOpenPrs, mainRunEvent, newActivity, openPrLines, queueCommand, reminderLines, replacementCandidates, runEvent, stamped, usageFrom } from './watch-events'
 
 const SHA = 'abcdef1234567890abcdef1234567890abcdef12'
 const run = (changes: Partial<Run> = {}): Run => ({ ageSeconds: 60, attempt: 1, conclusion: 'success', id: 7, status: 'completed', ...changes })
@@ -160,15 +160,21 @@ describe('answerFirst (#222)', () => {
   })
 })
 
+describe('queueCommand (#356)', () => {
+  it('names agent-queue with the repository and the PR, never gh pr merge', () => {
+    expect(queueCommand('owner/repo', 284)).toBe('agent-queue owner/repo 284')
+  })
+})
+
 describe('reminderLines (#224)', () => {
   const pr = (changes: Partial<OpenPr>): OpenPr => ({ autoMerge: false, bot: { asked: [], requested: false, reviewed: [], reviewing: false }, checks: ['SUCCESS'], draft: false, headRun: run(), mergeState: 'CLEAN', number: 1, parked: false, queued: false, reviewDecision: 'APPROVED', title: 'x', ...changes })
 
   it('reminds of an approved PR with green CI and auto-merge off, and of one whose CI failed', () => {
-    expect(reminderLines([pr({ number: 284 }), pr({ checks: ['SUCCESS', 'FAILURE'], number: 290 })])).toEqual([
-      'REMINDER: PR #284 is approved and CI is green, but auto-merge is off: enable it.',
+    expect(reminderLines([pr({ number: 284 }), pr({ checks: ['SUCCESS', 'FAILURE'], number: 290 })], 'owner/repo')).toEqual([
+      'REMINDER: PR #284 is approved and CI is green, but auto-merge is off: queue it, alone in its own call: agent-queue owner/repo 284',
       'REMINDER: PR #290 is approved and CI failed: fix it.',
     ])
-    expect(reminderLines([pr({ checks: [], headRun: run({ conclusion: 'startup_failure' }), number: 291 })])).toEqual(['REMINDER: PR #291 is approved and CI failed: fix it.'])
+    expect(reminderLines([pr({ checks: [], headRun: run({ conclusion: 'startup_failure' }), number: 291 })], 'owner/repo')).toEqual(['REMINDER: PR #291 is approved and CI failed: fix it.'])
   })
 
   it('stays quiet about running or unreported CI, auto-merge already on, parked or unapproved PRs', () => {
@@ -185,11 +191,11 @@ describe('reminderLines (#224)', () => {
       pr({ checks: ['FAILURE'], queued: true }),
       // A draft is marked ready first, which APPROVED_DRAFT asks for (#298).
       pr({ draft: true }),
-    ])).toEqual([])
+    ], 'owner/repo')).toEqual([])
   })
 
   it('holds the auto-merge reminder for a PR waiting on a review bot, not its failed CI (#299)', () => {
-    expect(reminderLines([pr({ number: 3 }), pr({ checks: ['FAILURE'], number: 4 })], new Set([3, 4]))).toEqual(['REMINDER: PR #4 is approved and CI failed: fix it.'])
+    expect(reminderLines([pr({ number: 3 }), pr({ checks: ['FAILURE'], number: 4 })], 'owner/repo', new Set([3, 4]))).toEqual(['REMINDER: PR #4 is approved and CI failed: fix it.'])
   })
 })
 
@@ -197,7 +203,7 @@ describe('reminders for branches that can\'t merge (#226)', () => {
   const pr = (changes: Partial<OpenPr>): OpenPr => ({ autoMerge: true, bot: { asked: [], requested: false, reviewed: [], reviewing: false }, checks: ['SUCCESS'], draft: false, headRun: run(), mergeState: 'CLEAN', number: 314, parked: false, queued: false, reviewDecision: 'APPROVED', title: 'x', ...changes })
 
   it('reminds of a branch behind main or in conflict, approved or not', () => {
-    expect(reminderLines([pr({ mergeState: 'BEHIND' }), pr({ mergeState: 'DIRTY', number: 9, reviewDecision: '' })])).toEqual([
+    expect(reminderLines([pr({ mergeState: 'BEHIND' }), pr({ mergeState: 'DIRTY', number: 9, reviewDecision: '' })], 'owner/repo')).toEqual([
       'REMINDER: PR #314 is behind main: rebase it and run the checks again.',
       'REMINDER: PR #9 has conflicts with main: rebase it.',
     ])
@@ -205,7 +211,7 @@ describe('reminders for branches that can\'t merge (#226)', () => {
 
   it('says so in the open-PR list, and leaves parked PRs and clean branches alone', () => {
     expect(openPrLines([pr({ mergeState: 'BEHIND', title: 'Triggers' })])).toEqual(['Open PRs:', '  #314 Triggers: approved, auto-merge on, CI green, behind main'])
-    expect(reminderLines([pr({ mergeState: 'BEHIND', parked: true }), pr({})])).toEqual([])
+    expect(reminderLines([pr({ mergeState: 'BEHIND', parked: true }), pr({})], 'owner/repo')).toEqual([])
   })
 })
 
