@@ -96,10 +96,13 @@ const closingParen = (text: string, from: number) => {
 
 /**
  * Whether the `((` at `at` is arithmetic: the `)` that closes its second `(` is followed by another.
- * Otherwise the shell reads a subshell in it, as `((gh pr close 1) )` (review on #374).
+ * Otherwise the shell reads a subshell in it, as `((gh pr close 1) )` (review on #374). A backtick
+ * before that `)` reads it as commands too: `closingParen` counts parentheses in backticks, the shell doesn't.
  */
-const opensArithmetic = (text: string, at: number) =>
-  text.startsWith('((', at) && text[closingParen(text, at + 2) + 1] === ')'
+const opensArithmetic = (text: string, at: number) => {
+  const close = closingParen(text, at + 2)
+  return text.startsWith('((', at) && text[close + 1] === ')' && !text.slice(at, close).includes('`')
+}
 
 /**
  * A `$(…)` or backtick substitution starting at `at`: its text is kept to be read as a command line
