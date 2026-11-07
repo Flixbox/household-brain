@@ -116,6 +116,17 @@ The Firebase project is a Google Cloud project; everything below happens in it.
   label was last put on: after a later one, take the label off and put it on again to clear it.
 - Create the label in that repository once (`gh label create subagent-cleared`).
 
+**The `agent-gh` and `agent-gh-token` commands, the agent bots' `gh`** (#358)
+- Their source is `packages/tooling/src/` (`agent-gh.ts` is the Windows `agent-gh.exe`). Install or
+  update them from a checkout of `main`, in bash (Git Bash on Windows, where it also builds the exe):
+
+  ```sh
+  bash packages/tooling/install-agent-gh.sh   # into ~/.local/bin; a folder argument overrides it
+  ```
+
+- Each bot's GitHub App key and ID go into the folder `agent-gh-token` names for its owner, by hand.
+  Without a token, `agent-gh` stops with an error instead of running `gh` as your own login.
+
 **The `agent-usage` command, for Claude and Codex agents** (#338)
 - Install a wrapper around the watcher plugin's clone (which the watcher's run command keeps pulled):
 

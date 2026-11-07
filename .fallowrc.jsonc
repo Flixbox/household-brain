@@ -4,7 +4,8 @@
   // reads only JSON(C) or TOML (it is a Rust binary), so there is no typed .ts config.
   "$schema": "./node_modules/fallow/schema.json",
   // `pwa-build` loads the app's config by name and compiles the service worker by path.
-  "entry": ["apps/web/pwa.config.ts", "packages/pwa/src/sw.ts"],
+  // agent-gh.ts is compiled into the Windows agent-gh.exe on its own (#358).
+  "entry": ["apps/web/pwa.config.ts", "packages/pwa/src/sw.ts", "packages/tooling/src/agent-gh.ts"],
   "boundaries": {
     "zones": [
       { "name": "app", "patterns": ["apps/web/**"] },
