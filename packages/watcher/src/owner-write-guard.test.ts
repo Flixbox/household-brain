@@ -169,13 +169,12 @@ describe('ownerWrite (#368)', () => {
     ])).toEqual([])
   })
 
-  it('reads arithmetic as data but for its substitutions, whose here-documents stay here-documents (#373)', () => {
-    expect(allowed([
+  it('reads arithmetic as data but for its substitutions (#373)', () => {
+    expect(allowed(['echo $(( $(echo 1) ))', '(( $(echo 1) + 1 ))'])).toEqual([])
+    expect(refused([
+      // A here-document needs a newline, which fails closed (review on #374): still a false denial.
       "echo $(( $(sed -n '1p' <<'EOF'\n1\ngh issue close 1\nEOF\n) ))",
       "(( $(sed -n '1p' <<'EOF'\n1\ngh issue close 1\nEOF\n) ))",
-      'echo $(( $(echo 1) ))',
-    ])).toEqual([])
-    expect(refused([
       'echo $(( $(cat <<EOF\n$(gh issue close 1)\nEOF\n) ))',
       "echo $(( $(cat <<'EOF'\n1\nEOF\ngh issue close 1) ))",
       'echo $(( $(gh issue close 1) + 1 ))',
@@ -203,6 +202,9 @@ describe('ownerWrite (#368)', () => {
       'echo $((gh issue close 1 `(`); (case x in x) :;; esac))',
       String.raw`((gh issue close 1 $'\''); : '))' )`,
       String.raw`echo $((gh issue close 1 $'\''); : '))' )`,
+      '((gh issue close 1 $(cat <<E\n(\nE\n));(true)))',
+      'echo $((gh issue close 1 $(cat <<E\n(\nE\n));(true)))',
+      '((gh issue close 1 # ))\n))',
     ])).toEqual([])
   })
 
