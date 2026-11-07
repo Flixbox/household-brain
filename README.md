@@ -168,7 +168,8 @@ codex plugin add project-watcher@household-brain
 
 Review and trust the plugin's hooks in `/hooks` (SessionStart and SessionEnd for the watcher, and
 PreToolUse on Bash for the guard against GitHub writes as the owner, #368, #370), then resume the
-session. In an existing
+session. Whether that guard fires for commands that code mode runs through `exec_command` is
+unconfirmed until #377's live check. In an existing
 root session, run `bun <installed-plugin>/src/codex-watch.ts` once. Keep the project's settings in
 `.claude/watcher.env`; no secrets belong there. The Codex adapter requires a running local daemon
 with a Unix control socket (Linux or WSL). It delivers external events as untrusted data to that

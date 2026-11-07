@@ -4,6 +4,8 @@
  * there too, the same one. These tests run the manifest's command as Codex would, with the input
  * Codex sends for its shell tools (`exec_command`: `tool_name` "Bash", `tool_input.command` a string,
  * after `pre-tool-use.command.input` in Codex 0.166), and check its answer is one Codex accepts.
+ * Whether Codex runs the hook for calls code mode makes (`tools.exec_command({cmd})`) is a live
+ * check, #377.
  */
 import { describe, expect, it } from 'bun:test'
 import { isRecord, textOf } from './read'

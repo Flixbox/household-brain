@@ -28,8 +28,9 @@ repository), never with the owner's account.
 - **Never write as the owner** (#368; `Coarisfinia/khovax#2136` posted as the owner once, when a
   rate-limited `agent-gh` call fell back to `gh`): every GitHub write goes through `agent-gh`; plain
   `gh` only reads. When `agent-gh` fails, wait and retry it, or report it. The project-watcher
-  plugin's PreToolUse hook (`packages/watcher/hooks/`) refuses plain `gh` writes in Claude Code, and
-  in Codex once that hook is trusted in `/hooks` (#370).
+  plugin's PreToolUse hook (`packages/watcher/hooks/`) refuses plain `gh` writes in Claude Code. It is
+  registered for Codex too (trusted in `/hooks`), but whether it fires for code mode's
+  `exec_command` calls is unconfirmed until #377's live check: don't rely on it there yet (#370).
 - **Every pull request is assigned to the owner:** `agent-gh pr create --assignee Flixbox …`.
 - **The bot can't**, on purpose: change settings or rulesets, merge past checks, approve, cancel or
   re-run CI. Those use the owner's `gh` login, when the owner asks.
