@@ -42,7 +42,7 @@ const wrappers = new Set([
 ])
 
 /** A redirection: its operator, and its target when attached (`>out`, `2>/dev/null`, `&>log`). */
-const redirection = /^\d*(?:&>>?|>>?|<<{0,2}|>&|<&|>\|)(?<target>.*)$/u
+const redirection = /^\d*(?:&>>?|>>?|<{1,3}|>&|<&|>\|)(?<target>.*)$/u
 
 const shells = new Set(['bash', 'dash', 'sh', 'zsh'])
 
