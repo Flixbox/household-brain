@@ -184,6 +184,19 @@ describe('ownerWrite (#368)', () => {
       'echo $(( $(echo 1) <<1 ))\ngh issue close 1\n1',
       '(( $(echo 1) <<1 ))\ngh issue close 1\n1',
       'echo $(( $((1<<1)) <<1 ))\ngh issue close 1\n1',
+      "echo $(( '$(gh issue close 1)' ))",
+    ])).toEqual([])
+    expect(allowed(['echo $(( \\$(gh issue close 1) ))'])).toEqual([])
+  })
+
+  it('reads ((…) ) as a subshell, not arithmetic, when the second ( closes alone (review on #374)', () => {
+    expect(refused([
+      'echo $((gh issue close 1) )',
+      '((gh issue close 1) )',
+      'echo $((gh issue close 1);(true))',
+      '((gh issue close 1)|cat)',
+      '((gh issue close 1) && (true))',
+      'echo $((gh issue close 1)|cat)',
     ])).toEqual([])
   })
 
