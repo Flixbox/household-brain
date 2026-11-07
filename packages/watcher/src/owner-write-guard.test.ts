@@ -199,6 +199,8 @@ describe('ownerWrite (#368)', () => {
       'echo $((gh issue close 1)|cat)',
       '((gh issue close 1 `(`); (case x in x) :;; esac))',
       'echo $((gh issue close 1 `(`); (case x in x) :;; esac))',
+      String.raw`((gh issue close 1 $'\''); : '))' )`,
+      String.raw`echo $((gh issue close 1 $'\''); : '))' )`,
     ])).toEqual([])
   })
 
