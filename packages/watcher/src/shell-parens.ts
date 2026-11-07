@@ -47,14 +47,17 @@ export const closingParen = (text: string, from: number) => {
   return text.length
 }
 
-/** Quotes and escapes: where they sit, `closingParen` may find a `)` other than the shell's (#378). */
-const quoting = /["'\\`]/u
+/**
+ * Quotes, escapes, comments and newlines (which here-document bodies need): where they sit,
+ * `closingParen` may find a `)` other than the shell's (#378).
+ */
+const quoting = /["#'\\`\n]/u
 
 /**
  * Whether the `((` at `at` is arithmetic: the `)` that closes its second `(` is followed by another.
- * Otherwise the shell reads a subshell in it, as `((gh pr close 1) )` (review on #374). Any quote or
- * escape before that `)` reads it as a subshell too, failing closed: `closingParen` reads quoting
- * (backticks, `$'…'`) other than the shell does.
+ * Otherwise the shell reads a subshell in it, as `((gh pr close 1) )` (review on #374). Any quote,
+ * escape, comment or newline before that `)` reads it as a subshell too, failing closed:
+ * `closingParen` reads backticks, `$'…'`, comments and here-documents other than the shell does.
  */
 export const opensArithmetic = (text: string, at: number) => {
   const close = closingParen(text, at + 2)
