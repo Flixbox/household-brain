@@ -69,7 +69,7 @@ const mergedLately = (pr: Json): boolean => pr.state === 'MERGED' && hasText(pr.
 const closingPrs = async (issues: readonly number[]): Promise<{ merged: number[], open: number[] }> => {
   const nodes = [...(await perIssue(issues, 'closedByPullRequestsReferences(first:100){nodes{number state mergedAt}}')).values()]
     .flatMap(issue => records(at(issue, 'closedByPullRequestsReferences', 'nodes')))
-  return { merged: nodes.filter(mergedLately).map(pr => count(pr.number)), open: nodes.filter(pr => pr.state === 'OPEN').map(pr => count(pr.number)) }
+  return { merged: nodes.filter(pr => mergedLately(pr)).map(pr => count(pr.number)), open: nodes.filter(pr => pr.state === 'OPEN').map(pr => count(pr.number)) }
 }
 
 /**
