@@ -14,8 +14,8 @@ const timed = (command: string) => {
 const files = (count: number) => Array.from({ length: count }, (_unused, nth) => `packages/watcher/src/some-module-${nth}.ts`).join(' ')
 
 describe('ownerWrite behind a wrapper stays within the work budget (#434)', () => {
-  it('refuses a wrapper with very many words, quickly', () => {
-    const { found, ms } = timed(`env ${'a '.repeat(8000)}`)
+  it('refuses very many words behind a wrapper that are each read further, quickly', () => {
+    const { found, ms } = timed(`env ${'sh '.repeat(8000)}`)
     expect(found).not.toBeNull()
     expect(ms).toBeLessThan(boundMs)
   }, testTimeoutMs)

@@ -16,12 +16,12 @@
  *
  * It also refuses a `git push` that git would authenticate as someone other than the bot (owner-push.ts, #455).
  */
-import { pushRefusal } from './owner-push'
+import { movesOrPushes, pushRefusal } from './owner-push'
 import { positionals, xargsFillsIn } from './owner-write-xargs'
 import { isRecord, textOf } from './read'
 import { commandsOf } from './shell-braces'
 import { isDynamic, plainWord } from './shell-commands'
-import { baseName, isGh, programCommands } from './shell-interpreters'
+import { baseName, isGh, programCommands, runsPrograms } from './shell-interpreters'
 import { type Work, charged, newWork, unreadableLine } from './shell-work'
 import { commandsFrom } from './owner-write-wrappers'
 
@@ -224,6 +224,17 @@ const readsScriptFromInput = ([name = '']: readonly string[]) =>
   shell.test(baseName(name)) || stdinRunners.has(baseName(name)) || isDynamic(name)
 
 /**
+ * Whether anything here reads a command with this first word further than the word itself, so a start
+ * behind a wrapper is worth taking: `writes`, `innerScript`, `readsScriptFromInput`, `programCommands`
+ * and `pushRefusal`. Whoever reads a new kind of command adds it here too, or behind a wrapper it goes unseen (#456).
+ */
+const readFurther = (name: string) => {
+  const base = baseName(name)
+  return isGh(name) || isDynamic(name) || base === 'xargs' || name === 'eval' || base === 'env' || scriptFlagRunners.has(base)
+    || shell.test(base) || stdinRunners.has(base) || runsPrograms(name) || movesOrPushes(name)
+}
+
+/**
  * Every simple command a command line runs, from its command word on, with the scripts of `bash -c` and
  * `eval` read too. When anything on the line may run its input as commands (`eval` and `env -S` too), every here-document and
  * here-string on it counts as commands, not only one on that command itself: pipes, groups and
@@ -233,7 +244,7 @@ const runCommands = (text: string, work: Work): string[][] => {
   const simple = commandsOf(text, work)
   const commands = simple
     .map(words => words.slice(commandStart(words)))
-    .flatMap(command => commandsFrom(command, work))
+    .flatMap(command => commandsFrom(command, work, readFurther))
   if (charged(work, 0)) {
     return unreadableLine()
   }
