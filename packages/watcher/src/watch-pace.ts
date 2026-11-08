@@ -133,6 +133,14 @@ const stretchOf = (budget: Budget, nowMs: number): number => {
 export const stretchFor = (limits: Limits, nowMs: number): number =>
   Math.max(1, ...Object.values(limits.budgets).map(budget => stretchOf(budget, nowMs)))
 
+/** Each poller's pause and the longest its quiet looks grow to; the owner's comments keep the answers' short. */
+export const PACES = {
+  answers: { pauseSeconds: 30, quietCapSeconds: 60 },
+  /** Without `--follow`: one look at everything, which holds the answers too. */
+  everything: { pauseSeconds: 60, quietCapSeconds: 300 },
+  project: { pauseSeconds: 60, quietCapSeconds: 300 },
+} as const
+
 const BUSY_GAP_MS = 10_000
 /** A poller's pause, times this, for its first, second and later quiet looks in a row. */
 const QUIET_STEPS = [1, 2, 5]
