@@ -1,8 +1,8 @@
-/* oxlint-disable import/no-nodejs-modules -- a temporary folder for each test's watchers; node:fs/promises and node:os are built into Bun */
+/* oxlint-disable import/no-nodejs-modules -- utimes ages a file; node:fs/promises is built into Bun */
 import { afterEach, describe, expect, it } from 'bun:test'
-import { mkdtemp, rm, utimes } from 'node:fs/promises'
+import { utimes } from 'node:fs/promises'
 import { retryDelayMs } from './watch-write-retry'
-import { tmpdir } from 'node:os'
+import { BOT_VIEWER, QUESTION, cleanUp, lookAtWriter, run, setUp } from './watch-writer-fixture'
 
 const MINUTE = 60_000
 const THREAD = "{ id: 'T1', url: 'https://example.test/t1' }"
@@ -23,25 +23,6 @@ const RELAY = `
   import { relayWrites } from '${import.meta.dir}/watch-writer'
   await relayWrites(7)
   await flush()`
-/** A look at the writer's freshness; `started` is when the watcher started, in epoch milliseconds (long ago unless given). */
-const lookAtWriter = (started = '0') => `
-  import { flush } from '${import.meta.dir}/watch-output'
-  import { checkWriter } from '${import.meta.dir}/watch-writer'
-  await checkWriter(${started})
-  await flush()`
-const MERGED_STATE = "{ autoMerge: false, closingIssues: [], draft: false, head: 'abc1234', labels: ['question'], mergeState: 'CLEAN', ownerApprovalCommit: '', ownerApproved: false, parked: false, queued: false, state: 'MERGED' }"
-const QUESTION = `
-  import { flush } from '${import.meta.dir}/watch-output'
-  import { preparePr } from '${import.meta.dir}/watch-queue'
-  await preparePr(7, ${MERGED_STATE})
-  await flush()`
-/** A subscribed watcher's look at the merged PR; prints whether its subscription may go on to end. `now`: the look's time, in epoch milliseconds. */
-const terminalLook = (state = MERGED_STATE, now = 'Temporal.Now.instant().epochMilliseconds') => `
-  import { flush } from '${import.meta.dir}/watch-output'
-  import { preparePr } from '${import.meta.dir}/watch-queue'
-  const ends = await preparePr(7, ${state}, ${now})
-  console.log(ends ? 'LOOK_ENDS' : 'LOOK_HOLDS')
-  await flush()`
 const ASKER = `
   import { askBotReviews } from '${import.meta.dir}/watch-bot-review'
   import { flush } from '${import.meta.dir}/watch-output'
@@ -49,38 +30,10 @@ const ASKER = `
   await flush()`
 
 // What the fake `gh` answers besides failing: its `case` arms.
-const BOT_VIEWER = String.raw`*viewer*) echo '{"data":{"viewer":{"login":"agent[bot]"}}}'; exit 0 ;;`
 const LABEL_TAKEN = String.raw`*labels/bot-review*) echo '[]'; exit 0 ;;
 *"pullRequest(number: 7)"*) echo '{"data":{"repository":{"pr7":{"state":"OPEN"}}}}'; exit 0 ;;`
 
-const dirs: string[] = []
-afterEach(async () => {
-  await Promise.all(dirs.splice(0).map(async dir => rm(dir, { force: true, recursive: true })))
-})
-
-/** A state folder and a `gh` that logs each call and fails, as a write GitHub refuses. */
-const setUp = async (answers = BOT_VIEWER) => {
-  const home = await mkdtemp(`${tmpdir()}/watch-writer-`)
-  dirs.push(home)
-  const gh = `${home}/gh`
-  await Bun.write(gh, `#!/bin/sh\necho "$*" >> "${home}/calls"\ncase "$*" in\n${answers}\nesac\nexit 1\n`)
-  await Bun.spawn(['chmod', '+x', gh]).exited
-  // Only the writes: a watcher also reads (the merge queue on loading, the open PRs for its reminders).
-  const calls = async () => (await Bun.file(`${home}/calls`).text().catch(() => '')).split('\n').filter(line => ['mutation{', '-X DELETE', 'viewer{'].some(part => line.includes(part)) || line.startsWith('pr ready'))
-  return { calls, gh, home }
-}
-
-/** One watcher process: all-events without `scoped`, else subscribed to PR 7. */
-const run = async ({ gh, home, scoped = false, script }: { gh: string, home: string, scoped?: boolean, script: string }) => {
-  const watcher = Bun.spawn([process.execPath, '-e', script], {
-    env: { ...process.env, CLAUDE_CODE_SESSION_ID: '', CLAUDE_CONFIG_DIR: home, CLEAR_QUESTION_LABEL: '1', CODEX_THREAD_ID: '', CODEX_WATCH_THREAD: '', GH: gh, OWNER: 'owner', READY_APPROVED_DRAFTS: '1', REPO: 'owner/repo', REVIEW_BOTS: 'coderabbitai', STATE_DIR: '', WATCHER_ID: scoped ? 'agent' : 'main', WATCHER_SUBSCRIPTIONS: scoped ? 'pr:7' : '', XDG_STATE_HOME: home },
-    stderr: 'ignore',
-    stdout: 'pipe',
-  })
-  const output = await new Response(watcher.stdout).text()
-  await watcher.exited
-  return output
-}
+afterEach(cleanUp)
 
 describe('how long a failed write waits (#402)', () => {
   it('is 1, 2, 5 and then 10 minutes, and stays at 10', () => {
@@ -234,55 +187,6 @@ describe('the bot-review ask and the question label come from the writer too (#4
     await run({ gh, home, script: QUESTION })
     expect(await run({ gh, home, scoped: true, script: QUESTION })).toContain('PR #7: QUESTION_CLEAR_FAILED')
     expect((await calls()).filter(call => call.includes('-X DELETE'))).toHaveLength(1)
-  }, 30_000)
-
-  it('a subscribed watcher holds a merged PR that still carries the label while a writer runs (#440)', async () => {
-    const { gh, home } = await setUp()
-    await run({ gh, home, script: lookAtWriter() })
-    expect(await run({ gh, home, scoped: true, script: terminalLook() })).toContain('LOOK_HOLDS')
-  }, 30_000)
-
-  it('a wait outlasts the label: the writer takes it off before it leaves its outcome', async () => {
-    const { gh, home } = await setUp()
-    await run({ gh, home, script: lookAtWriter() })
-    await run({ gh, home, scoped: true, script: terminalLook() })
-    const unlabelled = MERGED_STATE.replace("labels: ['question']", 'labels: []')
-    expect(await run({ gh, home, scoped: true, script: terminalLook(unlabelled) })).toContain('LOOK_HOLDS')
-  }, 30_000)
-
-  it('a wait belongs to its head: a new head waits afresh', async () => {
-    const { gh, home } = await setUp()
-    await run({ gh, home, script: lookAtWriter() })
-    const tenMinutesAgo = String(Temporal.Now.instant().epochMilliseconds - 10 * MINUTE)
-    await run({ gh, home, scoped: true, script: terminalLook(MERGED_STATE, tenMinutesAgo) })
-    const newHead = MERGED_STATE.replace("head: 'abc1234'", "head: 'def5678'")
-    expect(await run({ gh, home, scoped: true, script: terminalLook(newHead) })).toContain('LOOK_HOLDS')
-  }, 30_000)
-
-  it('it lets go once the outcome has been relayed', async () => {
-    const { gh, home } = await setUp()
-    await run({ gh, home, script: lookAtWriter() })
-    await run({ gh, home, scoped: true, script: terminalLook() })
-    await run({ gh, home, script: QUESTION })
-    const look = await run({ gh, home, scoped: true, script: terminalLook() })
-    expect(look).toContain('PR #7: QUESTION_CLEAR_FAILED')
-    expect(look).toContain('LOOK_ENDS')
-  }, 30_000)
-
-  it('it waits a bounded time: past the bound the look ends without an outcome', async () => {
-    const { gh, home } = await setUp()
-    await run({ gh, home, script: lookAtWriter() })
-    const tenMinutesAgo = String(Temporal.Now.instant().epochMilliseconds - 10 * MINUTE)
-    expect(await run({ gh, home, scoped: true, script: terminalLook(MERGED_STATE, tenMinutesAgo) })).toContain('LOOK_HOLDS')
-    expect(await run({ gh, home, scoped: true, script: terminalLook() })).toContain('LOOK_ENDS')
-  }, 30_000)
-
-  it('it does not wait when no writer is running, or the label is off', async () => {
-    const { gh, home } = await setUp()
-    expect(await run({ gh, home, scoped: true, script: terminalLook() })).toContain('LOOK_ENDS')
-    await run({ gh, home, script: lookAtWriter() })
-    const unlabelled = MERGED_STATE.replace("labels: ['question']", 'labels: []')
-    expect(await run({ gh, home, scoped: true, script: terminalLook(unlabelled) })).toContain('LOOK_ENDS')
   }, 30_000)
 
   it('a claim on the bot-review label that fails waits instead of being tried on the next look', async () => {

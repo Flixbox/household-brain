@@ -71,9 +71,13 @@ const heldSince = async ({ head, nowMs, pr, start }: { head: string, nowMs: numb
   const entry = `${pr} ${head} `
   const held: { since: number | null } = { since: null }
   await updateLines(WAITS, lines => {
-    const known = lines.find(line => line.startsWith(entry))
-    held.since = known === undefined ? (start ? nowMs : null) : Number(known.slice(entry.length))
-    return known === undefined && start ? [...lines, `${entry}${nowMs}`] : lines
+    const known = lines.find(line => line.startsWith(entry)) ?? ''
+    if (known !== '') {
+      held.since = Number(known.slice(entry.length))
+      return lines
+    }
+    held.since = start ? nowMs : null
+    return start ? [...lines, `${entry}${nowMs}`] : lines
   })
   return held.since
 }
