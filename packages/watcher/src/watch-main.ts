@@ -8,6 +8,7 @@ import { FOLLOW, checkCode, finishSubscriptions, flush, queue, quiet, report, re
 import { addLine, endPr, readLines, start, startSubscriptions, subscriptions, updateLines, writeLines } from './watch-state'
 import { activitiesOf, changedActivities, changedStates, checkActivity as checkPrActivity, checkTrackedActivity, watchedPrs } from './watch-activity'
 import { checkQueue, preparePr } from './watch-queue'
+import { checkWriter } from './watch-writer'
 import { checkIssueStates, checkIssues, checkSubscribedIssues } from './watch-issues'
 import { allSettled, hasText, ignoreFailure } from './read'
 
@@ -156,9 +157,9 @@ type Check = () => Promise<unknown>
 
 /** What someone waits for an answer to: issues, the owner's comments on them and on the PRs followed. */
 const ANSWER_CHECKS: Check[] = [checkIssues, checkIssueStates, checkTrackedActivity]
-/** The rest: the watcher's own code, main, the merge queue, and each PR's CI, reviews and deploy. */
+/** The rest: the watcher's own code, main, the merge queue, each PR's CI, reviews and deploy, and whether a writer runs. */
 // PR relationships precede queue events, so first-look issue subscriptions route their closing PRs.
-const PROJECT_CHECKS: Check[] = [checkCode, checkMain, checkMainHead, checkPrs, checkQueue, checkSubscribedIssues]
+const PROJECT_CHECKS: Check[] = [checkCode, checkMain, checkMainHead, checkPrs, checkQueue, checkSubscribedIssues, checkWriter]
 
 interface Poller {
   checks: readonly Check[]
