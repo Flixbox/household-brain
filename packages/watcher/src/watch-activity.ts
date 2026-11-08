@@ -6,7 +6,7 @@ import { changeTracker } from './watch-change-gate'
 import { ACTIVITY_GH, IGNORED, OWNER, SELF, openPrNumbers, perPr, recentlyMerged } from './watch-github'
 import { type Json, at, count, records } from './watch-text'
 import { perIssue } from './watch-per-issue'
-import { appendLines, exists, oneAtATime, readLines, subscriptions, writeLines } from './watch-state'
+import { appendLines, exists, oneAtATime, readLines, subscribedSince, subscriptions, writeLines } from './watch-state'
 import { allSettled, hasText, textOf } from './read'
 import { queue } from './watch-output'
 
@@ -115,20 +115,21 @@ if (process.env.MERGED_HOURS?.trim() === '' || !canGoBack(MERGED_HOURS)) {
 
 const byNumber = (first: number, second: number) => first - second
 
-/** Whether a closing reference's PR merged within MERGED_HOURS. */
-const mergedLately = (pr: Json): boolean => pr.state === 'MERGED' && hasText(textOf(pr.mergedAt))
-  && Temporal.Instant.compare(Temporal.Instant.from(textOf(pr.mergedAt)), Temporal.Now.instant().subtract({ hours: MERGED_HOURS })) > 0
+/** Whether a closing reference's PR merged within MERGED_HOURS and after `since`. */
+const mergedLately = (pr: Json, since: number): boolean => pr.state === 'MERGED' && hasText(textOf(pr.mergedAt))
+  && Temporal.Instant.from(textOf(pr.mergedAt)).epochMilliseconds >= Math.max(since, Temporal.Now.instant().subtract({ hours: MERGED_HOURS }).epochMilliseconds)
 
 /**
  * The PRs whose closing references name one of `issues` (#357), without listing every open PR: the
- * open ones, and the ones merged within MERGED_HOURS, so one opened and merged between two looks is
- * still reported. An older merge closed the issue before it was reopened: not this subscription's
- * news. The first hundred, one page: more PRs closing one issue are beyond an issue an agent works on.
+ * open ones, and the ones merged within MERGED_HOURS since this watcher first started, so one opened
+ * and merged between two looks is still reported. An older merge closed the issue before it was
+ * reopened, or came before the watcher (#477): not this subscription's news. The first hundred, one page: more PRs closing one issue are beyond an issue an agent works on.
  */
 const closingPrs = async (issues: readonly number[]): Promise<{ merged: number[], open: number[] }> => {
+  const since = await subscribedSince()
   const nodes = [...(await perIssue(issues, 'closedByPullRequestsReferences(first:100){nodes{number state mergedAt}}')).values()]
     .flatMap(issue => records(at(issue, 'closedByPullRequestsReferences', 'nodes')))
-  return { merged: nodes.filter(pr => mergedLately(pr)).map(pr => count(pr.number)), open: nodes.filter(pr => pr.state === 'OPEN').map(pr => count(pr.number)) }
+  return { merged: nodes.filter(pr => mergedLately(pr, since)).map(pr => count(pr.number)), open: nodes.filter(pr => pr.state === 'OPEN').map(pr => count(pr.number)) }
 }
 
 /**

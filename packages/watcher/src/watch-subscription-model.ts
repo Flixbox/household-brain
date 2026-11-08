@@ -40,6 +40,10 @@ export class Subscription {
   }
   public get scoped(): boolean { return this.wanted.size > 0 }
   public get complete(): boolean { return this.scoped && [...this.wanted].every(item => this.ended.has(item)) }
+  /** Whether ending these subjects leaves nothing wanted: only then is the subscription complete (#477). */
+  public endedBy(subjects: readonly string[]): boolean {
+    return this.scoped && [...this.wanted].every(item => this.ended.has(item) || subjects.includes(item))
+  }
   public canStop(pending: boolean): boolean { return this.complete && !pending }
   public get prs(): number[] { return [...this.wanted].filter(item => item.startsWith('pr:') && this.active(item)).map(item => Number(item.slice(3))) }
   public get issues(): number[] { return [...this.wanted].filter(item => item.startsWith('issue:') && this.active(item)).map(item => Number(item.slice(6))) }
