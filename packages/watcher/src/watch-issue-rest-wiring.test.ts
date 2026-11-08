@@ -80,3 +80,15 @@ test('a closing and a new issue reach the open list through since=, after one fu
   expect(await lines(home, 'open-issues')).toEqual(['9'])
   expect((await calls(home)).filter(call => call.includes('issues(states:OPEN'))).toHaveLength(1)
 })
+
+test('closing the last open issue reports, and so does opening it again (#412)', async () => {
+  const home = await fixture([listed(5, 'open')])
+  await run(home, 'checkIssueStates')
+  await Bun.write(`${home}/list`, JSON.stringify([listed(5, 'closed')]))
+  await run(home, 'checkIssueStates')
+  expect(await lines(home, 'open-issues')).toEqual([])
+  await Bun.write(`${home}/list`, JSON.stringify([listed(5, 'open')]))
+  await run(home, 'checkIssueStates')
+  expect(await lines(home, 'open-issues')).toEqual(['5'])
+  expect((await calls(home)).filter(call => call.startsWith('api repos/owner/repo/issues/5'))).toHaveLength(2)
+})
