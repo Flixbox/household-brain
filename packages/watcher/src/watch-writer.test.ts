@@ -45,6 +45,8 @@ const ASKER = `
 const BOT_VIEWER = String.raw`*viewer*) echo '{"data":{"viewer":{"login":"agent[bot]"}}}'; exit 0 ;;`
 const LABEL_TAKEN = String.raw`*labels/bot-review*) echo '[]'; exit 0 ;;
 *"pullRequest(number: 7)"*) echo '{"data":{"repository":{"pr7":{"state":"OPEN"}}}}'; exit 0 ;;`
+const LABEL_CLAIMED = String.raw`*labels/bot-review*) echo '[]'; exit 0 ;;`
+const LABEL_BACK = String.raw`*'labels[]=bot-review'*) echo '[]'; exit 0 ;;`
 
 const dirs: string[] = []
 afterEach(async () => {
@@ -248,5 +250,31 @@ describe('the bot-review ask and the question label come from the writer too (#4
     await run({ gh, home, script: ASKER })
     expect(await calls()).toHaveLength(1)
     expect(await run({ gh, home, scoped: true, script: RELAY })).toContain('PR #7: BOT_REVIEW_FAILED')
+  }, 30_000)
+})
+
+describe('a bot-review ask that never got as far as a comment says so (#461)', () => {
+  it('a claim that fails reports once, and a subscribed watcher hears it', async () => {
+    const { gh, home } = await setUp('')
+    expect(await run({ gh, home, script: ASKER })).toContain("BOT_REVIEW_FAILED: couldn't take the label `bot-review` off")
+    expect(await run({ gh, home, scoped: true, script: RELAY })).toContain('PR #7: BOT_REVIEW_FAILED')
+    expect(await run({ gh, home, scoped: true, script: RELAY })).not.toContain('BOT_REVIEW_FAILED')
+  }, 30_000)
+
+  it('a claim another watcher holds reports nothing', async () => {
+    const { gh, home } = await setUp(String.raw`*labels/bot-review*) echo '{"message":"Label does not exist","status":"404"}'; exit 1 ;;`)
+    expect(await run({ gh, home, script: ASKER })).not.toContain('BOT_REVIEW')
+  }, 30_000)
+
+  it('a PR that cannot be read after the claim reports the label put back, once, and a subscribed watcher hears it', async () => {
+    const { gh, home } = await setUp(`${LABEL_CLAIMED}\n${LABEL_BACK}`)
+    expect(await run({ gh, home, script: ASKER })).toContain("BOT_REVIEW_FAILED: couldn't read the PR after taking the label off, so no bot was asked; put the label `bot-review` back")
+    expect(await run({ gh, home, scoped: true, script: RELAY })).toContain('PR #7: BOT_REVIEW_FAILED')
+    expect(await run({ gh, home, scoped: true, script: RELAY })).not.toContain('BOT_REVIEW_FAILED')
+  }, 30_000)
+
+  it('says so when the label could not be put back either', async () => {
+    const { gh, home } = await setUp(LABEL_CLAIMED)
+    expect(await run({ gh, home, script: ASKER })).toContain("couldn't put the label `bot-review` back: add it again to ask again")
   }, 30_000)
 })

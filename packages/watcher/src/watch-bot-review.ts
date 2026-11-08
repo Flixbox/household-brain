@@ -12,7 +12,7 @@
  * `@<bot> review` comments, the files (`askedBots` in watch-state.ts), and the label itself while it
  * is on; a bot nobody asked holds nothing back, unless its check run on the head shows it reviewing.
  */
-import { BOT_REVIEW_LABEL, type BotReviewState, type LabelFate, REVIEW_BOTS, botReviewEvent, notAskingBecause, reviewCommand } from './watch-bot-review-events'
+import { BOT_REVIEW_LABEL, type BotReviewState, type LabelFate, REVIEW_BOTS, botReviewClaimFailedEvent, botReviewEvent, botReviewUnreadEvent, notAskingBecause, reviewCommand } from './watch-bot-review-events'
 import { REPO, gh, prStates } from './watch-github'
 import { GH, failedStatus } from './watch-gh'
 import { allSettled, ignoreFailure } from './read'
@@ -79,7 +79,7 @@ const botStateNow = async (pr: number): Promise<BotReviewState | null> =>
 const askClaimed = async (pr: number): Promise<boolean> => {
   const state = await botStateNow(pr)
   if (!state) {
-    await putLabelBack(pr)
+    await reportWrite(botReviewUnreadEvent(pr, await labelAfter(pr, true)), pr)
     return false
   }
   const outcomes = await Promise.all(REVIEW_BOTS.map(async bot => ({ bot, outcome: await askOnce({ bot, pr, state }) })))
@@ -96,7 +96,11 @@ const claimAndAsk = async (pr: number): Promise<boolean | null> => {
   if (claim === 'taken') {
     return askClaimed(pr)
   }
-  return claim === 'gone' ? null : false
+  if (claim === 'gone') {
+    return null
+  }
+  await reportWrite(botReviewClaimFailedEvent(pr), pr)
+  return false
 }
 
 /**
@@ -104,7 +108,8 @@ const claimAndAsk = async (pr: number): Promise<boolean | null> => {
  * taking the label off, then asks each bot that wasn't asked yet and reports each ask, skip or
  * failure. A failed ask, or a PR state that can't be read after the claim, puts the label back, so
  * a later look tries again, with backoff (READY_TO_MERGE waits meanwhile); a watcher whose claim
- * didn't go through asks nothing. Only the writer does this (#415); a subscribed watcher hears how it
+ * didn't go through asks nothing. A claim that failed and a PR that couldn't be read report
+ * BOT_REVIEW_FAILED too (#461), once per PR; another watcher's claim reports nothing. Only the writer does this (#415); a subscribed watcher hears how it
  * went from `relayWrites`.
  */
 export const askBotReviews = async (pr: number): Promise<void> => {
