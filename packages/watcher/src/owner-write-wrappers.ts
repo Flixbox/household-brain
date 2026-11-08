@@ -6,7 +6,8 @@
  * A variable counts as a command only where it can be one: at or before the wrapper's real command,
  * as far as the options can be read (#436).
  */
-import { baseName, isGh } from './shell-interpreters'
+import { movesOrPushes } from './owner-push'
+import { baseName, isGh, runsPrograms } from './shell-interpreters'
 import { type Work, charged } from './shell-work'
 import { isDynamic } from './shell-commands'
 
@@ -15,6 +16,26 @@ const wrappers = new Set([
   'builtin', 'busybox', 'chroot', 'chrt', 'command', 'coproc', 'doas', 'env', 'exec', 'flock', 'ionice', 'nice', 'nohup', 'script', 'setpriv',
   'setsid', 'stdbuf', 'sudo', 'taskset', 'time', 'timeout', 'unbuffer', 'unshare', 'watch', 'xargs',
 ])
+
+/** Wrappers that also take a whole command line after `-c`, as a shell does (`flock x -c '…'`). */
+export const scriptFlagRunners = new Set(['flock', 'script'])
+
+/** A shell by its name, however it is spelled (`mksh`, `bash-5.2`, `zsh.exe`): matching more than shells costs only a false denial. */
+export const shell = /^[a-z]*sh[-.\d]*(?:\.exe)?$/u
+
+/** Commands that run what comes in on their input (`source /dev/stdin`), the shells apart. */
+export const stdinRunners = new Set(['.', 'source'])
+
+/**
+ * Whether the guard reads a command with this first word further than the word itself, so a start
+ * behind a wrapper is worth taking: `writes`, `innerScript`, `readsScriptFromInput`, `programCommands`
+ * and `pushRefusal`. Whoever reads a new kind of command adds it here too, or behind a wrapper it goes unseen (#456).
+ */
+const readFurther = (name: string) => {
+  const base = baseName(name)
+  return isGh(name) || isDynamic(name) || base === 'xargs' || name === 'eval' || base === 'env' || scriptFlagRunners.has(base)
+    || shell.test(base) || stdinRunners.has(base) || runsPrograms(name) || movesOrPushes(name)
+}
 
 /** Wrappers with a word of their own before the command (`timeout 5 …`, `flock file …`). */
 const takesOperand = new Set(['chroot', 'chrt', 'coproc', 'flock', 'script', 'taskset', 'timeout'])
@@ -65,26 +86,19 @@ const costOf = (candidate: readonly string[]) => {
   return isGh(name) || isDynamic(name) ? candidate.join(' ').length : Math.ceil(candidate.length / wordsPerCharacter)
 }
 
-/** The words a wrapped command may start at: any written-out word, and a variable only up to the real command. */
+/** The words a wrapped command may start at: any written-out word, and a variable only up to the real command, if the guard reads a command starting there further. A word dropped here costs nothing, so a plain file list can be any length. */
 const startsOf = (command: readonly string[]) => {
   const realCommand = realCommandAt(command)
-  return [...command.keys()].filter(at => at <= realCommand || !isDynamic(command[at] ?? ''))
+  return [...command.keys()].filter(at => (at <= realCommand || !isDynamic(command[at] ?? '')) && readFurther(command[at] ?? ''))
 }
 
-/**
- * The commands a simple command may be: itself, and behind a wrapper one per word it can start at and
- * `readFurther` keeps, until the budget is spent. A word it drops costs nothing, so a plain file list
- * can be any length.
- */
-export const commandsFrom = (command: string[], work: Work, readFurther: (name: string) => boolean) => {
+/** The commands a simple command may be: itself, and behind a wrapper one per word it can start at until the budget is spent. */
+export const commandsFrom = (command: string[], work: Work) => {
   if (!wrappers.has(baseName(command[0] ?? ''))) {
     return [command]
   }
   const candidates: string[][] = []
   for (const at of startsOf(command)) {
-    if (!readFurther(command[at] ?? '')) {
-      continue
-    }
     const candidate = command.slice(at)
     if (charged(work, costOf(candidate))) {
       break
