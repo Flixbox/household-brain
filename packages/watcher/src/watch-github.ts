@@ -1,7 +1,7 @@
 /** The project watcher's questions to GitHub, through the `gh` CLI, answered as plain data. */
-import { type MainRun, type OpenPr, type Run, approvedBy, decisionFrom } from './watch-events'
+import { type MainRun, type Run, approvedBy, decisionFrom } from './watch-events'
 import type { QueueEntry } from './watch-queue-events'
-import { type BotReviewState, NO_BOT_REVIEW, REVIEW_BOTS, botReviewStateOf } from './watch-bot-review-events'
+import { type BotReviewState, REVIEW_BOTS, botReviewStateOf } from './watch-bot-review-events'
 import { type ReviewThread, threadsToResolve } from './watch-review-events'
 import { CLEARED_LABEL } from './watch-cleared-events'
 import { OPEN_ISSUE_FIELDS, allOpenIssues, goneIssueLine, isGone, isMoved, issueEventLine, issuePage } from './watch-issue-events'
@@ -177,7 +177,7 @@ const PR_FIELDS = 'closingIssuesReferences(first:100){nodes{number}} isDraft isI
   // The last hundred comments' text, for a `@<bot> review` ask from any machine (#325), and the head's
   // check suites, for a review bot's check run still going (#324).
   + ' comments(last: 100) { nodes { body } }'
-  + ' commits(last: 1) { nodes { commit { checkSuites(first: 30) { nodes { app { slug } checkRuns(first: 10) { nodes { status } } } } } } }'
+  + ' commits(last: 1) { nodes { commit { checkSuites(first: 10) { nodes { app { slug } checkRuns(first: 10) { nodes { status } } } } } } }'
 
 const stateOf = (value: Json): PrState => {
   const author = actor(value.author)
@@ -218,41 +218,17 @@ const stateOf = (value: Json): PrState => {
 export const prStates = async (prs: readonly number[], fresh = false): Promise<Map<number, PrState>> =>
   perPr(prs, { fields: PR_FIELDS, fresh, parse: stateOf, size: 50 })
 
-/**
- * WORKFLOW's run on `head` (#342); null when unreadable. The same question each look asks about an open
- * PR's head, so the shared answer costs no call of its own.
- */
-const headRunOf = async (head: string): Promise<Run | null> => hasText(head) ? runOf(head).catch(() => null) : null
-
 /** Only the open PRs' numbers (#345): `openPrs` waits for a run lookup per PR, which a round's list doesn't need. */
 export const openPrNumbers = async (): Promise<number[]> =>
   records(await ghRest(`repos/${REPO}/pulls?state=open&per_page=100`)).map(pr => count(pr.number))
 
-export const openPrs = async (): Promise<OpenPr[]> => {
-  const [listed, queue] = await Promise.all([
-    gh(['pr', 'list', '--repo', REPO, '--state', 'open', '--limit', '100', '--json', 'number,title,isDraft,autoMergeRequest,labels,statusCheckRollup,mergeStateStatus,headRefOid']),
-    // An unreadable queue lists the PRs as not queued (#251), rather than leaving out the list and its reminders.
-    queueEntries().catch((): Map<number, QueueEntry> => new Map()),
-  ])
-  // The review decision as `prStates` reads it, through GraphQL (#306). Unknown (empty) for a PR
-  // whose state couldn't be read: it is then simply not approved yet this round, rather than the
-  // whole listing failing.
-  const states = await prStates(records(listed).map(pr => count(pr.number)))
-  const headRuns = await Promise.all(records(listed).map(async pr => headRunOf(textOf(pr.headRefOid))))
-  return records(listed)
-    .map((pr, index) => ({
-      autoMerge: Boolean(pr.autoMergeRequest),
-      bot: states.get(count(pr.number))?.bot ?? NO_BOT_REVIEW,
-      checks: records(pr.statusCheckRollup).map(check => textOf(check.conclusion) || textOf(check.state) || 'pending'),
-      draft: pr.isDraft === true,
-      headRun: headRuns[index] ?? null,
-      mergeState: textOf(pr.mergeStateStatus),
-      number: count(pr.number),
-      parked: records(pr.labels).some(label => label.name === 'parked'),
-      queued: queue.has(count(pr.number)),
-      reviewDecision: states.get(count(pr.number))?.decision ?? '',
-      title: textOf(pr.title),
-    }))
+/** Each PR's state as last read in full (watch-change-gate.ts, #404). */
+export const lastStates = new Map<number, PrState>()
+
+/** A thread the watcher resolved: resolving moves nothing in the gate, and it mustn't be resolved again on each look. */
+export const forgetResolved = (pr: number, thread: string): void => {
+  const state = lastStates.get(pr)
+  if (state) { lastStates.set(pr, { ...state, toResolve: state.toResolve.filter(item => item.id !== thread) }) }
 }
 
 /** Resolves a review thread with the `GH` token, on a `Resolved:` reply (#279); never a shared answer. */

@@ -2,12 +2,15 @@
 import { type Activity, newActivity } from './watch-events'
 import { ACTIVITY_FIELDS, PENDING_FIELDS, activityFrom, addPending } from './watch-comment-lines'
 import { GH } from './watch-gh'
+import { changeTracker } from './watch-change-gate'
 import { ACTIVITY_GH, IGNORED, OWNER, SELF, openPrNumbers, perPr, recentlyMerged } from './watch-github'
 import { type Json, at, count, records } from './watch-text'
 import { perIssue } from './watch-per-issue'
 import { appendLines, exists, oneAtATime, readLines, subscriptions, writeLines } from './watch-state'
 import { allSettled, hasText, textOf } from './read'
 import { queue } from './watch-output'
+
+export { changedStates } from './watch-change-gate'
 
 const parseActivity = (value: Json): Activity[] => activityFrom(value, { ignored: IGNORED, owner: OWNER, self: SELF })
 
@@ -23,7 +26,7 @@ const allActivity = async (prs: readonly number[], cli: string, fresh: boolean) 
  * `ACTIVITY_GH` whole, so the owner's comments still arrive while the bot is out of points. A PR that
  * neither could read is missing.
  */
-export const activitiesOf = async (prs: readonly number[], fresh = false): Promise<Map<number, Activity[]>> => {
+export const activitiesOf = async (prs: readonly number[], fresh = false, needsPending = fresh): Promise<Map<number, Activity[]>> => {
   if (GH === ACTIVITY_GH) {
     return allActivity(prs, GH, fresh)
   }
@@ -32,7 +35,28 @@ export const activitiesOf = async (prs: readonly number[], fresh = false): Promi
   const read = await allActivity(prs, GH, fresh)
   const theirs = await allActivity(prs.filter(pr => !read.has(pr)), ACTIVITY_GH, fresh)
   const withPending = ([pr, items]: [number, Activity[]]): [number, Activity[]] => [pr, addPending(items, pending.get(pr) ?? [])]
-  return new Map([...theirs, ...[...read].filter(([pr]) => !fresh || pending.has(pr))].map(entry => withPending(entry)))
+  return new Map([...theirs, ...[...read].filter(([pr]) => !needsPending || pending.has(pr))].map(entry => withPending(entry)))
+}
+
+const activityReads = changeTracker()
+
+/**
+ * What a look needs to find new comments and reviews on each PR (#404): in full only for a PR the
+ * change gate calls due, and asked for fresh then (an answer shared from before the change would pass
+ * it by). The owner's pending review moves nothing in the gate, so for the others it alone is read,
+ * on every look; a refused check holds nothing back, as the pending review just comes a look later
+ * (#403). A due PR not read is missing and stays due.
+ */
+export const changedActivities = async (prs: readonly number[]): Promise<Map<number, Activity[]>> => {
+  const { due, settle } = await activityReads.look(prs)
+  const rest = prs.filter(pr => !due.includes(pr))
+  const [full, pending] = await Promise.all([
+    // Fresh, but a refused pending check holds nothing back: it is asked again next look.
+    activitiesOf(due, true, false),
+    perPr(rest, { cli: ACTIVITY_GH, fields: PENDING_FIELDS, parse: parseActivity, size: 50 }),
+  ])
+  settle(full.keys())
+  return new Map([...rest.map((pr): [number, Activity[]] => [pr, pending.get(pr) ?? []]), ...full])
 }
 
 /** The comments of a PR already reported. On the very first round, the ones already there are old news. */
@@ -66,7 +90,7 @@ export const checkActivity = async (pr: number, items: Activity[] | undefined): 
 /** The comments on every PR followed, on their own: the owner's answers mustn't wait for CI and deploys (#240). */
 export const checkTrackedActivity = async (): Promise<void> => {
   const prs = (await readLines('tracked')).map(Number)
-  const activities = await activitiesOf(prs)
+  const activities = await changedActivities(prs)
   await allSettled(prs.map(async pr => checkActivity(pr, activities.get(pr))))
 }
 
