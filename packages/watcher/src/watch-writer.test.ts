@@ -100,7 +100,7 @@ describe('one writer (#402)', () => {
     const { gh, home } = await setUp()
     await run({ gh, home, script: RESOLVER })
     const outcomes = `${home}/watch-project/owner_repo/write-outcomes/pr-7`
-    const old = new Date(Date.now() - 2 * 60 * MINUTE)
+    const old = Temporal.Now.instant().subtract({ hours: 2 }).epochMilliseconds / 1000
     const names = await Array.fromAsync(new Bun.Glob('*').scan(outcomes))
     await Promise.all(names.map(async name => utimes(`${outcomes}/${name}`, old, old)))
     expect(names.length).toBeGreaterThan(0)

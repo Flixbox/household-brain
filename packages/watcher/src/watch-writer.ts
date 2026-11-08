@@ -4,10 +4,13 @@ import { report } from './watch-output'
 
 export const retryDelayMs = (_failures: number): number => 0
 
+// fallow-ignore-next-line unused-export
 export const attemptWrite = async (_key: string, write: () => Promise<boolean | null>): Promise<boolean | null> => write()
 
+// fallow-ignore-next-line unused-export
 export const reportWrite = async (event: Event | null, pr: number): Promise<void> => report(event, pr)
 
+// fallow-ignore-next-line unused-export
 export const relayWrites = async (_pr: number): Promise<void> => {
   await Promise.resolve()
 }
