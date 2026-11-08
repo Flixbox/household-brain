@@ -84,9 +84,9 @@ const runOne = (input: string, { limitSeconds, standIn, unshare }: ProbeOptions)
     stdin: 'ignore',
     stdout: 'pipe',
   })
-  const [, ran, status] = /^(true|false) (\d+)\n$/u.exec(stdout.toString()) ?? []
-  if (typeof ran === 'undefined' || typeof status === 'undefined') {
-    throw new Error('could not set up the namespaces, so nothing was run')
+  const { ran = '', status = '' } = /^(?<ran>true|false) (?<status>\d+)\n$/u.exec(stdout.toString())?.groups ?? {}
+  if (ran === '') {
+    throw new Error('could not set up the namespaces, so this input was not run')
   }
   return { input, ran: ran === 'true', status: Number(status), timedOut: Number(status) === killedStatus }
 }
@@ -101,6 +101,6 @@ if (import.meta.main) {
   }
   const inputs = parseProbeInputs(await Bun.file(path).text())
   for (const result of runProbes(inputs, { limitSeconds: 5, standIn: 'gh', unshare: 'unshare' })) {
-    console.log(JSON.stringify(result))
+    process.stdout.write(`${JSON.stringify(result)}\n`)
   }
 }
