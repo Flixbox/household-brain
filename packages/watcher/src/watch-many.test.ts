@@ -73,8 +73,8 @@ describe('watchedPrs (#345)', () => {
     await Bun.write(gh, `#!/bin/sh
 echo "$*" >> "${home}/calls"
 case "$*" in
-  "pr list"*"--state open"*) ${openList} ;;
-  *) echo '[]' ;;
+  *"pulls?state=open"*) ${openList} ;;
+  *) printf 'HTTP/2.0 200 OK\\r\\n\\r\\n[]' ;;
 esac
 `)
     await Bun.spawn(['chmod', '+x', gh]).exited
@@ -83,7 +83,7 @@ esac
 
   it('lists the PRs to look at without asking for a run: a slow lookup would hold up the whole round', async () => {
     const home = await stateHome()
-    const gh = await listingGh(home, 'echo \'[{"headRefOid":"abc1234","number":7}]\'')
+    const gh = await listingGh(home, String.raw`printf 'HTTP/2.0 200 OK\r\n\r\n[{"number":7}]'`)
     const listed = await run(LISTER, home, { GH: gh })
     expect(listed.output.trim()).toBe('[7]')
     expect(await Bun.file(`${home}/calls`).text()).not.toContain('run list')

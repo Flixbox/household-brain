@@ -21,7 +21,11 @@ const FAKE_GH = String.raw`
   const answer = value => { console.log(JSON.stringify(value)); process.exit(0) }
   const reads = () => { try { return Number(readFileSync(home + '/comment-reads', 'utf8')) } catch { return 0 } }
   if (text.includes('mergeQueue{id}') || /issue\(number: ?5\)/.test(text)) { process.exit(text.includes('mergeQueue{id}') ? 0 : 1) }
-  if (text.startsWith('pr list') && text.includes('--state open')) { answer([{ number: 7 }, { number: 8 }, { number: 9 }]) }
+  const rest = value => { process.stdout.write('HTTP/2.0 200 OK\r\n\r\n' + JSON.stringify(value)); process.exit(0) }
+  if (text.includes('pulls?state=open')) { rest([{ number: 7 }, { number: 8 }, { number: 9 }]) }
+  if (text.includes('pulls?state=closed')) { rest([]) }
+  if (text.includes('runs?head_sha=')) { rest({ workflow_runs: [] }) }
+  if (text.startsWith('api -i')) { rest({ commit: { message: 'main' }, sha: 'main1' }) }
   if (text.startsWith('pr list') || text.startsWith('run list')) { answer([]) }
   if (text.startsWith('api repos/')) { answer({ ahead_by: 0, commit: { message: 'main' }, commits: [], sha: 'main1' }) }
   const state = pr => ({
@@ -90,7 +94,7 @@ test('a scoped watcher reads only its subjects: no open-PR, open-issue or reposi
   const { calls, code, output } = await runScoped('pr:7,issue:4')
   // PR 7 is subscribed, PRs 6 and 9 close issue 4; PR 8 is none of its business, and PR 3's merge is old.
   expect(prsAskedAbout(calls)).toEqual([6, 7, 9])
-  expect(calls.filter(call => call.startsWith('pr list'))).toEqual([])
+  expect(calls.filter(call => call.startsWith('pr list') || call.includes('pulls?state='))).toEqual([])
   expect(calls.filter(call => call.includes('issues(states:OPEN') || call.includes('created: issues('))).toEqual([])
   // What it reads instead still brings the owner's answer on the issue, and the issue's closing.
   expect(output).toContain('OWNER_ISSUE_ANSWER')

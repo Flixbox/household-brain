@@ -38,8 +38,8 @@ const FAKE = String.raw`
   const home = process.env.FIXTURE_HOME
   appendFileSync(home + '/calls', args + '\n')
   if (args.includes('mergeQueue{id}')) { console.log('queue-id'); process.exit(0) }
-  if (args.startsWith('run list')) {
-    console.log(JSON.stringify([{ attempt: 1, conclusion: 'success', databaseId: 1, startedAt: Temporal.Now.instant().toString(), status: 'completed' }]))
+  if (args.includes('runs?head_sha=')) {
+    process.stdout.write('HTTP/2.0 200 OK\r\n\r\n' + JSON.stringify({ workflow_runs: [{ conclusion: 'success', id: 1, run_attempt: 1, run_started_at: Temporal.Now.instant().toString(), status: 'completed' }] }))
     process.exit(0)
   }
   if (args.includes('pullRequest(number:7)')) {
@@ -67,7 +67,7 @@ const fixture = async (scenario: string) => {
   const [output, error, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
   expect({ code, error }).toEqual({ code: 0, error: '' })
   const calls = (await Bun.file(`${home}/calls`).text()).split('\n')
-  return { fresh: calls.filter(line => line.includes('pullRequest(number:7)')).length, output, runs: calls.filter(line => line.startsWith('run list')).length }
+  return { fresh: calls.filter(line => line.includes('pullRequest(number:7)')).length, output, runs: calls.filter(line => line.includes('runs?head_sha=')).length }
 }
 
 test('a reported NOT_QUEUED head makes no fresh GraphQL or run lookup (#348)', async () => {

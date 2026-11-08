@@ -23,6 +23,7 @@ if (!Number.isInteger(GH_PARALLEL) || GH_PARALLEL < 1) {
 }
 // How long a failed call's answer is waited for, once the call has ended.
 const ANSWER_WAIT_MS = 1000
+const NOT_MODIFIED = 304
 const slots = { free: GH_PARALLEL, waiting: new Array<() => void>() }
 
 /** Waits for one of the GH_PARALLEL places; `release` hands it to the next waiting call. */
@@ -74,8 +75,12 @@ const started = (args: string[], cli: string) => {
   }
 }
 
-/** The HTTP status in GitHub's answer to a refused call, as `gh api` prints it (`"status":"404"`); null without one. */
+/** The HTTP status in GitHub's answer to a refused call, as `gh api` prints it (`"status":"404"`, or the status line with `-i`); null without one. */
 const statusOf = (answer: string): number | null => {
+  const line = /^HTTP\/[\d.]+ (?<status>\d{3})/u.exec(answer)
+  if (line) {
+    return Number(line.groups?.status)
+  }
   try {
     const value: unknown = JSON.parse(answer)
     const status = isRecord(value) ? Number(value.status) : Number.NaN
@@ -99,8 +104,14 @@ const failure = async (command: string, call: ReturnType<typeof started>, output
   const answer = timedOut ? '' : await Promise.race([output, Bun.sleep(ANSWER_WAIT_MS).then(() => '')])
   output.catch(ignoreFailure)
   const why = timedOut ? `timed out after ${GH_TIMEOUT_MS / 1000} s` : `exit ${call.exitCode}`
-  lookups.lastFailure = why
-  return new Error(`${command}: ${why}`, { cause: { status: statusOf(answer) } })
+  const status = statusOf(answer)
+  // `gh` exits 1 on a 304 (#405), but GitHub answered: "not changed" is a lookup that worked.
+  if (status === NOT_MODIFIED) {
+    lookups.lastSuccess = Temporal.Now.instant()
+  } else {
+    lookups.lastFailure = why
+  }
+  return new Error(`${command}: ${why}`, { cause: { status } })
 }
 
 /** What a `gh` call prints; it fails on a non-zero exit, or when it runs out of time. */
@@ -150,23 +161,87 @@ const asked = async (args: string[], cli: string): Promise<string> => {
   }
 }
 
-/**
- * What `gh` answers to `args`. Every question names its repository (all but the one that finds the
- * repository from the folder, which passes `fresh`), so a shared answer is never another's. `fresh`
- * also asks GitHub again for what has to be known now, not some seconds ago.
- */
-export const ghText = async (args: string[], cli = GH, fresh = false): Promise<string> => {
+/** The answer shared under `key` within GH_SHARE_SECONDS, or what `ask` gets, kept for the others. */
+const sharedOr = async ({ cli, fresh, key }: { cli: string, fresh: boolean, key: string[] }, ask: () => Promise<string>): Promise<string> => {
   if (fresh || SHARE_MS === 0) {
-    return asked(args, cli)
+    return ask()
   }
-  const path = answerFile(args, cli)
+  const path = answerFile(key, cli)
   const shared = await sharedAnswer(path)
   if (shared !== null) {
     lookups.lastSuccess = Temporal.Now.instant()
     return shared
   }
-  const answer = await asked(args, cli)
+  const answer = await ask()
   // Sharing is only a saving: an answer that can't be kept is asked for again next time.
   await writeWhole(path, answer).catch(ignoreFailure)
   return answer
 }
+
+/**
+ * What `gh` answers to `args`. Every question names its repository (all but the one that finds the
+ * repository from the folder, which passes `fresh`), so a shared answer is never another's. `fresh`
+ * also asks GitHub again for what has to be known now, not some seconds ago.
+ */
+export const ghText = async (args: string[], cli = GH, fresh = false): Promise<string> =>
+  sharedOr({ cli, fresh, key: args }, async () => asked(args, cli))
+
+// What GitHub answered to a REST read, with its ETag (#405): asked again with `If-None-Match`, an
+// unchanged answer is a 304, which costs no rate limit. Kept longer than shared answers, since an
+// ETag saves a call however old it is; one left unused for a day (a finished commit's runs) goes.
+const ETAGS_DIR = `${WATCHERS_DIR}/gh-etags`
+await removeOlder(ETAGS_DIR, Temporal.Duration.from({ hours: 24 }))
+
+/**
+ * Where a REST answer is kept: per URL and per token, as an ETag holds only for who it was given to.
+ * `cli` stands for the token of a wrapper (`agent-gh`), the variables for plain `gh`'s. The name is
+ * a SHA-256, so the token itself is never written down.
+ */
+const etagFile = (path: string, cli: string) => {
+  const identity = JSON.stringify([cli, process.env.GH_TOKEN ?? '', process.env.GITHUB_TOKEN ?? '', path])
+  return `${ETAGS_DIR}/${new Bun.CryptoHasher('sha256').update(identity).digest('hex')}`
+}
+
+/** The kept answer for an ETag file; null when there is none, or it can't be read. */
+const keptAnswer = async (file: string): Promise<{ body: string, etag: string } | null> => {
+  const value: unknown = await Bun.file(file).json().catch(() => null)
+  return isRecord(value) && typeof value.body === 'string' && typeof value.etag === 'string' ? { body: value.body, etag: value.etag } : null
+}
+
+/** Keeps an answer, or marks a kept one as used. Only a saving, like sharing: without it the next read costs a call. */
+const keepAnswer = async (file: string, answer: { body: string, etag: string }): Promise<void> =>
+  writeWhole(file, JSON.stringify(answer)).catch(ignoreFailure)
+
+/** Splits what `gh api -i` prints into the body and its ETag ('' without one). */
+const parsedAnswer = (raw: string): { body: string, etag: string } => {
+  const end = raw.indexOf('\r\n\r\n')
+  if (end === -1) {
+    throw new Error('gh api -i printed no headers')
+  }
+  const etag = /^etag: *(?<etag>\S.*)$/imu.exec(raw.slice(0, end))?.groups?.etag ?? ''
+  return { body: raw.slice(end + 4), etag: etag.trim() }
+}
+
+/** Asks GitHub for `path`, with the kept ETag if there is one. `gh` exits 1 on a 304, so that failure is the good news. */
+const revalidated = async (path: string, cli: string): Promise<string> => {
+  const file = etagFile(path, cli)
+  const kept = await keptAnswer(file)
+  const condition = kept ? ['-H', `If-None-Match: ${kept.etag}`] : []
+  const raw = await ghText(['api', '-i', ...condition, path], cli, true).catch((error: unknown) => {
+    if (kept && failedStatus(error) === NOT_MODIFIED) {
+      return null
+    }
+    throw error
+  })
+  if (raw === null && kept) {
+    await keepAnswer(file, kept)
+    return kept.body
+  }
+  const answer = parsedAnswer(raw ?? '')
+  await (answer.etag ? keepAnswer(file, answer) : Promise.resolve())
+  return answer.body
+}
+
+/** The JSON at the REST `path`, asked for with its ETag (#405); shared like any answer, and `fresh` skips that. */
+export const ghRest = async (path: string, cli = GH, fresh = false): Promise<unknown> =>
+  JSON.parse(await sharedOr({ cli, fresh, key: ['rest', etagFile(path, cli)] }, async () => revalidated(path, cli)))
