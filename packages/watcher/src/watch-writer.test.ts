@@ -118,7 +118,9 @@ describe('one writer (#402)', () => {
 describe('no writer (#432)', () => {
   const age = async (home: string, hours: number) => {
     const old = Temporal.Now.instant().subtract({ hours }).epochMilliseconds / 1000
-    await utimes(`${home}/watch-project/owner_repo/writer-seen`, old, old)
+    const mark = `${home}/watch-project/owner_repo/writer-seen`
+    expect(await Bun.file(mark).exists()).toBe(true)
+    await utimes(mark, old, old)
   }
 
   it('a subscribed watcher says so once when no writer has looked for a while, and an all-events watcher never does', async () => {
