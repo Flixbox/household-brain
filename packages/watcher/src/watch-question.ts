@@ -63,26 +63,35 @@ export const clearQuestion = async (pr: number, state: PrState): Promise<void> =
 const OUTCOME_WAIT_MS = Temporal.Duration.from({ minutes: 6 }).total('milliseconds')
 const WAITS = 'question-waits'
 
-/** When this watcher first held PR `pr`, kept so a restarted watcher doesn't wait all over again. */
-const heldSince = async (pr: number, nowMs: number): Promise<number> => {
-  const held = { since: nowMs }
+/**
+ * When this watcher first held this head of PR `pr`, kept so a restarted watcher doesn't wait all over
+ * again; null when it never did and `start` is off.
+ */
+const heldSince = async ({ head, nowMs, pr, start }: { head: string, nowMs: number, pr: number, start: boolean }): Promise<number | null> => {
+  const entry = `${pr} ${head} `
+  const held: { since: number | null } = { since: null }
   await updateLines(WAITS, lines => {
-    const known = lines.find(line => line.startsWith(`${pr} `))
-    held.since = known === undefined ? nowMs : Number(known.split(' ')[1])
-    return known === undefined ? [...lines, `${pr} ${nowMs}`] : lines
+    const known = lines.find(line => line.startsWith(entry))
+    held.since = known === undefined ? (start ? nowMs : null) : Number(known.slice(entry.length))
+    return known === undefined && start ? [...lines, `${entry}${nowMs}`] : lines
   })
   return held.since
 }
 
 /**
  * Whether a subscribed watcher should stay on a merged or closed PR for the writer's word on the label
- * (#440): only while it is still labelled and unreported, a writer is running, and the bound isn't over.
- * Past the bound the look goes on: the all-events watcher still reports the outcome.
+ * (#440): while a writer runs, no outcome for this head has been reported, and the bound isn't over.
+ * A wait starts only on a PR still labelled, but outlasts the label: the writer takes it off before it
+ * leaves its outcome. Past the bound the look goes on: the all-events watcher still reports the outcome.
  */
 export const awaitsQuestionOutcome = async (pr: number, state: PrState, nowMs: number): Promise<boolean> => {
-  if (IS_WRITER || state.state === 'OPEN' || !clearsQuestion(factsOf(state)) || !await writerRuns()) {
+  if (IS_WRITER || state.state === 'OPEN' || !await writerRuns()) {
     return false
   }
   const reported = await readLines('reported')
-  return !questionOutcomeKeys(pr, state.head).some(key => reported.includes(key)) && nowMs - await heldSince(pr, nowMs) < OUTCOME_WAIT_MS
+  if (questionOutcomeKeys(pr, state.head).some(key => reported.includes(key))) {
+    return false
+  }
+  const since = await heldSince({ head: state.head, nowMs, pr, start: clearsQuestion(factsOf(state)) })
+  return since !== null && nowMs - since < OUTCOME_WAIT_MS
 }

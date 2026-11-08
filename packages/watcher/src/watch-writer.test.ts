@@ -242,6 +242,23 @@ describe('the bot-review ask and the question label come from the writer too (#4
     expect(await run({ gh, home, scoped: true, script: terminalLook() })).toContain('LOOK_HOLDS')
   }, 30_000)
 
+  it('a wait outlasts the label: the writer takes it off before it leaves its outcome', async () => {
+    const { gh, home } = await setUp()
+    await run({ gh, home, script: lookAtWriter() })
+    await run({ gh, home, scoped: true, script: terminalLook() })
+    const unlabelled = MERGED_STATE.replace("labels: ['question']", 'labels: []')
+    expect(await run({ gh, home, scoped: true, script: terminalLook(unlabelled) })).toContain('LOOK_HOLDS')
+  }, 30_000)
+
+  it('a wait belongs to its head: a new head waits afresh', async () => {
+    const { gh, home } = await setUp()
+    await run({ gh, home, script: lookAtWriter() })
+    const tenMinutesAgo = String(Temporal.Now.instant().epochMilliseconds - 10 * MINUTE)
+    await run({ gh, home, scoped: true, script: terminalLook(MERGED_STATE, tenMinutesAgo) })
+    const newHead = MERGED_STATE.replace("head: 'abc1234'", "head: 'def5678'")
+    expect(await run({ gh, home, scoped: true, script: terminalLook(newHead) })).toContain('LOOK_HOLDS')
+  }, 30_000)
+
   it('it lets go once the outcome has been relayed', async () => {
     const { gh, home } = await setUp()
     await run({ gh, home, script: lookAtWriter() })
