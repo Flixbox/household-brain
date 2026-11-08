@@ -1,13 +1,14 @@
 /**
  * A shell command line read into its simple commands (#368), closely enough for the owner-write
  * guard: the commands of a pipeline, list, group or subshell, of `$(…)` and backticks (also inside
- * double quotes), each as its words with quotes and escapes taken off, and comments and
+ * double quotes), each as its words with quotes and escapes taken off (`$'…'` decoded, #378), and comments and
  * here-document bodies left out. It
  * expands nothing: a `$` the shell would expand (outside single quotes) stays in the word, after a
  * mark, so `isDynamic` tells a word the shell may change from one it takes as written.
  */
 import { type Heredoc, closingLine, heredocOf, heredocOpener } from './shell-heredocs'
 import { closingParen, indexOrEnd, opensArithmetic } from './shell-parens'
+import { ansiCValue, closingQuote } from './shell-ansi-c'
 
 /** Put before each `$` the shell expands; a private-use character, so no command text has it. */
 const dynamic = '\u{E000}'
@@ -107,6 +108,19 @@ const singleQuoted = (scan: Scan, text: string, from: number) => {
   return end + 1
 }
 
+/** `$'…'` (ANSI-C quoting, #378): `\\'` and `\\\\` stay inside, and the escapes are decoded as bash does. */
+const ansiCQuoted = (scan: Scan, text: string, from: number) => {
+  const end = closingQuote(text, from + 2, "'")
+  append(scan, ansiCValue(text.slice(from + 2, end)))
+  return end + 1
+}
+
+/** `$$`, the shell's process id: its second `$` opens no `$'…'`. */
+const processId = (scan: Scan, _text: string, at: number) => {
+  append(scan, `${dynamic}$$`)
+  return at + 2
+}
+
 /** A backslash: the next character as it is, or nothing for a line continuation. */
 const escaped = (scan: Scan, text: string, at: number) => {
   const next = text[at + 1] ?? ''
@@ -177,7 +191,7 @@ const doubleParen: Reader = (scan, text, at) => {
 }
 
 const heredocOpen: Reader = (scan, text, at) => {
-  const match = heredocOpener.exec(text.slice(at))
+  const match = heredocOpener(text.slice(at))
   endWordBeforeRedirection(scan)
   if (match === null) {
     append(scan, '<<')
@@ -232,6 +246,8 @@ const readerRules: readonly (readonly [Test, Reader])[] = [
   [(scan, text, at) => scan.word === null && text.startsWith('((', at), doubleParen],
   [(_scan, text, at) => isSeparator(text, at), separator],
   [(_scan, text, at) => startsSubstitution(text, at), substituted],
+  [(_scan, text, at) => text.startsWith('$$', at), processId],
+  [(_scan, text, at) => text.startsWith("$'", at), ansiCQuoted],
   [(scan, text, at) => text[at] === '#' && scan.word === null, comment],
 ]
 
