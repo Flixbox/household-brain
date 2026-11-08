@@ -131,6 +131,9 @@ The Firebase project is a Google Cloud project; everything below happens in it.
 
 - Each bot's GitHub App key and ID go into the folder `agent-gh-token` names for its owner, by hand.
   Without a token, `agent-gh` stops with an error instead of running `gh` as your own login.
+- The same script installs `guard-bash-probe` (#395), the runner for reviews of the owner-write guard:
+  it runs shell inputs in namespaces with no network and a stand-in `gh`. It needs unprivileged user
+  namespaces (`unshare -rn`) and refuses to run without them.
 
 **The `agent-usage` command, for Claude and Codex agents** (#338)
 - Install a wrapper around the watcher plugin's clone (which the watcher's run command keeps pulled):
