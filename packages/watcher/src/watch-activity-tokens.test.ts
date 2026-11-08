@@ -10,11 +10,12 @@ afterEach(async () => { await Promise.all(dirs.splice(0).map(async dir => rm(dir
  * A `gh` that answers as FIXTURE_WHO (`bot` or `owner`) about PR 7, merged, so a scoped watcher's
  * subscription completes. Both see the owner's submitted comment; only the owner sees their pending
  * review, as GitHub answers. FAIL names the reads that are refused (`bot-activity`, `owner-pending`).
- * LATE_SUBMIT: the owner submits the review just after the bot's read, so that read lacks it and it is
- * no longer pending for any read after that one.
+ * LATE_SUBMIT: the owner submits the review just after the bot's second read, the last before a
+ * merged PR's subscription ends (the first look's answer is read again, fresh): that read lacks it,
+ * and it is no longer pending for any read after it.
  */
 const FAKE_GH = String.raw`
-  import { appendFileSync, existsSync, writeFileSync } from 'node:fs'
+  import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
   const text = process.argv.slice(2).join(' ').replaceAll('\n', ' ')
   const who = process.env.FIXTURE_WHO
   appendFileSync(process.env.FIXTURE_HOME + '/calls', who + ': ' + text + '\n')
@@ -29,14 +30,16 @@ const FAKE_GH = String.raw`
   const submitted = { author, body: 'OWNER_SUBMITTED_REVIEW', comments: { nodes: [] }, createdAt, databaseId: 10, state: 'COMMENTED', submittedAt: createdAt, url: 'https://c.test/10' }
   const comment = { author, body: 'OWNER_SUBMITTED_COMMENT', createdAt, databaseId: 1, url: 'https://c.test/1' }
   const late = process.env.LATE_SUBMIT === '1'
-  const submittedLate = late && existsSync(process.env.FIXTURE_HOME + '/bot-read')
+  const readsFile = process.env.FIXTURE_HOME + '/bot-reads'
+  const botReads = () => existsSync(readsFile) ? Number(readFileSync(readsFile, 'utf8')) : 0
+  const submittedLate = late && botReads() >= 2
   const visible = who === 'owner' && !submittedLate ? [pending] : []
   const failing = (process.env.FAIL ?? '').split(',')
   const read = name => { if (failing.includes(who + '-' + name)) { process.exit(1) } }
   const state = { author: { login: 'agent' }, closingIssuesReferences: { nodes: [] }, headRefOid: 'head7', mergeCommit: { oid: 'merge7' }, mergeable: 'MERGEABLE', state: 'MERGED', title: 'PR 7' }
   if (text.includes('pr7: pullRequest')) {
     let value = state
-    if (text.includes('reviews(last:100){nodes{databaseId')) { read('activity'); if (late && who === 'bot') { writeFileSync(process.env.FIXTURE_HOME + '/bot-read', '') } value = { comments: { nodes: [comment] }, reviews: { nodes: [submitted, ...visible] } } }
+    if (text.includes('reviews(last:100){nodes{databaseId')) { read('activity'); if (late && who === 'bot') { writeFileSync(readsFile, String(botReads() + 1)) } value = { comments: { nodes: [comment] }, reviews: { nodes: [submitted, ...visible] } } }
     if (text.includes('states:PENDING')) { read('pending'); value = { reviews: { nodes: visible } } }
     answer({ data: { repository: { pr7: value } } })
   }
