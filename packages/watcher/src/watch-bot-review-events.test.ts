@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { awaitsBotReview, botReviewEvent, botReviewStateOf, notAskingBecause } from './watch-bot-review-events'
+import { awaitsBotReview, botReviewEvent, botReviewStateOf, botReviewUnreadEvent, notAskingBecause } from './watch-bot-review-events'
 import { botNames, resolveCommand } from './watch-review-events'
 
 const botReview = (login: string, oid = 'abcdef1') => ({ author: { login }, commit: { oid }, state: 'COMMENTED' })
@@ -106,5 +106,23 @@ describe('botReviewEvent', () => {
       return fresh
     })
     expect(reported).toEqual(['restored', 'lost'])
+  })
+})
+
+describe('botReviewUnreadEvent', () => {
+  it('reports a lost label after an earlier restored one, each fate once (#484)', () => {
+    // `report` sends each key once, so a look that repeats a fate stays quiet and a new fate speaks.
+    const seen = new Set<string>()
+    const reported = (['restored', 'restored', 'lost', 'lost'] as const).filter(fate => {
+      const { key } = botReviewUnreadEvent(7, fate)
+      const fresh = !seen.has(key)
+      seen.add(key)
+      return fresh
+    })
+    expect(reported).toEqual(['restored', 'lost'])
+  })
+
+  it('tells who has to act when the label is lost', () => {
+    expect(botReviewUnreadEvent(7, 'lost').lines[0]).toContain("couldn't put the label `bot-review` back: add it again to ask again")
   })
 })

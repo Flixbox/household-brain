@@ -39,12 +39,21 @@ const fixture = async (list: unknown[]) => {
   return home
 }
 
-/** Runs one check as a watcher process would, on the folder's state, so a second call is a restart. */
+const envOf = (home: string) => ({ ...process.env, FIXTURE_HOME: home, GH: `${home}/gh`, GH_SHARE_SECONDS: '0', GH_TOKEN: 'token-a', GITHUB_TOKEN: '', OWNER: 'someone', REPO: 'owner/repo', SELF: 'helper[bot]', STATE_DIR: `${home}/state`, XDG_STATE_HOME: home })
+const IMPORTS = `const { checkIssues, checkIssueStates } = await import('${import.meta.dir}/watch-issues')
+const { checkActivity } = await import('${import.meta.dir}/watch-activity')
+const { flush } = await import('${import.meta.dir}/watch-output')`
+
+/** Runs a script as a watcher process would, on the folder's state, so a second call is a restart. */
+const script = async (home: string, body: string) => {
+  const child = Bun.spawn([process.execPath, '-e', `${IMPORTS}\n${body}`], { env: envOf(home), stderr: 'pipe', stdout: 'pipe' })
+  const [out, error, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+  return { code, error, out }
+}
+
+/** One look through to its flush, as a round ends. */
 const run = async (home: string, check: string) => {
-  const script = `const { ${check} } = await import('${import.meta.dir}/watch-issues')\nawait ${check}()`
-  const env = { ...process.env, FIXTURE_HOME: home, GH: `${home}/gh`, GH_SHARE_SECONDS: '0', GH_TOKEN: 'token-a', GITHUB_TOKEN: '', OWNER: 'someone', REPO: 'owner/repo', SELF: 'helper[bot]', STATE_DIR: `${home}/state`, XDG_STATE_HOME: home }
-  const child = Bun.spawn([process.execPath, '-e', script], { env, stderr: 'pipe', stdout: 'ignore' })
-  const [error, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
+  const { code, error } = await script(home, `await ${check}()\nawait flush()`)
   expect({ code, error }).toEqual({ code: 0, error: '' })
 }
 
@@ -92,6 +101,50 @@ test('closing the last open issue reports, and so does opening it again (#412)',
   await run(home, 'checkIssueStates')
   expect(await lines(home, 'open-issues')).toEqual(['5'])
   expect((await calls(home)).filter(call => call.startsWith('api repos/owner/repo/issues/5'))).toHaveLength(2)
+})
+
+/** Dies the hard way once the look is done: no exit handler runs, so what the round held is never printed. */
+const DIE = "process.kill(process.pid, 'SIGKILL')\nawait Bun.sleep(5000)"
+const ACTIVITY = "[{ id: 'comment 1', lines: ['the owner asks'] }]"
+
+test('a look that dies before printing leaves its issue event unseen, and the next look reports it (#435)', async () => {
+  const home = await fixture([listed(9, 'open')])
+  await Bun.write(`${home}/state/issue-events`, 'issue #1\n')
+  await script(home, `await checkIssues()\n${DIE}`)
+  expect(await lines(home, 'issue-events')).toEqual(['issue #1'])
+  expect(await Bun.file(`${home}/state/issue-event-cursors`).exists()).toBe(false)
+  const { out } = await script(home, 'await checkIssues()\nawait flush()')
+  expect(out).toContain('#9')
+  expect(await lines(home, 'issue-events')).toEqual(['issue #1', 'issue #9'])
+})
+
+test('following, an issue event is printed before it is marked seen (#435)', async () => {
+  const home = await fixture([listed(9, 'open')])
+  await Bun.write(`${home}/state/issue-events`, 'issue #1\n')
+  const body = `process.stdout.write = () => { require('node:fs').appendFileSync('${home}/at-print', require('node:fs').readFileSync('${home}/state/issue-events')); return true }
+await checkIssues()`
+  const child = Bun.spawn([process.execPath, '-e', `process.argv.push('--follow')\n${IMPORTS}\n${body}\nprocess.exit(0)`], { env: envOf(home), stderr: 'pipe', stdout: 'ignore' })
+  expect({ code: await child.exited, error: await new Response(child.stderr).text() }).toEqual({ code: 0, error: '' })
+  expect(await Bun.file(`${home}/at-print`).text()).toBe('issue #1\n')
+  expect(await lines(home, 'issue-events')).toEqual(['issue #1', 'issue #9'])
+})
+
+test('a look that dies before printing leaves a PR comment unseen, and the next look reports it (#435)', async () => {
+  const home = await fixture([])
+  await Bun.write(`${home}/state/pr-7-seen`, 'comment 0\n')
+  await script(home, `await checkActivity(7, ${ACTIVITY})\n${DIE}`)
+  expect(await lines(home, 'pr-7-seen')).toEqual(['comment 0'])
+  const { out } = await script(home, `await checkActivity(7, ${ACTIVITY})\nawait flush()`)
+  expect(out).toContain('the owner asks')
+  expect(await lines(home, 'pr-7-seen')).toEqual(['comment 0', 'comment 1'])
+})
+
+test('a comment two checks of one round find is reported once (#435)', async () => {
+  const home = await fixture([])
+  await Bun.write(`${home}/state/pr-7-seen`, 'comment 0\n')
+  const { out } = await script(home, `await checkActivity(7, ${ACTIVITY})\nawait checkActivity(7, ${ACTIVITY})\nawait flush()`)
+  expect(out.split('the owner asks')).toHaveLength(2)
+  expect(await lines(home, 'pr-7-seen')).toEqual(['comment 0', 'comment 1'])
 })
 
 test('after a capped move the next read still asks below the old cursor, and a burst can\'t hold it (#469)', async () => {

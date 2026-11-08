@@ -100,8 +100,8 @@ export const botReviewClaimFailedEvent = (pr: number): Event => ({
   lines: [`BOT_REVIEW_FAILED: couldn't take the label \`${BOT_REVIEW_LABEL}\` off, so no bot was asked; the next look tries again. Check the GH token may change labels on pull requests`],
 })
 
-/** The event for a PR that couldn't be read once the claim was made (#461), so no bot was asked: once per PR. */
+/** The event for a PR that couldn't be read once the claim was made (#461), so no bot was asked: once per PR and fate, so a `lost` label is still reported after a `restored` one (#484). */
 export const botReviewUnreadEvent = (pr: number, fate: LabelFate): Event => ({
-  key: `pr-${pr} bot-review-unread`,
+  key: `pr-${pr} bot-review-unread ${fate}`,
   lines: [`BOT_REVIEW_FAILED: couldn't read the PR after taking the label off, so no bot was asked; ${LABEL_LINES[fate]}`],
 })
