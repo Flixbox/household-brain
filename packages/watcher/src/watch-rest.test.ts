@@ -1,6 +1,6 @@
 /* oxlint-disable import/no-nodejs-modules -- a temporary folder for each test's fake gh and its calls */
 import { afterEach, expect, test } from 'bun:test'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readdir, rm, utimes } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 
 const dirs: string[] = []
@@ -95,6 +95,26 @@ test('ETags are kept per token and per URL (#405)', async () => {
   const calls = await restCalls(home)
   expect(calls.filter(call => call.includes('If-None-Match'))).toEqual([])
   expect(calls[2]).toContain('repos/owner/repo/commits/main')
+})
+
+test('a shared answer is never another token\'s (#405)', async () => {
+  const home = await fixture()
+  await inWatcher(home, OPEN, { GH_SHARE_SECONDS: '60' })
+  await inWatcher(home, OPEN, { GH_SHARE_SECONDS: '60' })
+  expect(await restCalls(home)).toHaveLength(1)
+  await inWatcher(home, OPEN, { GH_SHARE_SECONDS: '60', GH_TOKEN: 'token-b' })
+  expect(await restCalls(home)).toHaveLength(2)
+})
+
+test('a 304 marks the kept answer as used, so one in use doesn\'t age out (#405)', async () => {
+  const home = await fixture()
+  await inWatcher(home, OPEN)
+  const dir = `${home}/watch-project/gh-etags`
+  const [name = ''] = await readdir(dir)
+  const hoursAgo = Temporal.Now.instant().epochMilliseconds / 1000 - 12 * 3600
+  await utimes(`${dir}/${name}`, hoursAgo, hoursAgo)
+  await inWatcher(home, OPEN)
+  expect(Bun.file(`${dir}/${name}`).lastModified).toBeGreaterThan(Temporal.Now.instant().epochMilliseconds - 3_600_000)
 })
 
 test('a refused request fails, even with an answer kept (#405)', async () => {

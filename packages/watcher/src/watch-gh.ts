@@ -208,6 +208,10 @@ const keptAnswer = async (file: string): Promise<{ body: string, etag: string } 
   return isRecord(value) && typeof value.body === 'string' && typeof value.etag === 'string' ? { body: value.body, etag: value.etag } : null
 }
 
+/** Keeps an answer, or marks a kept one as used. Only a saving, like sharing: without it the next read costs a call. */
+const keepAnswer = async (file: string, answer: { body: string, etag: string }): Promise<void> =>
+  writeWhole(file, JSON.stringify(answer)).catch(ignoreFailure)
+
 /** Splits what `gh api -i` prints into the body and its ETag ('' without one). */
 const parsedAnswer = (raw: string): { body: string, etag: string } => {
   const end = raw.indexOf('\r\n\r\n')
@@ -230,14 +234,14 @@ const revalidated = async (path: string, cli: string): Promise<string> => {
     throw error
   })
   if (raw === null && kept) {
+    await keepAnswer(file, kept)
     return kept.body
   }
   const answer = parsedAnswer(raw ?? '')
-  // Keeping it is only a saving, like sharing: without it the next read costs a call.
-  await (answer.etag ? writeWhole(file, JSON.stringify(answer)).catch(ignoreFailure) : Promise.resolve())
+  await (answer.etag ? keepAnswer(file, answer) : Promise.resolve())
   return answer.body
 }
 
 /** The JSON at the REST `path`, asked for with its ETag (#405); shared like any answer, and `fresh` skips that. */
 export const ghRest = async (path: string, cli = GH, fresh = false): Promise<unknown> =>
-  JSON.parse(await sharedOr({ cli, fresh, key: ['rest', path] }, async () => revalidated(path, cli)))
+  JSON.parse(await sharedOr({ cli, fresh, key: ['rest', etagFile(path, cli)] }, async () => revalidated(path, cli)))
