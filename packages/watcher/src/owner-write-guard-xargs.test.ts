@@ -47,7 +47,7 @@ describe('ownerWrite with coproc and xargs (#387)', () => {
       'xargs -I{} gh pr view {}',
       'xargs -I{} gh api repos/o/r/issues/{}',
       'xargs -n1 gh api repos/o/r/issues',
-      'xargs gh api "$ENDPOINT"',
+      'xargs gh api "$ENDPOINT" --paginate',
       'xargs gh label list',
     ])).toEqual([])
   })

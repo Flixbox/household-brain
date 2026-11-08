@@ -14,6 +14,7 @@
  * `env` or `timeout`). A word naming `gh` (or a path ending in `/gh`) is the owner's login;
  * `agent-gh` never is.
  */
+import { baseName, isGh, positionals, xargsFillsIn } from './owner-write-xargs'
 import { isRecord, textOf } from './read'
 import { commandsOf } from './shell-braces'
 import { isDynamic, plainWord } from './shell-commands'
@@ -42,7 +43,7 @@ const keywords = new Set(['!', 'do', 'elif', 'else', 'if', 'then', 'until', 'whi
  * where the command may start.
  */
 const wrappers = new Set([
-  'builtin', 'busybox', 'command', 'doas', 'env', 'exec', 'ionice', 'nice', 'nohup', 'setsid', 'stdbuf', 'sudo', 'time',
+  'builtin', 'busybox', 'command', 'coproc', 'doas', 'env', 'exec', 'ionice', 'nice', 'nohup', 'setsid', 'stdbuf', 'sudo', 'time',
   'timeout', 'unbuffer', 'watch', 'xargs',
 ])
 
@@ -145,10 +146,6 @@ const apiWrites = (args: readonly string[]) => {
   return flags.input || flags.fields.length > 0
 }
 
-/** The arguments that are no flag, leaving out the value of `-R`/`--repo`, the one flag gh takes before the subcommand. */
-const positionals = (args: readonly string[]) =>
-  args.filter((arg, at) => !arg.startsWith('-') && args[at - 1] !== '-R' && args[at - 1] !== '--repo')
-
 /** Whether `gh` with these arguments changes something on GitHub, or may: a command the shell fills in counts. */
 const ghWrites = (args: readonly string[]) => {
   const [group = '', subcommand = ''] = positionals(args)
@@ -163,10 +160,6 @@ const ghWrites = (args: readonly string[]) => {
   }
   return (group === 'pr' || group === 'issue') && prIssueWrites.has(subcommand)
 }
-
-const isGh = (word: string) => /(?:^|[/\\])gh(?:\.exe)?$/u.test(word)
-
-const baseName = (word: string) => word.replace(/^.*[/\\]/u, '')
 
 /** How many words a leading word takes up: an assignment or keyword one, a redirection one or two (with its target), a command none. */
 const leadingLength = (word: string) => {
@@ -264,7 +257,7 @@ const runCommands = (text: string, work: Work): string[][] => {
  */
 const writes = ([name = '', ...words]: readonly string[]) => {
   const args = withoutRedirections(words)
-  return (isGh(name) && ghWrites(args)) || (isDynamic(name) && (args.length === 0 || ghWrites(args)))
+  return (isGh(name) && ghWrites(args)) || (isDynamic(name) && (args.length === 0 || ghWrites(args))) || xargsFillsIn(name, args)
 }
 
 /** The first command in a Bash command line that writes to GitHub through plain `gh`, as its words joined, or null when there is none. */
@@ -284,7 +277,7 @@ export const verdict = (input: unknown) => {
   }
   const reason = [
     `Refused (household-brain #368): \`${found}\` writes to GitHub through plain \`gh\`, the owner's own login, so it would act as the owner.`,
-    'A command the guard cannot read for certain (a command, method or query the shell fills in, as in `"$METHOD"` or `query="$(cat q.graphql)"`, or a here-document delimiter that mixes quoting, as in `<<E\'O\'F`) counts as a write.',
+    'A command the guard cannot read for certain (a command, method or query the shell fills in, as in `"$METHOD"` or `query="$(cat q.graphql)"`, a here-document delimiter that mixes quoting, as in `<<E\'O\'F`, or `xargs gh` without its subcommand written out) counts as a write.',
     'Write through `agent-gh` (the bot) instead; reads with `gh` stay allowed.',
     'If agent-gh fails or is rate-limited, wait and retry it, or report it: never fall back to `gh`.',
     'Something only the owner may do, the owner runs themselves.',
