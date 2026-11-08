@@ -30,6 +30,11 @@ describe('the since boundary (#412)', () => {
     const stuck = [issue(1, { updated_at: CURSOR })]
     expect(nextCursor(CURSOR, [stuck, [issue(2, { updated_at: '2026-11-08T12:01:00Z' })]])).toBe('2026-11-08T12:01:00Z')
   })
+
+  it('moves past a stuck first page only by the overlap, so what paging skipped is asked for again', () => {
+    const stuck = [issue(1, { updated_at: CURSOR })]
+    expect(nextCursor(CURSOR, [stuck, [issue(2, { updated_at: '2026-11-08T13:00:00Z' })]])).toBe('2026-11-08T12:02:00Z')
+  })
 })
 
 describe('reading the lists (#412)', () => {
