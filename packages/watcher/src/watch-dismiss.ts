@@ -18,6 +18,7 @@ import { OWNER, type PrState, REPO, SELF, gh, graphql, resolveThread, threadsFro
 import { GH, ghText } from './watch-gh'
 import { report } from './watch-output'
 import { reportedPassed } from './watch-ci-state'
+import { relayWrites } from './watch-writer'
 import { readLines } from './watch-state'
 import { WATCHERS_DIR, claim, removeOlder, unclaim } from './watch-files'
 import { allSettled, textOf } from './read'
@@ -168,6 +169,7 @@ export const askBotsToResolve = async (pr: number, state: PrState): Promise<void
  * failed attempt is reported once; the thread is tried again on every look until it is resolved.
  */
 export const resolveAsked = async (pr: number, state: PrState): Promise<void> => {
+  await relayWrites(pr)
   await allSettled(state.toResolve.map(async thread => {
     const resolved = await resolveThread(thread.id).catch(() => false)
     await report(resolvedThreadEvent(pr, thread, resolved), pr)

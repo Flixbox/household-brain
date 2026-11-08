@@ -9,7 +9,6 @@ export const attemptWrite = async (_key: string, write: () => Promise<boolean | 
 // fallow-ignore-next-line unused-export
 export const reportWrite = async (event: Event | null, pr: number): Promise<void> => report(event, pr)
 
-// fallow-ignore-next-line unused-export
 export const relayWrites = async (_pr: number): Promise<void> => {
   await Promise.resolve()
 }
