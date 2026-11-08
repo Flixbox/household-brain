@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it } from 'bun:test'
 import { utimes } from 'node:fs/promises'
 import { retryDelayMs } from './watch-write-retry'
-import { BOT_VIEWER, QUESTION, cleanUp, lookAtWriter, run, setUp } from './watch-writer-fixture'
+import { QUESTION, cleanUp, lookAtWriter, run, setUp } from './watch-writer-fixture'
 
 const MINUTE = 60_000
 const THREAD = "{ id: 'T1', url: 'https://example.test/t1' }"

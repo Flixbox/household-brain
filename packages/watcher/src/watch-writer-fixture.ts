@@ -17,7 +17,7 @@ export const QUESTION = `
   await flush()`
 
 // What the fake `gh` answers besides failing: its `case` arms.
-export const BOT_VIEWER = String.raw`*viewer*) echo '{"data":{"viewer":{"login":"agent[bot]"}}}'; exit 0 ;;`
+const BOT_VIEWER = String.raw`*viewer*) echo '{"data":{"viewer":{"login":"agent[bot]"}}}'; exit 0 ;;`
 
 const dirs: string[] = []
 /** For `afterEach`: removes every state folder the test made. */
