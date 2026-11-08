@@ -1,9 +1,10 @@
 /** The project watcher's issue checks (watch-project.ts): new issues, the owner's comments, closings, cycles in their links. */
 import { MAX_CYCLES, type OpenIssue, linkCycles, newCycles } from './watch-link-cycles'
-import { issueLine, openIssues } from './watch-github'
+import { issueLine } from './watch-github'
+import { currentOpenIssues } from './watch-open-issues'
 import { perIssue } from './watch-per-issue'
 import type { IssueEvent } from './watch-issue-events'
-import { issueEventLines, subscribedIssueEvents } from './watch-comments'
+import { type IssueEventRead, issueEventLines, subscribedIssueEvents } from './watch-comments'
 import { queue } from './watch-output'
 import { appendLines, endIssue, exists, oneAtATime, readLines, subscriptions, writeLines, writtenAt } from './watch-state'
 
@@ -24,8 +25,8 @@ const firstRun = async (name: string, lines: string[]): Promise<boolean> => {
  * otherwise all come up as news once.
  */
 const SEEN_FILE = subscriptions.scoped ? 'subscribed-issue-events' : 'issue-events'
-const issueEvents = async (fresh: boolean): Promise<IssueEvent[]> =>
-  subscriptions.scoped ? subscribedIssueEvents(subscriptions.issues, fresh) : issueEventLines(fresh)
+const issueEvents = async (fresh: boolean): Promise<IssueEventRead> =>
+  subscriptions.scoped ? { commit: async () => Promise.resolve(), events: await subscribedIssueEvents(subscriptions.issues, fresh) } : issueEventLines(fresh)
 
 const unseenIssues = async (lines: IssueEvent[]): Promise<IssueEvent[]> => {
   const seen = new Set(await readLines(SEEN_FILE))
@@ -53,19 +54,23 @@ const oldNews = async (lines: IssueEvent[]): Promise<IssueEvent[]> => {
   return since === null ? lines : lines.filter(({ at: written }) => !writtenAfter(written, since))
 }
 
-/** Issues and the owner's comments on them not reported yet; the ones from before the first run aren't news. */
-export const checkIssues = async (fresh = false): Promise<boolean> => oneAtATime('issue-activity', async () => {
-  const lines = await issueEvents(fresh).catch(() => null)
-  // A new state file for the id keys (#247): on its first run what is there is old news, so nothing
-  // already reported under the old text keys (`issues`) comes back.
-  if (!lines) { return false }
-  // A scoped watcher goes on to report what isn't old news (`oldNews`); for the others that is nothing.
-  if (await firstRun(SEEN_FILE, (await oldNews(lines)).map(({ key }) => key)) && !subscriptions.scoped) { return true }
-  const unseen = await unseenIssues(lines)
-  // Each its own event, with when it was written (#240): several comments are several answers.
-  for (const { at: written, issue, key, lines: event } of unseen) {
+/** Each its own event, with when it was written (#240): several comments are several answers. */
+const reportUnseen = async (lines: IssueEvent[]): Promise<void> => {
+  for (const { at: written, issue, key, lines: event } of await unseenIssues(lines)) {
     queue(event, { issue, key: `issue:${key}`, written })
   }
+}
+
+/** Issues and the owner's comments on them not reported yet; the ones from before the first run aren't news. */
+export const checkIssues = async (fresh = false): Promise<boolean> => oneAtATime('issue-activity', async () => {
+  const read = await issueEvents(fresh).catch(() => null)
+  if (!read) { return false }
+  // A new state file for the id keys (#247): on its first run what is there is old news, so nothing
+  // already reported under the old text keys (`issues`) comes back. A scoped watcher goes on to
+  // report what isn't old news (`oldNews`); for the others that is nothing.
+  const quietFirstRun = await firstRun(SEEN_FILE, (await oldNews(read.events)).map(({ key }) => key)) && !subscriptions.scoped
+  await (quietFirstRun ? Promise.resolve() : reportUnseen(read.events))
+  await read.commit()
   return true
 })
 
@@ -123,7 +128,7 @@ export const checkIssueStates = async (): Promise<void> => {
   if (subscriptions.scoped) {
     return
   }
-  const issues = await openIssues().catch(() => null)
+  const issues = await currentOpenIssues().catch(() => null)
   if (!issues || issues.length === 0) {
     return
   }
