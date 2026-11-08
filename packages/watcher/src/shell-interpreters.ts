@@ -14,10 +14,10 @@ export const baseName = (word: string) => word.replace(/^.*[/\\]/u, '')
 
 /** An interpreter's name, and the flag that gives it a program to run, with the program attached or as the next argument. */
 const inlineFlags: readonly (readonly [RegExp, RegExp])[] = [
-  [/^python[\d.]*$/u, /^-[A-Za-z]*?c(?<attached>.*)$/su],
-  [/^perl[\d.]*$/u, /^-[A-Za-z]*?[Ee](?<attached>.*)$/su],
-  [/^ruby[\d.]*$/u, /^-[A-Za-z]*?e(?<attached>.*)$/su],
-  [/^node(?:js)?$/u, /^(?:--(?:eval|print)=?|-[A-Za-z]*?[ep])(?<attached>.*)$/su],
+  [/^python[\d.]*$/u, /^-[A-Zabd-z]*c(?<attached>.*)$/su],
+  [/^perl[\d.]*$/u, /^-[A-DF-Za-df-z]*[Ee](?<attached>.*)$/su],
+  [/^ruby[\d.]*$/u, /^-[A-Za-df-z]*e(?<attached>.*)$/su],
+  [/^node(?:js)?$/u, /^(?:--(?:eval|print)=?|-[A-Za-df-oq-z]*[ep])(?<attached>.*)$/su],
 ]
 
 /** `awk` takes its program as a plain argument, so all its arguments count as program text. */
@@ -67,7 +67,7 @@ const runsInput = ([word = '', ...args]: readonly string[]) => {
 }
 
 /** What ends a command in a program; a line ending in a comma goes on, as an argument list spread over lines does. */
-const commandEnd = /(?<!,)\n|;|\|+|&&|\)|\]/u
+const commandEnd = /(?<!,)\n|\|+|&&|[);\]]/u
 
 const wordBreak = /[\s"'`,([]+/u
 
@@ -79,9 +79,8 @@ const ghCommandsIn = (piece: string) => {
   const words = piece.split(wordBreak).filter(word => word !== '')
   const starts = words.flatMap((word, at) => (isGh(plainWord(word)) ? [at] : []))
   return starts
-    .map((start, nth) => words.slice(start + 1, starts[nth + 1]))
+    .map((start, nth) => words.slice(start, starts[nth + 1]).with(0, 'gh'))
     .filter(args => !bareGraphql(args))
-    .map(args => ['gh', ...args])
 }
 
 /**
