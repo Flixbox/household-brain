@@ -49,6 +49,24 @@ export const heredocOf = (match: RegExpExecArray): Heredoc => {
   }
 }
 
+/** The text a shell reading a body as a script sees: a `<<-` body loses its leading tabs, and an unquoted body one level of `\$`, `` \` ``, `\\` and line continuations first. */
+export const bodyAsRead = (heredoc: Heredoc, body: string) => {
+  // Line continuations go first: the shell joins lines before it takes off tabs, so a continued line keeps its own.
+  const joined = heredoc.quoted ? body : body.replaceAll(/\\[\s\S]/gu, pair => (pair === '\\\n' ? '' : pair))
+  const text = heredoc.tabs ? joined.replaceAll(/^\t+/gmu, '') : joined
+  return heredoc.quoted ? text : text.replaceAll(/\\(?<char>[$`\\])/gu, '$<char>')
+}
+
+/**
+ * Whether a shell may read a body other than as written here: an unquoted body with a `$` or backtick
+ * not escaped, or a `<<-` body where a continued line starts with a tab, as shells may differ on what goes first.
+ */
+export const bodyExpands = (heredoc: Heredoc, body: string) =>
+  !heredoc.quoted && (/^(?:[^\\$`]|\\.)*[$`]/su.test(body) || (heredoc.tabs && /\\\n\t/u.test(body)))
+
+/** A here-string's operator; a here-document's body is handed over as one too, so whoever reads the commands treats both alike. */
+export const hereStringOperator = '<<<'
+
 /** Where the line starting at `from` ends. */
 const indexOrEnd = (text: string, from: number) => {
   const at = text.indexOf('\n', from)

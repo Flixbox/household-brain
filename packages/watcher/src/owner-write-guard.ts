@@ -9,8 +9,8 @@
  * refuses a command that writes through plain `gh`, and lets everything else run.
  *
  * `ownerWrite` reads the command as a shell would, closely enough: every simple command of a
- * pipeline, list, group, subshell, `$(…)`, backticks, `bash -c '…'` or `eval`, with quotes and
- * escapes, and only the word in command position (after variable assignments and wrappers such as
+ * pipeline, list, group, subshell, `$(…)`, backticks, `bash -c '…'`, `eval` or what a here-document
+ * or here-string feeds a shell, with quotes and escapes, and only the word in command position (after variable assignments and wrappers such as
  * `env` or `timeout`). A word naming `gh` (or a path ending in `/gh`) is the owner's login;
  * `agent-gh` never is.
  */
@@ -40,14 +40,21 @@ const keywords = new Set(['!', 'do', 'elif', 'else', 'if', 'then', 'until', 'whi
  * where the command may start.
  */
 const wrappers = new Set([
-  'builtin', 'command', 'doas', 'env', 'exec', 'ionice', 'nice', 'nohup', 'setsid', 'stdbuf', 'sudo', 'time',
+  'builtin', 'busybox', 'command', 'doas', 'env', 'exec', 'ionice', 'nice', 'nohup', 'setsid', 'stdbuf', 'sudo', 'time',
   'timeout', 'unbuffer', 'watch', 'xargs',
 ])
 
 /** A redirection: its operator, and its target when attached (`>out`, `2>/dev/null`, `&>log`). */
-const redirection = /^\d*(?:&>>?|>>?|<{1,3}|>&|<&|>\|)(?<target>.*)$/u
+const redirection = /^\d*(?:&>>?|>>?|<{1,3}|>&|<&|>\|)(?<target>.*)$/su
 
-const shells = new Set(['bash', 'dash', 'sh', 'zsh'])
+/** A shell by its name, however it is spelled (`mksh`, `bash-5.2`, `zsh.exe`): matching more than shells costs only a false denial. */
+const shell = /^[a-z]*sh[-.\d]*(?:\.exe)?$/u
+
+/** Commands that run what comes in on their input (`source /dev/stdin`), the shells apart. */
+const stdinRunners = new Set(['.', 'source'])
+
+/** A here-string, or a here-document's body as shell-commands.ts hands it over. */
+const hereString = /^\d*<<<(?<text>.*)$/su
 
 // --- Telling a write ------------------------------------------------------------------------
 
@@ -209,19 +216,45 @@ const innerScript = (words: readonly string[]) => {
   if (baseName(name) === 'env') {
     return envSplitString(args)
   }
-  const at = shells.has(baseName(name)) ? args.findIndex(arg => /^-[abd-z]*c[a-z]*$/u.test(arg)) : -1
+  const at = shell.test(baseName(name)) ? args.findIndex(arg => /^-[abd-z]*c[a-z]*$/u.test(arg)) : -1
   return at === -1 ? null : (args[at + 1] ?? null)
 }
 
-/** Every simple command a command line runs, from its command word on, with the scripts of `bash -c` and `eval` read too. */
-const runCommands = (text: string): string[][] =>
-  commandsOf(text)
+/** The texts of a simple command's here-strings, attached (`<<<x`) or the next word (`<<< x`). */
+const hereStringsOf = (words: readonly string[]) =>
+  words.flatMap((word, at) => {
+    const text = hereString.exec(word)?.groups?.text
+    if (typeof text === 'undefined') {
+      return []
+    }
+    return [text === '' ? (words[at + 1] ?? '') : text]
+  })
+
+/** Whether a command may run what comes in on its input as commands: a shell, `source`, or a command the shell fills in. */
+const readsScriptFromInput = ([name = '']: readonly string[]) =>
+  shell.test(baseName(name)) || stdinRunners.has(baseName(name)) || isDynamic(name)
+
+/**
+ * Every simple command a command line runs, from its command word on, with the scripts of `bash -c` and
+ * `eval` read too. When anything on the line may run its input as commands (`eval` and `env -S` too), every here-document and
+ * here-string on it counts as commands, not only one on that command itself: pipes, groups and
+ * `bash -c bash` hand input on in ways this reader doesn't follow (#382), and a false denial costs less than a missed write.
+ * Text the shell expands first may become any commands, so it counts as a command the shell fills in.
+ */
+const runCommands = (text: string): string[][] => {
+  const simple = commandsOf(text)
+  const commands = simple
     .map(words => words.slice(commandStart(words)))
     .flatMap(command => startsOf(command).map(at => command.slice(at)))
-    .flatMap(command => {
+  const fed = commands.some(command => readsScriptFromInput(command) || innerScript(command) !== null) ? simple.flatMap(words => hereStringsOf(words)) : []
+  return [
+    ...commands.flatMap(command => {
       const script = innerScript(command)
       return script === null ? [command] : runCommands(script)
-    })
+    }),
+    ...fed.flatMap(script => (isDynamic(script) ? [[script]] : runCommands(script))),
+  ]
+}
 
 /**
  * Whether one command writes through plain gh, or may: a command word the shell fills in counts when
