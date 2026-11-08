@@ -1,3 +1,4 @@
+/* oxlint-disable no-template-curly-in-string -- these strings are shell text, where `${…}` is what is tested */
 import { describe, expect, it } from 'bun:test'
 import { ownerWrite, verdict } from './owner-write-guard'
 
@@ -170,12 +171,22 @@ describe('ownerWrite (#368)', () => {
   })
 
   it('reads arithmetic as data but for its substitutions (#373)', () => {
-    expect(allowed(['echo $(( 1 + 2 ))', 'echo $(( (1+2)*3 ))', '(( $(echo 1) + 1 ))'])).toEqual([])
-    expect(refused([
-      // Known false denials (#373): a substitution or a here-document in arithmetic fails closed.
+    expect(allowed([
+      'echo $(( 1 + 2 ))',
+      'echo $(( (1+2)*3 ))',
+      '(( $(echo 1) + 1 ))',
       'echo $(( $(echo 1) ))',
       "echo $(( $(sed -n '1p' <<'EOF'\n1\ngh issue close 1\nEOF\n) ))",
       "(( $(sed -n '1p' <<'EOF'\n1\ngh issue close 1\nEOF\n) ))",
+    ])).toEqual([])
+    expect(refused([
+      // $$ is the process id, so no substitution opens at its second $.
+      '(( $$(gh issue close 1) ))',
+      'echo $(( $$(gh issue close 1) ))',
+      // A substitution the guard can't match parentheses in fails closed.
+      '((gh issue close 1 $(echo ${x:-)})); :)',
+      '(( $( [[ x =~ foo) ]] ; gh issue close 1 )))',
+      "echo $(( $(cat <<'EOF'\n)\ngh issue close 1\nEOF\n) ))",
       'echo $(( $(cat <<EOF\n$(gh issue close 1)\nEOF\n) ))',
       "echo $(( $(cat <<'EOF'\n1\nEOF\ngh issue close 1) ))",
       'echo $(( $(gh issue close 1) + 1 ))',
