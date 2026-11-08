@@ -105,6 +105,8 @@ describe('ownerWrite, on here-documents and here-strings (#382)', () => {
   it('takes the tabs off a <<- body before a shell reads it (review on #383)', () => {
     expect(refused([
       'bash <<-E\ngh\\\n\tissue close 1\nE',
+      // Shells differ on whether tabs or the line continuation go first, so this form fails closed.
+      'bash <<-E\ng\\\n\th issue close 1\nE',
       "bash <<-'E'\n\tcat <<'I'\n\tdata\n\tI\n\tgh issue close 1\nE",
       'sh <<-E\n\tcat <<I\n\tI\n\tgh issue close 1\nE',
     ])).toEqual([])
