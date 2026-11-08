@@ -1,3 +1,4 @@
+/* oxlint-disable no-template-curly-in-string -- these strings are shell text, where `${…}` is what is tested */
 import { describe, expect, it } from 'bun:test'
 import { ownerWrite, verdict } from './owner-write-guard'
 
