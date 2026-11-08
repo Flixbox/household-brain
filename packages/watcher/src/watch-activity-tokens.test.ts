@@ -10,9 +10,11 @@ afterEach(async () => { await Promise.all(dirs.splice(0).map(async dir => rm(dir
  * A `gh` that answers as FIXTURE_WHO (`bot` or `owner`) about PR 7, merged, so a scoped watcher's
  * subscription completes. Both see the owner's submitted comment; only the owner sees their pending
  * review, as GitHub answers. FAIL names the reads that are refused (`bot-activity`, `owner-pending`).
+ * LATE_SUBMIT: the owner submits the review just after the bot's read, so that read lacks it and it is
+ * no longer pending for any read after that one.
  */
 const FAKE_GH = String.raw`
-  import { appendFileSync } from 'node:fs'
+  import { appendFileSync, existsSync, writeFileSync } from 'node:fs'
   const text = process.argv.slice(2).join(' ').replaceAll('\n', ' ')
   const who = process.env.FIXTURE_WHO
   appendFileSync(process.env.FIXTURE_HOME + '/calls', who + ': ' + text + '\n')
@@ -26,13 +28,15 @@ const FAKE_GH = String.raw`
   const pending = { author, body: 'OWNER_PENDING_REVIEW', comments: { nodes: [line] }, createdAt, databaseId: 11, state: 'PENDING', submittedAt: null, url: 'https://c.test/11' }
   const submitted = { author, body: 'OWNER_SUBMITTED_REVIEW', comments: { nodes: [] }, createdAt, databaseId: 10, state: 'COMMENTED', submittedAt: createdAt, url: 'https://c.test/10' }
   const comment = { author, body: 'OWNER_SUBMITTED_COMMENT', createdAt, databaseId: 1, url: 'https://c.test/1' }
-  const visible = who === 'owner' ? [pending] : []
+  const late = process.env.LATE_SUBMIT === '1'
+  const submittedLate = late && existsSync(process.env.FIXTURE_HOME + '/bot-read')
+  const visible = who === 'owner' && !submittedLate ? [pending] : []
   const failing = (process.env.FAIL ?? '').split(',')
   const read = name => { if (failing.includes(who + '-' + name)) { process.exit(1) } }
   const state = { author: { login: 'agent' }, closingIssuesReferences: { nodes: [] }, headRefOid: 'head7', mergeCommit: { oid: 'merge7' }, mergeable: 'MERGEABLE', state: 'MERGED', title: 'PR 7' }
   if (text.includes('pr7: pullRequest')) {
     let value = state
-    if (text.includes('reviews(last:100){nodes{databaseId')) { read('activity'); value = { comments: { nodes: [comment] }, reviews: { nodes: [submitted, ...visible] } } }
+    if (text.includes('reviews(last:100){nodes{databaseId')) { read('activity'); if (late && who === 'bot') { writeFileSync(process.env.FIXTURE_HOME + '/bot-read', '') } value = { comments: { nodes: [comment] }, reviews: { nodes: [submitted, ...visible] } } }
     if (text.includes('states:PENDING')) { read('pending'); value = { reviews: { nodes: visible } } }
     answer({ data: { repository: { pr7: value } } })
   }
@@ -53,14 +57,14 @@ const fakeGh = async (home: string, name: string, who: string) => {
 }
 
 /** Runs a watcher subscribed to the merged PR 7; `oneLogin` gives it the owner's `gh` for both reads. */
-const runWatcher = async ({ fail = '', oneLogin = false }: { fail?: string, oneLogin?: boolean } = {}) => {
+const runWatcher = async ({ fail = '', late = false, oneLogin = false }: { fail?: string, late?: boolean, oneLogin?: boolean } = {}) => {
   const home = await mkdtemp(`${tmpdir()}/watch-tokens-`)
   dirs.push(home)
   await Bun.write(`${home}/fake.ts`, FAKE_GH)
   await Promise.all([fakeGh(home, 'bot', 'bot'), fakeGh(home, 'owner', 'owner')])
   // Not the first look ever: what is on the PR is news.
   await Bun.write(`${home}/state/initialized`, '')
-  const env = { ...process.env, ACTIVITY_GH: `${home}/owner`, AGENT_USAGE_PROVIDER: 'claude', CLAUDE_CODE_SESSION_ID: '', CLAUDE_CONFIG_DIR: home, CODEX_THREAD_ID: '', CODEX_WATCH_THREAD: '', FAIL: fail, FIXTURE_HOME: home, GH: `${home}/${oneLogin ? 'owner' : 'bot'}`, GH_SHARE_SECONDS: '0', OWNER: 'owner', REPO: 'owner/repo', SELF: 'agent', STATE_DIR: `${home}/state`, WATCHER_SUBSCRIPTIONS: 'pr:7', XDG_STATE_HOME: home }
+  const env = { ...process.env, ACTIVITY_GH: `${home}/owner`, AGENT_USAGE_PROVIDER: 'claude', CLAUDE_CODE_SESSION_ID: '', CLAUDE_CONFIG_DIR: home, CODEX_THREAD_ID: '', CODEX_WATCH_THREAD: '', FAIL: fail, FIXTURE_HOME: home, GH: `${home}/${oneLogin ? 'owner' : 'bot'}`, GH_SHARE_SECONDS: '0', LATE_SUBMIT: late ? '1' : '', OWNER: 'owner', REPO: 'owner/repo', SELF: 'agent', STATE_DIR: `${home}/state`, WATCHER_SUBSCRIPTIONS: 'pr:7', XDG_STATE_HOME: home }
   const watcher = Bun.spawn([process.execPath, '-e', WATCHER], { env, stderr: 'pipe', stdout: 'pipe', timeout: 8000 })
   const [output, code] = await Promise.all([new Response(watcher.stdout).text(), watcher.exited])
   const calls = (await Bun.file(`${home}/calls`).text()).split('\n').filter(Boolean)
@@ -101,6 +105,12 @@ test('a refused pending check holds back none of the submitted comments (#403)',
   const { code, output } = await runWatcher({ fail: 'owner-pending' })
   expect(output).toContain('OWNER_SUBMITTED_COMMENT')
   expect(output).toContain('OWNER_SUBMITTED_REVIEW')
+  expect(code).toBe(3)
+}, 30_000)
+
+test('a review submitted just after the bot read it is not lost between the two reads (#403)', async () => {
+  const { code, output } = await runWatcher({ late: true })
+  expect(output).toContain('OWNER_PENDING_REVIEW')
   expect(code).toBe(3)
 }, 30_000)
 
