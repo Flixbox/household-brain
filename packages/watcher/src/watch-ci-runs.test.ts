@@ -8,12 +8,19 @@ afterEach(async () => { await Promise.all(dirs.splice(0).map(async dir => rm(dir
 
 const LOOKS = `
   import { checkRun } from '${import.meta.dir}/watch-ci-runs'
+  import { mkdir } from 'node:fs/promises'
   import { reportedLines } from '${import.meta.dir}/watch-output'
   const look = async () => checkRun({ label: process.env.LABEL, limitSeconds: 1200, pr: 7, sha: 'abc' })
   await look()
   await look()
   await look()
   await Bun.write(process.env.FIXTURE_HOME + '/attempt', '2')
+  // The run list's shared answer runs out before the jobs' does, as it did on the live watcher (#493).
+  const answers = process.env.XDG_STATE_HOME + '/watch-project/gh-answers'
+  await mkdir(answers, { recursive: true })
+  for (const name of new Bun.Glob('*').scanSync(answers)) {
+    if ((await Bun.file(answers + '/' + name).text()).includes('workflow_runs')) { await Bun.file(answers + '/' + name).delete() }
+  }
   await look()
   await look()
   console.log('REPORTED', JSON.stringify(await reportedLines()))
@@ -28,7 +35,8 @@ const FAKE = String.raw`
   appendFileSync(home + '/calls', args + '\n')
   const attempt = Number(await Bun.file(home + '/attempt').text().catch(() => '1'))
   const scenario = process.env.SCENARIO
-  const status = scenario === 'running' ? 'in_progress' : 'completed'
+  const status = scenario === 'running' || (scenario === 'finishing' && attempt === 1) ? 'in_progress' : 'completed'
+  const jobsDone = scenario !== 'stuck' && (!['finishing', 'lagging'].includes(scenario) || attempt === 2)
   const replaced = scenario === 'replaced' && attempt === 2
   if (args.startsWith('api -i')) {
     if (scenario === 'refused' && attempt === 2) { process.exit(1) }
@@ -39,10 +47,10 @@ const FAKE = String.raw`
     const newer = args.includes('head_sha=def')
     const finished = scenario === 'cancelled' || scenario === 'replaced' ? 'cancelled' : 'success'
     const conclusion = status === 'completed' ? (newer ? 'success' : finished) : null
-    console.log('HTTP/2.0 200 OK\r\nEtag: "e' + attempt + '"\r\n\r\n' + JSON.stringify({ workflow_runs: [{ conclusion, id: newer ? 6 : 5, run_attempt: attempt, run_started_at: Temporal.Now.instant().toString(), status }] }))
+    console.log('HTTP/2.0 200 OK\r\nEtag: "e' + attempt + '"\r\n\r\n' + JSON.stringify({ workflow_runs: [{ conclusion, id: newer ? 6 : 5, run_attempt: scenario === 'stuck' ? 1 : attempt, run_started_at: Temporal.Now.instant().toString(), status }] }))
     process.exit(0)
   }
-  if (args.startsWith('run view')) { console.log(JSON.stringify({ jobs: [{ conclusion: 'success', name: 'Lint', status: 'completed' }] })); process.exit(0) }
+  if (args.startsWith('run view')) { console.log(JSON.stringify({ jobs: [{ conclusion: jobsDone ? 'success' : null, name: 'Lint', status: jobsDone ? 'completed' : 'in_progress' }] })); process.exit(0) }
   if (args.startsWith('run list')) {
     console.log(JSON.stringify(replaced ? [{ attempt: 1, conclusion: 'success', databaseId: 6, headSha: 'def', startedAt: Temporal.Now.instant().toString(), status: 'completed' }] : []))
     process.exit(0)
@@ -62,7 +70,7 @@ const looks = async (scenario: string, label = 'pr', reported: readonly string[]
   await Bun.write(gh, `#!/bin/sh\nexec "${process.execPath}" "${home}/fake.ts" "$@"\n`)
   await Bun.spawn(['chmod', '+x', gh]).exited
   const child = Bun.spawn([process.execPath, '-e', LOOKS], {
-    env: { ...process.env, AGENT_USAGE_PROVIDER: 'claude', CLAUDE_CONFIG_DIR: home, CODEX_THREAD_ID: '', FIXTURE_HOME: home, GH: gh, GH_SHARE_SECONDS: '0', LABEL: label, OWNER: 'owner', REPO: 'owner/repo', SCENARIO: scenario, STATE_DIR: `${home}/state`, WATCHER_SUBSCRIPTIONS: '', XDG_STATE_HOME: home },
+    env: { ...process.env, AGENT_USAGE_PROVIDER: 'claude', CLAUDE_CONFIG_DIR: home, CODEX_THREAD_ID: '', FIXTURE_HOME: home, GH: gh, GH_SHARE_SECONDS: scenario === 'finishing' ? '60' : '0', LABEL: label, OWNER: 'owner', REPO: 'owner/repo', SCENARIO: scenario, STATE_DIR: `${home}/state`, WATCHER_SUBSCRIPTIONS: '', XDG_STATE_HOME: home },
     stderr: 'pipe', stdout: 'pipe',
   })
   const [output, error, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
@@ -113,4 +121,26 @@ test('a replacement that comes later still reports the deploy (#417)', async () 
   expect(result.views).toBe(3)
   expect(result.output).toContain('"pr-7 deployed def"')
   expect(result.output).not.toContain('deploy-failed abc 2')
+}, 30_000)
+
+test('a run that finished is reported with its jobs as they are now, not a shared answer from before (#493)', async () => {
+  const result = await looks('finishing')
+  // Shared while the run went on, and asked again once it had finished.
+  expect(result.views).toBe(2)
+  expect(result.output).toContain('Lint: completed success')
+  expect(result.output).not.toContain('Lint: in_progress')
+}, 30_000)
+
+test('a passed run whose jobs still read as running waits a look (#493)', async () => {
+  const result = await looks('lagging')
+  expect(result.output).not.toContain('Lint: in_progress')
+  expect(result.output).toContain('CI_PASSED')
+}, 30_000)
+
+test('a passed run whose jobs never finish is reported after a few looks, with the jobs as they are (#493)', async () => {
+  const result = await looks('stuck')
+  // Held for three looks, reported on the fourth, and then finished with.
+  expect(result.views).toBe(4)
+  expect(result.output).toContain('CI_PASSED')
+  expect(result.output).toContain('Lint: in_progress')
 }, 30_000)
