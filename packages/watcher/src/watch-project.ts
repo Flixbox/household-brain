@@ -106,8 +106,9 @@
  * after a refusal no watcher asks GitHub until the wait is over (watch-pace.ts, #400).
  * A PR is read in full only when the change gate says so (watch-change-gate.ts, #404).
  */
-// Which code this watcher runs is read before the rest of it is loaded (#265): a pull that finishes
-// while it loads then shows as a change, never as the version it started on.
+// Which code this watcher runs is read before the rest of it is loaded (#265), and readStartedOn then
+// starts this file over (#512): a pull that finishes while it loads then shows as a change, never as
+// the version it started on.
 import { readStartedOn } from './watch-version'
 
 await readStartedOn()

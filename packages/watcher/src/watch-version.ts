@@ -17,7 +17,18 @@ export const codeVersion = async (): Promise<string> =>
 /** The code this watcher started on: read by watch-project.ts before it loads the rest (#265). */
 const startState = { on: '' }
 export const readStartedOn = async (): Promise<void> => {
-  startState.on = await codeVersion()
+  const handedOver = process.env.WATCHER_STARTED_ON
+  delete process.env.WATCHER_STARTED_ON
+  startState.on = handedOver ?? await codeVersion()
+  if (typeof handedOver === 'string') { return }
+  // The files loaded so far may be older than this version (#512): replace this process, same pid and
+  // output, so that all the code is loaded after the version was read. Where that's refused (Windows),
+  // it carries on with the files it has.
+  try {
+    process.execve?.(process.execPath, [process.execPath, ...process.execArgv, ...process.argv.slice(1)], { ...process.env, WATCHER_STARTED_ON: startState.on })
+  } catch {
+    // Carries on as it is.
+  }
 }
 export const startedOn = (): string => startState.on
 
