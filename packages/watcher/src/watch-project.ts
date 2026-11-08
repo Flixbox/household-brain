@@ -8,8 +8,8 @@
  *   PR #<n>: NEW_PR                  a pull request opened (by anyone, Dependabot included)
  *   PR #<n>: CI_PASSED / CI_FAILED   CI finished for the PR's current head commit
  *   PR #<n>: CI_SLOW                 a CI run (PR or deploy) has been going for more than the limit
- *   PR #<n>: CONFLICT                the PR conflicts with its base branch: rebase it
- *   PR #<n>: MAIN_MOVED              main got commits the PR doesn't have yet: rebase and test again
+ *   PR #<n>: CONFLICT                the PR conflicts with its base branch: merge it in and resolve the conflict
+ *   PR #<n>: MAIN_MOVED              main got commits the PR doesn't have yet: merge main in and test again
  *   PR #<n>: APPROVED                the owner approved (queue with `agent-queue <owner/name> <n>` once it is well reviewed)
  *   PR #<n>: READY_TO_MERGE          approved, CI green for the current head, auto-merge still off
  *   PR #<n>: APPROVED_DRAFT          approved but still a draft (#298): mark it ready, queue (after the review a bot was asked for)

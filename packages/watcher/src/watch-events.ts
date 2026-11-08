@@ -135,9 +135,9 @@ export interface OpenPr {
 /** A branch that can't merge as it is (#226): behind the base branch, or in conflict with it. */
 const branchProblem = (pr: OpenPr): string | null => {
   if (pr.mergeState === 'DIRTY') {
-    return `REMINDER: PR #${pr.number} has conflicts with main: rebase it.`
+    return `REMINDER: PR #${pr.number} has conflicts with main: merge main in and resolve them.`
   }
-  return pr.mergeState === 'BEHIND' ? `REMINDER: PR #${pr.number} is behind main: rebase it and run the checks again.` : null
+  return pr.mergeState === 'BEHIND' ? `REMINDER: PR #${pr.number} is behind main: merge main in and run the checks again.` : null
 }
 
 /** The queue command the events name (#356): `agent-queue` checks the rules itself (#354); run it alone in its call. */
@@ -159,11 +159,11 @@ const approvalProblem = (pr: OpenPr, repo: string, awaitingBot: boolean): string
 /**
  * A reminder for each open PR waiting on the agent, on every notification until dealt with: a branch behind
  * main or in conflict (#226), approved with failed CI, or with green CI and auto-merge off (#224), unless it
- * is `awaitingBot`, a review bot's review (#299). Parked PRs don't count. `repo` is named in the queue command.
+ * is `awaitingBot`, a review bot's review (#299). Parked PRs don't count, nor the branch of one in `branchSaid` (#508).
  */
-export const reminderLines = (prs: readonly OpenPr[], repo: string, awaitingBot: ReadonlySet<number> = new Set()): string[] => prs
+export const reminderLines = (prs: readonly OpenPr[], repo: string, { awaitingBot = new Set(), branchSaid = new Set() }: { awaitingBot?: ReadonlySet<number>, branchSaid?: ReadonlySet<number> } = {}): string[] => prs
   .filter(pr => !pr.parked)
-  .flatMap(pr => [branchProblem(pr), approvalProblem(pr, repo, awaitingBot.has(pr.number))].filter(line => line !== null))
+  .flatMap(pr => [branchSaid.has(pr.number) ? null : branchProblem(pr), approvalProblem(pr, repo, awaitingBot.has(pr.number))].filter(line => line !== null))
 
 /** Each reviewer's latest review that counts (a comment doesn't undo an approval, a dismissal does), by login in lower case. */
 const latestReviews = (reviews: readonly { login: string, state: string }[]): Map<string, string> => new Map(reviews
