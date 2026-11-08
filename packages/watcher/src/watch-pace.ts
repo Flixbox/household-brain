@@ -80,9 +80,8 @@ const isRefused = (response: GhResponse, log: string, failed: boolean): boolean 
  * Whether the hourly budget ran out, as against a secondary limit, which a bare 429 is taken for, and
  * so is a retry-after with budget left.
  */
-const isPrimary = (response: GhResponse, log: string, retries: boolean): boolean => {
-  return numberOf(response, 'x-ratelimit-remaining') === 0 || (!retries && (GRAPHQL_REFUSAL.test(log) || response.status === 403))
-}
+const isPrimary = (response: GhResponse, log: string, retries: boolean): boolean =>
+  numberOf(response, 'x-ratelimit-remaining') === 0 || (!retries && (GRAPHQL_REFUSAL.test(log) || response.status === 403))
 
 interface Wait {
   key: string
