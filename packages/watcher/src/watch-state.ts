@@ -111,19 +111,32 @@ export const updateLines = async (name: string, change: (lines: string[]) => rea
 
 export const appendLines = async (name: string, lines: readonly string[]): Promise<void> => updateLines(name, old => [...old, ...lines])
 
-/** Adds a line unless it is there already, or `adopt` finds it under an older form and rewrites the lines; true when it was added. */
-export const addLine = async (name: string, line: string, adopt: (lines: readonly string[], line: string) => readonly string[] | null = () => null): Promise<boolean> => oneAtATime(name, async () => {
+/** Adds a line unless it is there already; true when it was added. */
+export const addLine = async (name: string, line: string): Promise<boolean> => oneAtATime(name, async () => {
   const lines = await readLines(name)
   if (lines.includes(line)) {
     return false
   }
-  const adopted = adopt(lines, line)
-  await write(name, adopted ?? [...lines, line])
-  return adopted === null
+  await write(name, [...lines, line])
+  return true
 })
 
-/** Records an event as reported; true when it is news. A CI result recorded before its key held the run id isn't (#486). */
-export const addReported = async (key: string): Promise<boolean> => addLine('reported', key, adoptOldCiKey)
+/**
+ * Whether the report line `key` is news, with `claim` deciding in the same step: no if the file has
+ * it, or has it in its form from before the run id, which it then takes over (#486).
+ */
+export const claimReportedLine = async (key: string, claim: () => boolean): Promise<boolean> => oneAtATime('reported', async () => {
+  const lines = await readLines('reported')
+  if (lines.includes(key)) {
+    return false
+  }
+  const adopted = adoptOldCiKey(lines, key)
+  if (adopted) {
+    await write('reported', adopted)
+    return false
+  }
+  return claim()
+})
 
 /**
  * Gets this watcher going: the record of a session that ended long ago is removed (#264), and a stop

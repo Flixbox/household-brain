@@ -27,3 +27,21 @@ describe('ownerWrite answers long lines inside the hook timeout (#416)', () => {
     expect(timed('>&'.repeat(150_000)).ms).toBeLessThan(boundMs)
   }, testTimeoutMs)
 })
+
+describe('ownerWrite refuses nested unsure arithmetic, quickly and without a crash (#496)', () => {
+  const nested = (levels: number) => `${'$((a)'.repeat(levels)}1${')'.repeat(levels)}; gh issue close 1`
+
+  it('refuses a few thousand characters of it inside the hook timeout', () => {
+    const { found, ms } = timed(nested(1000))
+    expect(found).not.toBeNull()
+    expect(ms).toBeLessThan(boundMs)
+  }, testTimeoutMs)
+
+  it('refuses it nested too deep for the stack', () => {
+    expect(timed(nested(12_000)).found).not.toBeNull()
+  }, testTimeoutMs)
+
+  it('refuses it with text between the levels, too deep for the stack', () => {
+    expect(timed(`${'$((1)x '.repeat(17_000)}; gh issue close 1`).found).not.toBeNull()
+  }, testTimeoutMs)
+})

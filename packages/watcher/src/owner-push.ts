@@ -99,11 +99,24 @@ const pushReason = (dir: string) => [
   'The config is shared by every worktree of the clone and another agent may be setting it up: retry shortly, and if it stays wrong report it, rather than changing it from a worktree.',
 ].join(' ')
 
+/** Spellings that can change where a push goes unseen in its words, read with quotes and backslashes removed. */
+const hidingSpellings = [
+  // A variable git reads, assigned, or named bare as a `for` or `read` might fill it; `$GIT_DIR` only reads it.
+  /\bGIT_\w+=|(?<![$\w{])GIT_\w+/u,
+  /\bxargs\b/u,
+  /(?:^|[\s;&|(])(?:source|\.|pushd|popd)(?=[\s;&|)]|$)/u,
+  // `env -C` or `--chdir` (which env lets be abbreviated), before the command env runs. Stopping at the next `env` keeps the scan linear.
+  /\benv\b(?:(?!\b(?:env|git)\b)[^;&|\n])*?\s-(?:\S*C|-c)/u,
+]
+
 /**
- * Whether the line can change where a push goes unseen in its words: it sets a variable git reads, feeds a command through xargs,
- * sources a file or moves with `pushd`/`popd`. Read with quotes and backslashes removed, as they can splice a word together.
+ * Whether the line can change where a push goes unseen in its words. Quotes and backslashes can splice a word together, so they
+ * are removed first; a `$'` word can spell any name in escapes, so it counts by itself.
  */
-const hidesDestination = (line: string) => /\bGIT_\w+=|\bxargs\b|(?:^|[\s;&|(])(?:source|\.|pushd|popd)(?=[\s;&|)]|$)/u.test(line.replaceAll(/["'\\]/gu, ''))
+const hidesDestination = (line: string) => {
+  const plain = line.replaceAll(/["'\\]/gu, '')
+  return line.includes("$'") || hidingSpellings.some(spelling => spelling.test(plain))
+}
 
 /** Why the first `git push` among these commands, the ones this line runs, that would not go out as the bot is refused, or null when there is none. */
 export const pushRefusal = (commands: readonly (readonly string[])[], cwd: string, line: string) => {

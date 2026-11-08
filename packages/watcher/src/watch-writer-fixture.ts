@@ -38,9 +38,9 @@ export const setUp = async (answers = BOT_VIEWER) => {
 }
 
 /** One watcher process: all-events without `scoped`, else subscribed to PR 7. */
-export const run = async ({ gh, home, scoped = false, script }: { gh: string, home: string, scoped?: boolean, script: string }) => {
+export const run = async ({ env = {}, gh, home, scoped = false, script }: { env?: Record<string, string>, gh: string, home: string, scoped?: boolean, script: string }) => {
   const watcher = Bun.spawn([process.execPath, '-e', script], {
-    env: { ...process.env, CLAUDE_CODE_SESSION_ID: '', CLAUDE_CONFIG_DIR: home, CLEAR_QUESTION_LABEL: '1', CODEX_THREAD_ID: '', CODEX_WATCH_THREAD: '', GH: gh, OWNER: 'owner', READY_APPROVED_DRAFTS: '1', REPO: 'owner/repo', REVIEW_BOTS: 'coderabbitai', STATE_DIR: '', WATCHER_ID: scoped ? 'agent' : 'main', WATCHER_SUBSCRIPTIONS: scoped ? 'pr:7' : '', XDG_STATE_HOME: home },
+    env: { ...process.env, CLAUDE_CODE_SESSION_ID: '', CLAUDE_CONFIG_DIR: home, CLEAR_QUESTION_LABEL: '1', CODEX_THREAD_ID: '', CODEX_WATCH_THREAD: '', GH: gh, OWNER: 'owner', READY_APPROVED_DRAFTS: '1', REPO: 'owner/repo', REVIEW_BOTS: 'coderabbitai', STATE_DIR: '', WATCHER_ID: scoped ? 'agent' : 'main', WATCHER_SUBSCRIPTIONS: scoped ? 'pr:7' : '', XDG_STATE_HOME: home, ...env },
     stderr: 'ignore',
     stdout: 'pipe',
   })
