@@ -8,8 +8,9 @@ afterEach(async () => { await Promise.all(dirs.splice(0).map(async dir => rm(dir
 
 /**
  * A `gh` for a repository with three open PRs: 7 (subscribed, merged), 8 (unrelated) and 9 (closes the
- * subscribed issue 4). PR 6 closes issue 4 too and merged a minute ago, between two looks; PR 3 closed
- * it long ago, before it was reopened. It keeps every call in `calls`. Issue 4 gets the owner's answer
+ * subscribed issue 4). PR 6 closes issue 4 too and has just merged, between two looks; PR 2 merged an
+ * hour ago, before the watcher started (#477); PR 3 closed it long ago, before it was reopened. It
+ * keeps every call in `calls`. Issue 4 gets the owner's answer
  * from its COMMENT_FROM-th comment read on (the second by default), and is closed from its third, so
  * the subscription completes. Issue 5 is gone: any query that asks about it fails.
  */
@@ -28,13 +29,14 @@ const FAKE_GH = String.raw`
   if (text.startsWith('api -i')) { rest({ commit: { message: 'main' }, sha: 'main1' }) }
   if (text.startsWith('pr list') || text.startsWith('run list')) { answer([]) }
   if (text.startsWith('api repos/')) { answer({ ahead_by: 0, commit: { message: 'main' }, commits: [], sha: 'main1' }) }
+  const merged = pr => [2, 6, 7].includes(pr)
   const state = pr => ({
     author: { login: 'agent' },
-    closingIssuesReferences: { nodes: pr === 9 ? [{ number: 4 }] : [] },
+    closingIssuesReferences: { nodes: [2, 6, 9].includes(pr) ? [{ number: 4 }] : [] },
     headRefOid: 'head' + pr,
-    mergeCommit: pr === 7 || pr === 6 ? { oid: 'merge' + pr } : null,
+    mergeCommit: merged(pr) ? { oid: 'merge' + pr } : null,
     mergeable: 'MERGEABLE',
-    state: pr === 7 || pr === 6 ? 'MERGED' : 'OPEN',
+    state: merged(pr) ? 'MERGED' : 'OPEN',
     title: 'PR ' + pr,
   })
   const prs = [...text.matchAll(/pr(\d+): pullRequest\(number: (\d+)\)/g)].map(match => Number(match[1]))
@@ -48,7 +50,8 @@ const FAKE_GH = String.raw`
     const comments = reads() >= Number(process.env.COMMENT_FROM ?? 2) ? [{ author: { login: 'owner' }, body: 'OWNER_ISSUE_ANSWER', createdAt: Temporal.Now.instant().toString(), databaseId: 41, url: 'https://comments.test/41' }] : []
     const issue = { closedByPullRequestsReferences: { nodes: [
       { mergedAt: '2026-01-01T00:00:00Z', number: 3, state: 'MERGED' },
-      { mergedAt: Temporal.Now.instant().subtract({ minutes: 1 }).toString(), number: 6, state: 'MERGED' },
+      { mergedAt: Temporal.Now.instant().subtract({ hours: 1 }).toString(), number: 2, state: 'MERGED' },
+      { mergedAt: Temporal.Now.instant().toString(), number: 6, state: 'MERGED' },
       { mergedAt: null, number: 9, state: 'OPEN' },
     ] }, comments: { nodes: comments }, number: 4, state: reads() >= 3 ? 'CLOSED' : 'OPEN' }
     answer({ data: { repository: Object.fromEntries(issues.map(number => ['issue' + number, issue])) } })
@@ -92,7 +95,7 @@ const prsAskedAbout = (calls: readonly string[]) =>
 
 test('a scoped watcher reads only its subjects: no open-PR, open-issue or repository-wide lists (#357)', async () => {
   const { calls, code, output } = await runScoped('pr:7,issue:4')
-  // PR 7 is subscribed, PRs 6 and 9 close issue 4; PR 8 is none of its business, and PR 3's merge is old.
+  // PR 7 is subscribed, PRs 6 and 9 close issue 4; PR 8 is none of its business, and the merges of PRs 2 and 3 are old.
   expect(prsAskedAbout(calls)).toEqual([6, 7, 9])
   expect(calls.filter(call => call.startsWith('pr list') || call.includes('pulls?state='))).toEqual([])
   expect(calls.filter(call => call.includes('issues(states:OPEN') || call.includes('created: issues('))).toEqual([])
@@ -107,7 +110,8 @@ test('a gone subscribed issue holds back neither the other issues nor the PRs (#
   expect(prsAskedAbout(calls)).toEqual([6, 7, 9])
   expect(output).toContain('PR #7: MERGED')
   expect(output).toContain('OWNER_ISSUE_ANSWER')
-  expect(output).toContain('ISSUE_CLOSED #4: subscription completed')
+  expect(output).toContain('ISSUE_CLOSED #4')
+  expect(output).not.toContain('subscription completed')
   expect(output).not.toContain('WATCHER_ERROR')
   // Issue 5 never closes, so the subscription never completes: the watcher was stopped.
   expect(code).not.toBe(3)
@@ -116,5 +120,21 @@ test('a gone subscribed issue holds back neither the other issues nor the PRs (#
 test('after the upgrade, an owner comment newer than the old issue-events file is still news (#357)', async () => {
   const { code, output } = await runScoped('pr:7,issue:4', { commentFrom: '1', upgraded: true })
   expect(output).toContain('OWNER_ISSUE_ANSWER')
+  expect(code).toBe(3)
+}, 30_000)
+
+test('an issue subscription hears nothing of a PR merged before it started, and no early completion (#477)', async () => {
+  const { calls, code, output } = await runScoped('issue:4')
+  expect(prsAskedAbout(calls)).toEqual([6, 9])
+  expect(output).not.toContain('PR #2')
+  expect(output).toContain('MERGED: merge6')
+  expect(output).not.toContain('merge6; subscription completed')
+  expect(output).toContain('ISSUE_CLOSED #4: subscription completed')
+  expect(code).toBe(3)
+}, 30_000)
+
+test('the merge that ends the last subject says the subscription completed (#477)', async () => {
+  const { code, output } = await runScoped('pr:7')
+  expect(output).toContain('MERGED: merge7; subscription completed')
   expect(code).toBe(3)
 }, 30_000)
