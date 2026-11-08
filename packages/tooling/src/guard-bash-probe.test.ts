@@ -43,6 +43,15 @@ describe('runProbes', () => {
     expect(probe('exit 7')).toMatchObject({ ran: false, status: 7 })
   })
 
+  test.skipIf(!canIsolate)('takes the record of the stand-in, not a file an input can touch', () => {
+    expect(probe('touch /tmp/ran').ran).toBe(false)
+    expect(probe('probe-stand-in; rm -rf /tmp/ran').ran).toBe(true)
+  })
+
+  test.skipIf(!canIsolate)('does not take an input killing itself for a timeout', () => {
+    expect(probe('kill -9 $$')).toMatchObject({ status: 137, timedOut: false })
+  })
+
   test.skipIf(!canIsolate)('has no network, environment or home', () => {
     expect(probe('[ -z "$(tail -n +2 /proc/net/route)" ] && probe-stand-in').ran).toBe(true)
     expect(probe('[ "$(env | grep -cv -e ^PATH= -e ^PWD= -e ^SHLVL= -e ^_=)" = 0 ] && probe-stand-in').ran).toBe(true)

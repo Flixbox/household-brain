@@ -26,27 +26,32 @@ export interface ProbeOptions {
   unshare: string
 }
 
-// `timeout -s KILL` reports the kill as 128 + 9.
-const killedStatus = 137
-
 // Run inside the namespaces, with the input, the stand-in's name and the limit as $1, $2 and $3. Only
 // its last line of output is read, so the input's own output goes nowhere. Before the input runs,
 // `set -e` ends it without that line if a folder can't be covered, which refuses the whole run.
+// The stand-in records itself on an open descriptor of a file already deleted, so an input can't
+// fake or erase that by file name. A status of 137 is a timeout only once the limit has passed: an
+// input can kill itself too.
 const insideNamespaces = String.raw`
 set -eu
 for folder in /home /root /mnt /media /run /tmp /var/tmp /dev/shm; do
   if [ -d "$folder" ]; then mount -t tmpfs tmpfs "$folder"; fi
 done
 mkdir /tmp/bin /tmp/work
-printf '#!/bin/bash\n: >>/tmp/ran\necho RAN\n' >"/tmp/bin/$2"
+exec 9>/tmp/ran 8</tmp/ran
+rm /tmp/ran
+printf '#!/bin/bash\necho ran >&9\necho RAN\n' >"/tmp/bin/$2"
 chmod 755 "/tmp/bin/$2"
 cd /tmp/work
 status=0
 timeout -s KILL "$3" env -i PATH=/tmp/bin:/usr/bin:/bin /bin/bash -c "$1" probe \
-  </dev/null >/dev/null 2>&1 || status=$?
-if [ -e /tmp/ran ]; then ran=true; else ran=false; fi
-printf '%s %s\n' "$ran" "$status"
+  </dev/null >/dev/null 2>&1 8<&- || status=$?
+if [ -n "$(cat <&8)" ]; then ran=true; else ran=false; fi
+if [ "$status" = 137 ] && [ "$SECONDS" -ge "$3" ]; then timedOut=true; else timedOut=false; fi
+printf '%s %s %s\n' "$ran" "$status" "$timedOut"
 `
+
+const reportLine = /^(?<ran>true|false) (?<status>\d+) (?<timedOut>true|false)\n$/u
 
 export const parseProbeInputs = (text: string): string[] => {
   const inputs: unknown = JSON.parse(text)
@@ -84,11 +89,11 @@ const runOne = (input: string, { limitSeconds, standIn, unshare }: ProbeOptions)
     stdin: 'ignore',
     stdout: 'pipe',
   })
-  const { ran = '', status = '' } = /^(?<ran>true|false) (?<status>\d+)\n$/u.exec(stdout.toString())?.groups ?? {}
+  const { ran = '', status = '', timedOut = '' } = reportLine.exec(stdout.toString())?.groups ?? {}
   if (ran === '') {
     throw new Error('could not set up the namespaces, so this input was not run')
   }
-  return { input, ran: ran === 'true', status: Number(status), timedOut: Number(status) === killedStatus }
+  return { input, ran: ran === 'true', status: Number(status), timedOut: timedOut === 'true' }
 }
 
 export const runProbes = (inputs: string[], options: ProbeOptions): ProbeResult[] =>
