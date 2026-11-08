@@ -18,7 +18,8 @@ const allActivity = async (prs: readonly number[], cli: string, fresh: boolean) 
  * Comments, reviews (not plain approvals, each with its line comments) and review comments on each PR
  * asked about, the agent's own left out (see `activityFrom`), through GraphQL (#306). `GH` reads them,
  * and `ACTIVITY_GH` adds only its pending review, the one thing `GH` can't see (#403); a refused check
- * holds nothing back, as the pending review just comes a look later. A PR `GH` couldn't read goes to
+ * holds nothing back, as the pending review just comes a look later, except on a `fresh` read, the
+ * last before a subscription ends: there the PR counts as unread, to be tried again. A PR `GH` couldn't read goes to
  * `ACTIVITY_GH` whole, so the owner's comments still arrive while the bot is out of points. A PR that
  * neither could read is missing.
  */
@@ -30,7 +31,7 @@ export const activitiesOf = async (prs: readonly number[], fresh = false): Promi
   const pending = await perPr(prs, { cli: ACTIVITY_GH, fields: PENDING_FIELDS, fresh, parse: parseActivity, size: 50 })
   const read = await allActivity(prs, GH, fresh)
   const theirs = await allActivity(prs.filter(pr => !read.has(pr)), ACTIVITY_GH, fresh)
-  return new Map([...theirs, ...[...read].map(([pr, items]): [number, Activity[]] => [pr, addPending(items, pending.get(pr) ?? [])])])
+  return new Map([...theirs, ...[...read].filter(([pr]) => !fresh || pending.has(pr)).map(([pr, items]): [number, Activity[]] => [pr, addPending(items, pending.get(pr) ?? [])])])
 }
 
 /** The comments of a PR already reported. On the very first round, the ones already there are old news. */
