@@ -48,7 +48,7 @@ const resolved = (from: string, name: string, files: Map<string, unknown>): stri
 const importNames = (text: string): string[] | null => {
   try {
     if (COMPUTED_IMPORT.test(scanner.transformSync(text))) { return null }
-    return scanner.scanImports(text).filter(found => found.kind !== 'dynamic-import').map(found => found.path).filter(name => !isBuiltIn(name))
+    return scanner.scanImports(text).map(found => found.path).filter(name => !isBuiltIn(name))
   } catch {
     return null
   }
