@@ -17,7 +17,7 @@ import { CLEARED_LABEL, clearedAt, coveredByClearance } from './watch-cleared-ev
 import { OWNER, type PrState, REPO, SELF, gh, graphql, resolveThread, threadsFrom } from './watch-github'
 import { GH, ghText } from './watch-gh'
 import { reportedPassed } from './watch-ci-state'
-import { IS_WRITER, attemptWrite, relayWrites, reportWrite } from './watch-writer'
+import { IS_WRITER, attemptWrite, reportWrite } from './watch-writer'
 import { readLines } from './watch-state'
 import { WATCHERS_DIR, claim, removeOlder, unclaim } from './watch-files'
 import { allSettled, textOf } from './read'
@@ -172,10 +172,9 @@ export const askBotsToResolve = async (pr: number, state: PrState): Promise<void
 /**
  * Resolves each open thread whose last comment is a `Resolved: <reason>` reply (#279), and says so. A
  * failed attempt is reported once and tried again with backoff. Only the writer resolves (#402); a
- * subscribed watcher reports here what the writer did on the PR.
+ * subscribed watcher hears what the writer did from `relayWrites`, in `preparePr`.
  */
 export const resolveAsked = async (pr: number, state: PrState): Promise<void> => {
-  await relayWrites(pr)
   await allSettled(state.toResolve.map(async thread => {
     const resolved = await attemptWrite(`resolve-${thread.id}`, async () => resolveThread(thread.id).catch(() => false))
     await (resolved === null ? Promise.resolve() : reportWrite(resolvedThreadEvent(pr, thread, resolved), pr))
