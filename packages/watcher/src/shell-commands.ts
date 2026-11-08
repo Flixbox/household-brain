@@ -171,10 +171,7 @@ const plain: Reader = (scan, text, at) => {
   return at + 1
 }
 
-/**
- * `<` and `>` end the word before them, as in the shell, unless it is the file descriptor (`2>`) or the operator so far (`>>`, `&>`).
- * An operator so far is at most two characters, so a long run of them ends its word instead of being read again at every character (#416); bash refuses such a run anyway.
- */
+/** `<` and `>` end the word before them, as in the shell, unless it is the file descriptor (`2>`) or the operator so far (`>>`, `&>`), at most two characters: a longer run, which bash refuses, would otherwise be read again at every character (#416). */
 const endWordBeforeRedirection = (scan: Scan) => {
   if (!/^\d*[&<>]{0,2}$/u.test(scan.word ?? '')) {
     endWord(scan)
