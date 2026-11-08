@@ -17,6 +17,7 @@
 import { positionals, xargsFillsIn } from './owner-write-xargs'
 import { isRecord, textOf } from './read'
 import { commandsOf } from './shell-braces'
+import { withoutMarks } from './shell-ansi-c'
 import { isDynamic, plainWord } from './shell-commands'
 import { baseName, isGh, programCommands } from './shell-interpreters'
 import { type Work, charged, newWork, unreadableLine } from './shell-work'
@@ -257,7 +258,7 @@ const writes = ([name = '', ...words]: readonly string[]) => {
 
 /** The first command in a Bash command line that writes to GitHub through plain `gh`, as its words joined, or null when there is none. */
 export const ownerWrite = (command: string): string | null => {
-  const found = runCommands(command, newWork()).find(words => writes(words))
+  const found = runCommands(withoutMarks(command), newWork()).find(words => writes(words))
   return found ? found.map(word => plainWord(word)).join(' ') : null
 }
 
