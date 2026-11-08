@@ -15,6 +15,7 @@
  *   usage          the last usage line this watcher posted: its numbers and when, as JSON (#318)
  *   pr-<n>-seen    the comments and reviews of a PR already reported
  *   initialized    set after the first complete round: from then on, a PR is new, and so is all on it
+ *   subscribed-since  empty; its time is when a scoped watcher first started (#477)
  *
  * And, shared by all of this machine's watchers of the repository: `review-asked/pr-<n>-<bot>`, one
  * file for each review bot asked to review a PR, or seen asked (#324), so it is asked once: empty
@@ -141,7 +142,15 @@ const save = async (): Promise<void> => {
   }
 }
 
+const SUBSCRIBED_SINCE = 'subscribed-since'
+/**
+ * The whole second this scoped watcher first started in, in epoch milliseconds: a linked PR merged
+ * earlier isn't news (#477). Whole, as GitHub's merge times are: a merge just after the start must count.
+ */
+export const subscribedSince = async (): Promise<number> => Math.floor((await writtenAt(SUBSCRIBED_SINCE) ?? 0) / 1000) * 1000
+
 export const startSubscriptions = async (): Promise<void> => {
+  if (subscriptions.scoped && !await exists(SUBSCRIBED_SINCE)) { await writeLines(SUBSCRIBED_SINCE, []) }
   const [saved] = await readLines('subscriptions')
   if (typeof saved === 'string') { subscriptions.restore(JSON.parse(saved)) }
 }
