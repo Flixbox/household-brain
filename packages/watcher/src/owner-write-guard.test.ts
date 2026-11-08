@@ -205,6 +205,10 @@ describe('ownerWrite (#368)', () => {
       '((gh issue close 1 $(cat <<E\n(\nE\n));(true)))',
       'echo $((gh issue close 1 $(cat <<E\n(\nE\n));(true)))',
       '((gh issue close 1 # ))\n))',
+      '((gh issue close 1 $(case x in x) :;; esac)); :)',
+      'echo $((gh issue close 1 $(case x in x) :;; esac)); :)',
+      '(( "1"<<1 ))\ngh issue close 1\n1',
+      '(( (1)<<1 ))\ngh issue close 1\n1',
     ])).toEqual([])
   })
 
