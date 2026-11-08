@@ -111,5 +111,7 @@ test('after a capped move the next read still asks below the old cursor, and a b
   await run(home, 'checkIssues')
   const asked = (await calls(home)).filter(call => call.includes('issues?state=all') && call.endsWith('&page=1')).map(call => /since=(?<since>[^&]+)/u.exec(call)?.groups?.since)
   expect(asked).toEqual(['2026-11-08T11:58:00Z', '2026-11-08T11:58:00Z', '2026-11-08T11:59:00Z'])
-  expect(await lines(home, 'issue-events')).toEqual(expect.arrayContaining(['issue #700', 'issue #701']))
+  const reported = await lines(home, 'issue-events')
+  expect(reported).toContain('issue #700')
+  expect(reported).toContain('issue #701')
 })
