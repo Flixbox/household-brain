@@ -78,15 +78,30 @@ export const readSince = async (rest: Rest, base: string, cursor: string | null)
 const newestOn = (page: readonly Json[]): string | null =>
   page.map(item => textOf(item.updated_at)).reduce<string | null>((newest, updated) => (newest === null || updated > newest ? updated : newest), null)
 
+/** Whether `newest` is past `cursor`. */
+const moves = (newest: string | null, cursor: string | null): newest is string => newest !== null && (cursor === null || newest > cursor)
+
+/** `newest`, but at most one overlap past `cursor`: the next read then still asks from `cursor`. */
+const capped = (newest: string, cursor: string): string => {
+  const limit = Temporal.Instant.from(cursor).add(OVERLAP).toString()
+  return newest < limit ? newest : limit
+}
+
 /**
- * The cursor after a read: the newest update on the first page that moves it, never earlier than it
- * was. Not the last page, as a list that shifted while it was paged can skip an item at a page's
- * edge, and a cursor past that item would lose it: the rest of the list is simply read again next
- * round. A later page only when the first moves nothing, a burst filling the overlap, which would
- * otherwise hold the cursor where it is for good.
+ * The cursor after a read: the newest update on the first page, never earlier than it was. Not the
+ * last page, as a list that shifted while it was paged can skip an item at a page's edge, and a
+ * cursor past that item would lose it: the rest of the list is simply read again next round. When a
+ * burst fills the overlap and the first page moves nothing, a later page moves it, by one overlap at
+ * most, so what paging skipped is still asked for.
  */
-export const nextCursor = (cursor: string | null, pages: readonly Json[][]): string | null =>
-  pages.map(page => newestOn(page)).find(newest => newest !== null && (cursor === null || newest > cursor)) ?? cursor
+export const nextCursor = (cursor: string | null, pages: readonly Json[][]): string | null => {
+  const [first, ...later] = pages.map(page => newestOn(page))
+  if (moves(first ?? null, cursor) || cursor === null) {
+    return first ?? cursor
+  }
+  const newer = later.find(newest => moves(newest, cursor)) ?? null
+  return newer === null ? cursor : capped(newer, cursor)
+}
 
 /** Whether something written at `created` is news to a read from `cursor`: an old one that only now came up isn't. */
 const isNew = (created: unknown, cursor: string | null): boolean => cursor === null || textOf(created) >= askedSince(cursor)
