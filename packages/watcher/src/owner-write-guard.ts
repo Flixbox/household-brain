@@ -20,10 +20,11 @@ import { pushRefusal } from './owner-push'
 import { positionals, xargsFillsIn } from './owner-write-xargs'
 import { isRecord, textOf } from './read'
 import { commandsOf } from './shell-braces'
+import { withoutMarks } from './shell-ansi-c'
 import { isDynamic, plainWord } from './shell-commands'
 import { baseName, isGh, programCommands } from './shell-interpreters'
 import { type Work, charged, newWork, unreadableLine } from './shell-work'
-import { commandsFrom } from './owner-write-wrappers'
+import { commandsFrom, scriptFlagRunners, shell, stdinRunners } from './owner-write-wrappers'
 
 /** `gh pr` and `gh issue` subcommands that change something on GitHub. */
 const prIssueWrites = new Set([
@@ -42,17 +43,8 @@ const methodFlags = new Set(['--method', '-X'])
 /** Shell keywords that may stand before a command. */
 const keywords = new Set(['!', 'do', 'elif', 'else', 'if', 'then', 'until', 'while', '{', '}'])
 
-/** Wrappers that also take a whole command line after `-c`, as a shell does (`flock x -c '…'`). */
-const scriptFlagRunners = new Set(['flock', 'script'])
-
 /** A redirection: its operator, and its target when attached (`>out`, `2>/dev/null`, `&>log`). */
 const redirection = /^\d*(?:&>>?|>>?|<{1,3}|>&|<&|>\|)(?<target>.*)$/su
-
-/** A shell by its name, however it is spelled (`mksh`, `bash-5.2`, `zsh.exe`): matching more than shells costs only a false denial. */
-const shell = /^[a-z]*sh[-.\d]*(?:\.exe)?$/u
-
-/** Commands that run what comes in on their input (`source /dev/stdin`), the shells apart. */
-const stdinRunners = new Set(['.', 'source'])
 
 /** A here-string, or a here-document's body as shell-commands.ts hands it over. */
 const hereString = /^\d*<<<(?<text>.*)$/su
@@ -260,7 +252,7 @@ const writes = ([name = '', ...words]: readonly string[]) => {
 
 /** The first command in a Bash command line that writes to GitHub through plain `gh`, as its words joined, or null when there is none. */
 export const ownerWrite = (command: string): string | null => {
-  const found = runCommands(command, newWork()).find(words => writes(words))
+  const found = runCommands(withoutMarks(command), newWork()).find(words => writes(words))
   return found ? found.map(word => plainWord(word)).join(' ') : null
 }
 
