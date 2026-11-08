@@ -35,6 +35,9 @@ const PER_PAGE = 100
  */
 const OVERLAP = Temporal.Duration.from({ minutes: 2 })
 
+/** How far a burst moves the position in a round: less than the overlap, so a read always asks below the old cursor (#469). */
+const CAPPED_STEP = Temporal.Duration.from({ minutes: 1 })
+
 /**
  * How often the whole open list is read again. Two things never show as an update: an issue deleted
  * or transferred (#263) leaves no entry in `since`, and adding a blocker doesn't move `updated_at`,
@@ -89,9 +92,9 @@ const newestOn = (page: readonly Json[]): string | null =>
 /** Whether `newest` is past `cursor`. */
 const moves = (newest: string | null, cursor: string | null): newest is string => newest !== null && (cursor === null || newest > cursor)
 
-/** `newest`, but at most one overlap past `from`. */
-const withinOverlap = (newest: string, from: string): string => {
-  const limit = Temporal.Instant.from(from).add(OVERLAP).toString()
+/** `newest`, but at most one step past `from`. */
+const withinStep = (newest: string, from: string): string => {
+  const limit = Temporal.Instant.from(from).add(CAPPED_STEP).toString()
   return newest < limit ? newest : limit
 }
 
@@ -101,8 +104,8 @@ const withinOverlap = (newest: string, from: string): string => {
  * cursor past that item would lose it: the rest of the list is simply read again next round.
  *
  * When a burst fills the overlap and the first page moves nothing, a later page moves `capped`, by
- * one overlap at most, and the cursor follows it a round later. So the round after a capped move
- * still asks below the old cursor (#469), and a burst can't hold the cursor for good.
+ * one step at most, and the cursor follows it a round later. So every read during a burst still
+ * asks below the old cursor (#469), and a burst can't hold the cursor for good.
  */
 export const nextPosition = ({ capped, cursor }: Position, pages: readonly Json[][]): Position => {
   const [first, ...later] = pages.map(page => newestOn(page))
@@ -111,7 +114,7 @@ export const nextPosition = ({ capped, cursor }: Position, pages: readonly Json[
   }
   const from = capped ?? cursor
   const newer = later.find(newest => moves(newest, from)) ?? null
-  return { capped: newer === null ? null : withinOverlap(newer, from), cursor: capped ?? cursor }
+  return { capped: newer === null ? null : withinStep(newer, from), cursor: capped ?? cursor }
 }
 
 /** Whether something written at `created` is news to a read from `cursor`: an old one that only now came up isn't. */

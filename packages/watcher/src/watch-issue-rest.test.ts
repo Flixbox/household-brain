@@ -33,9 +33,9 @@ describe('the since boundary (#412)', () => {
     expect(nextPosition(at(CURSOR), [stuck, later('2026-11-08T12:01:00Z')])).toEqual(at(CURSOR, '2026-11-08T12:01:00Z'))
   })
 
-  it('caps a later page at one overlap past where it has got to', () => {
-    expect(nextPosition(at(CURSOR), [stuck, later('2026-11-08T13:00:00Z')])).toEqual(at(CURSOR, '2026-11-08T12:02:00Z'))
-    expect(nextPosition(at(CURSOR, '2026-11-08T12:02:00Z'), [stuck, later('2026-11-08T13:00:00Z')])).toEqual(at('2026-11-08T12:02:00Z', '2026-11-08T12:04:00Z'))
+  it('caps a later page at one step, less than the overlap, past where it has got to', () => {
+    expect(nextPosition(at(CURSOR), [stuck, later('2026-11-08T13:00:00Z')])).toEqual(at(CURSOR, '2026-11-08T12:01:00Z'))
+    expect(nextPosition(at(CURSOR, '2026-11-08T12:01:00Z'), [stuck, later('2026-11-08T13:00:00Z')])).toEqual(at('2026-11-08T12:01:00Z', '2026-11-08T12:02:00Z'))
   })
 
   it('takes the capped position once the burst is over, so nothing holds the cursor', () => {
