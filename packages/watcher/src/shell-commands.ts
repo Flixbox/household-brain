@@ -9,7 +9,7 @@
  */
 import { type Enclosures, type Heredoc, bodyAsRead, bodyExpands, closingLine, countEnclosure, hereStringOperator, heredocOf, heredocOpener, opensHereString, opensHeredoc, quoteInExpansion, unsureInEnclosure } from './shell-heredocs'
 import { closingParen, indexOrEnd, isSeparator, opensArithmetic } from './shell-parens'
-import { ansiCValue, closingQuote, dynamic } from './shell-ansi-c'
+import { ansiCValue, closingQuote, dynamic, standIn } from './shell-ansi-c'
 import { type Work, spent, unreadableLine } from './shell-work'
 
 /** Whether the shell may change a word before the command sees it (a variable, `$(…)`, backticks). */
@@ -197,7 +197,7 @@ const doubleParen: Reader = (scan, text, at) => {
 const noteHeredoc = (scan: Scan, match: RegExpExecArray) => {
   const heredoc = heredocOf(match)
   scan.heredocs.push(heredoc)
-  if (isDynamic(heredoc.delimiter)) {
+  if (isDynamic(heredoc.delimiter) || heredoc.delimiter.includes(standIn)) {
     scan.commands.push([dynamic + match[0]])
   }
 }

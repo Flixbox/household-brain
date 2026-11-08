@@ -9,8 +9,11 @@
 /** Put in a word the shell may change, before each `$` it expands or for what can't be read for certain; a private-use character. */
 export const dynamic = '\u{E000}'
 
-/** A text as written on a command line, or decoded from one: its own U+E000 is plain text, so it stands as U+FFFD and no mark means anything but an expansion (#390). */
-export const withoutMarks = (text: string) => text.replaceAll(dynamic, '\uFFFD')
+/** What a text's own U+E000 stands as. Two different characters then read alike, so a here-document delimiter holding it is refused (clearing review of #475). */
+export const standIn = '\uFFFD'
+
+/** A text as written on a command line, or decoded from one: its own U+E000 is plain text, so no mark means anything but an expansion (#390). */
+export const withoutMarks = (text: string) => text.replaceAll(dynamic, standIn)
 
 /** Where the `quote` that closes a string whose text starts at `from` is, a backslash escaping the character after it. */
 export const closingQuote = (text: string, from: number, quote: string) => {
