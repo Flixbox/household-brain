@@ -7,6 +7,7 @@
  * mark, so `isDynamic` tells a word the shell may change from one it takes as written.
  */
 import { type Heredoc, closingLine, heredocOf, heredocOpener } from './shell-heredocs'
+import { closingParen, indexOrEnd, opensArithmetic } from './shell-parens'
 
 /** Put before each `$` the shell expands; a private-use character, so no command text has it. */
 const dynamic = '\u{E000}'
@@ -47,66 +48,31 @@ const append = (scan: Scan, text: string) => {
   scan.word = (scan.word ?? '') + text
 }
 
-const indexOrEnd = (text: string, search: string, from: number) => {
-  const at = text.indexOf(search, from)
-  return at === -1 ? text.length : at
+/**
+ * Text that may be arithmetic or a subshell, failing closed (#373): read as commands, where a `<<`
+ * may be a shift and so opens no here-document, and searched for substitutions whatever quotes them,
+ * as arithmetic runs one even in single quotes.
+ */
+const unsureArithmetic = (scan: Scan, inner: string) => {
+  scan.nested.push(inner.replaceAll('<<', '  '))
+  substitutionsIn(scan, inner)
 }
-
-/** Where the `"` that closes a double-quoted string starting at `from` is. */
-const closingQuote = (text: string, from: number) => {
-  let at = from
-  while (at < text.length && text[at] !== '"') {
-    at += text[at] === '\\' ? 2 : 1
-  }
-  return at
-}
-
-/** Where what follows a quoted string or an escape that starts at `at` starts; `at` itself when none starts there. */
-const pastQuoted = (text: string, at: number) => {
-  if (text[at] === '\\') {
-    return at + 2
-  }
-  if (text[at] === "'") {
-    return indexOrEnd(text, "'", at + 1) + 1
-  }
-  return text[at] === '"' ? closingQuote(text, at + 1) + 1 : at
-}
-
-const depthChange = (char: string | undefined) => {
-  if (char === '(') {
-    return 1
-  }
-  return char === ')' ? -1 : 0
-}
-
-/** The `)` that closes a `$(` whose text starts at `from`: parentheses in between are counted, those in quotes not. */
-const closingParen = (text: string, from: number) => {
-  let depth = 1
-  let at = from
-  while (at < text.length) {
-    const past = pastQuoted(text, at)
-    depth += past === at ? depthChange(text[at]) : 0
-    if (depth === 0) {
-      return at
-    }
-    at = Math.max(past, at + 1)
-  }
-  return text.length
-}
-
-/** The text of `$((…))` arithmetic, where `<<` is a shift and opens no here-document; other text as it is. */
-const arithmeticSafe = (text: string, at: number, inner: string) =>
-  text.startsWith('$((', at) ? inner.replaceAll('<<', '  ') : inner
 
 /**
  * A `$(…)` or backtick substitution starting at `at`: its text is kept to be read as a command line
- * of its own, and the word gets it, marked as dynamic. Returns that text and where the next thing starts.
+ * of its own, and the word gets it, marked as dynamic; surely arithmetic `$((…))` is data. Returns
+ * that text and where the next thing starts.
  */
 const substitution = (scan: Scan, text: string, at: number): [string, number] => {
   const backtick = text[at] === '`'
   const from = at + (backtick ? 1 : 2)
   const end = backtick ? indexOrEnd(text, '`', from) : closingParen(text, from)
-  scan.nested.push(arithmeticSafe(text, at, text.slice(from, end)))
+  const inner = text.slice(from, end)
+  if (!text.startsWith('$((', at)) {
+    scan.nested.push(inner)
+  } else if (!opensArithmetic(text, at + 1)) {
+    unsureArithmetic(scan, inner)
+  }
   return [dynamic + text.slice(at, end + 1), end + 1]
 }
 
@@ -201,10 +167,12 @@ const redirect: Reader = (scan, text, at) => {
   return at + 1
 }
 
-/** `((…))` arithmetic: data, but for the substitutions in it; a `<<` there is a shift. */
-const arithmetic: Reader = (scan, text, at) => {
+/** `((`: surely arithmetic is data; anything else fails closed. */
+const doubleParen: Reader = (scan, text, at) => {
   const end = closingParen(text, at + 1)
-  scan.nested.push(text.slice(at + 2, end - 1).replaceAll('<<', '  '))
+  if (!opensArithmetic(text, at)) {
+    unsureArithmetic(scan, text.slice(at + 2, end - 1))
+  }
   return end + 1
 }
 
@@ -261,7 +229,7 @@ const readerRules: readonly (readonly [Test, Reader])[] = [
   [(_scan, text, at) => text[at] === '\n', newline],
   [(_scan, text, at) => opensHeredoc(text, at), heredocOpen],
   [(_scan, text, at) => text[at] === '<' || text[at] === '>', redirect],
-  [(scan, text, at) => scan.word === null && text.startsWith('((', at), arithmetic],
+  [(scan, text, at) => scan.word === null && text.startsWith('((', at), doubleParen],
   [(_scan, text, at) => isSeparator(text, at), separator],
   [(_scan, text, at) => startsSubstitution(text, at), substituted],
   [(scan, text, at) => text[at] === '#' && scan.word === null, comment],

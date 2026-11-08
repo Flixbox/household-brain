@@ -169,6 +169,50 @@ describe('ownerWrite (#368)', () => {
     ])).toEqual([])
   })
 
+  it('reads arithmetic as data but for its substitutions (#373)', () => {
+    expect(allowed(['echo $(( 1 + 2 ))', 'echo $(( (1+2)*3 ))', '(( $(echo 1) + 1 ))'])).toEqual([])
+    expect(refused([
+      // Known false denials (#373): a substitution or a here-document in arithmetic fails closed.
+      'echo $(( $(echo 1) ))',
+      "echo $(( $(sed -n '1p' <<'EOF'\n1\ngh issue close 1\nEOF\n) ))",
+      "(( $(sed -n '1p' <<'EOF'\n1\ngh issue close 1\nEOF\n) ))",
+      'echo $(( $(cat <<EOF\n$(gh issue close 1)\nEOF\n) ))',
+      "echo $(( $(cat <<'EOF'\n1\nEOF\ngh issue close 1) ))",
+      'echo $(( $(gh issue close 1) + 1 ))',
+      'echo "$(( $(gh issue close 1) ))"',
+      '(( `gh issue close 1` ))',
+      'echo $(( $(echo 1) <<1 ))\ngh issue close 1\n1',
+      '(( $(echo 1) <<1 ))\ngh issue close 1\n1',
+      'echo $(( $((1<<1)) <<1 ))\ngh issue close 1\n1',
+      "echo $(( '$(gh issue close 1)' ))",
+      "(( '$(gh issue close 1)' ))",
+      // Quoting in arithmetic reads it as commands too, failing closed (review on #374).
+      String.raw`echo $(( \$(gh issue close 1) ))`,
+    ])).toEqual([])
+  })
+
+  it('reads ((…) ) as a subshell, not arithmetic, when the second ( closes alone (review on #374)', () => {
+    expect(refused([
+      'echo $((gh issue close 1) )',
+      '((gh issue close 1) )',
+      'echo $((gh issue close 1);(true))',
+      '((gh issue close 1)|cat)',
+      '((gh issue close 1) && (true))',
+      'echo $((gh issue close 1)|cat)',
+      '((gh issue close 1 `(`); (case x in x) :;; esac))',
+      'echo $((gh issue close 1 `(`); (case x in x) :;; esac))',
+      String.raw`((gh issue close 1 $'\''); : '))' )`,
+      String.raw`echo $((gh issue close 1 $'\''); : '))' )`,
+      '((gh issue close 1 $(cat <<E\n(\nE\n));(true)))',
+      'echo $((gh issue close 1 $(cat <<E\n(\nE\n));(true)))',
+      '((gh issue close 1 # ))\n))',
+      '((gh issue close 1 $(case x in x) :;; esac)); :)',
+      'echo $((gh issue close 1 $(case x in x) :;; esac)); :)',
+      '(( "1"<<1 ))\ngh issue close 1\n1',
+      '(( (1)<<1 ))\ngh issue close 1\n1',
+    ])).toEqual([])
+  })
+
   it('names the command it found', () => {
     expect(ownerWrite('cd repo && gh pr comment 1 -b "a b" | cat')).toBe('gh pr comment 1 -b a b')
     expect(ownerWrite('gh api x --method "$METHOD"')).toBe('gh api x --method $METHOD')
