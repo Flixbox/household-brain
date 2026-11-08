@@ -19,7 +19,7 @@ import { filesIn, removeOlder, unclaim, writeWhole } from './watch-files'
 import { allSettled, ignoreFailure, textOf } from './read'
 import { type Event, clockTime } from './watch-events'
 import { record } from './watch-text'
-import { claimReported, markReported, queue, report } from './watch-output'
+import { claimReported, markReported, queueClaimed, report } from './watch-output'
 import { retryDelayMs } from './watch-write-retry'
 
 const RETRIES_DIR = `${REPO_DIR}/write-retries`
@@ -118,7 +118,7 @@ export const checkWriter = async (started = STARTED_AT): Promise<void> => {
   const fresh = Temporal.Now.instant().epochMilliseconds - Math.max(seen ?? 0, started) < WRITER_GONE_AFTER_MS
   const key = `no-writer ${seen ?? 'never'}`
   if (!fresh && await claimReported(key)) {
-    queue([noWriterLine(seen)], { system: true })
+    queueClaimed(key, [noWriterLine(seen)], { key: `writer:${key}`, system: true })
     await markReported(key)
   }
 }
