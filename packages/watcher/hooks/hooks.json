@@ -8,7 +8,8 @@
           {
             "statusMessage": "Owner-write guard: refuse plain gh writes",
             "type": "command",
-            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/owner-write-guard.sh\""
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/owner-write-guard.sh\"",
+            "onFailure": "block"
           }
         ]
       }

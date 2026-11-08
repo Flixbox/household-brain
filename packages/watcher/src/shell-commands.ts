@@ -52,9 +52,10 @@ const append = (scan: Scan, text: string) => {
 /**
  * Text in `((…))`: only its substitutions are read if it is surely arithmetic, each whole, here-documents
  * included (#373). Else it fails closed: it is also read as commands, where a `<<` may be a shift and
- * so opens no here-document, and substitutions count whatever quotes them, as arithmetic runs one even in single quotes.
+ * so opens no here-document, and substitutions count whatever quotes them, as arithmetic runs one even in single quotes. It may recurse into its own text, so charging it each time bounds both the work and the depth: `substitutionsIn` stops at a spent budget, and the line is denied (#496).
  */
 const readArithmetic = (scan: Scan, inner: string, sure: boolean) => {
+  spent(scan.work, inner)
   if (!sure) {
     scan.nested.push(inner.replaceAll('<<', '  '))
   }
