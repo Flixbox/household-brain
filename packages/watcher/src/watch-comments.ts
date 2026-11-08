@@ -1,6 +1,6 @@
 /** The project watcher's questions to GitHub about new issues and the owner's comments on them. */
 import { type IssueEvent, SUBSCRIBED_ISSUE_FIELDS, subscribedIssueEventsFrom } from './watch-issue-events'
-import { type Rest, commentsBase, isCursor, issuesBase, newIssueEvents, nextCursor, ownerCommentEvents, readSince } from './watch-issue-rest'
+import { type Position, type Rest, commentsBase, isCursor, issuesBase, newIssueEvents, nextPosition, ownerCommentEvents, readSince } from './watch-issue-rest'
 import { perIssue } from './watch-per-issue'
 import { OWNER, REPO, SELF } from './watch-github'
 import { GH, ghRest } from './watch-gh'
@@ -33,6 +33,12 @@ const lastSeen = async (): Promise<string | null> => {
   return written === null ? null : Temporal.Instant.fromEpochMilliseconds(written).toString()
 }
 
+const positionOf = (cursor: string | null, capped: unknown): Position => ({ capped: isCursor(capped) ? capped : null, cursor })
+
+/** The line that remembers both lists' positions. */
+const positionsLine = (comments: Position, issues: Position): string =>
+  JSON.stringify({ comments: comments.cursor, commentsCapped: comments.capped, issues: issues.cursor, issuesCapped: issues.capped })
+
 /**
  * New issues (not the agent's own) and the owner's comments on issues, each with when it was written
  * and the key it is remembered by, through REST with `since=` (#412).
@@ -44,7 +50,7 @@ export const issueEventLines = async (fresh = false): Promise<IssueEventRead> =>
   const rest: Rest = async path => ghRest(path, GH, fresh)
   const [issues, comments] = await Promise.all([readSince(rest, issuesBase(REPO), issuesFrom), readSince(rest, commentsBase(REPO), commentsFrom)])
   return {
-    commit: async () => writeLines(CURSORS, [JSON.stringify({ comments: nextCursor(commentsFrom, comments), issues: nextCursor(issuesFrom, issues) })]),
+    commit: async () => writeLines(CURSORS, [positionsLine(nextPosition(positionOf(commentsFrom, saved.commentsCapped), comments), nextPosition(positionOf(issuesFrom, saved.issuesCapped), issues))]),
     events: [...newIssueEvents(issues.flat(), SELF, issuesFrom), ...ownerCommentEvents(comments.flat(), OWNER, commentsFrom)],
   }
 }
