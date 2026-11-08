@@ -75,6 +75,8 @@ describe('ownerWrite, on programs interpreters and make run (#394)', () => {
       "make <<'EOF'\ngh issue close 1\nEOF",
       "make -f Makefile <<'EOF'\ngh issue close 1\nEOF",
       "python3 tool.py -c 'gh is the login'",
+      "python3 tool.py - <<'EOF'\ngh issue close 1\nEOF",
+      "awk '{ print }' - <<'EOF'\ngh issue close 1\nEOF",
     ])).toEqual([])
   })
 })

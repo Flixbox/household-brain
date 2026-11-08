@@ -57,13 +57,14 @@ const makefileFromInput = (args: readonly string[]) =>
     return stdinNames.has(attached ?? (/^(?:-f|--(?:make)?file)$/u.test(arg) ? (args[at + 1] ?? '') : ''))
   })
 
-/** Whether a command runs its input as a program: an interpreter given no script, or told to read the program from input. */
+/** Whether a command runs its input as a program: an interpreter whose first argument that is no option is missing, or names its input. */
 const runsInput = ([word = '', ...args]: readonly string[]) => {
   const name = nameOf(word)
   if (make.test(name)) {
     return makefileFromInput(args)
   }
-  return isInterpreter(name) && (args.every(arg => arg.startsWith('-')) || args.some(arg => stdinNames.has(arg)))
+  const script = args.find(arg => arg === '-' || !arg.startsWith('-'))
+  return isInterpreter(name) && (typeof script === 'undefined' || stdinNames.has(script))
 }
 
 /** What ends a command in a program; a line ending in a comma goes on, as an argument list spread over lines does. */
