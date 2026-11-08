@@ -8,6 +8,7 @@ afterEach(async () => { await Promise.all(dirs.splice(0).map(async dir => rm(dir
 
 const LOOKS = `
   import { checkRun } from '${import.meta.dir}/watch-ci-runs'
+  import { mkdir } from 'node:fs/promises'
   import { readLines } from '${import.meta.dir}/watch-state'
   const look = async () => checkRun({ label: process.env.LABEL, limitSeconds: 1200, pr: 7, sha: 'abc' })
   await look()
@@ -16,7 +17,8 @@ const LOOKS = `
   await Bun.write(process.env.FIXTURE_HOME + '/attempt', '2')
   // The run list's shared answer runs out before the jobs' does, as it did on the live watcher (#493).
   const answers = process.env.XDG_STATE_HOME + '/watch-project/gh-answers'
-  for (const name of new Bun.Glob('*').scanSync({ cwd: answers, throwOnError: false })) {
+  await mkdir(answers, { recursive: true })
+  for (const name of new Bun.Glob('*').scanSync(answers)) {
     if ((await Bun.file(answers + '/' + name).text()).includes('workflow_runs')) { await Bun.file(answers + '/' + name).delete() }
   }
   await look()
