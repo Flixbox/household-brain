@@ -224,10 +224,10 @@ const heredocOpen: Reader = (scan, text, at) => {
   return at + match[0].length
 }
 
-/** Reads only the `$(…)` and backtick substitutions of a text the shell otherwise takes as data. */
+/** Reads only the `$(…)` and backtick substitutions of a text the shell otherwise takes as data; a spent budget ends that, as the line is denied anyway (review on #476). */
 const substitutionsIn = (scan: Scan, text: string) => {
   let at = 0
-  while (at < text.length) {
+  while (at < text.length && scan.work.left >= 0) {
     const escape = text[at] === '\\' ? 2 : 1
     at = startsSubstitution(text, at) ? substitution(scan, text, at)[1] : at + escape
   }
