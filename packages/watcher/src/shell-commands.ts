@@ -200,7 +200,6 @@ const noteHeredoc = (scan: Scan, match: RegExpExecArray) => {
 /** A `<<` there may be a shift, and read either way wrongly it hides what follows (a quote in a real here-document's body, say): refused (#385). */
 const refuseUnsureShift: Reader = (scan, text, at) => {
   refuse(scan, text, at)
-  append(scan, text.slice(at, at + 2))
   return at + 2
 }
 

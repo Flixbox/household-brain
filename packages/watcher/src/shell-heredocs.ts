@@ -140,12 +140,12 @@ const expansionUnfollowable = (rest: string) => {
 }
 
 /**
- * Whether a `$[` or `${` in double quotes starts at `from` and holds a quote or substitution: bash pairs
- * a `"` inside the expansion, where the reader would end the string (clearing review of #391).
+ * Whether a `$[` in double quotes starts at `from` and holds a quote or substitution: bash pairs a `"`
+ * inside it, where the reader would end the string (clearing review of #391). `${…}` is #380's, in shell-braces.ts.
  */
 export const quoteInExpansion = (text: string, from: number) => {
   const rest = text[from] === '$' ? text.slice(from).replaceAll('\\\n', '') : ''
-  return /^\$[[{]/u.test(rest) && expansionUnfollowable(rest)
+  return rest.startsWith('$[') && expansionUnfollowable(rest)
 }
 
 const insideEnclosure = (open: Enclosures) => open.braces > 0 || open.brackets > 0
