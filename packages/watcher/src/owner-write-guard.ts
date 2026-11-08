@@ -250,7 +250,7 @@ export const verdict = (input: unknown) => {
   }
   const reason = [
     `Refused (household-brain #368): \`${found}\` writes to GitHub through plain \`gh\`, the owner's own login, so it would act as the owner.`,
-    'A command the guard cannot read for certain (a command, method or query the shell fills in, as in `"$METHOD"` or `query="$(cat q.graphql)"`) counts as a write.',
+    'A command the guard cannot read for certain (a command, method or query the shell fills in, as in `"$METHOD"` or `query="$(cat q.graphql)"`, or a here-document delimiter that mixes quoting, as in `<<E\'O\'F`) counts as a write.',
     'Write through `agent-gh` (the bot) instead; reads with `gh` stay allowed.',
     'If agent-gh fails or is rate-limited, wait and retry it, or report it: never fall back to `gh`.',
     'Something only the owner may do, the owner runs themselves.',
