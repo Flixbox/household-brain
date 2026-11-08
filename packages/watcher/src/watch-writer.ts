@@ -26,8 +26,8 @@ const RETRIES_DIR = `${REPO_DIR}/write-retries`
 const OUTCOMES_DIR = `${REPO_DIR}/write-outcomes`
 const OUTCOME_LIFE = Temporal.Duration.from({ hours: 1 })
 const WRITER_SEEN = `${REPO_DIR}/writer-seen`
-/** Long enough for a re-armed or restarted writer not to count as gone. */
-const WRITER_GONE_AFTER_MS = Temporal.Duration.from({ minutes: 15 }).total('milliseconds')
+/** Must stay above the writer's longest pause between looks (paced, #407), and a restart: a live writer never counts as gone. */
+const WRITER_GONE_AFTER_MS = Temporal.Duration.from({ minutes: 30 }).total('milliseconds')
 const STARTED_AT = Temporal.Now.instant().epochMilliseconds
 
 // Only room: a retry forgotten after a day is simply due.

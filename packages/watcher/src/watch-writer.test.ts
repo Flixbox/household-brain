@@ -116,8 +116,8 @@ describe('one writer (#402)', () => {
 })
 
 describe('no writer (#432)', () => {
-  const age = async (home: string, hours: number) => {
-    const old = Temporal.Now.instant().subtract({ hours }).epochMilliseconds / 1000
+  const age = async (home: string, minutes: number) => {
+    const old = Temporal.Now.instant().subtract({ minutes }).epochMilliseconds / 1000
     const mark = `${home}/watch-project/owner_repo/writer-seen`
     expect(await Bun.file(mark).exists()).toBe(true)
     await utimes(mark, old, old)
@@ -126,7 +126,7 @@ describe('no writer (#432)', () => {
   it('a subscribed watcher says so once when no writer has looked for a while, and an all-events watcher never does', async () => {
     const { gh, home } = await setUp()
     expect(await run({ gh, home, script: lookAtWriter() })).not.toContain('NO_WRITER')
-    await age(home, 1)
+    await age(home, 60)
     expect(await run({ gh, home, scoped: true, script: lookAtWriter() })).toContain('NO_WRITER')
     expect(await run({ gh, home, scoped: true, script: lookAtWriter() })).not.toContain('NO_WRITER')
   }, 30_000)
@@ -140,17 +140,20 @@ describe('no writer (#432)', () => {
     const { gh, home } = await setUp()
     await run({ gh, home, script: lookAtWriter() })
     expect(await run({ gh, home, scoped: true, script: lookAtWriter() })).not.toContain('NO_WRITER')
-    await age(home, 1)
+    // A paced writer's longest pause (#407) is no absence.
+    await age(home, 25)
+    expect(await run({ gh, home, scoped: true, script: lookAtWriter() })).not.toContain('NO_WRITER')
+    await age(home, 60)
     expect(await run({ gh, home, scoped: true, script: lookAtWriter('Temporal.Now.instant().epochMilliseconds') })).not.toContain('NO_WRITER')
   }, 30_000)
 
   it('says so again when a writer came back and went away again', async () => {
     const { gh, home } = await setUp()
     await run({ gh, home, script: lookAtWriter() })
-    await age(home, 1)
+    await age(home, 60)
     expect(await run({ gh, home, scoped: true, script: lookAtWriter() })).toContain('NO_WRITER')
     await run({ gh, home, script: lookAtWriter() })
-    await age(home, 2)
+    await age(home, 120)
     expect(await run({ gh, home, scoped: true, script: lookAtWriter() })).toContain('NO_WRITER')
   }, 30_000)
 })
