@@ -195,7 +195,7 @@ describe('reminderLines (#224)', () => {
   })
 
   it('holds the auto-merge reminder for a PR waiting on a review bot, not its failed CI (#299)', () => {
-    expect(reminderLines([pr({ number: 3 }), pr({ checks: ['FAILURE'], number: 4 })], 'owner/repo', new Set([3, 4]))).toEqual(['REMINDER: PR #4 is approved and CI failed: fix it.'])
+    expect(reminderLines([pr({ number: 3 }), pr({ checks: ['FAILURE'], number: 4 })], 'owner/repo', { awaitingBot: new Set([3, 4]) })).toEqual(['REMINDER: PR #4 is approved and CI failed: fix it.'])
   })
 })
 
@@ -204,8 +204,8 @@ describe('reminders for branches that can\'t merge (#226)', () => {
 
   it('reminds of a branch behind main or in conflict, approved or not', () => {
     expect(reminderLines([pr({ mergeState: 'BEHIND' }), pr({ mergeState: 'DIRTY', number: 9, reviewDecision: '' })], 'owner/repo')).toEqual([
-      'REMINDER: PR #314 is behind main: rebase it and run the checks again.',
-      'REMINDER: PR #9 has conflicts with main: rebase it.',
+      'REMINDER: PR #314 is behind main: merge main in and run the checks again.',
+      'REMINDER: PR #9 has conflicts with main: merge main in and resolve them.',
     ])
   })
 
