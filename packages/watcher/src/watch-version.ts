@@ -13,7 +13,10 @@ const ENTRY = 'src/watch-project.ts'
 /** Not imported, but Bun reads them to load the code. */
 const SETTINGS = ['package.json', 'tsconfig.json']
 /** Loads code in a way the scanner doesn't report (#515): an import of anything but one plain string, import.meta.require, createRequire or a Worker. Run on transpiled code, so comments don't count. */
-const UNFOLLOWABLE_LOAD = /\b(?:import|require)\s*\(\s*(?!(?:"[^"\\]*"|'[^'\\]*')\s*[,)])|\bimport\.meta\.require\b|\bcreateRequire\b|\bWorker\b/u
+const UNFOLLOWABLE_LOADS = [
+  /\b(?:import|require)\s*\(\s*(?!(?:"[^"\\]*"|'[^'\\]*')\s*[,)])/u,
+  /\bimport\.meta\.require\b|\bcreateRequire\b|\bWorker\b/u,
+]
 
 const scanner = new Bun.Transpiler({ loader: 'ts' })
 
@@ -48,7 +51,7 @@ const resolved = (from: string, name: string, files: Map<string, unknown>): stri
 const importNames = (text: string): string[] | null => {
   try {
     const code = scanner.transformSync(text)
-    if (UNFOLLOWABLE_LOAD.test(code)) { return null }
+    if (UNFOLLOWABLE_LOADS.some(load => load.test(code))) { return null }
     // The transpiled code too: only there has `import('./a' + 'b')` become one string the scanner reports.
     return [...scanner.scanImports(text), ...scanner.scanImports(code)].map(found => found.path).filter(name => !isBuiltIn(name))
   } catch {
