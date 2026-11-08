@@ -8,7 +8,8 @@ afterEach(async () => { await Promise.all(dirs.splice(0).map(async dir => rm(dir
 
 const CHECK = `
   import { checkNotQueued } from '${import.meta.dir}/watch-queue'
-  import { readLines, writeLines } from '${import.meta.dir}/watch-state'
+  import { writeLines } from '${import.meta.dir}/watch-state'
+  import { reportedLines } from '${import.meta.dir}/watch-output'
   const state = { autoMerge: true, draft: false, head: 'abc', mergeState: 'CLEAN', ownerApproved: true, parked: false, queued: false, state: 'OPEN' }
   const seed = async head => {
     const now = Temporal.Now.instant()
@@ -20,7 +21,7 @@ const CHECK = `
   if (process.env.SCENARIO === 'new-head') {
     state.head = 'def'
     await checkNotQueued(7, state)
-    console.log('NEW_HEAD_FIRST', JSON.stringify(await readLines('reported')))
+    console.log('NEW_HEAD_FIRST', JSON.stringify(await reportedLines()))
     await seed('def')
     await checkNotQueued(7, state)
     await checkNotQueued(7, state)
@@ -29,7 +30,7 @@ const CHECK = `
     await checkNotQueued(7, state)
     await checkNotQueued(7, state)
   }
-  console.log('REPORTED', JSON.stringify(await readLines('reported')))
+  console.log('REPORTED', JSON.stringify(await reportedLines()))
 `
 
 const FAKE = String.raw`

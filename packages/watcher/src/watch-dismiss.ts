@@ -18,7 +18,7 @@ import { OWNER, type PrState, REPO, SELF, forgetResolved, gh, graphql, resolveTh
 import { GH, ghText } from './watch-gh'
 import { reportedPassed } from './watch-ci-state'
 import { IS_WRITER, attemptWrite, reportWrite } from './watch-writer'
-import { readLines } from './watch-state'
+import { reportedLines } from './watch-output'
 import { WATCHERS_DIR, claim, removeOlder, unclaim } from './watch-files'
 import { allSettled, textOf } from './read'
 import { actor, at, count, record, records } from './watch-text'
@@ -157,7 +157,7 @@ export const askBotsToResolve = async (pr: number, state: PrState): Promise<void
   if (!IS_WRITER) {
     return
   }
-  const reported = await readLines('reported')
+  const reported = await reportedLines()
   const asked = reported.some(line => line.startsWith(`pr-${pr} bot-resolve-asked ${state.head} `))
   const eligible = state.decision === 'CHANGES_REQUESTED' && !state.draft && !state.ownerApproved && !asked
     && reportedPassed(reported, pr, state.head)

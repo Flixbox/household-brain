@@ -15,7 +15,8 @@ import { dismissesCleared } from './watch-cleared-events'
 import { askBotReviews } from './watch-bot-review'
 import { awaitsBotReview } from './watch-bot-review-events'
 import { GH, ghText } from './watch-gh'
-import { askedBots, readLines } from './watch-state'
+import { askedBots } from './watch-state'
+import { reportedLines } from './watch-output'
 import { IS_WRITER, attemptWrite, reportWrite } from './watch-writer'
 
 // Resolving threads on `Resolved:` replies comes before what the approval asks (#279).
@@ -76,7 +77,7 @@ const checkBlocked = async (pr: number, head: string): Promise<void> => {
 export const checkApproval = async (pr: number, state: PrState): Promise<void> => {
   // A review bot asked for once, on the label (#324), before what waits on it.
   await (state.bot.requested ? askBotReviews(pr) : Promise.resolve())
-  const reported = await readLines('reported')
+  const reported = await reportedLines()
   const green = reportedPassed(reported, pr, state.head)
   await checkAutoMergeOff({ green, pr, state })
   // The owner's own approval, not the decision: a stale change request, one of the causes it names,
