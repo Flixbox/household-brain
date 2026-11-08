@@ -35,7 +35,7 @@ const READY_PR = {
  * `GH_REPO` it got. `FAKE_VIEWER` is the login GitHub's `viewer` answers with.
  */
 const FAKE = String.raw`
-  import { appendFileSync, existsSync, writeFileSync } from 'node:fs'
+  import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
   const args = process.argv.slice(2)
   const repo = process.env.GH_REPO ?? ''
   appendFileSync(process.env.FIXTURE_HOME + '/calls', (repo || '-') + ' ' + args.join(' ').replaceAll('\n', ' ') + '\n')
@@ -44,6 +44,16 @@ const FAKE = String.raw`
     process.exit(1)
   }
   const joined = args.join(' ')
+  const path = args.find(arg => arg.startsWith('repos/')) ?? ''
+  if (args.includes('-i') && path !== '') {
+    const script = JSON.parse(process.env.FAKE_REST ?? '{}')[path] ?? [{ body: { owner: { type: 'User' } } }]
+    const seen = process.env.FIXTURE_HOME + '/seen-' + encodeURIComponent(path)
+    const turn = existsSync(seen) ? Number(readFileSync(seen, 'utf8')) : 0
+    writeFileSync(seen, String(turn + 1))
+    const { body, headers = '', status = 200 } = script[Math.min(turn, script.length - 1)]
+    console.log('HTTP/2.0 ' + status + ' X\n' + headers + '\n' + JSON.stringify(body))
+    process.exit(status === 200 ? 0 : 1)
+  }
   if (joined.startsWith('api repos/')) { console.log('User'); process.exit(0) }
   if (joined.includes('enablePullRequestAutoMerge')) {
     console.log('HTTP/2.0 200 OK\nContent-Type: application/json\n\n' + JSON.stringify({ data: { enablePullRequestAutoMerge: { clientMutationId: null } } }))
@@ -103,4 +113,49 @@ test('a read GitHub refuses for a rate limit logs the limit headers and is waite
   expect(result.error).toContain('retry-after: 0')
   expect(result.error).toContain('x-ratelimit-remaining: 17')
   expect(result.output).toContain('Auto-merge (squash) is on')
+})
+
+const REPO_PATH = 'repos/owner/repo'
+const adminsPage = (page: number) => `${REPO_PATH}/collaborators?permission=admin&per_page=100&page=${page}`
+const LIMITED = { body: { message: 'You have exceeded a secondary rate limit' }, headers: 'Retry-After: 0\nX-RateLimit-Remaining: 17\n', status: 403 }
+const ORGANISATION = { body: { owner: { type: 'Organization' } } }
+const NEXT_PAGE = 'Link: <https://api.github.com/next>; rel="next"\n'
+const ADMIN = { login: 'admin-one', type: 'User' }
+
+/** The fixture's answers to REST reads, by path, for a PR only `admin-one` approved: only their being the owner clears it. */
+const restFor = (script: Record<string, unknown>) => ({
+  FAKE_PR: JSON.stringify({ ...READY_PR, reviews: { nodes: [{ author: { login: ADMIN.login }, state: 'APPROVED', submittedAt: T1 }], pageInfo: { hasPreviousPage: false } } }),
+  FAKE_REST: JSON.stringify(script),
+})
+
+const merges = (calls: readonly string[]) => calls.filter(call => call.includes('enablePullRequestAutoMerge') || call.includes('mergePullRequest'))
+
+test('a rate limit on the repository lookup logs its headers and is waited out once (#428)', async () => {
+  const result = await runFromNonClone('agent-bot[bot]', { FAKE_REST: JSON.stringify({ [REPO_PATH]: [LIMITED, { body: { owner: { type: 'User' } } }] }) })
+  expect(result.error).toContain('retry-after: 0')
+  expect(result.error).toContain('x-ratelimit-remaining: 17')
+  expect(result.code).toBe(0)
+})
+
+test('a rate limit on a later page of the admins is waited out, and every page is read (#428)', async () => {
+  const script = { [REPO_PATH]: [ORGANISATION], [adminsPage(1)]: [{ body: [{ login: 'an-app', type: 'Bot' }], headers: NEXT_PAGE }], [adminsPage(2)]: [LIMITED, { body: [ADMIN] }] }
+  const result = await runFromNonClone('agent-bot[bot]', restFor(script))
+  expect(result.error).toContain('retry-after: 0')
+  expect(result.output).toContain('Auto-merge (squash) is on')
+  expect(result.code).toBe(0)
+})
+
+test('a page of the admins that stays refused does not make the first page the whole list (#428)', async () => {
+  const script = { [REPO_PATH]: [ORGANISATION], [adminsPage(1)]: [{ body: [ADMIN], headers: NEXT_PAGE }], [adminsPage(2)]: [LIMITED] }
+  const result = await runFromNonClone('agent-bot[bot]', restFor(script))
+  expect(result.error).toContain("couldn't read")
+  expect(result.code).toBe(1)
+  expect(merges(result.calls)).toEqual([])
+})
+
+test("an answer that doesn't say what owns the repository counts as unread (#428)", async () => {
+  const result = await runFromNonClone('agent-bot[bot]', restFor({ [REPO_PATH]: [{ body: 'not the repository' }] }))
+  expect(result.error).toContain("couldn't read")
+  expect(result.code).toBe(1)
+  expect(merges(result.calls)).toEqual([])
 })
