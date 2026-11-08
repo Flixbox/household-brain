@@ -14,7 +14,7 @@
  */
 import { type PrComment, RESOLVE_BOT_REVIEWS, type Review, type ReviewThread, bare, botsToAskResolve, dismissalMessage, dismissedReviewEvent, resolveAskedEvent, resolveCommand, resolvedThreadEvent, reviewsToDismiss } from './watch-review-events'
 import { CLEARED_LABEL, clearedAt, coveredByClearance } from './watch-cleared-events'
-import { OWNER, type PrState, REPO, SELF, gh, graphql, resolveThread, threadsFrom } from './watch-github'
+import { OWNER, type PrState, REPO, SELF, forgetResolved, gh, graphql, resolveThread, threadsFrom } from './watch-github'
 import { GH, ghText } from './watch-gh'
 import { reportedPassed } from './watch-ci-state'
 import { IS_WRITER, attemptWrite, relayWrites, reportWrite } from './watch-writer'
@@ -178,6 +178,7 @@ export const resolveAsked = async (pr: number, state: PrState): Promise<void> =>
   await relayWrites(pr)
   await allSettled(state.toResolve.map(async thread => {
     const resolved = await attemptWrite(`resolve-${thread.id}`, async () => resolveThread(thread.id).catch(() => false))
+    if (resolved === true) { forgetResolved(pr, thread.id) }
     await (resolved === null ? Promise.resolve() : reportWrite(resolvedThreadEvent(pr, thread, resolved), pr))
   }))
 }
