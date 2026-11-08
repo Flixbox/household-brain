@@ -230,7 +230,9 @@ const askAsBot = (self: string): void => {
 
 const main = async (): Promise<void> => {
   const { pr, repo } = argsOf()
-  const [facts, owner] = await Promise.all([readFacts(repo, pr), ownerOf(repo)])
+  // The owner first: its read can wait out a rate limit, and the facts must be as of the decision (#428).
+  const owner = await ownerOf(repo)
+  const facts = await readFacts(repo, pr)
   askAsBot(facts.self)
   if (facts.state === 'OPEN' && (facts.autoMerge || facts.queued)) {
     const where = facts.queued ? 'in the merge queue' : 'set to auto-merge'

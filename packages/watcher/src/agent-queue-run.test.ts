@@ -136,6 +136,14 @@ test('a rate limit on the repository lookup logs its headers and is waited out o
   expect(result.code).toBe(0)
 })
 
+test('the facts are read only after the owner lookup has waited out its rate limit (#428)', async () => {
+  const result = await runFromNonClone('agent-bot[bot]', { FAKE_REST: JSON.stringify({ [REPO_PATH]: [LIMITED, { body: { owner: { type: 'User' } } }] }) })
+  const lookups = result.calls.filter(call => call.includes(`api -i ${REPO_PATH}`))
+  const lastLookup = result.calls.lastIndexOf(lookups.at(-1) ?? '')
+  expect(lookups.length).toBe(2)
+  expect(result.calls.findIndex(call => call.includes('viewer{login}'))).toBeGreaterThan(lastLookup)
+})
+
 test('a rate limit on a later page of the admins is waited out, and every page is read (#428)', async () => {
   const script = { [REPO_PATH]: [ORGANISATION], [adminsPage(1)]: [{ body: [{ login: 'an-app', type: 'Bot' }], headers: NEXT_PAGE }], [adminsPage(2)]: [LIMITED, { body: [ADMIN] }] }
   const result = await runFromNonClone('agent-bot[bot]', restFor(script))
