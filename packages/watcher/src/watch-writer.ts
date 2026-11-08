@@ -3,8 +3,6 @@
 import type { Event } from './watch-events'
 import { report } from './watch-output'
 
-export const retryDelayMs = (_failures: number): number => 0
-
 // fallow-ignore-next-line unused-export
 export const attemptWrite = async (_key: string, write: () => Promise<boolean | null>): Promise<boolean | null> => write()
 

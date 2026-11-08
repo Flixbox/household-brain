@@ -1,7 +1,7 @@
 /* oxlint-disable import/no-nodejs-modules -- a temporary folder for each test's watchers; node:fs/promises and node:os are built into Bun */
 import { afterEach, describe, expect, it } from 'bun:test'
 import { mkdtemp, rm, utimes } from 'node:fs/promises'
-import { retryDelayMs } from './watch-writer'
+import { retryDelayMs } from './watch-write-retry'
 import { tmpdir } from 'node:os'
 
 const MINUTE = 60_000
