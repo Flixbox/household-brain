@@ -16,8 +16,8 @@ import { type PrComment, RESOLVE_BOT_REVIEWS, type Review, type ReviewThread, ba
 import { CLEARED_LABEL, clearedAt, coveredByClearance } from './watch-cleared-events'
 import { OWNER, type PrState, REPO, SELF, gh, graphql, resolveThread, threadsFrom } from './watch-github'
 import { GH, ghText } from './watch-gh'
-import { report } from './watch-output'
 import { reportedPassed } from './watch-ci-state'
+import { IS_WRITER, attemptWrite, relayWrites, reportWrite } from './watch-writer'
 import { readLines } from './watch-state'
 import { WATCHERS_DIR, claim, removeOlder, unclaim } from './watch-files'
 import { allSettled, textOf } from './read'
@@ -72,7 +72,7 @@ const dismiss = async (pr: number, id: number, message: string): Promise<boolean
 /**
  * For a PR the owner approved, or one labelled `cleared` at `since` (#327; the caller checks): dismisses
  * what `reviewsToDismiss` names (for a cleared one, what the clearance covers), when the setting is on, and reports each, a failure once (it is tried again
- * on every look). Returns the reviews with the dismissed ones marked so, for what still blocks the
+ * with backoff, watch-writer.ts). A subscribed watcher leaves them to the writer and counts them as dismissed. Returns the reviews with the dismissed ones marked so, for what still blocks the
  * merge.
  */
 export const dismissStale = async ({ cleared = '', comments, complete, head, pr, reviews, since = '', threads }: {
@@ -90,11 +90,11 @@ export const dismissStale = async ({ cleared = '', comments, complete, head, pr,
   const named = DISMISS_STALE_BOT_REVIEWS ? reviewsToDismiss({ comments, complete, head, owner: OWNER, reviews, self: SELF, strict, threads }) : []
   const toDismiss = strict ? coveredByClearance(named, since) : named
   await allSettled(toDismiss.map(async dismissal => {
-    const done = await dismiss(pr, dismissal.review.id, dismissalMessage(dismissal, cleared))
-    if (done) {
+    const done = await attemptWrite(`dismiss-${pr}-${dismissal.review.id}`, async () => dismiss(pr, dismissal.review.id, dismissalMessage(dismissal, cleared)))
+    if (done ?? !IS_WRITER) {
       dismissed.add(dismissal.review.id)
     }
-    await report(dismissedReviewEvent({ cleared, dismissal, dismissed: done, head, pr }), pr)
+    await (done === null ? Promise.resolve() : reportWrite(dismissedReviewEvent({ cleared, dismissal, dismissed: done, head, pr }), pr))
   }))
   return { reviews: reviews.map(review => (dismissed.has(review.id) ? { ...review, state: 'DISMISSED' } : review)), threads }
 }
@@ -106,6 +106,9 @@ export const dismissStale = async ({ cleared = '', comments, complete, head, pr,
  * next look asks again.
  */
 export const dismissCleared = async (pr: number, head: string): Promise<void> => {
+  if (!IS_WRITER) {
+    return
+  }
   const event = 'createdAt actor{login kind:__typename} label{name}'
   const labelled = graphql(`pullRequest(number:${pr}){timelineItems(itemTypes:[LABELED_EVENT,UNLABELED_EVENT],last:100){nodes{kind:__typename ... on LabeledEvent{${event}} ... on UnlabeledEvent{${event}}}}}`)
     .then(value => clearedAt(records(at(value, 'pullRequest', 'timelineItems', 'nodes')), [OWNER, SELF]))
@@ -126,7 +129,7 @@ export const comment = async (pr: number, body: string): Promise<boolean> =>
  * Posts `@<bot> resolve` once among this machine's watchers (#264): only the one that claims it first,
  * also after a restart; a watcher on another machine sees the comment instead (`botsToAskResolve`).
  * Null when another one claimed it, else whether it was posted. A failed post gives the claim back,
- * to be tried again next look; a claim that can't be made counts as a failure, and nothing is posted.
+ * to be tried again after its wait; a claim that can't be made counts as a failure, and nothing is posted.
  */
 const askOnce = async (pr: number, head: string, login: string): Promise<boolean | null> => {
   const path = `${CLAIMS_DIR}/pr-${pr}-${head}-${bare(login)}`
@@ -147,10 +150,13 @@ const askOnce = async (pr: number, head: string, login: string): Promise<boolean
  * watcher reads no risk rating. Only for a PR that changes are requested on, with CI passed at the
  * head, no draft, not the owner's and not approved by them (`dismissStale` handles that one; the caller
  * skips one `dismissCleared` handles, #327); which bots
- * is `botsToAskResolve`. Each ask is reported, a failure once (tried again on every look). A lookup
+ * is `botsToAskResolve`. Each ask is reported, a failure once (tried again with backoff). Only the writer asks (#402). A lookup
  * that fails asks nothing.
  */
 export const askBotsToResolve = async (pr: number, state: PrState): Promise<void> => {
+  if (!IS_WRITER) {
+    return
+  }
   const reported = await readLines('reported')
   const asked = reported.some(line => line.startsWith(`pr-${pr} bot-resolve-asked ${state.head} `))
   const eligible = state.decision === 'CHANGES_REQUESTED' && !state.draft && !state.ownerApproved && !asked
@@ -158,18 +164,20 @@ export const askBotsToResolve = async (pr: number, state: PrState): Promise<void
   const found = RESOLVE_BOT_REVIEWS.length > 0 && eligible ? await reviewBlockers(pr).catch(() => null) : null
   const toAsk = found && found.author.toLowerCase() !== OWNER.toLowerCase() ? botsToAskResolve({ ...found, bots: RESOLVE_BOT_REVIEWS, head: state.head, owner: OWNER, self: SELF }) : []
   await allSettled(toAsk.map(async review => {
-    const posted = await askOnce(pr, state.head, review.login)
-    await (posted === null ? Promise.resolve() : report(resolveAskedEvent({ asked: posted, head: state.head, pr, review }), pr))
+    const posted = await attemptWrite(`bot-resolve-${pr}-${state.head}-${bare(review.login)}`, async () => askOnce(pr, state.head, review.login))
+    await (posted === null ? Promise.resolve() : reportWrite(resolveAskedEvent({ asked: posted, head: state.head, pr, review }), pr))
   }))
 }
 
 /**
  * Resolves each open thread whose last comment is a `Resolved: <reason>` reply (#279), and says so. A
- * failed attempt is reported once; the thread is tried again on every look until it is resolved.
+ * failed attempt is reported once and tried again with backoff. Only the writer resolves (#402); a
+ * subscribed watcher reports here what the writer did on the PR.
  */
 export const resolveAsked = async (pr: number, state: PrState): Promise<void> => {
+  await relayWrites(pr)
   await allSettled(state.toResolve.map(async thread => {
-    const resolved = await resolveThread(thread.id).catch(() => false)
-    await report(resolvedThreadEvent(pr, thread, resolved), pr)
+    const resolved = await attemptWrite(`resolve-${thread.id}`, async () => resolveThread(thread.id).catch(() => false))
+    await (resolved === null ? Promise.resolve() : reportWrite(resolvedThreadEvent(pr, thread, resolved), pr))
   }))
 }
