@@ -10,6 +10,7 @@
           "matcher": "Bash",
           "hooks": [
             {
+              "statusMessage": "Owner-write guard: refuse plain gh writes",
               "type": "command",
               "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/owner-write-guard.sh\""
             }
@@ -20,6 +21,7 @@
         {
           "hooks": [
             {
+              "statusMessage": "Project watcher: stop the Codex adapter",
               "type": "command",
               "command": "bun \"${PLUGIN_ROOT}/src/codex-watch.ts\" --hook --stop"
             }
@@ -30,6 +32,7 @@
         {
           "hooks": [
             {
+              "statusMessage": "Project watcher: start the Codex adapter",
               "type": "command",
               "command": "bun \"${PLUGIN_ROOT}/src/codex-watch.ts\" --hook"
             }
