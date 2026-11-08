@@ -44,13 +44,12 @@ const defaultRemote = (dir: string) => {
 /** Whether git would read this word as a URL or a path, not as the name of a remote. */
 const isLocation = (word: string) => /[/:]/u.test(word) || word === '.' || word === '..'
 
-/** The URLs of a location named on the command line; none when a push-only rewrite could change it, as `ls-remote` doesn't apply those. */
-const locationUrls = (dir: string, word: string) => {
-  if (!isLocation(word) || gitLines(dir, 'config', '--get-regexp', String.raw`^url\..*\.pushinsteadof$`).length > 0) {
-    return []
-  }
-  return gitLines(dir, 'ls-remote', '--get-url', word)
-}
+/** Whether a `pushInsteadOf` rule applies to this location. */
+const hasPushRewrite = (dir: string, word: string) =>
+  gitLines(dir, 'config', '--get-regexp', String.raw`^url\..*\.pushinsteadof$`).some(line => word.startsWith(line.slice(line.indexOf(' ') + 1)))
+
+/** The URLs of a location named on the command line; none when a push-only rewrite applies, as `ls-remote` doesn't apply those. */
+const locationUrls = (dir: string, word: string) => (isLocation(word) && !hasPushRewrite(dir, word) ? gitLines(dir, 'ls-remote', '--get-url', word) : [])
 
 /** Every URL this push would go to; none when that is unclear. */
 const pushUrls = (dir: string, args: readonly string[]) => {

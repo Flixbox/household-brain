@@ -148,6 +148,17 @@ describe('a git push under the wrong credential helper, by where it goes (#467)'
     expect(denied('git push origin HEAD', wrongWith(['url.https://github.com/.pushInsteadOf', 'git@host.test:'], ['remote.origin.url', ssh]))).toBe(true)
   })
 
+  it('applies a push-only rewrite only to the URLs it matches', () => {
+    const rewrite = ['url.https://github.com/.pushInsteadOf', 'ph:'] as const
+    expect(denied('git push ph:owner-test/repo HEAD', wrongWith(rewrite))).toBe(true)
+    expect(denied(`git push ${ssh} HEAD`, wrongWith(rewrite))).toBe(false)
+  })
+
+  it('reads the destination past a git option that cannot change it', () => {
+    expect(denied('git --no-pager push origin HEAD', origin(ssh))).toBe(false)
+    expect(denied('git --no-pager push origin HEAD', origin(github))).toBe(true)
+  })
+
   it('keeps refusing when the destination is unclear', () => {
     const toSsh = origin(ssh)
     const commands = [

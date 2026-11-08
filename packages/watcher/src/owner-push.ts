@@ -17,7 +17,10 @@ import { baseName } from './shell-interpreters'
 /** Git's own options that take the next word as their value, before the subcommand. */
 const valueOptions = new Set(['--attr-source', '--config-env', '--git-dir', '--namespace', '--super-prefix', '--work-tree', '-C', '-c'])
 
-/** The directories of a git call's `-C` options, its other options, its subcommand and that subcommand's arguments. */
+/** Git's own options that can't change where a push goes. */
+const inertOptions = new Set(['--no-pager', '--paginate', '-P', '-p'])
+
+/** The directories of a git call's `-C` options, whether it has options that may change where a push goes, its subcommand and that subcommand's arguments. */
 const readGit = (args: readonly string[]) => {
   const dirs: string[] = []
   let otherOptions = false
@@ -25,7 +28,7 @@ const readGit = (args: readonly string[]) => {
   while (args[at]?.startsWith('-') === true) {
     if (args[at] === '-C') {
       dirs.push(args[at + 1] ?? '')
-    } else {
+    } else if (!inertOptions.has(args[at] ?? '')) {
       otherOptions = true
     }
     at += valueOptions.has(args[at] ?? '') ? 2 : 1
