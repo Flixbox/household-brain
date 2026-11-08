@@ -24,7 +24,7 @@ import { withoutMarks } from './shell-ansi-c'
 import { isDynamic, plainWord } from './shell-commands'
 import { redirection, withoutRedirections } from './shell-redirections'
 import { baseName, isGh, programCommands } from './shell-interpreters'
-import { type Work, charged, newWork, unreadableLine } from './shell-work'
+import { type Work, charged, newWork, unreadableLine, unreadableOnOverflow } from './shell-work'
 import { commandsFrom, scriptFlagRunners, shell, stdinRunners } from './owner-write-wrappers'
 
 /** `gh pr` and `gh issue` subcommands that change something on GitHub. */
@@ -246,7 +246,7 @@ const writes = ([name = '', ...words]: readonly string[]) => {
 
 /** The first command in a Bash command line that writes to GitHub through plain `gh`, as its words joined, or null when there is none. */
 export const ownerWrite = (command: string): string | null => {
-  const found = runCommands(withoutMarks(command), newWork()).find(words => writes(words))
+  const found = unreadableOnOverflow(() => runCommands(withoutMarks(command), newWork())).find(words => writes(words))
   return found ? found.map(word => plainWord(word)).join(' ') : null
 }
 
@@ -272,7 +272,7 @@ export const verdict = (input: unknown) => {
     return denial(writeReason(found))
   }
   const cwd = isRecord(input) ? textOf(input.cwd) : ''
-  const refusal = pushRefusal(runCommands(command, newWork()), cwd === '' ? process.cwd() : cwd, command)
+  const refusal = pushRefusal(unreadableOnOverflow(() => runCommands(command, newWork())), cwd === '' ? process.cwd() : cwd, command)
   return refusal === null ? null : denial(refusal)
 }
 
