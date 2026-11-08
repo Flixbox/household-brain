@@ -14,7 +14,7 @@
  * `env` or `timeout`), and the programs interpreters and `make` run (shell-interpreters.ts). A word naming `gh` (or a path ending in `/gh`) is the owner's login;
  * `agent-gh` never is.
  */
-import { baseName, isGh, positionals, xargsFillsIn } from './owner-write-xargs'
+import { positionals, xargsFillsIn } from './owner-write-xargs'
 import { isRecord, textOf } from './read'
 import { commandsOf } from './shell-braces'
 import { isDynamic, plainWord } from './shell-commands'

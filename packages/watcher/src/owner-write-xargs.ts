@@ -4,11 +4,8 @@
  * write unless gh's group and subcommand (for `gh api`, its endpoint) are written out, and then it is
  * judged by those words as any gh call. Flags the input might add to a read go unseen.
  */
+import { baseName, isGh } from './shell-interpreters'
 import { isDynamic } from './shell-commands'
-
-export const baseName = (word: string) => word.replace(/^.*[/\\]/u, '')
-
-export const isGh = (word: string) => /(?:^|[/\\])gh(?:\.exe)?$/u.test(word)
 
 /** The arguments that are no flag, leaving out the value of `-R`/`--repo`, the one flag gh takes before the subcommand. */
 export const positionals = (args: readonly string[]) =>
