@@ -1,6 +1,6 @@
 /** Parentheses and quotes as the owner-write guard's shell reader (shell-commands.ts) matches them (#368, #373). */
 import { closingQuote } from './shell-ansi-c'
-import { type Work, charged } from './shell-work'
+import { type Work, charged, spent } from './shell-work'
 
 export const indexOrEnd = (text: string, search: string, from: number) => {
   const at = text.indexOf(search, from)
@@ -89,7 +89,7 @@ const unsure = /["#'(\\`\n]/u
 /** Whether nothing outside its substitutions could move the `)`; a budget spent on finding out means no, and the reader fails closed (#489). */
 const surelyData = (text: string, work: Work) => {
   const outside = outsideSubstitutions(text, work)
-  return work.left >= 0 && !unsure.test(outside)
+  return !spent(work, text) && !unsure.test(outside)
 }
 
 /**
