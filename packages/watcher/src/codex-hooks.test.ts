@@ -39,7 +39,7 @@ const handlersOf = (entry: unknown): unknown[] => (isRecord(entry) && Array.isAr
 const withoutOnFailure = (handler: unknown) =>
   isRecord(handler) ? Object.fromEntries(Object.entries(handler).filter(([key]) => key !== 'onFailure')) : handler
 
-/** The entries with only what both hosts read, to compare the two manifests. */
+/** Claude Code's entries with only what Codex reads too: the Codex manifest must match this exactly. */
 const sharedEntries = (entries: readonly unknown[]) =>
   entries.map(entry => (isRecord(entry) ? { ...entry, hooks: handlersOf(entry).map(handler => withoutOnFailure(handler)) } : entry))
 
@@ -77,7 +77,7 @@ describe('the owner-write guard as a Codex hook (#370)', () => {
   it('is registered in the Codex manifest as it is in hooks.json, matcher and command alike', async () => {
     const codex = await codexHooks()
     expect(codex).not.toEqual([])
-    expect(sharedEntries(codex)).toEqual(sharedEntries(await claudeHooks()))
+    expect(codex).toEqual(sharedEntries(await claudeHooks()))
   })
 
   it('denies a write through plain gh with an answer Codex accepts', async () => {
