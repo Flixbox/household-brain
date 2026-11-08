@@ -3,12 +3,11 @@
 import { type Activity, mainRunEvent, queueCommand } from './watch-events'
 import { type PrState, REPO, mainAhead, mainHead, newestMainRun, prStates } from './watch-github'
 import { checkRun } from './watch-ci-runs'
-import { APPROVED_DRAFT_NOTE, checkApproval, resolveAsked } from './watch-approval'
+import { APPROVED_DRAFT_NOTE, checkApproval, checkWriter, resolveAsked } from './watch-approval'
 import { FOLLOW, checkCode, finishSubscriptions, flush, queue, quiet, report, reportLookups, reportUsage } from './watch-output'
 import { addLine, endPr, readLines, start, startSubscriptions, subscriptions, updateLines, writeLines } from './watch-state'
 import { activitiesOf, changedActivities, changedStates, checkActivity as checkPrActivity, checkTrackedActivity, watchedPrs } from './watch-activity'
 import { checkQueue, preparePr } from './watch-queue'
-import { checkWriter } from './watch-writer'
 import { checkIssueStates, checkIssues, checkSubscribedIssues } from './watch-issues'
 import { allSettled, hasText, ignoreFailure } from './read'
 
