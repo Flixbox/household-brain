@@ -138,8 +138,11 @@ const save = async (): Promise<void> => {
 }
 
 const SUBSCRIBED_SINCE = 'subscribed-since'
-/** When this scoped watcher first started, in epoch milliseconds: a linked PR merged earlier isn't news (#477). */
-export const subscribedSince = async (): Promise<number> => await writtenAt(SUBSCRIBED_SINCE) ?? 0
+/**
+ * The whole second this scoped watcher first started in, in epoch milliseconds: a linked PR merged
+ * earlier isn't news (#477). Whole, as GitHub's merge times are: a merge just after the start must count.
+ */
+export const subscribedSince = async (): Promise<number> => Math.floor((await writtenAt(SUBSCRIBED_SINCE) ?? 0) / 1000) * 1000
 
 export const startSubscriptions = async (): Promise<void> => {
   if (subscriptions.scoped && !await exists(SUBSCRIBED_SINCE)) { await writeLines(SUBSCRIBED_SINCE, []) }

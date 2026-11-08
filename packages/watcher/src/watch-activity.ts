@@ -117,7 +117,7 @@ const byNumber = (first: number, second: number) => first - second
 
 /** Whether a closing reference's PR merged within MERGED_HOURS and after `since`. */
 const mergedLately = (pr: Json, since: number): boolean => pr.state === 'MERGED' && hasText(textOf(pr.mergedAt))
-  && Temporal.Instant.from(textOf(pr.mergedAt)).epochMilliseconds > Math.max(since, Temporal.Now.instant().subtract({ hours: MERGED_HOURS }).epochMilliseconds)
+  && Temporal.Instant.from(textOf(pr.mergedAt)).epochMilliseconds >= Math.max(since, Temporal.Now.instant().subtract({ hours: MERGED_HOURS }).epochMilliseconds)
 
 /**
  * The PRs whose closing references name one of `issues` (#357), without listing every open PR: the
