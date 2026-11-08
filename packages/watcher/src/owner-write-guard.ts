@@ -19,7 +19,8 @@ import { isRecord, textOf } from './read'
 import { commandsOf } from './shell-braces'
 import { isDynamic, plainWord } from './shell-commands'
 import { baseName, isGh, programCommands } from './shell-interpreters'
-import { type Work, newWork } from './shell-work'
+import { type Work, charged, newWork, unreadableLine } from './shell-work'
+import { commandsFrom } from './owner-write-wrappers'
 
 /** `gh pr` and `gh issue` subcommands that change something on GitHub. */
 const prIssueWrites = new Set([
@@ -37,12 +38,6 @@ const methodFlags = new Set(['--method', '-X'])
 
 /** Shell keywords that may stand before a command. */
 const keywords = new Set(['!', 'do', 'elif', 'else', 'if', 'then', 'until', 'while', '{', '}'])
-
-/** Commands that run a command given in their arguments, after options that may take values (`sudo -u x gh …`, `nice -n 10 gh …`). Their options aren't read: every later word counts as where the command may start. */
-const wrappers = new Set([
-  'builtin', 'busybox', 'chroot', 'chrt', 'command', 'coproc', 'doas', 'env', 'exec', 'flock', 'ionice', 'nice', 'nohup', 'script', 'setpriv',
-  'setsid', 'stdbuf', 'sudo', 'taskset', 'time', 'timeout', 'unbuffer', 'unshare', 'watch', 'xargs',
-])
 
 /** Wrappers that also take a whole command line after `-c`, as a shell does (`flock x -c '…'`). */
 const scriptFlagRunners = new Set(['flock', 'script'])
@@ -188,10 +183,6 @@ const commandStart = (words: readonly string[]) => {
   return at
 }
 
-/** Where the command may start in a simple command: at its first word, and after a wrapper at any word. */
-const startsOf = (command: readonly string[]) =>
-  wrappers.has(baseName(command[0] ?? '')) ? command.map((_word, at) => at) : [0]
-
 /** The command line `env -S '…'` (`--split-string`) splits and runs, if one is given. */
 const envSplitString = (args: readonly string[]) => {
   const at = args.findIndex(arg => /^(?:-[0iv]*S|--split-string)/u.test(arg))
@@ -239,7 +230,10 @@ const runCommands = (text: string, work: Work): string[][] => {
   const simple = commandsOf(text, work)
   const commands = simple
     .map(words => words.slice(commandStart(words)))
-    .flatMap(command => startsOf(command).map(at => command.slice(at)))
+    .flatMap(command => commandsFrom(command, work))
+  if (charged(work, 0)) {
+    return unreadableLine()
+  }
   const fed = commands.some(command => readsScriptFromInput(command) || innerScript(command) !== null) ? simple.flatMap(words => hereStringsOf(words)) : []
   return [
     ...commands.flatMap(command => {
@@ -247,7 +241,7 @@ const runCommands = (text: string, work: Work): string[][] => {
       return script === null ? [command] : runCommands(script, work)
     }),
     ...fed.flatMap(script => (isDynamic(script) ? [[script]] : runCommands(script, work))),
-    ...programCommands(commands.map(command => withoutRedirections(command)), simple.flatMap(words => hereStringsOf(words))),
+    ...programCommands(commands.map(command => withoutRedirections(command)), simple.flatMap(words => hereStringsOf(words)), work),
   ]
 }
 
