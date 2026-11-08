@@ -70,6 +70,17 @@ describe('ownerWrite and a variable behind a wrapper (#436)', () => {
     'timeout "$OPTION" 5 "$CMD"',
     'timeout 5 2>/dev/null "$CMD"',
     'timeout 5 "$GH" issue close 1',
+    'env -i timeout 5 "$CMD"',
+    'env -- timeout 5 "$CMD"',
+    'env -S timeout 5 "$CMD"',
+    'sudo -n timeout 5 "$CMD"',
+    'sudo -uroot timeout 5 "$CMD"',
+    'sudo -n flock x "$CMD"',
+    'timeout -k5 10 flock x "$CMD"',
+    'flock -n x timeout 5 "$CMD"',
+    'taskset -c 1 timeout 5 "$CMD"',
+    'coproc timeout 5 "$CMD"',
+    'nohup 2>/dev/null timeout 5 "$CMD"',
   ])('still refuses %s: the variable may be the command', command => {
     expect(ownerWrite(command)).not.toBeNull()
   })
