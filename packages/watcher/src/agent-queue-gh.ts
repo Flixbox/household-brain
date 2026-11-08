@@ -36,8 +36,10 @@ export const gh = async (repo: string, args: readonly string[]): Promise<string>
 const LIMIT_HEADERS = ['x-ratelimit-remaining', 'x-ratelimit-reset', 'x-ratelimit-resource', 'retry-after']
 
 /** A refusal's status and limit headers, for the log. */
-const limitsOf = (answer: Answer): string =>
-  `HTTP ${answer.status}; ${LIMIT_HEADERS.map(name => `${name}: ${answer.headers.get(name) ?? '-'}`).join(', ')}`
+const limitsOf = (answer: Answer): string => {
+  const limits = LIMIT_HEADERS.map(name => `${name}: ${answer.headers.get(name) ?? '-'}`)
+  return `HTTP ${answer.status}; ${limits.join(', ')}`
+}
 
 /** GitHub's answer to a GraphQL call with these `gh api` fields; a rate limit is logged, and waited out once. */
 export const graphqlAnswer = async (repo: string, fields: readonly string[], retried = false): Promise<Answer> => {
