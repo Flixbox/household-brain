@@ -35,13 +35,13 @@
  */
 import { type Ask, type Check, type PrFacts, type ReviewStance, factsFrom } from './agent-queue-facts'
 import { CLEARED_LABEL, clearedAt } from './watch-cleared-events'
-import { GH, errorsOf, gh, graphqlAnswer } from './agent-queue-gh'
+import { GH, errorsOf, graphqlAnswer } from './agent-queue-gh'
 import { at, record, records } from './watch-text'
-import { hasText, textOf } from './read'
 import { BOT_REVIEW_LABEL } from './watch-bot-review-events'
 import { bare } from './watch-review-events'
 import { checksPassed } from './watch-ci-state'
-import { defaultOwner } from './watch-owner'
+import { ownerOf } from './agent-queue-owner'
+import { textOf } from './read'
 
 const STILL_RUNNING = new Set(['EXPECTED', 'IN_PROGRESS', 'PENDING', 'QUEUED', 'REQUESTED', 'WAITING'])
 const STANCES = new Set(['APPROVED', 'CHANGES_REQUESTED'])
@@ -164,24 +164,6 @@ const readFacts = async (repo: string, pr: number): Promise<PrFacts> => {
   const answer = record(at(data, 'repository', 'pullRequest'))
   const nodes = [...await earlierComments(repo, pr, answer.comments), ...records(at(answer, 'comments', 'nodes'))]
   return factsFrom({ ...answer, comments: { nodes } }, textOf(at(data, 'viewer', 'login')))
-}
-
-/** OWNER, else `defaultOwner` for the repository (its note goes to stderr). */
-const ownerOf = async (repo: string): Promise<string> => {
-  if (hasText(process.env.OWNER)) {
-    return process.env.OWNER
-  }
-  const [repoOwner = ''] = repo.split('/')
-  const organisation = await gh(repo, ['api', `repos/${repo}`, '-q', '.owner.type']).then(text => text.trim() === 'Organization', () => null)
-  const humanAdmins = organisation === true
-    ? await gh(repo, ['api', '--paginate', `repos/${repo}/collaborators?permission=admin`, '-q', '.[] | select(.type == "User") | .login'])
-      .then(text => text.split('\n').filter(line => line !== ''), () => null)
-    : []
-  const { note, owner } = defaultOwner(repoOwner, organisation, humanAdmins)
-  if (note !== null) {
-    process.stderr.write(`${note}\n`)
-  }
-  return owner
 }
 
 /** The command's arguments; exits with the usage when they don't fit. */

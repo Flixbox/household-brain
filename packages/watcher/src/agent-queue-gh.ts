@@ -1,7 +1,7 @@
 /**
- * How `agent-queue` (#354) asks GitHub. A GraphQL call is made with `gh api -i`, so a refusal's limit
- * headers can be read (#402, A7 of #357): on a rate limit (as reply-review-thread.ts tells it) they go
- * to stderr and the call is tried once more after waiting them out.
+ * How `agent-queue` (#354) asks GitHub. Every call, GraphQL (#402, A7 of #357) or REST (#428), is made
+ * with `gh api -i`, so a refusal's limit headers can be read: on a rate limit (as reply-review-thread.ts
+ * tells it) they go to stderr and the call is tried once more after waiting them out.
  */
 import { type Answer, answerFrom, rateLimitWait } from './reply-review-thread'
 import { record, records } from './watch-text'
@@ -22,17 +22,6 @@ const ghAnswer = async (repo: string, args: readonly string[]): Promise<string> 
   return out
 }
 
-/** What `gh` prints for `args`; throws with its exit code when it fails. Its stderr goes straight through. */
-export const gh = async (repo: string, args: readonly string[]): Promise<string> => {
-  const call = Bun.spawn([GH, ...args], { env: envFor(repo), stderr: 'inherit', stdout: 'pipe' })
-  const out = await new Response(call.stdout).text()
-  const code = await call.exited
-  if (code !== 0) {
-    throw new Error(`${GH} ${args.slice(0, 2).join(' ')} failed (exit ${code})`)
-  }
-  return out
-}
-
 const LIMIT_HEADERS = ['x-ratelimit-remaining', 'x-ratelimit-reset', 'x-ratelimit-resource', 'retry-after']
 
 /** A refusal's status and limit headers, for the log. */
@@ -41,9 +30,9 @@ const limitsOf = (answer: Answer): string => {
   return `HTTP ${answer.status}; ${limits.join(', ')}`
 }
 
-/** GitHub's answer to a GraphQL call with these `gh api` fields; a rate limit is logged, and waited out once. */
-export const graphqlAnswer = async (repo: string, fields: readonly string[], retried = false): Promise<Answer> => {
-  const answer = answerFrom(await ghAnswer(repo, ['api', 'graphql', '-i', ...fields]))
+/** GitHub's answer to a `gh api -i` call with these `args`; a rate limit is logged, and waited out once. */
+const limitedAnswer = async (repo: string, args: readonly string[], retried = false): Promise<Answer> => {
+  const answer = answerFrom(await ghAnswer(repo, args))
   const wait = rateLimitWait(answer, Math.floor(Temporal.Now.instant().epochMilliseconds / 1000))
   if (wait === null) {
     return answer
@@ -54,8 +43,15 @@ export const graphqlAnswer = async (repo: string, fields: readonly string[], ret
   }
   process.stderr.write(`Rate limited (${limitsOf(answer)}); trying once more in ${Math.ceil(wait / 1000)} s\n`)
   await Bun.sleep(wait)
-  return graphqlAnswer(repo, fields, true)
+  return limitedAnswer(repo, args, true)
 }
+
+/** GitHub's answer to a GraphQL call with these `gh api` fields, a rate limit waited out once. */
+export const graphqlAnswer = async (repo: string, fields: readonly string[]): Promise<Answer> =>
+  limitedAnswer(repo, ['api', 'graphql', '-i', ...fields])
+
+/** GitHub's answer to a REST read of `path` (one page: `gh api -i` can't paginate and parse), a rate limit waited out once. */
+export const restAnswer = async (repo: string, path: string): Promise<Answer> => limitedAnswer(repo, ['api', '-i', path])
 
 /** What GitHub refused in an answer; '' when it refused nothing. */
 export const errorsOf = (answer: Answer): string => {

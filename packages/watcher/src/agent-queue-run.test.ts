@@ -54,7 +54,6 @@ const FAKE = String.raw`
     console.log('HTTP/2.0 ' + status + ' X\n' + headers + '\n' + JSON.stringify(body))
     process.exit(status === 200 ? 0 : 1)
   }
-  if (joined.startsWith('api repos/')) { console.log('User'); process.exit(0) }
   if (joined.includes('enablePullRequestAutoMerge')) {
     console.log('HTTP/2.0 200 OK\nContent-Type: application/json\n\n' + JSON.stringify({ data: { enablePullRequestAutoMerge: { clientMutationId: null } } }))
     process.exit(0)
