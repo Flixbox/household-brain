@@ -6,6 +6,12 @@ export const ciPassedKey = (pr: number, sha: string, attempt: number): string =>
   return attempt > 1 ? `${key} ${attempt}` : key
 }
 
+/** Whether any attempt on `head` was reported passed. */
+export const reportedPassed = (reported: readonly string[], pr: number, head: string): boolean => {
+  const key = ciPassedKey(pr, head, 1)
+  return reported.some(line => line === key || line.startsWith(`${key} `))
+}
+
 interface HeadRun {
   conclusion: string
   status: string
