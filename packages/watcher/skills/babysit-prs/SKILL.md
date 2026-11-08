@@ -105,9 +105,9 @@ default branch's CI, new issues, the owner's comments on issues, and issues clos
     several watchers cost hardly more than one.
   - `GH_PARALLEL`: how many `gh` calls run at once (2 by default); the pull requests are checked in
     parallel, and the cap keeps the bursts within GitHub's rate limits.
-  - `FULL_READ_MINUTES`: how long a pull request goes without a full read at most (10 by default; 0,
-    or set empty, reads every one in full on every look; anything else but a number from 0 stops the
-    watcher at the start). Each look asks one cheap question about what changed, and a PR it shows as changed is
+  - `FULL_READ_MINUTES`: how long a pull request goes without a full read at most (10 by default; 0
+    reads every one in full on every look; anything else but a number from 0, a blank value included,
+    stops the watcher at the start). Each look asks one cheap question about what changed, and a PR it shows as changed is
     read in full at once (#404); this limit is for what that question can't see.
   - `MERGED_HOURS`: how far back a merged pull request still counts as recent (3 by default), so one
     opened and merged between two looks is still reported. It applies to the repository's merged PRs
@@ -229,7 +229,7 @@ approved one whose auto-merge is still off and that isn't in the merge queue, no
 | `QUESTION_CLEAR_FAILED` | The watcher couldn't take that label off; it tries again on every look. It says so too where it couldn't confirm the `GH` token is a bot's: GitHub's `viewer` is a person (set `GH` to the bot), or the question failed. Repeated, its `GH` token likely can't write issues (Issues: write): tell the owner, and take the label off by hand meanwhile. |
 | `BOT_REVIEW_ASKED` | With `REVIEW_BOTS` set, the PR got the label `BOT_REVIEW_LABEL` and the watcher posted `@<bot> review` on it, the only time it ever will for that PR, and took the label off (#324; the event says when it couldn't yet, and it tries again). Wait for the review: `READY_TO_MERGE` and its reminder hold until the bot has reviewed. Then handle its points and settle its threads with `Resolved:` replies as usual. Agents never post `@<bot>` commands themselves: label the PR instead. |
 | `BOT_REVIEW_SKIPPED` | The PR got the label, but the bot reviewed it already or was asked already (a `@<bot> review` comment), so it isn't asked again (#324): a PR gets at most one bot review. The label came off. Go on without a new bot review. |
-| `BOT_REVIEW_FAILED` | The watcher couldn't post `@<bot> review`; the label stays and it tries again on every look. Repeated, its `GH` token likely can't comment on pull requests: tell the owner. |
+| `BOT_REVIEW_FAILED` | The watcher couldn't post `@<bot> review`, couldn't take the label off to claim the ask, or couldn't read the PR after claiming it (#461); the event says which and what became of the label, and it tries again after 1, 2, 5 and then every 10 minutes while the label is on. Repeated, its `GH` token likely can't comment on pull requests or change labels: tell the owner. |
 | `BOT_RESOLVE_ASKED` | With `RESOLVE_BOT_REVIEWS` set, the watcher posted `@<bot> resolve` on a PR whose bot change request on the head is settled (every thread resolved, CI green, #303; not one without threads that a later owner comment took back, #294). Nothing to do: the bot resolves its threads and approves if its own risk limit allows; if it doesn't approve, the PR waits for the owner as before. |
 | `BOT_RESOLVE_FAILED` | The watcher couldn't post that comment; the all-events watcher tries again after 1, 2, 5 and then every 10 minutes (#402). Repeated, its `GH` token likely can't comment on pull requests: tell the owner. |
 | `REVIEW_DISMISS_FAILED` | The watcher couldn't dismiss such a change request; the all-events watcher tries again after 1, 2, 5 and then every 10 minutes (#402). Repeated, its `GH` token likely can't write pull requests: tell the owner. |
