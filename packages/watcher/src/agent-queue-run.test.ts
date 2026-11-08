@@ -35,7 +35,7 @@ const READY_PR = {
  * `GH_REPO` it got. `FAKE_VIEWER` is the login GitHub's `viewer` answers with.
  */
 const FAKE = String.raw`
-  import { appendFileSync } from 'node:fs'
+  import { appendFileSync, existsSync, writeFileSync } from 'node:fs'
   const args = process.argv.slice(2)
   const repo = process.env.GH_REPO ?? ''
   appendFileSync(process.env.FIXTURE_HOME + '/calls', (repo || '-') + ' ' + args.join(' ').replaceAll('\n', ' ') + '\n')
@@ -50,7 +50,14 @@ const FAKE = String.raw`
     process.exit(0)
   }
   if (joined.includes('viewer{login}')) {
-    console.log(JSON.stringify({ data: { repository: { pullRequest: JSON.parse(process.env.FAKE_PR) }, viewer: { login: process.env.FAKE_VIEWER } } }))
+    const refusedFile = process.env.FIXTURE_HOME + '/refused'
+    if (process.env.FAKE_REFUSE === '1' && !existsSync(refusedFile)) {
+      writeFileSync(refusedFile, '')
+      console.log('HTTP/2.0 403 Forbidden\nRetry-After: 0\nX-RateLimit-Remaining: 17\n\n' + JSON.stringify({ message: 'You have exceeded a secondary rate limit' }))
+      process.exit(1)
+    }
+    const body = JSON.stringify({ data: { repository: { pullRequest: JSON.parse(process.env.FAKE_PR) }, viewer: { login: process.env.FAKE_VIEWER } } })
+    console.log(args.includes('-i') ? 'HTTP/2.0 200 OK\n\n' + body : body)
     process.exit(0)
   }
   console.error('unexpected call: ' + joined)
@@ -58,7 +65,7 @@ const FAKE = String.raw`
 `
 
 /** Runs `agent-queue owner/repo 7` from a folder that isn't a clone, with GH_REPO unset, asking as `viewer`. */
-const runFromNonClone = async (viewer: string) => {
+const runFromNonClone = async (viewer: string, extra: Record<string, string> = {}) => {
   const home = await mkdtemp(`${tmpdir()}/agent-queue-`)
   dirs.push(home)
   const gh = `${home}/agent-gh`
@@ -68,7 +75,7 @@ const runFromNonClone = async (viewer: string) => {
   const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => name !== 'GH_REPO' && name !== 'OWNER'))
   const child = Bun.spawn([process.execPath, `${import.meta.dir}/agent-queue.ts`, 'owner/repo', '7'], {
     cwd: home,
-    env: { ...env, FAKE_PR: JSON.stringify(READY_PR), FAKE_VIEWER: viewer, FIXTURE_HOME: home, GH: gh },
+    env: { ...env, FAKE_PR: JSON.stringify(READY_PR), FAKE_VIEWER: viewer, FIXTURE_HOME: home, GH: gh, ...extra },
     stderr: 'pipe', stdout: 'pipe',
   })
   const [output, error, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
@@ -88,4 +95,12 @@ test("agent-queue refuses to act when GitHub's viewer isn't a bot login (#365)",
   expect(result.code).not.toBe(0)
   expect(result.error).toContain('asks as owner, not as a bot')
   expect(result.calls.filter(call => call.includes('enablePullRequestAutoMerge') || call.includes('mergePullRequest'))).toEqual([])
+})
+
+test('a read GitHub refuses for a rate limit logs the limit headers and is waited out once (#402)', async () => {
+  const result = await runFromNonClone('agent-bot[bot]', { FAKE_REFUSE: '1' })
+  expect(result.code).toBe(0)
+  expect(result.error).toContain('retry-after: 0')
+  expect(result.error).toContain('x-ratelimit-remaining: 17')
+  expect(result.output).toContain('Auto-merge (squash) is on')
 })

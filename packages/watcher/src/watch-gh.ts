@@ -224,24 +224,35 @@ const etagFile = (path: string, cli: string) => {
   return `${ETAGS_DIR}/${new Bun.CryptoHasher('sha256').update(identity).digest('hex')}`
 }
 
-/** The kept answer for an ETag file; null when there is none, or it can't be read. */
+const isJson = (text: string): boolean => {
+  try {
+    JSON.parse(text)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** The kept answer for an ETag file; null when there is none, it can't be read, or its body isn't JSON (#424), so the next read asks without its ETag. */
 const keptAnswer = async (file: string): Promise<{ body: string, etag: string } | null> => {
   const value: unknown = await Bun.file(file).json().catch(() => null)
-  return isRecord(value) && typeof value.body === 'string' && typeof value.etag === 'string' ? { body: value.body, etag: value.etag } : null
+  return isRecord(value) && typeof value.body === 'string' && typeof value.etag === 'string' && isJson(value.body) ? { body: value.body, etag: value.etag } : null
 }
 
 /** Keeps an answer, or marks a kept one as used. Only a saving, like sharing: without it the next read costs a call. */
 const keepAnswer = async (file: string, answer: { body: string, etag: string }): Promise<void> =>
   writeWhole(file, JSON.stringify(answer)).catch(ignoreFailure)
 
-/** Splits what `gh api -i` prints into the body and its ETag ('' without one). */
+/** Splits what `gh api -i` prints into the body and its ETag ('' without one). A body that isn't JSON throws (#418), so it is neither kept nor shared. */
 const parsedAnswer = (raw: string): { body: string, etag: string } => {
   const end = raw.indexOf('\r\n\r\n')
   if (end === -1) {
     throw new Error('gh api -i printed no headers')
   }
   const etag = /^etag: *(?<etag>\S.*)$/imu.exec(raw.slice(0, end))?.groups?.etag ?? ''
-  return { body: raw.slice(end + 4), etag: etag.trim() }
+  const body = raw.slice(end + 4)
+  JSON.parse(body)
+  return { body, etag: etag.trim() }
 }
 
 /** Asks GitHub for `path`, with the kept ETag if there is one. `gh` exits 1 on a 304, so that failure is the good news. */

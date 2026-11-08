@@ -39,7 +39,7 @@ const FAKE_GH = String.raw`
   })
   const prs = [...text.matchAll(/pr(\d+): pullRequest\(number: (\d+)\)/g)].map(match => Number(match[1]))
   if (prs.length > 0) {
-    const activity = text.includes('reviews(last:100){nodes{databaseId')
+    const activity = text.includes('submittedAt')
     answer({ data: { repository: Object.fromEntries(prs.map(pr => ['pr' + pr, activity ? { comments: { nodes: [] }, reviews: { nodes: [] } } : state(pr)])) } })
   }
   const issues = [...text.matchAll(/issue(\d+): ?issue\(number: ?(\d+)\)/g)].map(match => Number(match[1]))

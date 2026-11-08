@@ -101,6 +101,7 @@
  * GH_PARALLEL `gh` calls running, so one slow call holds back only its own events. Those are the
  * shortest pauses: they grow while nothing happens and while GitHub's rate limit runs short, and
  * after a refusal no watcher asks GitHub until the wait is over (watch-pace.ts, #400).
+ * A PR is read in full only when the change gate says so (watch-change-gate.ts, #404).
  */
 // Which code this watcher runs is read before the rest of it is loaded (#265): a pull that finishes
 // while it loads then shows as a change, never as the version it started on.

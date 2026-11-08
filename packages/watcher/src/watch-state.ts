@@ -34,7 +34,7 @@ import { bare } from './watch-review-events'
 // by every watcher without an id: those would split the events between them. STATE_DIR names the
 // folder outright.
 const WATCHER_ID = [process.env.WATCHER_ID, process.env.CODEX_THREAD_ID, process.env.CLAUDE_CODE_SESSION_ID].find(id => hasText(id))
-const REPO_DIR = `${WATCHERS_DIR}/${REPO.replace('/', '_')}`
+export const REPO_DIR = `${WATCHERS_DIR}/${REPO.replace('/', '_')}`
 const SESSIONS_DIR = `${REPO_DIR}/sessions`
 /** A folder name for an id: a hash, so no two ids meet, also where case doesn't count (Windows). */
 const folderOf = (id: string) => Bun.hash(id).toString(36)

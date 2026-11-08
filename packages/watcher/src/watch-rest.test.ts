@@ -8,7 +8,8 @@ afterEach(async () => { await Promise.all(dirs.splice(0).map(async dir => rm(dir
 
 /**
  * A `gh` that answers REST as `gh api -i` does: headers, a blank line, the body. Its ETag follows the
- * file `version`, and like the real one it prints a 304's headers and exits 1. FAIL makes it refuse.
+ * file `version`, and like the real one it prints a 304's headers and exits 1. A file `refuse` makes
+ * it refuse, and a file `html` makes its 200s HTML.
  */
 const FAKE_GH = String.raw`
   import { appendFileSync, existsSync, readFileSync } from 'node:fs'
@@ -21,6 +22,7 @@ const FAKE_GH = String.raw`
   const version = readFileSync(home + '/version', 'utf8').trim()
   const etag = 'W/"' + version + '"'
   if (args.includes('If-None-Match: ' + etag)) { process.stdout.write('HTTP/2.0 304 Not Modified\r\nEtag: ' + etag + '\r\n\r\n'); process.exit(1) }
+  if (existsSync(home + '/html')) { process.stdout.write('HTTP/2.0 200 OK\r\nEtag: ' + etag + '\r\n\r\n<html>Unicorn!</html>'); process.exit(0) }
   const now = Temporal.Now.instant().toString()
   const body = text.includes('state=open') ? [{ number: 7 }, { number: Number(version) }]
     : text.includes('state=closed') ? [{ merged_at: now, number: 3 }, { merged_at: null, number: 4 }, { merged_at: '2020-01-01T00:00:00Z', number: 5 }]
@@ -122,6 +124,59 @@ test('a refused request fails, even with an answer kept (#405)', async () => {
   await inWatcher(home, OPEN)
   await Bun.write(`${home}/refuse`, '')
   expect(await inWatcher(home, 'console.log(await github.openPrNumbers().then(() => "read", () => "failed"))')).toBe('failed')
+})
+
+const READ = 'console.log(await github.openPrNumbers().then(numbers => JSON.stringify(numbers), () => "failed"))'
+
+test('a 200 that isn\'t JSON fails and is not kept with its ETag (#418)', async () => {
+  const home = await fixture()
+  await Bun.write(`${home}/html`, '')
+  expect(await inWatcher(home, READ)).toBe('failed')
+  await rm(`${home}/html`)
+  expect(await inWatcher(home, READ)).toBe('[7,8]')
+  expect((await restCalls(home))[1]).not.toContain('If-None-Match')
+})
+
+test('a 200 that isn\'t JSON leaves the answer kept before it in place (#418)', async () => {
+  const home = await fixture()
+  await inWatcher(home, READ)
+  await Bun.write(`${home}/version`, '9')
+  await Bun.write(`${home}/html`, '')
+  expect(await inWatcher(home, READ)).toBe('failed')
+  await rm(`${home}/html`)
+  expect(await inWatcher(home, READ)).toBe('[7,9]')
+  expect((await restCalls(home))[2]).toContain('If-None-Match: W/"8"')
+})
+
+test('a 200 that isn\'t JSON is not shared with the next read (#418)', async () => {
+  const home = await fixture()
+  await Bun.write(`${home}/html`, '')
+  expect(await inWatcher(home, READ, { GH_SHARE_SECONDS: '60' })).toBe('failed')
+  await rm(`${home}/html`)
+  expect(await inWatcher(home, READ, { GH_SHARE_SECONDS: '60' })).toBe('[7,8]')
+})
+
+test('a non-JSON answer already kept is not served, and the next read asks without its ETag (#424)', async () => {
+  const home = await fixture()
+  await inWatcher(home, READ)
+  const dir = `${home}/watch-project/gh-etags`
+  const [name = ''] = await readdir(dir)
+  await Bun.write(`${dir}/${name}`, JSON.stringify({ body: '<html>Unicorn!</html>', etag: 'W/"8"' }))
+  expect(await inWatcher(home, READ)).toBe('[7,8]')
+  expect((await restCalls(home))[1]).not.toContain('If-None-Match')
+})
+
+test('the answer read in place of a non-JSON kept one is kept with its ETag (#424)', async () => {
+  const home = await fixture()
+  await inWatcher(home, READ)
+  const dir = `${home}/watch-project/gh-etags`
+  const [name = ''] = await readdir(dir)
+  await Bun.write(`${dir}/${name}`, JSON.stringify({ body: '<html>Unicorn!</html>', etag: 'W/"8"' }))
+  await inWatcher(home, READ)
+  expect(await inWatcher(home, READ)).toBe('[7,8]')
+  expect((await restCalls(home))[2]).toContain('If-None-Match: W/"8"')
+  expect(await Bun.file(`${dir}/${name}`).json()).toMatchObject({ etag: 'W/"8"' })
+  expect(await Bun.file(`${dir}/${name}`).text()).not.toContain('Unicorn')
 })
 
 test('the merged list, a commit\'s run and main\'s head read the REST answers (#405)', async () => {

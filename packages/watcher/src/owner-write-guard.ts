@@ -11,12 +11,14 @@
  * `ownerWrite` reads the command as a shell would, closely enough: every simple command of a
  * pipeline, list, group, subshell, `$(…)`, backticks, `bash -c '…'`, `eval` or what a here-document
  * or here-string feeds a shell, with quotes and escapes, and only the word in command position (after variable assignments and wrappers such as
- * `env` or `timeout`). A word naming `gh` (or a path ending in `/gh`) is the owner's login;
+ * `env` or `timeout`), and the programs interpreters and `make` run (shell-interpreters.ts). A word naming `gh` (or a path ending in `/gh`) is the owner's login;
  * `agent-gh` never is.
  */
+import { positionals, xargsFillsIn } from './owner-write-xargs'
 import { isRecord, textOf } from './read'
 import { commandsOf } from './shell-braces'
 import { isDynamic, plainWord } from './shell-commands'
+import { baseName, isGh, programCommands } from './shell-interpreters'
 import { type Work, newWork } from './shell-work'
 
 /** `gh pr` and `gh issue` subcommands that change something on GitHub. */
@@ -36,15 +38,14 @@ const methodFlags = new Set(['--method', '-X'])
 /** Shell keywords that may stand before a command. */
 const keywords = new Set(['!', 'do', 'elif', 'else', 'if', 'then', 'until', 'while', '{', '}'])
 
-/**
- * Commands that run a command given in their arguments, after options that may take values
- * (`sudo -u x gh …`, `nice -n 10 gh …`). Their options aren't read: every later word counts as
- * where the command may start.
- */
+/** Commands that run a command given in their arguments, after options that may take values (`sudo -u x gh …`, `nice -n 10 gh …`). Their options aren't read: every later word counts as where the command may start. */
 const wrappers = new Set([
-  'builtin', 'busybox', 'command', 'doas', 'env', 'exec', 'ionice', 'nice', 'nohup', 'setsid', 'stdbuf', 'sudo', 'time',
-  'timeout', 'unbuffer', 'watch', 'xargs',
+  'builtin', 'busybox', 'chroot', 'chrt', 'command', 'coproc', 'doas', 'env', 'exec', 'flock', 'ionice', 'nice', 'nohup', 'script', 'setpriv',
+  'setsid', 'stdbuf', 'sudo', 'taskset', 'time', 'timeout', 'unbuffer', 'unshare', 'watch', 'xargs',
 ])
+
+/** Wrappers that also take a whole command line after `-c`, as a shell does (`flock x -c '…'`). */
+const scriptFlagRunners = new Set(['flock', 'script'])
 
 /** A redirection: its operator, and its target when attached (`>out`, `2>/dev/null`, `&>log`). */
 const redirection = /^\d*(?:&>>?|>>?|<{1,3}|>&|<&|>\|)(?<target>.*)$/su
@@ -145,10 +146,6 @@ const apiWrites = (args: readonly string[]) => {
   return flags.input || flags.fields.length > 0
 }
 
-/** The arguments that are no flag, leaving out the value of `-R`/`--repo`, the one flag gh takes before the subcommand. */
-const positionals = (args: readonly string[]) =>
-  args.filter((arg, at) => !arg.startsWith('-') && args[at - 1] !== '-R' && args[at - 1] !== '--repo')
-
 /** Whether `gh` with these arguments changes something on GitHub, or may: a command the shell fills in counts. */
 const ghWrites = (args: readonly string[]) => {
   const [group = '', subcommand = ''] = positionals(args)
@@ -163,10 +160,6 @@ const ghWrites = (args: readonly string[]) => {
   }
   return (group === 'pr' || group === 'issue') && prIssueWrites.has(subcommand)
 }
-
-const isGh = (word: string) => /(?:^|[/\\])gh(?:\.exe)?$/u.test(word)
-
-const baseName = (word: string) => word.replace(/^.*[/\\]/u, '')
 
 /** How many words a leading word takes up: an assignment or keyword one, a redirection one or two (with its target), a command none. */
 const leadingLength = (word: string) => {
@@ -218,7 +211,7 @@ const innerScript = (words: readonly string[]) => {
   if (baseName(name) === 'env') {
     return envSplitString(args)
   }
-  const at = shell.test(baseName(name)) ? args.findIndex(arg => /^-[abd-z]*c[a-z]*$/u.test(arg)) : -1
+  const at = shell.test(baseName(name)) || scriptFlagRunners.has(baseName(name)) ? args.findIndex(arg => /^-[abd-z]*c[a-z]*$/u.test(arg)) : -1
   return at === -1 ? null : (args[at + 1] ?? null)
 }
 
@@ -254,6 +247,7 @@ const runCommands = (text: string, work: Work): string[][] => {
       return script === null ? [command] : runCommands(script, work)
     }),
     ...fed.flatMap(script => (isDynamic(script) ? [[script]] : runCommands(script, work))),
+    ...programCommands(commands.map(command => withoutRedirections(command)), simple.flatMap(words => hereStringsOf(words))),
   ]
 }
 
@@ -264,7 +258,7 @@ const runCommands = (text: string, work: Work): string[][] => {
  */
 const writes = ([name = '', ...words]: readonly string[]) => {
   const args = withoutRedirections(words)
-  return (isGh(name) && ghWrites(args)) || (isDynamic(name) && (args.length === 0 || ghWrites(args)))
+  return (isGh(name) && ghWrites(args)) || (isDynamic(name) && (args.length === 0 || ghWrites(args))) || xargsFillsIn(name, args)
 }
 
 /** The first command in a Bash command line that writes to GitHub through plain `gh`, as its words joined, or null when there is none. */
@@ -284,7 +278,7 @@ export const verdict = (input: unknown) => {
   }
   const reason = [
     `Refused (household-brain #368): \`${found}\` writes to GitHub through plain \`gh\`, the owner's own login, so it would act as the owner.`,
-    'A command the guard cannot read for certain (a command, method or query the shell fills in, as in `"$METHOD"` or `query="$(cat q.graphql)"`, or a here-document delimiter that mixes quoting, as in `<<E\'O\'F`) counts as a write.',
+    'A command the guard cannot read for certain (a command, method or query the shell fills in, as in `"$METHOD"` or `query="$(cat q.graphql)"`, a here-document delimiter that mixes quoting, as in `<<E\'O\'F`, or `xargs gh` without its subcommand written out) counts as a write.',
     'Write through `agent-gh` (the bot) instead; reads with `gh` stay allowed.',
     'If agent-gh fails or is rate-limited, wait and retry it, or report it: never fall back to `gh`.',
     'Something only the owner may do, the owner runs themselves.',

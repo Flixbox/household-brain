@@ -6,6 +6,14 @@ export const ciPassedKey = (pr: number, sha: string, attempt: number): string =>
   return attempt > 1 ? `${key} ${attempt}` : key
 }
 
+/** The highest attempt reported under `key`: a line without a number is attempt 1, none at all 0. */
+const highestAttempt = (reported: readonly string[], key: string): number =>
+  Math.max(0, ...reported.filter(line => line === key || line.startsWith(`${key} `)).map(line => Number(line.slice(key.length + 1)) || 1))
+
+/** Whether `head`'s latest reported attempt passed (#419): a pass stops counting once a later attempt fails. */
+export const reportedPassed = (reported: readonly string[], pr: number, head: string): boolean =>
+  highestAttempt(reported, ciPassedKey(pr, head, 1)) > highestAttempt(reported, `pr-${pr} ci-failed ${head}`)
+
 interface HeadRun {
   conclusion: string
   status: string
