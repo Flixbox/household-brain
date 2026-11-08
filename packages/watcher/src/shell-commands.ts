@@ -7,8 +7,8 @@
  * expands nothing: a `$` the shell would expand (outside single quotes) stays in the word, after a
  * mark, so `isDynamic` tells a word the shell may change from one it takes as written.
  */
-import { type Heredoc, bodyAsRead, bodyExpands, closingLine, hereStringOperator, heredocOf, heredocOpener } from './shell-heredocs'
-import { closingParen, indexOrEnd, opensArithmetic } from './shell-parens'
+import { type Enclosures, type Heredoc, bodyAsRead, bodyExpands, closingLine, countEnclosure, hereStringOperator, heredocOf, heredocOpener, opensHereString, opensHeredoc, quoteInExpansion, unsureInEnclosure } from './shell-heredocs'
+import { closingParen, indexOrEnd, isSeparator, opensArithmetic } from './shell-parens'
 import { ansiCValue, closingQuote, dynamic } from './shell-ansi-c'
 import { type Work, spent, unreadableLine } from './shell-work'
 
@@ -19,7 +19,7 @@ export const isDynamic = (word: string) => word.includes(dynamic)
 export const plainWord = (word: string) => word.replaceAll(dynamic, '')
 
 /** The scan of a command line: the simple commands found so far, and the one being read. */
-interface Scan {
+interface Scan extends Enclosures {
   commands: string[][]
   heredocs: Heredoc[]
   /** The texts of `$(…)` and backticks, each read as a command line of its own. */
@@ -78,8 +78,16 @@ const substitution = (scan: Scan, text: string, at: number): [string, number] =>
 
 const startsSubstitution = (text: string, at: number) => text[at] === '`' || text.startsWith('$(', at)
 
+/** What the guard can't read for certain: a command word the shell fills in, so the whole command line is refused. */
+const refuse = (scan: Scan, text: string, at: number) => {
+  scan.commands.push([dynamic + (/^\S*/u.exec(text.slice(at))?.[0] ?? '')])
+}
+
 /** One piece of a double-quoted string: its text and where the next piece starts. */
 const doubleQuotedPart = (scan: Scan, text: string, at: number): [string, number] => {
+  if (quoteInExpansion(text, at)) {
+    refuse(scan, text, at)
+  }
   if (text[at] === '\\') {
     return [text[at + 1] ?? '', at + 2]
   }
@@ -129,14 +137,6 @@ const escaped = (scan: Scan, text: string, at: number) => {
   return at + 2
 }
 
-/** `&` ends a command, but not in a redirection (`2>&1`, `&>file`). */
-const endsWithAmpersand = (text: string, at: number) =>
-  text[at] === '&' && text[at - 1] !== '>' && text[at - 1] !== '<' && text[at + 1] !== '>'
-
-const separators = new Set(['(', ')', ';', '|'])
-
-const isSeparator = (text: string, at: number) => separators.has(text[at] ?? '') || endsWithAmpersand(text, at)
-
 /** What reads a quoted string or an escaped character, by its first character. */
 const readers = new Map([['"', doubleQuoted], ["'", singleQuoted], ['\\', escaped]])
 
@@ -161,13 +161,10 @@ const substituted: Reader = (scan, text, at) => {
 const comment: Reader = (_scan, text, at) => indexOrEnd(text, '\n', at)
 
 const plain: Reader = (scan, text, at) => {
+  countEnclosure(scan, text[at], scan.word?.endsWith('$') === true)
   append(scan, text[at] === '$' ? `${dynamic}$` : (text[at] ?? ''))
   return at + 1
 }
-
-const opensHereString = (text: string, at: number) => text.startsWith(hereStringOperator, at)
-
-const opensHeredoc = (text: string, at: number) => text.startsWith('<<', at) && !opensHereString(text, at)
 
 /** `<` and `>` end the word before them, as in the shell, unless it is the file descriptor (`2>`) or the operator so far (`>>`, `&>`). */
 const endWordBeforeRedirection = (scan: Scan) => {
@@ -182,7 +179,7 @@ const redirect: Reader = (scan, text, at) => {
   return at + 1
 }
 
-/** `((`: surely arithmetic is data; anything else fails closed. */
+/** `((`: surely arithmetic is data; anything else fails closed. Arithmetic also runs a substitution hidden in a variable's array subscript (`x='a[$(…)]'; $(( x ))`); the guard can't see that, and the gap is accepted (#375). */
 const doubleParen: Reader = (scan, text, at) => {
   const end = closingParen(text, at + 1)
   if (!opensArithmetic(text, at)) {
@@ -200,8 +197,12 @@ const noteHeredoc = (scan: Scan, match: RegExpExecArray) => {
   }
 }
 
-/** A here-document opener that can't be read for certain, as a command word the shell fills in, which the guard refuses (#381). */
-const unreadable = (rest: string) => dynamic + (/^\S*/u.exec(rest)?.[0] ?? '')
+/** A `<<` there may be a shift, and read either way wrongly it hides what follows (a quote in a real here-document's body, say): refused (#385). */
+const refuseUnsureShift: Reader = (scan, text, at) => {
+  refuse(scan, text, at)
+  append(scan, text.slice(at, at + 2))
+  return at + 2
+}
 
 /** `<<<`: a word of its own, so the word after it, attached or not and even empty, is the next word; no body follows on the next lines. */
 const hereString: Reader = (scan, _text, at) => {
@@ -215,7 +216,7 @@ const heredocOpen: Reader = (scan, text, at) => {
   const match = heredocOpener(text.slice(at))
   endWordBeforeRedirection(scan)
   if (match === null) {
-    scan.commands.push([unreadable(text.slice(at))])
+    refuse(scan, text, at)
     append(scan, '<<')
     return at + 2
   }
@@ -270,6 +271,7 @@ const readerRules: readonly (readonly [Test, Reader])[] = [
   [(_scan, text, at) => text[at] === ' ' || text[at] === '\t', blank],
   [(_scan, text, at) => text[at] === '\n', newline],
   [(_scan, text, at) => opensHereString(text, at), hereString],
+  [unsureInEnclosure, refuseUnsureShift],
   [(_scan, text, at) => opensHeredoc(text, at), heredocOpen],
   [(_scan, text, at) => text[at] === '<' || text[at] === '>', redirect],
   [(scan, text, at) => scan.word === null && text.startsWith('((', at), doubleParen],
@@ -289,7 +291,7 @@ export const scanned = (text: string, readNested: (inner: string) => string[][],
   if (spent(work, text)) {
     return unreadableLine()
   }
-  const scan: Scan = { commands: [], heredocs: [], nested: [], word: null, words: [] }
+  const scan: Scan = { braces: 0, brackets: 0, commands: [], heredocs: [], nested: [], word: null, words: [] }
   let at = 0
   while (at < text.length) {
     at = readerAt(scan, text, at)(scan, text, at)

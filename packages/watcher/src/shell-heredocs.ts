@@ -67,6 +67,89 @@ export const bodyExpands = (heredoc: Heredoc, body: string) =>
 /** A here-string's operator; a here-document's body is handed over as one too, so whoever reads the commands treats both alike. */
 export const hereStringOperator = '<<<'
 
+/** The unquoted `${…}` and `[…]` still open, inside which a `<<` may be a shift (#385). */
+export interface Enclosures {
+  /** How many `${` are open: bash reads to their `}`, whatever stands in between. */
+  braces: number
+  /** How many `[` are open; a subscript or `$[` runs to its `]` the same way. */
+  brackets: number
+}
+
+const countBrace = (open: Enclosures, char: string | undefined, afterDollar: boolean) => {
+  if (char === '{' && (open.braces > 0 || afterDollar)) {
+    open.braces += 1
+  } else if (char === '}') {
+    open.braces = Math.max(0, open.braces - 1)
+  }
+}
+
+/** Any `[` counts, as telling a subscript from a pattern or `[ … ]` would be modelling bash; inside `${…}` only its braces count. */
+const countBracket = (open: Enclosures, char: string | undefined) => {
+  if (open.braces > 0) {
+    return
+  }
+  if (char === '[') {
+    open.brackets += 1
+  } else if (char === ']') {
+    open.brackets = Math.max(0, open.brackets - 1)
+  }
+}
+
+/** Counts an unquoted character into what is open. */
+export const countEnclosure = (open: Enclosures, char: string | undefined, afterDollar: boolean) => {
+  countBracket(open, char)
+  countBrace(open, char, afterDollar)
+}
+
+const closerOpenedBy = (rest: string, at: number, top: string | undefined) => {
+  const nests = rest[at - 1] === '$'
+  if (rest[at] === '{' && (nests || top === '}')) {
+    return '}'
+  }
+  return rest[at] === '[' && (nests || top === ']') ? ']' : null
+}
+
+/** Opens or closes what `rest[at]` opens or closes: a closer counts only for the innermost expansion, as in bash. */
+const trackExpansion = (open: string[], rest: string, at: number) => {
+  const closer = closerOpenedBy(rest, at, open.at(-1))
+  if (closer !== null) {
+    open.push(closer)
+  } else if (rest[at] === open.at(-1)) {
+    open.pop()
+  }
+}
+
+/** A quote, or a substitution with closers of its own: past this the reader can't follow bash. */
+const unfollowable = (rest: string, at: number) => /["'`]/u.test(rest[at] ?? '') || rest.startsWith('$(', at)
+
+/** Whether the expansion `rest` starts with has something unfollowable before its closer, or has none. */
+const expansionUnfollowable = (rest: string) => {
+  const open: string[] = []
+  let at = 1
+  while (at < rest.length) {
+    if (unfollowable(rest, at)) {
+      return true
+    }
+    trackExpansion(open, rest, at)
+    if (open.length === 0) {
+      return false
+    }
+    at += rest[at] === '\\' ? 2 : 1
+  }
+  return true
+}
+
+/**
+ * Whether a `$[` or `${` in double quotes starts at `from` and holds a quote or substitution: bash pairs
+ * a `"` inside the expansion, where the reader would end the string (clearing review of #391).
+ */
+export const quoteInExpansion = (text: string, from: number) => {
+  const rest = text[from] === '$' ? text.slice(from).replaceAll('\\\n', '') : ''
+  return /^\$[[{]/u.test(rest) && expansionUnfollowable(rest)
+}
+
+const insideEnclosure = (open: Enclosures) => open.braces > 0 || open.brackets > 0
+
 /** Where the line starting at `from` ends. */
 const indexOrEnd = (text: string, from: number) => {
   const at = text.indexOf('\n', from)
@@ -86,3 +169,11 @@ export const closingLine = (heredoc: Heredoc, text: string, from: number) => {
   }
   return { after: text.length, start: text.length }
 }
+
+export const opensHereString = (text: string, at: number) => text.startsWith(hereStringOperator, at)
+
+export const opensHeredoc = (text: string, at: number) => text.startsWith('<<', at) && !opensHereString(text, at)
+
+/** Inside an open `[` or `${` bash has no comments or `((`; the reader skipping them could miss a closer or an opener. */
+export const unsureInEnclosure = (open: Enclosures & { word: string | null }, text: string, at: number) =>
+  insideEnclosure(open) && (opensHeredoc(text, at) || (open.word === null && (text[at] === '#' || text.startsWith('((', at))))
