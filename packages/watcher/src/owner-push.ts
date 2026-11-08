@@ -11,8 +11,9 @@
  */
 import path from 'node:path'
 import { mayUseGithubHelpers } from './push-destination'
-import { isDynamic, withoutRedirections } from './shell-commands'
+import { isDynamic } from './shell-commands'
 import { baseName } from './shell-interpreters'
+import { withoutRedirections } from './shell-redirections'
 
 /** Git's own options that take the next word as their value, before the subcommand. */
 const valueOptions = new Set(['--attr-source', '--config-env', '--git-dir', '--namespace', '--super-prefix', '--work-tree', '-C', '-c'])
