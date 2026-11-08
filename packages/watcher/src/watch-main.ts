@@ -10,6 +10,7 @@ import { checkNotQueued, checkQueue } from './watch-queue'
 import { clearQuestion } from './watch-question'
 import { checkIssueStates, checkIssues, checkSubscribedIssues } from './watch-issues'
 import { allSettled, hasText, ignoreFailure } from './read'
+import { nextPauseMs, useLimitsOf } from './watch-pace'
 
 const [limitMinutes = '20', maxHours = '12'] = process.argv.slice(2).filter(arg => arg !== '--follow')
 if (!/^\d+$/u.test(limitMinutes) || !/^\d+$/u.test(maxHours)) {
@@ -221,7 +222,7 @@ interface Poller {
   pauseSeconds: number
 }
 
-/** One look; true when it printed events, so the next look comes at once. */
+/** One look; true when it printed events, so the next look comes after only a short gap (#400). */
 const lookOnce = async ({ checks, heartbeat }: Poller): Promise<boolean> => {
   await inOrder(checks, async check => check())
   const busy = await flush()
@@ -245,7 +246,7 @@ const lookSafely = async (poller: Poller): Promise<boolean> => lookOnce(poller).
   return false
 })
 
-/** Looks again and again, `pauseSeconds` apart after a look that found nothing. */
+/** Looks again and again, paced by what it found and by GitHub's rate limit (watch-pace.ts, #400). */
 const poll = async (poller: Poller): Promise<never> => {
   // A loop rather than a function awaiting itself: following, the watcher runs for a whole session.
   for (;;) {
@@ -255,14 +256,15 @@ const poll = async (poller: Poller): Promise<never> => {
     await (poller.heartbeat ? reportLookups().catch(ignoreFailure) : Promise.resolve())
     // A failed read or write leaves the line for the next look.
     await (poller.heartbeat ? reportUsage().catch(ignoreFailure) : Promise.resolve())
-    await (busy ? Promise.resolve() : Bun.sleep(poller.pauseSeconds * 1000))
+    await Bun.sleep(await nextPauseMs(poller, busy))
   }
 }
 
+useLimitsOf(REPO)
 await start()
 await startSubscriptions()
 finishSubscriptions()
-// Following, two pollers run side by side (#240): the answers every 30 s, never waiting for a slow
+// Following, two pollers run side by side (#240): the answers from every 30 s, never waiting for a slow
 // look at CI and deploys. Without `--follow`, one look at everything, the answers first (#235).
 await (FOLLOW
   ? Promise.all([poll({ checks: ANSWER_CHECKS, heartbeat: false, pauseSeconds: 30 }), poll({ checks: PROJECT_CHECKS, heartbeat: true, pauseSeconds: 60 })])

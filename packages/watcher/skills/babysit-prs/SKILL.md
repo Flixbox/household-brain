@@ -100,7 +100,7 @@ default branch's CI, new issues, the owner's comments on issues, and issues clos
   - `GH_SHARE_SECONDS`: how long a `gh` answer is shared with the other watchers on this machine (20
     by default, at most 3600; 0 shares none): watchers asking the same question within it ask GitHub once, so
     several watchers cost hardly more than one.
-  - `GH_PARALLEL`: how many `gh` calls run at once (4 by default); the pull requests are checked in
+  - `GH_PARALLEL`: how many `gh` calls run at once (2 by default); the pull requests are checked in
     parallel, and the cap keeps the bursts within GitHub's rate limits.
   - `REVIEW_BOTS`: the review bots' logins, comma-separated (`coderabbitai`, with or without `[bot]`).
     Their reviews are asked for, never awaited by default (#324): a PR labelled `BOT_REVIEW_LABEL`

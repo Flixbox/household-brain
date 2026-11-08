@@ -3,6 +3,7 @@
  * many at once, and sharing each answer with the other watchers on this machine for a moment.
  */
 import { WATCHERS_DIR, removeOlder, writeWhole } from './watch-files'
+import { blockedUntil, noteLimits } from './watch-pace'
 import { ignoreFailure, isRecord } from './read'
 
 // GH: the `gh` to ask with, e.g. a wrapper logged in as a bot (GH=agent-gh). Defaults to plain gh.
@@ -12,10 +13,11 @@ export const GH = process.env.GH ?? 'gh'
 // treats it as unknown and tries again next look), and the other calls' events still come out.
 const GH_TIMEOUT_MS = Number(process.env.GH_TIMEOUT_SECONDS ?? 30) * 1000
 
-// GH_PARALLEL: how many `gh` calls run at once (#240), 4 by default. The pollers and pull requests
-// are checked in parallel, so one slow call holds back only its own check; the cap keeps the bursts
-// within GitHub's rate limits.
-const GH_PARALLEL = Number(process.env.GH_PARALLEL ?? 4)
+// GH_PARALLEL: how many `gh` calls run at once (#240), 2 by default (#400: GitHub allows 100 at once
+// across every watcher and agent of an installation). The pollers and pull requests are checked in
+// parallel, so one slow call holds back only its own check; the cap keeps the bursts within GitHub's
+// rate limits.
+const GH_PARALLEL = Number(process.env.GH_PARALLEL ?? 2)
 // Anything but a whole number from 1 would either never let a call through or never hold one back.
 if (!Number.isInteger(GH_PARALLEL) || GH_PARALLEL < 1) {
   process.stderr.write('GH_PARALLEL must be a whole number from 1\n')
@@ -67,7 +69,8 @@ export const lookupNews = (health: Readonly<typeof lookups>, now: Temporal.Insta
 /** Starts a call; one that can't even start (no such program) counts as a failed call too. */
 const started = (args: string[], cli: string) => {
   try {
-    return Bun.spawn([cli, ...args], { killSignal: 'SIGKILL', stderr: 'ignore', stdout: 'pipe', timeout: GH_TIMEOUT_MS })
+    // GH_DEBUG=api: `gh` logs each answer's headers to stderr, whichever command asked (#400).
+    return Bun.spawn([cli, ...args], { env: { ...process.env, GH_DEBUG: 'api' }, killSignal: 'SIGKILL', stderr: 'pipe', stdout: 'pipe', timeout: GH_TIMEOUT_MS })
   } catch (error) {
     lookups.lastFailure = `${cli} couldn't be started`
     throw error
@@ -103,13 +106,22 @@ const failure = async (command: string, call: ReturnType<typeof started>, output
   return new Error(`${command}: ${why}`, { cause: { status: statusOf(answer) } })
 }
 
+/** Passes a finished call's log on for pacing, not waiting long for it (see ghCall on a wrapper's child). */
+const noted = async (cli: string, log: Promise<string>, failed: boolean): Promise<void> => {
+  log.catch(ignoreFailure)
+  const text = await Promise.race([log, Bun.sleep(ANSWER_WAIT_MS).then(() => '')]).catch(() => '')
+  await noteLimits(cli, text, failed)
+}
+
 /** What a `gh` call prints; it fails on a non-zero exit, or when it runs out of time. */
 const ghCall = async (args: string[], cli: string): Promise<string> => {
   const call = started(args, cli)
   // Read while it runs (a full pipe would stall it), but don't wait long for the end of the output
   // once it failed: a wrapper script's child (`agent-gh` runs `gh`) can outlive it and hold the pipe open.
   const output = new Response(call.stdout).text()
+  const log = new Response(call.stderr).text()
   const exitCode = await call.exited
+  await noted(cli, log, exitCode !== 0)
   if (exitCode !== 0) {
     throw await failure(`${cli} ${args.join(' ')}`, call, output)
   }
@@ -141,9 +153,19 @@ const sharedAnswer = async (path: string): Promise<string | null> => {
   return age >= 0 && age < SHARE_MS ? file.text().catch(() => null) : null
 }
 
+/** Refused and told to wait (#400): the call fails here, costing GitHub nothing, and the next look tries again. */
+const refuseWhileLimited = async (cli: string): Promise<void> => {
+  const until = await blockedUntil(cli)
+  if (until) {
+    lookups.lastFailure = `waiting for GitHub's rate limit until ${until.toString()}`
+    throw new Error(`${cli}: ${lookups.lastFailure}`, { cause: { status: null } })
+  }
+}
+
 const asked = async (args: string[], cli: string): Promise<string> => {
   await take()
   try {
+    await refuseWhileLimited(cli)
     return await ghCall(args, cli)
   } finally {
     release()
