@@ -204,8 +204,8 @@ describe('reminders for branches that can\'t merge (#226)', () => {
 
   it('reminds of a branch behind main or in conflict, approved or not', () => {
     expect(reminderLines([pr({ mergeState: 'BEHIND' }), pr({ mergeState: 'DIRTY', number: 9, reviewDecision: '' })], 'owner/repo')).toEqual([
-      'REMINDER: PR #314 is behind main: rebase it and run the checks again.',
-      'REMINDER: PR #9 has conflicts with main: rebase it.',
+      'REMINDER: PR #314 is behind main: merge main in and run the checks again.',
+      'REMINDER: PR #9 has conflicts with main: merge main in and resolve them.',
     ])
   })
 
