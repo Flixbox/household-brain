@@ -173,6 +173,39 @@ describe('a git push under the wrong credential helper, by where it goes (#467)'
     expect(commands.filter(command => !denied(command, toSsh))).toEqual([])
   })
 
+  it('never takes a redirection for the destination', () => {
+    const commands = [
+      'git push 2>/dev/null',
+      'git push >/tmp/x 2>&1',
+      'git push --quiet 2>/dev/null',
+      'git push --force-with-lease 2>/dev/null',
+      'git push </dev/null',
+      'git push &>/tmp/log',
+      'git push {out}>/tmp/x',
+      'bash -c "git push 2>/dev/null"',
+    ]
+    const toGithub = origin(github)
+    expect(commands.filter(command => !denied(command, toGithub))).toEqual([])
+    expect(denied('git push 2>/dev/null origin HEAD', origin(ssh))).toBe(false)
+  })
+
+  it('counts a trailing dot on GitHub\'s host as GitHub', () => {
+    expect(denied('git push origin HEAD', origin('https://github.com./owner-test/repo'))).toBe(true)
+    expect(denied('git push https://github.com./owner-test/repo HEAD', origin(ssh))).toBe(true)
+  })
+
+  it('keeps refusing what git reads from the environment or xargs fills in', () => {
+    const commands = [
+      `GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=remote.origin.pushurl GIT_CONFIG_VALUE_0=${github} git push origin HEAD`,
+      'GIT_DIR=/x git push origin HEAD',
+      'export GIT_DIR=/x; git push origin HEAD',
+      'env GIT_DIR=/x git push origin HEAD',
+      `echo ${github} | xargs git push`,
+    ]
+    const toSsh = origin(ssh)
+    expect(commands.filter(command => !denied(command, toSsh))).toEqual([])
+  })
+
   it('does not count a branch the shell fills in as unclear', () => {
     expect(denied('git push origin "$BRANCH"', origin(ssh))).toBe(false)
   })
