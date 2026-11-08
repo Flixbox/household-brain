@@ -11,7 +11,7 @@ import { activitiesOf, changedActivities, changedStates, checkActivity as checkP
 import { checkQueue, preparePr } from './watch-queue'
 import { checkIssueStates, checkIssues, checkSubscribedIssues } from './watch-issues'
 import { allSettled, hasText, ignoreFailure } from './read'
-import { nextPauseMs, setLimitsOwner } from './watch-pace'
+import { PACES, nextPauseMs, setLimitsOwner } from './watch-pace'
 
 const [limitMinutes = '20', maxHours = '12'] = process.argv.slice(2).filter(arg => arg !== '--follow')
 if (!/^\d+$/u.test(limitMinutes) || !/^\d+$/u.test(maxHours)) {
@@ -220,5 +220,5 @@ finishSubscriptions()
 // Following, two pollers run side by side (#240): the answers from every 30 s, never waiting for a slow
 // look at CI and deploys. Without `--follow`, one look at everything, the answers first (#235).
 await (FOLLOW
-  ? Promise.all([poll({ checks: ANSWER_CHECKS, heartbeat: false, pauseSeconds: 30, quietCapSeconds: 60 }), poll({ checks: PROJECT_CHECKS, heartbeat: true, pauseSeconds: 60, quietCapSeconds: 300 })])
-  : poll({ checks: [...ANSWER_CHECKS, ...PROJECT_CHECKS], heartbeat: true, pauseSeconds: 60, quietCapSeconds: 300 }))
+  ? Promise.all([poll({ checks: ANSWER_CHECKS, heartbeat: false, ...PACES.answers }), poll({ checks: PROJECT_CHECKS, heartbeat: true, ...PACES.project })])
+  : poll({ checks: [...ANSWER_CHECKS, ...PROJECT_CHECKS], heartbeat: true, ...PACES.everything }))
