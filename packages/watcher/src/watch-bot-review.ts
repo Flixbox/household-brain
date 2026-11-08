@@ -19,7 +19,7 @@ import { allSettled, ignoreFailure } from './read'
 import { writeWhole } from './watch-files'
 import { askedFile, isAsked } from './watch-state'
 import { comment } from './watch-dismiss'
-import { report } from './watch-output'
+import { attemptWrite, reportWrite } from './watch-writer'
 
 const LABEL_PATH = `repos/${REPO}/issues`
 
@@ -75,24 +75,38 @@ const labelAfter = async (pr: number, failed: boolean): Promise<LabelFate> => {
 const botStateNow = async (pr: number): Promise<BotReviewState | null> =>
   prStates([pr], true).then(states => states.get(pr)?.bot ?? null, () => null)
 
+/** With the claim made: asks each bot and reports how each went; false when an ask failed or the PR couldn't be read. */
+const askClaimed = async (pr: number): Promise<boolean> => {
+  const state = await botStateNow(pr)
+  if (!state) {
+    await putLabelBack(pr)
+    return false
+  }
+  const outcomes = await Promise.all(REVIEW_BOTS.map(async bot => ({ bot, outcome: await askOnce({ bot, pr, state }) })))
+  const failed = outcomes.some(({ outcome }) => typeof outcome === 'object' && 'asked' in outcome && !outcome.asked)
+  const label = await labelAfter(pr, failed)
+  await allSettled(outcomes.map(async ({ bot, outcome }) =>
+    (typeof outcome === 'string' ? Promise.resolve() : reportWrite(botReviewEvent({ bot, label, outcome, pr }), pr))))
+  return !failed
+}
+
+/** Claims the asks and makes them: null when another watcher holds the claim, so nothing was attempted. */
+const claimAndAsk = async (pr: number): Promise<boolean | null> => {
+  const claim = await takeLabel(pr)
+  if (claim === 'taken') {
+    return askClaimed(pr)
+  }
+  return claim === 'gone' ? null : false
+}
+
 /**
  * For a PR labelled BOT_REVIEW_LABEL (the caller checks, with REVIEW_BOTS named): claims the asks by
  * taking the label off, then asks each bot that wasn't asked yet and reports each ask, skip or
  * failure. A failed ask, or a PR state that can't be read after the claim, puts the label back, so
- * the next look tries again (READY_TO_MERGE waits meanwhile); a watcher whose claim didn't go
- * through asks nothing.
+ * a later look tries again, with backoff (READY_TO_MERGE waits meanwhile); a watcher whose claim
+ * didn't go through asks nothing. Only the writer does this (#415); a subscribed watcher hears how it
+ * went from `relayWrites`.
  */
 export const askBotReviews = async (pr: number): Promise<void> => {
-  if (await takeLabel(pr) !== 'taken') {
-    return
-  }
-  const state = await botStateNow(pr)
-  if (!state) {
-    await putLabelBack(pr)
-    return
-  }
-  const outcomes = await Promise.all(REVIEW_BOTS.map(async bot => ({ bot, outcome: await askOnce({ bot, pr, state }) })))
-  const label = await labelAfter(pr, outcomes.some(({ outcome }) => typeof outcome === 'object' && 'asked' in outcome && !outcome.asked))
-  await allSettled(outcomes.map(async ({ bot, outcome }) =>
-    (typeof outcome === 'string' ? Promise.resolve() : report(botReviewEvent({ bot, label, outcome, pr }), pr))))
+  await attemptWrite(`bot-review-${pr}`, async () => claimAndAsk(pr))
 }
