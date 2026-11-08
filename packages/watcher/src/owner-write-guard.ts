@@ -16,7 +16,7 @@
  *
  * It also refuses a `git push` that git would authenticate as someone other than the bot (owner-push.ts, #455).
  */
-import { pushNotAsBot } from './owner-push'
+import { pushRefusal } from './owner-push'
 import { positionals, xargsFillsIn } from './owner-write-xargs'
 import { isRecord, textOf } from './read'
 import { commandsOf } from './shell-braces'
@@ -269,13 +269,6 @@ export const ownerWrite = (command: string): string | null => {
 /** The hook's answer refusing a command. */
 const denial = (reason: string) => ({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: reason } })
 
-/** Why a push from this clone is refused. */
-const pushReason = (dir: string) => [
-  `Refused (household-brain #455): git in ${dir} would not ask the bot's credential helper first, so this push could go out under the owner's login.`,
-  'Check it with `git config --local --get-all credential.https://github.com.helper`: an empty line, then the bot\'s helper, is right.',
-  'The config is shared by every worktree of the clone and another agent may be setting it up: retry shortly, and if it stays wrong report it, rather than changing it from a worktree.',
-].join(' ')
-
 /** Why a write through plain gh is refused. */
 const writeReason = (found: string) => [
   `Refused (household-brain #368): \`${found}\` writes to GitHub through plain \`gh\`, the owner's own login, so it would act as the owner.`,
@@ -293,8 +286,8 @@ export const verdict = (input: unknown) => {
     return denial(writeReason(found))
   }
   const cwd = isRecord(input) ? textOf(input.cwd) : ''
-  const pushDir = pushNotAsBot(runCommands(command, newWork()), cwd === '' ? process.cwd() : cwd)
-  return pushDir === null ? null : denial(pushReason(pushDir))
+  const refusal = pushRefusal(runCommands(command, newWork()), cwd === '' ? process.cwd() : cwd)
+  return refusal === null ? null : denial(refusal)
 }
 
 if (import.meta.main) {

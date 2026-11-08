@@ -65,6 +65,15 @@ const wrongOrder = (helpers: readonly string[]) => {
   return helpers.some(helper => isBot(helper)) && !isBot(effective[0] ?? '')
 }
 
-/** The directory of the first `git push` among these commands that would not go out as the bot, or null when there is none. */
-export const pushNotAsBot = (commands: readonly (readonly string[])[], cwd: string) =>
-  pushDirs(commands, cwd).find(dir => wrongOrder(helpersOf(dir))) ?? null
+/** Why a push from this clone is refused. */
+const pushReason = (dir: string) => [
+  `Refused (household-brain #455): git in ${dir} would not ask the bot's credential helper first, so this push could go out under the owner's login.`,
+  'Check it with `git config --local --get-all credential.https://github.com.helper`: an empty line, then the bot\'s helper, is right.',
+  'The config is shared by every worktree of the clone and another agent may be setting it up: retry shortly, and if it stays wrong report it, rather than changing it from a worktree.',
+].join(' ')
+
+/** Why the first `git push` among these commands that would not go out as the bot is refused, or null when there is none. */
+export const pushRefusal = (commands: readonly (readonly string[])[], cwd: string) => {
+  const dir = pushDirs(commands, cwd).find(candidate => wrongOrder(helpersOf(candidate)))
+  return typeof dir === 'undefined' ? null : pushReason(dir)
+}
