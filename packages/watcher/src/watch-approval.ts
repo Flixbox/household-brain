@@ -16,7 +16,7 @@ import { askBotReviews } from './watch-bot-review'
 import { awaitsBotReview } from './watch-bot-review-events'
 import { GH, ghText } from './watch-gh'
 import { askedBots, readLines } from './watch-state'
-import { report } from './watch-output'
+import { IS_WRITER, attemptWrite, reportWrite } from './watch-writer'
 
 // Resolving threads on `Resolved:` replies comes before what the approval asks (#279).
 export { resolveAsked } from './watch-dismiss'
@@ -26,17 +26,17 @@ export const APPROVED_DRAFT_NOTE = draftNote(READY_APPROVED_DRAFTS)
 
 /**
  * Marks PR `pr` ready where `marksReady` says so, with the `GH` token, and reports it. True when it
- * did; false when it wasn't asked to, or failed (reported once per head, tried again on every look),
- * and APPROVED_DRAFT then asks the agent. Another watcher that marked it ready first leaves `gh pr
+ * did; false when it wasn't asked to, or failed (reported once per head, tried again with backoff),
+ * and APPROVED_DRAFT then asks the agent. A subscribed watcher leaves it to the writer (#402): true. Another watcher that marked it ready first leaves `gh pr
  * ready` nothing to do, which still succeeds.
  */
 const readyApprovedDraft = async (pr: number, state: PrState): Promise<boolean> => {
   if (!marksReady({ approvedCommit: state.ownerApprovalCommit, draft: state.draft, enabled: READY_APPROVED_DRAFTS })) {
     return false
   }
-  const readied = await ghText(['pr', 'ready', String(pr), '--repo', REPO], GH, true).then(() => true, () => false)
-  await report(draftReadiedEvent({ approved: state.ownerApprovalCommit, head: state.head, pr, readied, repo: REPO }), pr)
-  return readied
+  const readied = await attemptWrite(`ready-${pr}-${state.head}`, async () => ghText(['pr', 'ready', String(pr), '--repo', REPO], GH, true).then(() => true, () => false))
+  await (readied === null ? Promise.resolve() : reportWrite(draftReadiedEvent({ approved: state.ownerApprovalCommit, head: state.head, pr, readied, repo: REPO }), pr))
+  return readied ?? !IS_WRITER
 }
 
 /**
@@ -52,7 +52,9 @@ const checkAutoMergeOff = async ({ green, pr, state }: { green: boolean, pr: num
   if (!waits || await readyApprovedDraft(pr, state)) {
     return
   }
-  await report(approvedEvent({ botAsked: asked.length > 0, draft: state.draft, green, head: state.head, pr, ready: readyCommand(pr), repo: REPO }), pr)
+  // Reached with a draft the watcher marks ready only when that failed: its agent hears this too.
+  const failedReady = marksReady({ approvedCommit: state.ownerApprovalCommit, draft: state.draft, enabled: READY_APPROVED_DRAFTS })
+  await reportWrite(approvedEvent({ botAsked: asked.length > 0, draft: state.draft, green, head: state.head, pr, ready: readyCommand(pr), repo: REPO }), pr, failedReady)
 }
 
 /**
@@ -62,7 +64,7 @@ const checkAutoMergeOff = async ({ green, pr, state }: { green: boolean, pr: num
  */
 const checkBlocked = async (pr: number, head: string): Promise<void> => {
   const blockers = await reviewBlockers(pr).then(async found => dismissStale({ ...found, head, pr })).catch(() => null)
-  await report(blockers && blockedByReviewEvent({ ...blockers, dismiss: DISMISS_STALE_BOT_REVIEWS, head, pr, self: SELF }), pr)
+  await reportWrite(blockers && blockedByReviewEvent({ ...blockers, dismiss: DISMISS_STALE_BOT_REVIEWS, head, pr, self: SELF }), pr)
 }
 
 /**

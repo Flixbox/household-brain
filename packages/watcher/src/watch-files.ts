@@ -53,4 +53,10 @@ export const claim = async (file: string): Promise<boolean> => {
   })
 }
 
+/** The files directly in `dir`, each with its text and when it last changed; none when it isn't there. */
+export const filesIn = async (dir: string): Promise<{ changed: number, text: string }[]> => {
+  const names = await readdir(dir).catch((): string[] => [])
+  return Promise.all(names.map(async name => ({ changed: Bun.file(`${dir}/${name}`).lastModified, text: await Bun.file(`${dir}/${name}`).text().catch(() => '') })))
+}
+
 export const unclaim = async (file: string): Promise<void> => rm(file, { force: true })

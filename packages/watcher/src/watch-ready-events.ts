@@ -35,7 +35,7 @@ const approvedAt = (approved: string, head: string): string => (approved === hea
 /** The event for a draft the watcher marked ready (`readied`), or failed to: once per head. `approved` is the commit the owner approved. */
 export const draftReadiedEvent = ({ approved, head, pr, readied, repo }: { approved: string, head: string, pr: number, readied: boolean, repo: string }): Event => readied
   ? { key: `pr-${pr} draft-readied ${head}`, lines: [`DRAFT_READIED: the owner approved ${approvedAt(approved, head)}, so the watcher marked it ready (READY_APPROVED_DRAFTS): queue once CI is green (after the review a bot was asked for, if any, and its threads settled), alone in its own call: ${queueCommand(repo, pr)}`] }
-  : { key: `pr-${pr} draft-ready-failed ${head}`, lines: ['DRAFT_READY_FAILED: couldn\'t mark the approved draft ready (it tries again on every look; see APPROVED_DRAFT); check the GH token may write pull requests'] }
+  : { key: `pr-${pr} draft-ready-failed ${head}`, lines: ['DRAFT_READY_FAILED: couldn\'t mark the approved draft ready (it tries again after 1, 2, 5 and then every 10 minutes; see APPROVED_DRAFT); check the GH token may write pull requests'] }
 
 /** What the APPROVED event says about a draft: who marks it ready. */
 export const draftNote = (enabled: boolean): string => (enabled

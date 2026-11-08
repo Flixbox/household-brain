@@ -35,7 +35,7 @@
  */
 import { type Ask, type Check, type PrFacts, type ReviewStance, factsFrom } from './agent-queue-facts'
 import { CLEARED_LABEL, clearedAt } from './watch-cleared-events'
-import { answerFrom, rateLimitWait } from './reply-review-thread'
+import { GH, errorsOf, gh, graphqlAnswer } from './agent-queue-gh'
 import { at, record, records } from './watch-text'
 import { hasText, textOf } from './read'
 import { BOT_REVIEW_LABEL } from './watch-bot-review-events'
@@ -123,32 +123,6 @@ export const blockersOf = (facts: PrFacts, owner: string): string[] => {
   ]
 }
 
-const GH = process.env.GH ?? 'agent-gh'
-
-/**
- * The environment of every `GH` call: `GH_REPO` is the repository asked about (#365), so `agent-gh`
- * picks that repository's bot from any folder; without it, outside a clone, it fails (#360).
- */
-const envFor = (repo: string) => ({ ...process.env, GH_REPO: repo })
-
-/** What `gh api -i` prints for `args`, whatever its exit code: the answer says what went wrong. */
-const ghAnswer = async (repo: string, args: readonly string[]): Promise<string> => {
-  const call = Bun.spawn([GH, ...args], { env: envFor(repo), stderr: 'pipe', stdout: 'pipe' })
-  const [out] = await Promise.all([new Response(call.stdout).text(), call.exited])
-  return out
-}
-
-/** What `gh` prints for `args`; throws with its exit code when it fails. Its stderr goes straight through. */
-const gh = async (repo: string, args: readonly string[]): Promise<string> => {
-  const call = Bun.spawn([GH, ...args], { env: envFor(repo), stderr: 'inherit', stdout: 'pipe' })
-  const out = await new Response(call.stdout).text()
-  const code = await call.exited
-  if (code !== 0) {
-    throw new Error(`${GH} ${args.slice(0, 2).join(' ')} failed (exit ${code})`)
-  }
-  return out
-}
-
 // `kind: __typename` aliases GraphQL's type name to the name clearedAt reads (actors too: `Bot`).
 const LABEL_FIELDS = 'createdAt actor{kind: __typename login} label{name}'
 const PR_QUERY = `query($owner:String!,$name:String!,$pr:Int!){viewer{login} repository(owner:$owner,name:$name){pullRequest(number:$pr){
@@ -165,8 +139,13 @@ const COMMENTS_QUERY = `query($owner:String!,$name:String!,$pr:Int!,$before:Stri
 /** The `data` of a GraphQL answer to `query` for the PR, with `extra` variables (strings). */
 const ask = async ({ extra = [], pr, query, repo }: { extra?: readonly string[], pr: number, query: string, repo: string }): Promise<unknown> => {
   const [owner = '', name = ''] = repo.split('/')
-  const args = ['api', 'graphql', '-f', `query=${query}`, '-f', `owner=${owner}`, '-f', `name=${name}`, '-F', `pr=${pr}`, ...extra.flatMap(variable => ['-f', variable])]
-  return at(JSON.parse(await gh(repo, args)), 'data')
+  const fields = ['-f', `query=${query}`, '-f', `owner=${owner}`, '-f', `name=${name}`, '-F', `pr=${pr}`, ...extra.flatMap(variable => ['-f', variable])]
+  const answer = await graphqlAnswer(repo, fields)
+  const errors = errorsOf(answer)
+  if (errors !== '') {
+    throw new Error(`${GH} api graphql failed: ${errors}`)
+  }
+  return at(answer.body, 'data')
 }
 
 /** The PR's comments before the page `comments` (oldest first), a hundred at a time, so no `@<bot> review` is missed. */
@@ -216,18 +195,10 @@ const argsOf = (): { pr: number, repo: string } => {
   return { pr, repo }
 }
 
-/** A GraphQL mutation's answer; on a rate limit (as reply-review-thread.ts tells it) its limit headers go to stderr and it is tried once more after waiting. */
-const mutate = async ({ mutation, repo, retried = false, variables }: { mutation: string, repo: string, retried?: boolean, variables: readonly string[] }): Promise<{ data: unknown, errors: string }> => {
-  const answer = answerFrom(await ghAnswer(repo, ['api', 'graphql', '-i', '-f', `query=${mutation}`, ...variables.flatMap(variable => ['-f', variable])]))
-  const wait = rateLimitWait(answer, Math.floor(Temporal.Now.instant().epochMilliseconds / 1000))
-  if (wait !== null && !retried) {
-    const limits = ['x-ratelimit-remaining', 'x-ratelimit-reset', 'x-ratelimit-resource', 'retry-after'].map(name => `${name}: ${answer.headers.get(name) ?? '-'}`)
-    process.stderr.write(`Rate limited (HTTP ${answer.status}; ${limits.join(', ')}); trying once more in ${Math.ceil(wait / 1000)} s\n`)
-    await Bun.sleep(wait)
-    return mutate({ mutation, repo, retried: true, variables })
-  }
-  const errors = records(record(answer.body).errors).map(error => textOf(error.message)).join('; ')
-  return { data: at(answer.body, 'data'), errors: answer.status === 200 ? errors : `HTTP ${answer.status}: ${errors || textOf(record(answer.body).message)}` }
+/** A GraphQL mutation's data and what GitHub refused. */
+const mutate = async ({ mutation, repo, variables }: { mutation: string, repo: string, variables: readonly string[] }): Promise<{ data: unknown, errors: string }> => {
+  const answer = await graphqlAnswer(repo, ['-f', `query=${mutation}`, ...variables.flatMap(variable => ['-f', variable])])
+  return { data: at(answer.body, 'data'), errors: errorsOf(answer) }
 }
 
 // One mutation each (#357): `gh pr merge --auto` reads the PR again first and kept running into the

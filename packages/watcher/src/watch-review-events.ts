@@ -40,7 +40,7 @@ export const threadsToResolve = (threads: readonly ReviewThread[]): ReviewThread
 /** The event for a thread the watcher resolved, or failed to: reported once per thread. */
 export const resolvedThreadEvent = (pr: number, thread: ReviewThread, resolved: boolean): Event => resolved
   ? { key: `pr-${pr} thread-resolved ${thread.id}`, lines: [`THREAD_RESOLVED: resolved on its \`Resolved:\` reply: ${thread.url}`] }
-  : { key: `pr-${pr} thread-resolve-failed ${thread.id}`, lines: [`THREAD_RESOLVE_FAILED: couldn't resolve ${thread.url} (it tries again on every look); check the GH token may write pull requests`] }
+  : { key: `pr-${pr} thread-resolve-failed ${thread.id}`, lines: [`THREAD_RESOLVE_FAILED: couldn't resolve ${thread.url} (it tries again after 1, 2, 5 and then every 10 minutes); check the GH token may write pull requests`] }
 
 export interface Review {
   /** The REST id (GraphQL's `databaseId`), which a dismissal takes. */
@@ -180,7 +180,7 @@ export const dismissedReviewEvent = ({ cleared = '', dismissal: { replies, revie
   const why = replies.length === 0 ? `${basis}, and no review thread is open` : `${basis}, and \`Resolved:\` replies settled it`
   return dismissed
     ? { key: `pr-${pr} review-dismissed ${review.id}`, lines: [`REVIEW_DISMISSED: dismissed ${what}: ${why}`] }
-    : { key: `pr-${pr} review-dismiss-failed ${review.id}`, lines: [`REVIEW_DISMISS_FAILED: couldn't dismiss ${what} (it tries again on every look); check the GH token may write pull requests`] }
+    : { key: `pr-${pr} review-dismiss-failed ${review.id}`, lines: [`REVIEW_DISMISS_FAILED: couldn't dismiss ${what} (it tries again after 1, 2, 5 and then every 10 minutes); check the GH token may write pull requests`] }
 }
 
 /**
@@ -281,5 +281,5 @@ export const resolveAskedEvent = ({ asked, head, pr, review }: { asked: boolean,
   const what = `${bare(review.login)} (\`${resolveCommand(review.login)}\`) for its change request on ${where(review, head)}`
   return asked
     ? { key: `pr-${pr} bot-resolve-asked ${head} ${bare(review.login)}`, lines: [`BOT_RESOLVE_ASKED: asked ${what}: every review thread is resolved and CI is green`] }
-    : { key: `pr-${pr} bot-resolve-failed ${head} ${bare(review.login)}`, lines: [`BOT_RESOLVE_FAILED: couldn't ask ${what} (it tries again on every look); check the GH token may write pull requests`] }
+    : { key: `pr-${pr} bot-resolve-failed ${head} ${bare(review.login)}`, lines: [`BOT_RESOLVE_FAILED: couldn't ask ${what} (it tries again after 1, 2, 5 and then every 10 minutes); check the GH token may write pull requests`] }
 }
