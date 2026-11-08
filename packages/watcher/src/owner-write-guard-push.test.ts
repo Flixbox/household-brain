@@ -87,7 +87,7 @@ describe('a git push under the wrong credential helper, by where it goes (#467)'
   const github = 'https://github.com/owner-test/repo.git'
   const ssh = 'git@host.test:owner-test/repo.git'
 
-  const config = (dir: string, key: string, value: string) => Bun.spawnSync(['git', '-C', dir, 'config', '--add', key, value])
+  const config = (dir: string, name: string, value: string) => Bun.spawnSync(['git', '-C', dir, 'config', '--add', name, value])
 
   /** A clone with its helpers in the wrong order and these settings. */
   const wrongWith = (...settings: readonly (readonly [string, string])[]) => {
