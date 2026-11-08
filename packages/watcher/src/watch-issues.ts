@@ -5,8 +5,8 @@ import { currentOpenIssues } from './watch-open-issues'
 import { perIssue } from './watch-per-issue'
 import type { IssueEvent } from './watch-issue-events'
 import { type IssueEventRead, issueEventLines, subscribedIssueEvents } from './watch-comments'
-import { queue } from './watch-output'
-import { appendLines, endIssue, exists, oneAtATime, readLines, subscriptions, writeLines, writtenAt } from './watch-state'
+import { isUnwritten, markSeen, queue } from './watch-output'
+import { endIssue, exists, oneAtATime, readLines, subscriptions, writeLines, writtenAt } from './watch-state'
 
 const byNumber = (first: number, second: number) => first - second
 
@@ -30,9 +30,7 @@ const issueEvents = async (fresh: boolean): Promise<IssueEventRead> =>
 
 const unseenIssues = async (lines: IssueEvent[]): Promise<IssueEvent[]> => {
   const seen = new Set(await readLines(SEEN_FILE))
-  const unseen = lines.filter(({ key }) => !seen.has(key))
-  await appendLines(SEEN_FILE, unseen.map(({ key }) => key))
-  return unseen
+  return lines.filter(({ key }) => !seen.has(key) && !isUnwritten(SEEN_FILE, key))
 }
 
 /** Whether `written` (GitHub's timestamp) is after `since` (epoch milliseconds); an unreadable one isn't. */
@@ -55,10 +53,12 @@ const oldNews = async (lines: IssueEvent[]): Promise<IssueEvent[]> => {
 }
 
 /** Each its own event, with when it was written (#240): several comments are several answers. */
-const reportUnseen = async (lines: IssueEvent[]): Promise<void> => {
-  for (const { at: written, issue, key, lines: event } of await unseenIssues(lines)) {
+const reportUnseen = async (lines: IssueEvent[]): Promise<string[]> => {
+  const unseen = await unseenIssues(lines)
+  for (const { at: written, issue, key, lines: event } of unseen) {
     queue(event, { issue, key: `issue:${key}`, written })
   }
+  return unseen.map(({ key }) => key)
 }
 
 /** Issues and the owner's comments on them not reported yet; the ones from before the first run aren't news. */
@@ -69,8 +69,9 @@ export const checkIssues = async (fresh = false): Promise<boolean> => oneAtATime
   // already reported under the old text keys (`issues`) comes back. A scoped watcher goes on to
   // report what isn't old news (`oldNews`); for the others that is nothing.
   const quietFirstRun = await firstRun(SEEN_FILE, (await oldNews(read.events)).map(({ key }) => key)) && !subscriptions.scoped
-  await (quietFirstRun ? Promise.resolve() : reportUnseen(read.events))
-  await read.commit()
+  const reported = quietFirstRun ? [] : await reportUnseen(read.events)
+  // Once printed, and the cursor last: a crash before then reads these events again (#435).
+  await markSeen(SEEN_FILE, reported, read.commit)
   return true
 })
 
@@ -144,8 +145,10 @@ export const checkSubscribedIssues = async (): Promise<void> => {
   const closed = issues.filter(issue => states.get(issue)?.state === 'CLOSED')
   // A failed final activity lookup cannot close a subscription or discard an owner's comment.
   if (closed.length === 0 || !await checkIssues(true)) { return }
+  const completes = subscriptions.endedBy(closed.map(issue => `issue:${issue}`))
   await Promise.all(closed.map(async issue => {
-    queue([`ISSUE_CLOSED #${issue}: subscription completed`], { issue, key: `subscription-issue-closed:${issue}` })
+    const completed = completes && issue === closed.at(-1) ? ': subscription completed' : ''
+    queue([`ISSUE_CLOSED #${issue}${completed}`], { issue, key: `subscription-issue-closed:${issue}` })
     await endIssue(issue)
   }))
 }

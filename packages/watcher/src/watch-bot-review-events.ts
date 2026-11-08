@@ -82,7 +82,7 @@ const LABEL_LINES: Record<LabelFate, string> = {
   restored: `put the label \`${BOT_REVIEW_LABEL}\` back, so the next look tries again`,
 }
 
-/** The event for a review the watcher asked `bot` for, failed to ask, or skipped (#324): once per PR and bot. */
+/** The event for a review the watcher asked `bot` for, failed to ask, or skipped (#324): once per PR and bot, a failed ask once per fate of the label too (#488). */
 export const botReviewEvent = ({ bot, label: fate, outcome, pr }: { bot: string, label: LabelFate, outcome: { asked: boolean } | { skipped: string }, pr: number }): Event => {
   const label = LABEL_LINES[fate]
   const command = `\`${reviewCommand(bot)}\``
@@ -91,5 +91,17 @@ export const botReviewEvent = ({ bot, label: fate, outcome, pr }: { bot: string,
   }
   return outcome.asked
     ? { key: `pr-${pr} bot-review-asked ${bare(bot)}`, lines: [`BOT_REVIEW_ASKED: asked ${bare(bot)} for its review (${command}), never again for this PR; ${label}. READY_TO_MERGE waits for its review`] }
-    : { key: `pr-${pr} bot-review-failed ${bare(bot)}`, lines: [`BOT_REVIEW_FAILED: couldn't post ${command}; ${label}. Check the GH token may comment on pull requests`] }
+    : { key: `pr-${pr} bot-review-failed ${bare(bot)} ${fate}`, lines: [`BOT_REVIEW_FAILED: couldn't post ${command}; ${label}. Check the GH token may comment on pull requests`] }
 }
+
+/** The event for a claim on BOT_REVIEW_LABEL that failed (#461), so no bot was asked: once per PR. */
+export const botReviewClaimFailedEvent = (pr: number): Event => ({
+  key: `pr-${pr} bot-review-claim-failed`,
+  lines: [`BOT_REVIEW_FAILED: couldn't take the label \`${BOT_REVIEW_LABEL}\` off, so no bot was asked; the next look tries again. Check the GH token may change labels on pull requests`],
+})
+
+/** The event for a PR that couldn't be read once the claim was made (#461), so no bot was asked: once per PR and fate, so a `lost` label is still reported after a `restored` one (#484). */
+export const botReviewUnreadEvent = (pr: number, fate: LabelFate): Event => ({
+  key: `pr-${pr} bot-review-unread ${fate}`,
+  lines: [`BOT_REVIEW_FAILED: couldn't read the PR after taking the label off, so no bot was asked; ${LABEL_LINES[fate]}`],
+})

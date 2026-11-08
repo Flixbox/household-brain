@@ -10,9 +10,17 @@ import { hasText, isRecord, textOf } from './read'
 
 export type Rest = (path: string) => Promise<unknown>
 
-/** The open issues known, and how far REST's updates have been read into them. */
-export interface IssueSnapshot {
+/**
+ * How far a list has been read. `cursor` is what the next read asks from; `capped` is where a stuck
+ * burst has got to, which becomes the cursor one round later (#469).
+ */
+export interface Position {
+  capped: string | null
   cursor: string | null
+}
+
+/** The open issues known, and how far REST's updates have been read into them. */
+export interface IssueSnapshot extends Position {
   /** When the whole list was last read, in epoch milliseconds. */
   fullAt: number
   issues: OpenIssue[]
@@ -26,6 +34,9 @@ const PER_PAGE = 100
  * put keeps the URL, and so its ETag.
  */
 const OVERLAP = Temporal.Duration.from({ minutes: 2 })
+
+/** How far a burst moves the position in a round: less than the overlap, so a read always asks below the old cursor (#469). */
+const CAPPED_STEP = Temporal.Duration.from({ minutes: 1 })
 
 /**
  * How often the whole open list is read again. Two things never show as an update: an issue deleted
@@ -81,26 +92,29 @@ const newestOn = (page: readonly Json[]): string | null =>
 /** Whether `newest` is past `cursor`. */
 const moves = (newest: string | null, cursor: string | null): newest is string => newest !== null && (cursor === null || newest > cursor)
 
-/** `newest`, but at most one overlap past `cursor`: the next read then still asks from `cursor`. */
-const capped = (newest: string, cursor: string): string => {
-  const limit = Temporal.Instant.from(cursor).add(OVERLAP).toString()
+/** `newest`, but at most one step past `from`. */
+const withinStep = (newest: string, from: string): string => {
+  const limit = Temporal.Instant.from(from).add(CAPPED_STEP).toString()
   return newest < limit ? newest : limit
 }
 
 /**
- * The cursor after a read: the newest update on the first page, never earlier than it was. Not the
- * last page, as a list that shifted while it was paged can skip an item at a page's edge, and a
- * cursor past that item would lose it: the rest of the list is simply read again next round. When a
- * burst fills the overlap and the first page moves nothing, a later page moves it, by one overlap at
- * most, so what paging skipped is still asked for.
+ * The position after a read: the newest update on the first page, never earlier than it was. Not
+ * the last page, as a list that shifted while it was paged can skip an item at a page's edge, and a
+ * cursor past that item would lose it: the rest of the list is simply read again next round.
+ *
+ * When a burst fills the overlap and the first page moves nothing, a later page moves `capped`, by
+ * one step at most, and the cursor follows it a round later. So every read during a burst still
+ * asks below the old cursor (#469), and a burst can't hold the cursor for good.
  */
-export const nextCursor = (cursor: string | null, pages: readonly Json[][]): string | null => {
+export const nextPosition = ({ capped, cursor }: Position, pages: readonly Json[][]): Position => {
   const [first, ...later] = pages.map(page => newestOn(page))
   if (moves(first ?? null, cursor) || cursor === null) {
-    return first ?? cursor
+    return { capped: null, cursor: first ?? cursor }
   }
-  const newer = later.find(newest => moves(newest, cursor)) ?? null
-  return newer === null ? cursor : capped(newer, cursor)
+  const from = capped ?? cursor
+  const newer = later.find(newest => moves(newest, from)) ?? null
+  return { capped: newer === null ? null : withinStep(newer, from), cursor: capped ?? cursor }
 }
 
 /** Whether something written at `created` is news to a read from `cursor`: an old one that only now came up isn't. */
@@ -149,7 +163,7 @@ export const parseSnapshot = (line: string | null): IssueSnapshot | null => {
   try {
     const value: unknown = JSON.parse(line ?? '')
     return isRecord(value) && (value.cursor === null || isCursor(value.cursor)) && typeof value.fullAt === 'number' && Array.isArray(value.issues) && value.issues.every(isOpenIssue)
-      ? { cursor: value.cursor, fullAt: value.fullAt, issues: value.issues.filter(isOpenIssue) }
+      ? { capped: isCursor(value.capped) ? value.capped : null, cursor: value.cursor, fullAt: value.fullAt, issues: value.issues.filter(isOpenIssue) }
       : null
   } catch {
     return null

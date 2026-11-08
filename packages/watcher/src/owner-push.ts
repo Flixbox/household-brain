@@ -31,6 +31,9 @@ const readGit = (args: readonly string[]) => {
 /** The directory after a `cd` or `-C` to this word; one the shell fills in changes nothing. */
 const moveTo = (dir: string, word: string) => (isDynamic(word) ? dir : path.resolve(dir, word.replace(/^~(?=\/|$)/u, Bun.env.HOME ?? '~')))
 
+/** Whether `pushDirs` reads a command with this first word. */
+export const movesOrPushes = (name: string) => name === 'cd' || baseName(name) === 'git'
+
 /** The directory each `git push` runs in, following the `cd`s before it in the line. */
 const pushDirs = (commands: readonly (readonly string[])[], cwd: string) => {
   let dir = cwd
