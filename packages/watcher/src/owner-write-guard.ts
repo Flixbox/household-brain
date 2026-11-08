@@ -13,7 +13,10 @@
  * or here-string feeds a shell, with quotes and escapes, and only the word in command position (after variable assignments and wrappers such as
  * `env` or `timeout`), and the programs interpreters and `make` run (shell-interpreters.ts). A word naming `gh` (or a path ending in `/gh`) is the owner's login;
  * `agent-gh` never is.
+ *
+ * It also refuses a `git push` that git would authenticate as someone other than the bot (owner-push.ts, #455).
  */
+import { pushNotAsBot } from './owner-push'
 import { positionals, xargsFillsIn } from './owner-write-xargs'
 import { isRecord, textOf } from './read'
 import { commandsOf } from './shell-braces'
@@ -269,21 +272,35 @@ export const ownerWrite = (command: string): string | null => {
 
 // --- The hook -------------------------------------------------------------------------------
 
+/** The hook's answer refusing a command. */
+const denial = (reason: string) => ({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: reason } })
+
+/** Why a push from this clone is refused. */
+const pushReason = (dir: string) => [
+  `Refused (household-brain #455): git in ${dir} would not ask the bot's credential helper first, so this push could go out under the owner's login.`,
+  'Check it with `git config --local --get-all credential.https://github.com.helper`: an empty line, then the bot\'s helper, is right.',
+  'The config is shared by every worktree of the clone and another agent may be setting it up: retry shortly, and if it stays wrong report it, rather than changing it from a worktree.',
+].join(' ')
+
+/** Why a write through plain gh is refused. */
+const writeReason = (found: string) => [
+  `Refused (household-brain #368): \`${found}\` writes to GitHub through plain \`gh\`, the owner's own login, so it would act as the owner.`,
+  'A command the guard cannot read for certain (a command, method or query the shell fills in, as in `"$METHOD"` or `query="$(cat q.graphql)"`, a here-document delimiter that mixes quoting, as in `<<E\'O\'F`, or `xargs gh` without its subcommand written out) counts as a write.',
+  'Write through `agent-gh` (the bot) instead; reads with `gh` stay allowed.',
+  'If agent-gh fails or is rate-limited, wait and retry it, or report it: never fall back to `gh`.',
+  'Something only the owner may do, the owner runs themselves.',
+].join(' ')
+
 /** What the PreToolUse hook answers for a command: a denial with its reason, or null to let it run. */
 export const verdict = (input: unknown) => {
   const command = isRecord(input) && isRecord(input.tool_input) ? textOf(input.tool_input.command) : ''
   const found = ownerWrite(command)
-  if (found === null) {
-    return null
+  if (found !== null) {
+    return denial(writeReason(found))
   }
-  const reason = [
-    `Refused (household-brain #368): \`${found}\` writes to GitHub through plain \`gh\`, the owner's own login, so it would act as the owner.`,
-    'A command the guard cannot read for certain (a command, method or query the shell fills in, as in `"$METHOD"` or `query="$(cat q.graphql)"`, a here-document delimiter that mixes quoting, as in `<<E\'O\'F`, or `xargs gh` without its subcommand written out) counts as a write.',
-    'Write through `agent-gh` (the bot) instead; reads with `gh` stay allowed.',
-    'If agent-gh fails or is rate-limited, wait and retry it, or report it: never fall back to `gh`.',
-    'Something only the owner may do, the owner runs themselves.',
-  ].join(' ')
-  return { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: reason } }
+  const cwd = isRecord(input) ? textOf(input.cwd) : ''
+  const pushDir = pushNotAsBot(runCommands(command, newWork()), cwd === '' ? process.cwd() : cwd)
+  return pushDir === null ? null : denial(pushReason(pushDir))
 }
 
 if (import.meta.main) {

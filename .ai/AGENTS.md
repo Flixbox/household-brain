@@ -15,7 +15,9 @@ repository), never with the owner's account.
   signed with `~/.config/household-brain-agent/app.pem`. The key is never committed, pasted or sent
   anywhere but GitHub's token endpoint. To revoke: suspend or uninstall the app; to rotate: a new
   key on the app's page, replace `app.pem`, delete the old key.
-- **Each new worktree**, once:
+- **Each clone, once** (from `main/`, never from a worktree): every worktree shares the clone's
+  `.git/config`, so setting this per worktree let concurrent agents rewrite the same keys, and a push
+  went out under the owner's login while the order was wrong (#455).
 
   ```sh
   git config user.name 'flixbox-ai-agent[bot]'
@@ -25,6 +27,12 @@ repository), never with the owner's account.
     '!f() { test "$1" = get || exit 0; echo username=x-access-token; echo "password=$(agent-gh-token)"; }; f'
   ```
 
+- **Each new worktree only checks it**, and changes nothing:
+  `git config --local --get-all credential.https://github.com.helper` prints an empty line, then the
+  bot's helper. If it doesn't, stop and report it. The project-watcher plugin's PreToolUse hook also
+  refuses a `git push` while git wouldn't ask the bot's helper first.
+- **No `git stash` in a worktree** (#452): the stack is shared by every worktree of the clone, and a
+  bare `git stash pop` took another agent's work. Commit to your own branch instead.
 - **Never write as the owner** (#368; `Coarisfinia/khovax#2136` posted as the owner once, when a
   rate-limited `agent-gh` call fell back to `gh`): every GitHub write goes through `agent-gh`; plain
   `gh` only reads. When `agent-gh` fails, wait and retry it, or report it. The project-watcher
