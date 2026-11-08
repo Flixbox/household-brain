@@ -57,8 +57,12 @@ export const bodyAsRead = (heredoc: Heredoc, body: string) => {
   return heredoc.quoted ? text : text.replaceAll(/\\(?<char>[$`\\])/gu, '$<char>')
 }
 
-/** Whether the shell expands something in a body before it is read: an unquoted body with a `$` or backtick not escaped. */
-export const bodyExpands = (heredoc: Heredoc, body: string) => !heredoc.quoted && /^(?:[^\\$`]|\\.)*[$`]/su.test(body)
+/**
+ * Whether a shell may read a body other than as written here: an unquoted body with a `$` or backtick
+ * not escaped, or a `<<-` body where a continued line starts with a tab, as shells may differ on what goes first.
+ */
+export const bodyExpands = (heredoc: Heredoc, body: string) =>
+  !heredoc.quoted && (/^(?:[^\\$`]|\\.)*[$`]/su.test(body) || (heredoc.tabs && /\\\n\t/u.test(body)))
 
 /** A here-string's operator; a here-document's body is handed over as one too, so whoever reads the commands treats both alike. */
 export const hereStringOperator = '<<<'
