@@ -87,6 +87,10 @@ describe('codeVersion: when it can\'t tell what the watcher runs, any change in 
     expectChanged(await versionsAround({ 'src/watch-main.ts': "const name = './guard'\nawait import(name)\n" }, elsewhere))
   })
 
+  it('an import computed while running, with a comment before its bracket', async () => {
+    expectChanged(await versionsAround({ 'src/watch-main.ts': "const name = './guard'\nawait import /* note */ (name)\n" }, elsewhere))
+  })
+
   it('an import of a file that isn\'t there', async () => {
     expectChanged(await versionsAround({ 'src/watch-main.ts': "import './missing'\n" }, elsewhere))
   })
