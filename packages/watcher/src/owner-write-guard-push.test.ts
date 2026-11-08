@@ -209,7 +209,7 @@ describe('a git push under the wrong credential helper, by where it goes (#467)'
   it('keeps refusing past quotes spliced into a variable or xargs', () => {
     const commands = [
       'env G"IT_DIR"=/x git push origin HEAD',
-      "env GIT\\_DIR=/x git push origin HEAD",
+      'env GIT\\_DIR=/x git push origin HEAD',
       `echo ${github} | x"args" git push`,
       `echo ${github} | xa\\rgs git push`,
     ]
@@ -227,6 +227,11 @@ describe('a git push under the wrong credential helper, by where it goes (#467)'
     expect(denied('git push origin HEAD', origin('https://www.github.com/owner-test/repo'))).toBe(true)
     expect(denied('git push origin HEAD', origin('https://www.github.com./owner-test/repo'))).toBe(true)
     expect(denied('git push origin HEAD', origin('https://notgithub.com/owner-test/repo'))).toBe(false)
+  })
+
+  it('does not take a lone option for the destination', () => {
+    expect(denied('git push --quiet', origin(ssh))).toBe(false)
+    expect(denied('git push -u', origin(ssh))).toBe(false)
   })
 
   it('does not count a branch the shell fills in as unclear', () => {
