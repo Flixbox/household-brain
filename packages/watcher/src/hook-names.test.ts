@@ -24,7 +24,7 @@ const readJson = async (path: string): Promise<unknown> => JSON.parse(await Bun.
 
 /** The hook files a manifest points to: its `hooks` can be a path, or a list of them, from the plugin's folder. */
 const referencedFiles = (path: string, manifest: unknown) => {
-  const plugin = path.split('/')[0]
+  const [plugin] = path.split('/')
   return [isRecord(manifest) ? manifest.hooks : null]
     .flat()
     .filter(reference => typeof reference === 'string')
