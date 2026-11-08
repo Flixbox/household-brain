@@ -1,7 +1,7 @@
+/* oxlint-disable import/no-nodejs-modules -- throwaway git repositories in a temporary folder; node:fs and node:os are built into Bun */
 import { afterAll, describe, expect, it } from 'bun:test'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import { verdict } from './owner-write-guard'
 
 const key = 'credential.https://github.com.helper'
@@ -16,7 +16,7 @@ let clones = 0
 /** A throwaway clone whose local config lists these helpers, in this order. */
 const clone = (helpers: readonly string[]) => {
   clones += 1
-  const dir = join(root, `clone-${clones}`)
+  const dir = `${root}/clone-${clones}`
   Bun.spawnSync(['git', 'init', '-q', dir])
   for (const helper of helpers) {
     Bun.spawnSync(['git', '-C', dir, 'config', '--add', key, helper])
@@ -73,7 +73,7 @@ describe('a git push under the wrong credential helper (#455)', () => {
   it('leaves clones without the bot\'s helper alone', () => {
     expect(denied('git push', clone(['', owner]))).toBe(false)
     expect(denied('git push', clone([]))).toBe(false)
-    expect(denied('git push', join(root, 'not-a-repository'))).toBe(false)
+    expect(denied('git push', `${root}/not-a-repository`)).toBe(false)
   })
 
   it('leaves other git commands alone', () => {
