@@ -185,6 +185,7 @@ describe('ownerWrite (#368)', () => {
       'echo $(( $$(gh issue close 1) ))',
       // A substitution the guard can't match parentheses in fails closed.
       '((gh issue close 1 $(echo ${x:-)})); :)',
+      '(( $( [[ x =~ foo) ]] ; gh issue close 1 )))',
       "echo $(( $(cat <<'EOF'\n)\ngh issue close 1\nEOF\n) ))",
       'echo $(( $(cat <<EOF\n$(gh issue close 1)\nEOF\n) ))',
       "echo $(( $(cat <<'EOF'\n1\nEOF\ngh issue close 1) ))",

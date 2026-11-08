@@ -47,10 +47,10 @@ export const closingParen = (text: string, from: number) => {
 
 /**
  * What may move the `)` `closingParen` finds for a `$(…)` from the shell's: a comment, backticks, a
- * `case` pattern's `)`, what `${…}` or `$[…]` takes as text, or a quote, parenthesis or backslash
+ * `case` pattern's `)`, a `)` in a `[[ =~ ]]` regex, what `${…}` or `$[…]` takes as text, or a quote, parenthesis or backslash
  * in a here-document's body, which is all that follows the first newline may be (#373).
  */
-const unsureSubstitution = /[#`]|\$[[{]|\bcase\b|\n.*["'()\\]/su
+const unsureSubstitution = /[#`]|=~|\$[[{]|\bcase\b|\n.*["'()\\]/su
 
 /** Where what follows the `$(…)` at `at` starts, if there is one and its `)` is surely the shell's; else `at`. */
 const pastSubstitution = (text: string, at: number) => {
