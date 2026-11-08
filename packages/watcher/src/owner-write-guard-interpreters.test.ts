@@ -34,7 +34,7 @@ describe('ownerWrite, on programs interpreters and make run (#394)', () => {
       "perl <<'EOF'\nsystem('gh issue close 1');\nEOF",
       "ruby <<'EOF'\nsystem('gh issue close 1')\nEOF",
       "node <<'EOF'\nexecSync('gh issue close 1')\nEOF",
-      `python3 <<< 'import os; os.system("gh issue close 1")'`,
+      String.raw`python3 <<< 'import os; os.system("gh issue close 1")'`,
       "awk -f - <<'EOF'\nBEGIN { system(\"gh issue close 1\") }\nEOF",
       "make -f - <<'EOF'\nall:\n\tgh issue close 1\nEOF",
       "make -f- <<'EOF'\nall:\n\tgh issue close 1\nEOF",
