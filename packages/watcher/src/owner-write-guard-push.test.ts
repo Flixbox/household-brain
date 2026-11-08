@@ -224,6 +224,55 @@ describe('a git push under the wrong credential helper, by where it goes (#467)'
     expect(commands.filter(command => !denied(command, toSsh))).toEqual([])
   })
 
+  it('keeps refusing when env moves to another directory (#492)', () => {
+    const commands = [
+      'env -C /other git push origin HEAD',
+      'env -C/other git push origin HEAD',
+      'env -iC /other git push origin HEAD',
+      'env -u FOO -C /other git push origin HEAD',
+      'env --chdir=/other git push origin HEAD',
+      'env --chdir /other git push origin HEAD',
+      'env --ch=/other git push origin HEAD',
+      '/usr/bin/env -C /other git push origin HEAD',
+      'env "-C" /other git push origin HEAD',
+    ]
+    const toSsh = origin(ssh)
+    expect(commands.filter(command => !denied(command, toSsh))).toEqual([])
+  })
+
+  it('keeps refusing when a git variable is named without an assignment (#492)', () => {
+    const commands = [
+      'for GIT_DIR in /x; do export GIT_DIR; git push origin HEAD; done',
+      'for G"IT_DIR" in /x; do export GIT_DIR; git push origin HEAD; done',
+      'read GIT_DIR; export GIT_DIR; git push origin HEAD',
+      'read -r GIT_DIR < f; export GIT_DIR; git push origin HEAD',
+      'printf -v GIT_DIR /x; export GIT_DIR; git push origin HEAD',
+    ]
+    const toSsh = origin(ssh)
+    expect(commands.filter(command => !denied(command, toSsh))).toEqual([])
+  })
+
+  it('keeps refusing a word in ANSI-C quotes (#492)', () => {
+    const commands = [
+      String.raw`env $'G\x49T_DIR=/x' git push origin HEAD`,
+      String.raw`$'\x65nv' GIT_DIR=/x git push origin HEAD`,
+    ]
+    const toSsh = origin(ssh)
+    expect(commands.filter(command => !denied(command, toSsh))).toEqual([])
+  })
+
+  it('still passes an ordinary push to another host past env or a git variable it only reads (#492)', () => {
+    const commands = [
+      'env FOO=1 git push origin HEAD',
+      'env -i git push origin HEAD',
+      'env -u FOO git push origin HEAD',
+      'echo $GIT_DIR; git push origin HEAD',
+    ]
+    const toSsh = origin(ssh)
+    commands.push(`env FOO=1 git -C ${toSsh} push origin HEAD`)
+    expect(commands.filter(command => denied(command, toSsh))).toEqual([])
+  })
+
   it('counts GitHub\'s subdomains as GitHub, but not a host that only looks like it', () => {
     expect(denied('git push origin HEAD', origin('https://www.github.com/owner-test/repo'))).toBe(true)
     expect(denied('git push origin HEAD', origin('https://www.github.com./owner-test/repo'))).toBe(true)
