@@ -50,22 +50,15 @@ const append = (scan: Scan, text: string) => {
 }
 
 /**
- * Text that may be arithmetic or a subshell, failing closed (#373): read as commands, where a `<<`
- * may be a shift and so opens no here-document, and searched for substitutions whatever quotes them,
- * as arithmetic runs one even in single quotes.
+ * Text in `((…))`: only its substitutions are read if it is surely arithmetic, each whole, here-documents
+ * included (#373). Else it fails closed: it is also read as commands, where a `<<` may be a shift and
+ * so opens no here-document, and substitutions count whatever quotes them, as arithmetic runs one even in single quotes.
  */
-const unsureArithmetic = (scan: Scan, inner: string) => {
-  scan.nested.push(inner.replaceAll('<<', '  '))
-  substitutionsIn(scan, inner)
-}
-
-/** Text in `((…))`: surely arithmetic is data but for its substitutions, each read whole, here-documents included (#373). */
 const readArithmetic = (scan: Scan, inner: string, sure: boolean) => {
-  if (sure) {
-    substitutionsIn(scan, inner)
-  } else {
-    unsureArithmetic(scan, inner)
+  if (!sure) {
+    scan.nested.push(inner.replaceAll('<<', '  '))
   }
+  substitutionsIn(scan, inner)
 }
 
 /**
@@ -78,10 +71,10 @@ const substitution = (scan: Scan, text: string, at: number): [string, number] =>
   const from = at + (backtick ? 1 : 2)
   const end = backtick ? indexOrEnd(text, '`', from) : closingParen(text, from)
   const inner = text.slice(from, end)
-  if (!text.startsWith('$((', at)) {
-    scan.nested.push(inner)
-  } else {
+  if (text.startsWith('$((', at)) {
     readArithmetic(scan, inner, opensArithmetic(text, at + 1))
+  } else {
+    scan.nested.push(inner)
   }
   return [dynamic + text.slice(at, end + 1), end + 1]
 }
