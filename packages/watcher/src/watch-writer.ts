@@ -57,7 +57,9 @@ export const attemptWrite = async (key: string, write: () => Promise<boolean | n
     return null
   }
   const result = await write()
-  await (result === false ? writeWhole(path, String(failures + 1)) : unclaim(path)).catch(ignoreFailure)
+  if (result !== null) {
+    await (result ? unclaim(path) : writeWhole(path, String(failures + 1))).catch(ignoreFailure)
+  }
   return result
 }
 
