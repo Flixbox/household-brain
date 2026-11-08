@@ -8,7 +8,7 @@ const key = 'credential.https://github.com.helper'
 const bot = '!f() { echo "password=$(agent-gh-token)"; }; f'
 const owner = '!gh auth git-credential'
 
-const root = mkdtempSync(join(tmpdir(), 'push-guard-'))
+const root = mkdtempSync(`${tmpdir()}/push-guard-`)
 afterAll(() => rmSync(root, { force: true, recursive: true }))
 
 let clones = 0
