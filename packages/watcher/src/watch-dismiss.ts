@@ -24,6 +24,7 @@ import { allSettled, textOf } from './read'
 import { actor, at, count, record, records } from './watch-text'
 
 export { reportedPassed } from './watch-ci-state'
+export { reportedLines } from './watch-output'
 
 export const DISMISS_STALE_BOT_REVIEWS = process.env.DISMISS_STALE_BOT_REVIEWS === '1'
 

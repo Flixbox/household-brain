@@ -7,7 +7,7 @@
  * Merging still waits for CI and, where a review bot was asked (#324), its review. Which drafts is
  * `marksReady` (watch-ready-events.ts). The `GH` token must then be allowed to write pull requests.
  */
-import { DISMISS_STALE_BOT_REVIEWS, askBotsToResolve, dismissCleared, dismissStale, reportedPassed, reviewBlockers } from './watch-dismiss'
+import { DISMISS_STALE_BOT_REVIEWS, askBotsToResolve, dismissCleared, dismissStale, reportedLines, reportedPassed, reviewBlockers } from './watch-dismiss'
 import { type PrState, REPO, SELF, readyCommand } from './watch-github'
 import { READY_APPROVED_DRAFTS, draftNote, draftReadiedEvent, marksReady } from './watch-ready-events'
 import { approvedEvent, blockedByReviewEvent } from './watch-review-events'
@@ -16,7 +16,6 @@ import { askBotReviews } from './watch-bot-review'
 import { awaitsBotReview } from './watch-bot-review-events'
 import { GH, ghText } from './watch-gh'
 import { askedBots } from './watch-state'
-import { reportedLines } from './watch-output'
 import { IS_WRITER, attemptWrite, reportWrite } from './watch-writer'
 
 // Resolving threads on `Resolved:` replies comes before what the approval asks (#279).
