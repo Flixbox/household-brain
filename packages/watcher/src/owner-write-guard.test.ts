@@ -202,16 +202,6 @@ describe('ownerWrite (#368)', () => {
     ])).toEqual([])
   })
 
-  it('refuses arithmetic full of substitutions it cannot skip without a hang (#489)', () => {
-    const lines = [
-      `(( ${'$(#'.repeat(31_000)} ${')'.repeat(31_000)} ))`,
-      `(( ${'$('.repeat(42_000)}#${')'.repeat(42_000)} ))`,
-    ]
-    const start = performance.now()
-    expect(refused(lines)).toEqual([])
-    expect(performance.now() - start).toBeLessThan(1000)
-  })
-
   it('reads ((…) ) as a subshell, not arithmetic, when the second ( closes alone (review on #374)', () => {
     expect(refused([
       'echo $((gh issue close 1) )',

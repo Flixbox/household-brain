@@ -44,6 +44,16 @@ describe('ownerWrite and a << that may be a shift (#385)', () => {
     expect(performance.now() - start).toBeLessThan(1000)
   })
 
+  it('refuses arithmetic full of substitutions it cannot skip without a hang (#489)', () => {
+    const lines = [
+      `(( ${'$(#'.repeat(31_000)} ${')'.repeat(31_000)} ))`,
+      `(( ${'$('.repeat(42_000)}#${')'.repeat(42_000)} ))`,
+    ]
+    const start = performance.now()
+    expect(refused(lines)).toEqual([])
+    expect(performance.now() - start).toBeLessThan(1000)
+  })
+
   it('still reads a here-document after brackets and braces that have closed (#385)', () => {
     expect(allowed([
       'if [ -f x ]; then cat <<EOF\ngh issue close 1\nEOF\nfi',
