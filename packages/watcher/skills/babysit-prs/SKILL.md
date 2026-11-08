@@ -105,6 +105,18 @@ default branch's CI, new issues, the owner's comments on issues, and issues clos
     several watchers cost hardly more than one.
   - `GH_PARALLEL`: how many `gh` calls run at once (4 by default); the pull requests are checked in
     parallel, and the cap keeps the bursts within GitHub's rate limits.
+  - `FULL_READ_MINUTES`: how long a pull request goes without a full read at most (10 by default; 0,
+    or set empty, reads every one in full on every look; anything else but a number from 0 stops the
+    watcher at the start). Each look asks one cheap question about what changed, and a PR it shows as changed is
+    read in full at once (#404); this limit is for what that question can't see.
+  - `MERGED_HOURS`: how far back a merged pull request still counts as recent (3 by default), so one
+    opened and merged between two looks is still reported. It applies to the repository's merged PRs
+    and, for a scoped watcher, to those closing a subscribed issue.
+  - `STATE_DIR`: the folder of this watcher's record, outright (by default one per watcher id, as for
+    `WATCHER_ID`, or per subscription of a scoped watcher, under
+    `watch-project/<owner>_<repo>/sessions/` in `$XDG_STATE_HOME` or `~/.local/state`; an unscoped
+    watcher without an id uses `<owner>_<repo>` itself). Two watchers given the same folder share one record and
+    split the events.
   - `REVIEW_BOTS`: the review bots' logins, comma-separated (`coderabbitai`, with or without `[bot]`).
     Their reviews are asked for, never awaited by default (#324): a PR labelled `BOT_REVIEW_LABEL`
     gets `@<bot> review` from the watcher, once per PR ever (not again after new pushes, nor when the
