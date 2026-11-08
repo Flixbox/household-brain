@@ -56,15 +56,19 @@ const costOf = (candidate: readonly string[]) => {
   return isGh(name) || isDynamic(name) ? candidate.join(' ').length : Math.ceil(candidate.length / wordsPerCharacter)
 }
 
+/** The words a wrapped command may start at: any written-out word, and a variable only up to the real command. */
+const startsOf = (command: readonly string[]) => {
+  const realCommand = realCommandAt(command)
+  return [...command.keys()].filter(at => at <= realCommand || !isDynamic(command[at] ?? ''))
+}
+
 /** The commands a simple command may be: itself, and behind a wrapper one per word it can start at until the budget is spent. */
 export const commandsFrom = (command: string[], work: Work) => {
   if (!wrappers.has(baseName(command[0] ?? ''))) {
     return [command]
   }
-  const realCommand = realCommandAt(command)
-  const starts = [...command.keys()].filter(at => at <= realCommand || !isDynamic(command[at] ?? ''))
   const candidates: string[][] = []
-  for (const at of starts) {
+  for (const at of startsOf(command)) {
     const candidate = command.slice(at)
     if (charged(work, costOf(candidate))) {
       break
