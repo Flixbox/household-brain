@@ -67,6 +67,17 @@ test('an unchanged list is asked for with its ETag, and a 304 gives the kept ans
   expect(calls[1]).toContain('If-None-Match: W/"8"')
 })
 
+test('a 304 counts as a lookup that succeeded, so it can\'t feed LOOKUPS_FAILING (#405)', async () => {
+  const home = await fixture()
+  const script = `
+    const { lookups } = await import('${import.meta.dir}/watch-gh')
+    await github.openPrNumbers()
+    lookups.lastSuccess = Temporal.Instant.from('2020-01-01T00:00:00Z')
+    await github.openPrNumbers()
+    console.log(JSON.stringify([lookups.lastFailure, lookups.lastSuccess.toString() > '2021']))`
+  expect(await inWatcher(home, script)).toBe('["",true]')
+})
+
 test('a changed list is read anew and kept under its new ETag (#405)', async () => {
   const home = await fixture()
   await inWatcher(home, OPEN)
@@ -96,7 +107,7 @@ test('a refused request fails, even with an answer kept (#405)', async () => {
 test('the merged list, a commit\'s run and main\'s head read the REST answers (#405)', async () => {
   const home = await fixture()
   expect(await inWatcher(home, 'console.log(JSON.stringify(await github.recentlyMerged(24)))')).toBe('[3]')
-  const run = JSON.parse(await inWatcher(home, 'console.log(JSON.stringify(await github.runOf("abc")))'))
+  const run: unknown = JSON.parse(await inWatcher(home, 'console.log(JSON.stringify(await github.runOf("abc")))'))
   expect(run).toMatchObject({ attempt: 2, conclusion: 'success', id: 11, status: 'completed' })
   expect(await inWatcher(home, 'console.log(JSON.stringify(await github.runOf("none")))')).toBe('null')
   expect(await inWatcher(home, 'console.log(JSON.stringify(await github.mainHead()))')).toBe('{"sha":"main1","subject":"subject"}')
