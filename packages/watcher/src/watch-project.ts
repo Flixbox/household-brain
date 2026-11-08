@@ -99,6 +99,7 @@
  * issues, the owner's comments, every followed PR's comments and reviews), every 30 s; one for main
  * and each PR's CI, reviews and deploy, every 60 s. The PRs are checked at once, with at most
  * GH_PARALLEL `gh` calls running, so one slow call holds back only its own events.
+ * A PR is read in full only when the change gate says so (watch-change-gate.ts, #404).
  */
 // Which code this watcher runs is read before the rest of it is loaded (#265): a pull that finishes
 // while it loads then shows as a change, never as the version it started on.

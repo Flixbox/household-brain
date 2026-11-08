@@ -10,7 +10,7 @@ import { deliver, deliveryPending } from './watch-delivery'
 import { agentUsageText, readAgentUsage } from './agent-usage'
 import { type Event, type OpenPr, answerFirst, clockTime, listsOpenPrs, openPrLines, reminderLines, stamped } from './watch-events'
 import { lookupNews, lookups } from './watch-gh'
-import { REPO, openPrs } from './watch-github'
+import { REPO, endOpenPrsLook, openPrsThisLook } from './watch-open-prs'
 import { addLine, askedBots, oneAtATime, readLines, subscriptions, writeLines } from './watch-state'
 import { awaitsBotReview } from './watch-bot-review-events'
 import { codeVersion, outdatedLine, startedOn } from './watch-version'
@@ -71,7 +71,7 @@ export const report = async (event: Event | null, pr: number | null = null): Pro
   }
   const [first = '', ...rest] = event.lines
   // Every CI result comes with where each open PR stands, so no approval goes unnoticed.
-  const prs = !subscriptions.scoped && listsOpenPrs(event.key) ? await openPrs().then(openPrLines, () => ['Open PRs: (listing failed)']) : []
+  const prs = !subscriptions.scoped && listsOpenPrs(event.key) ? await openPrsThisLook().then(openPrLines, () => ['Open PRs: (listing failed)']) : []
   queue([pr === null ? first : `PR #${pr}: ${first}`, ...rest, ...prs], { ...audience, key: `event:${pr}:${event.key}`, quiet: event.quiet === true })
 }
 
@@ -100,7 +100,7 @@ const dueUsage = async (): Promise<string[]> => oneAtATime('usage-due', async ()
 /** The reminders, and the active agent's usage when it is due (#233, #318); nothing when neither has a line. */
 const sayClosing = async (): Promise<void> => {
   if (subscriptions.scoped) { return }
-  const closing = [...await openPrs().then(reminders, () => []), ...await dueUsage()]
+  const closing = [...await openPrsThisLook().then(reminders, () => []), ...await dueUsage()]
   if (closing.length > 0) {
     say(FOLLOW ? [...closing, '---'] : closing)
   }
@@ -119,6 +119,7 @@ export const flush = async (): Promise<boolean> => {
   printFound()
   printed.any = false
   await sayClosing()
+  endOpenPrsLook()
   quiet.since = Temporal.Now.instant()
   if (!FOLLOW) {
     process.exit(0)

@@ -6,7 +6,7 @@ import { checkRun } from './watch-ci-runs'
 import { APPROVED_DRAFT_NOTE, checkApproval, resolveAsked } from './watch-approval'
 import { FOLLOW, checkCode, finishSubscriptions, flush, queue, quiet, report, reportLookups, reportUsage } from './watch-output'
 import { addLine, endPr, readLines, start, startSubscriptions, subscriptions, updateLines, writeLines } from './watch-state'
-import { activitiesOf, checkActivity as checkPrActivity, checkTrackedActivity, watchedPrs } from './watch-activity'
+import { activitiesOf, changedActivities, changedStates, checkActivity as checkPrActivity, checkTrackedActivity, watchedPrs } from './watch-activity'
 import { checkQueue, preparePr } from './watch-queue'
 import { checkIssueStates, checkIssues, checkSubscribedIssues } from './watch-issues'
 import { allSettled, hasText, ignoreFailure } from './read'
@@ -143,7 +143,7 @@ const checkPrs = async (): Promise<void> => {
   if (!prs) {
     return
   }
-  const [states, activities] = await Promise.all([prStates(prs), activitiesOf(prs)])
+  const [states, activities] = await Promise.all([changedStates(prs), changedActivities(prs)])
   round.complete = true
   // All at once (#240): a slow PR holds back only its own events; GH_PARALLEL caps the calls.
   await allSettled(prs.map(async pr => checkPr(pr, states.get(pr), activities.get(pr))))
