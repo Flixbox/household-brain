@@ -6,7 +6,7 @@ import { type PrState, REPO, mainAhead, mainHead, newestMainRun, prStates } from
 import { checkRun } from './watch-ci-runs'
 import { APPROVED_DRAFT_NOTE, checkApproval, checkWriter, resolveAsked } from './watch-approval'
 import { FOLLOW, checkCode, finishSubscriptions, flush, queue, quiet, report, reportLookups, reportUsage } from './watch-output'
-import { addLine, endPr, readLines, start, startSubscriptions, subscriptions, updateLines, writeLines } from './watch-state'
+import { addLine, endPr, oneAtATime, readLines, start, startSubscriptions, subscriptions, updateLines, writeLines } from './watch-state'
 import { activitiesOf, changedActivities, changedStates, checkActivity as checkPrActivity, checkTrackedActivity, watchedPrs } from './watch-activity'
 import { checkQueue, preparePr } from './watch-queue'
 import { checkIssueStates, checkIssues, checkSubscribedIssues } from './watch-issues'
@@ -82,9 +82,12 @@ const checkMerged = async (pr: number, mergeSha: string, items: Activity[] | und
     return
   }
   if (subscriptions.scoped) {
-    const completed = subscriptions.endedBy([`pr:${pr}`]) ? '; subscription completed' : ''
-    await report({ key: `pr-${pr} merged ${mergeSha}`, lines: [`MERGED: ${short(mergeSha)}${completed}`] }, pr)
-    await endPr(pr)
+    // One at a time: PRs merged in the same look run side by side, and the last to end must see the others ended.
+    await oneAtATime('subscription-end', async () => {
+      const completed = subscriptions.endedBy([`pr:${pr}`]) ? '; subscription completed' : ''
+      await report({ key: `pr-${pr} merged ${mergeSha}`, lines: [`MERGED: ${short(mergeSha)}${completed}`] }, pr)
+      await endPr(pr)
+    })
     await untrack(pr)
     return
   }
