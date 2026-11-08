@@ -60,3 +60,11 @@ export const opensArithmetic = (text: string, at: number) => {
   const close = closingParen(text, at + 2)
   return text.startsWith('((', at) && text[close + 1] === ')' && !unsure.test(text.slice(at + 2, close))
 }
+
+/** `&` ends a command, but not in a redirection (`2>&1`, `&>file`). */
+const endsWithAmpersand = (text: string, at: number) =>
+  text[at] === '&' && text[at - 1] !== '>' && text[at - 1] !== '<' && text[at + 1] !== '>'
+
+const separators = new Set(['(', ')', ';', '|'])
+
+export const isSeparator = (text: string, at: number) => separators.has(text[at] ?? '') || endsWithAmpersand(text, at)

@@ -4,7 +4,8 @@
  */
 import { MERGE_QUEUE, type PrState, dequeueReason, graphql, prStates, queueEntries, runOf } from './watch-github'
 import { type QueueEntry, dequeuedEvent, notQueuedEvent, notQueuedKey, queueChanges, queueLine, queuedEvent, unqueuedLines, waitingId, waitingValueId } from './watch-queue-events'
-import { exists, readLines, updateLines, writeLines } from './watch-state'
+import { exists, readLines, rememberPr, subscriptions, updateLines, writeLines } from './watch-state'
+import { clearQuestion } from './watch-question'
 import { GH } from './watch-gh'
 import { report } from './watch-output'
 import { at, record } from './watch-text'
@@ -59,6 +60,7 @@ const stillWaiting = async (pr: number, head: string): Promise<string | null> =>
  * that saw it so; once it has waited NOT_QUEUED_MINUTES, GitHub is asked once more, fresh, so a PR that
  * has just entered the queue, or whose checks no longer pass, isn't reported.
  */
+// fallow-ignore-next-line unused-export -- watch-queue.test.ts runs it in a subprocess, which fallow can't see
 export const checkNotQueued = async (pr: number, state: PrState): Promise<void> => {
   const found = { overdue: false }
   await updateLines('unqueued', lines => {
@@ -70,4 +72,14 @@ export const checkNotQueued = async (pr: number, state: PrState): Promise<void> 
   const reported = (await readLines('reported')).includes(notQueuedKey(pr, state.head))
   const id = found.overdue && !reported ? await stillWaiting(pr, state.head).catch(() => null) : null
   await report(id === null ? null : notQueuedEvent({ gh: GH, head: state.head, id, pr }), pr)
+}
+
+/** What every look does first for a PR; false when this watcher doesn't follow it. */
+export const preparePr = async (pr: number, state: PrState): Promise<boolean> => {
+  await rememberPr(pr, state.closingIssues ?? [], state.state === 'OPEN')
+  if (!subscriptions.accepts({ pr })) { return false }
+  await checkNotQueued(pr, state)
+  // Approved, merged or closed: it no longer waits on the owner (#371).
+  await clearQuestion(pr, state)
+  return true
 }

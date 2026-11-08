@@ -1,6 +1,6 @@
 /** What the project watcher reports, decided from what GitHub answered (pure, so it is tested). */
 import { isRecord } from './read'
-import { ciState } from './watch-ci-state'
+import { ciPassedKey, ciState } from './watch-ci-state'
 
 export interface Event {
   /** Scoped agents do not wake for housekeeping such as non-conflicting main movement. */
@@ -46,7 +46,7 @@ const finishedEvent = ({ pr, sha, label, run, jobs, repo }: RunContext): Event |
       : { key: `pr-${pr} deploy-failed ${sha} ${run.attempt}`, lines: [`DEPLOY_FAILED: run ${run.id} on main ended ${run.conclusion}: open a follow-up PR`, ...jobs] }
   }
   if (run.conclusion === 'success') {
-    return { key: `pr-${pr} ci-passed ${sha}`, lines: [`CI_PASSED for ${short(sha)} (run ${run.id})`, ...jobs] }
+    return { key: ciPassedKey(pr, sha, run.attempt), lines: [`CI_PASSED for ${short(sha)} (run ${run.id})`, ...jobs] }
   }
   // Cancelled: a newer push superseded it.
   if (run.conclusion === 'cancelled') {

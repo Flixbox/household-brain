@@ -138,7 +138,7 @@ describe('ghText and the limit (#400)', () => {
   })
 
   it('runs two calls at once by default', async () => {
-    const log = `${folder}/parallel`
+    const log = `${folder}/parallel-log`
     const gh = await fakeGh('parallel', `echo start >> ${log}\nsleep 0.2\necho end >> ${log}`)
     await Promise.all(['a', 'b', 'c', 'd'].map(async id => ghText([id], gh, true)))
     const running = (await linesOf(log)).reduce((seen, line) => {

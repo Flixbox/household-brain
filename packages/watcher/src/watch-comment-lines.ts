@@ -11,13 +11,19 @@ export const commentText = (item: Json, { author, indent = '    ', owner }: { au
   bodyLines(item.body, { indent, url: item.html_url ?? item.url, whole: author === owner })
 
 const AUTHOR = 'author{login kind:__typename}'
+/** A review with its line comments, as GraphQL names them. */
+const REVIEW_FIELDS = `databaseId body url state createdAt submittedAt ${AUTHOR}`
+  + ` comments(first:100){nodes{databaseId body url createdAt path line originalLine replyTo{databaseId} ${AUTHOR}}}`
 /**
- * A PR's comments and its reviews, each review with its line comments, as GraphQL names them (#306):
- * the last hundred comments and reviews, which leaves out only old news.
+ * A PR's comments and its reviews, each review with its line comments (#306): the last hundred
+ * comments and reviews, which leaves out only old news.
  */
-export const ACTIVITY_FIELDS = `comments(last:100){nodes{databaseId body url createdAt ${AUTHOR}}}`
-  + ` reviews(last:100){nodes{databaseId body url state createdAt submittedAt ${AUTHOR}`
-  + ` comments(first:100){nodes{databaseId body url createdAt path line originalLine replyTo{databaseId} ${AUTHOR}}}}}`
+export const ACTIVITY_FIELDS = `comments(last:100){nodes{databaseId body url createdAt ${AUTHOR}}} reviews(last:100){nodes{${REVIEW_FIELDS}}}`
+/**
+ * The asking login's pending review on a PR (#403): GitHub shows one to its author only, and an author
+ * has at most one per PR, so this is all that login sees beyond what any other reader does.
+ */
+export const PENDING_FIELDS = `reviews(first:1,states:PENDING){nodes{${REVIEW_FIELDS}}}`
 
 /** The line a review comment is on; one on an outdated diff only has its original line. */
 const lineOf = (item: Json) => [item.line, item.originalLine].find((value): value is number => typeof value === 'number')
@@ -33,6 +39,10 @@ interface People {
   /** The agent's own login: its replies in review threads and its plain reviews are no news. */
   self: string
 }
+
+/** `items` and what `pending` adds to them: a review submitted between the two reads is in both. */
+export const addPending = (items: readonly Activity[], pending: readonly Activity[]): Activity[] =>
+  [...items, ...pending.filter(item => !items.some(known => known.id === item.id))]
 
 /**
  * Comments, reviews (not plain approvals) and review comments on a PR, from its `ACTIVITY_FIELDS`,

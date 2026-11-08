@@ -1,6 +1,7 @@
 /** The project watcher's look at a pull request's comments and reviews (watch-project.ts), and which pull requests a round looks at. */
 import { type Activity, newActivity } from './watch-events'
-import { ACTIVITY_FIELDS, activityFrom } from './watch-comment-lines'
+import { ACTIVITY_FIELDS, PENDING_FIELDS, activityFrom, addPending } from './watch-comment-lines'
+import { GH } from './watch-gh'
 import { ACTIVITY_GH, IGNORED, OWNER, SELF, openPrNumbers, perPr, recentlyMerged } from './watch-github'
 import { type Json, at, count, records } from './watch-text'
 import { perIssue } from './watch-per-issue'
@@ -8,14 +9,31 @@ import { appendLines, exists, oneAtATime, readLines, subscriptions, writeLines }
 import { allSettled, hasText, textOf } from './read'
 import { queue } from './watch-output'
 
+const parseActivity = (value: Json): Activity[] => activityFrom(value, { ignored: IGNORED, owner: OWNER, self: SELF })
+
+/** Everything on `prs` as `cli` sees it, twenty PRs to a query: a reviewed PR's hundred reviews of a hundred line comments each stay within GitHub's limits. */
+const allActivity = async (prs: readonly number[], cli: string, fresh: boolean) => perPr(prs, { cli, fields: ACTIVITY_FIELDS, fresh, parse: parseActivity, size: 20 })
+
 /**
  * Comments, reviews (not plain approvals, each with its line comments) and review comments on each PR
- * asked about, the agent's own left out (see `activityFrom`). Read through GraphQL (#306), twenty PRs to
- * a query, so a reviewed PR's hundred reviews of a hundred line comments each stay within GitHub's
- * limits; a PR that couldn't be read is missing.
+ * asked about, the agent's own left out (see `activityFrom`), through GraphQL (#306). `GH` reads them,
+ * and `ACTIVITY_GH` adds only its pending review, the one thing `GH` can't see (#403); a refused check
+ * holds nothing back, as the pending review just comes a look later, except on a `fresh` read, the
+ * last before a subscription ends: there the PR counts as unread, to be tried again. A PR `GH` couldn't read goes to
+ * `ACTIVITY_GH` whole, so the owner's comments still arrive while the bot is out of points. A PR that
+ * neither could read is missing.
  */
-export const activitiesOf = async (prs: readonly number[], fresh = false): Promise<Map<number, Activity[]>> =>
-  perPr(prs, { cli: ACTIVITY_GH, fields: ACTIVITY_FIELDS, fresh, parse: value => activityFrom(value, { ignored: IGNORED, owner: OWNER, self: SELF }), size: 20 })
+export const activitiesOf = async (prs: readonly number[], fresh = false): Promise<Map<number, Activity[]>> => {
+  if (GH === ACTIVITY_GH) {
+    return allActivity(prs, GH, fresh)
+  }
+  // Pending first: a review submitted between the two reads is then in the second, and in neither the other way round.
+  const pending = await perPr(prs, { cli: ACTIVITY_GH, fields: PENDING_FIELDS, fresh, parse: parseActivity, size: 50 })
+  const read = await allActivity(prs, GH, fresh)
+  const theirs = await allActivity(prs.filter(pr => !read.has(pr)), ACTIVITY_GH, fresh)
+  const withPending = ([pr, items]: [number, Activity[]]): [number, Activity[]] => [pr, addPending(items, pending.get(pr) ?? [])]
+  return new Map([...theirs, ...[...read].filter(([pr]) => !fresh || pending.has(pr))].map(entry => withPending(entry)))
+}
 
 /** The comments of a PR already reported. On the very first round, the ones already there are old news. */
 const seenActivity = async (pr: number, items: Activity[]): Promise<Set<string>> => {

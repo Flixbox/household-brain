@@ -5,7 +5,7 @@ import { type BotReviewState, NO_BOT_REVIEW, REVIEW_BOTS, botReviewStateOf } fro
 import { type ReviewThread, threadsToResolve } from './watch-review-events'
 import { CLEARED_LABEL } from './watch-cleared-events'
 import { OPEN_ISSUE_FIELDS, allOpenIssues, goneIssueLine, isGone, isMoved, issueEventLine, issuePage } from './watch-issue-events'
-import { GH, failedStatus, ghText } from './watch-gh'
+import { GH, failedStatus, ghRest, ghText } from './watch-gh'
 import type { OpenIssue } from './watch-link-cycles'
 import { ownerOfRepo } from './watch-owner'
 import { ownerApprovalCommit } from './watch-ready-events'
@@ -42,8 +42,8 @@ export const MERGE_QUEUE = await mergeQueued()
 export const readyCommand = (pr: number): string => `${GH} pr ready ${pr}`
 // WORKFLOW: the CI workflow file whose runs are followed (a PR's checks, main's deploy).
 const WORKFLOW = process.env.WORKFLOW ?? 'ci.yml'
-// ACTIVITY_GH: comments are read with the owner's login: a pending (unsubmitted) review is only
-// visible to its author, and the owner leaves those.
+// ACTIVITY_GH: the owner's login, asked only for their pending (unsubmitted) reviews, visible to
+// their author alone, and for the activity of a PR `GH` couldn't read (#403). `GH` reads the rest.
 export const ACTIVITY_GH = process.env.ACTIVITY_GH ?? 'gh'
 // OWNER: whose issue comments are news, and whose approval counts as one (#277); by default the
 // repository's owner, or for an organisation's repository its one human admin (#295).
@@ -68,8 +68,8 @@ const RUN_FIELDS = 'databaseId,attempt,startedAt,status,conclusion'
 
 /** The CI run of a commit; null when there is none yet. */
 export const runOf = async (sha: string, fresh = false): Promise<Run | null> => {
-  const [run] = records(await gh(['run', 'list', '--repo', REPO, '--workflow', WORKFLOW, '--commit', sha, '--json', RUN_FIELDS], GH, fresh))
-  return run ? runFrom(run) : null
+  const [run] = records(record(await ghRest(`repos/${REPO}/actions/workflows/${WORKFLOW}/runs?head_sha=${sha}&per_page=1`, GH, fresh)).workflow_runs)
+  return run ? runFrom({ attempt: run.run_attempt, conclusion: run.conclusion, databaseId: run.id, startedAt: run.run_started_at, status: run.status }) : null
 }
 
 /**
@@ -226,7 +226,7 @@ const headRunOf = async (head: string): Promise<Run | null> => hasText(head) ? r
 
 /** Only the open PRs' numbers (#345): `openPrs` waits for a run lookup per PR, which a round's list doesn't need. */
 export const openPrNumbers = async (): Promise<number[]> =>
-  records(await gh(['pr', 'list', '--repo', REPO, '--state', 'open', '--limit', '100', '--json', 'number'])).map(pr => count(pr.number))
+  records(await ghRest(`repos/${REPO}/pulls?state=open&per_page=100`)).map(pr => count(pr.number))
 
 export const openPrs = async (): Promise<OpenPr[]> => {
   const [listed, queue] = await Promise.all([
@@ -264,8 +264,8 @@ export const resolveThread = async (id: string): Promise<boolean> => {
 /** Pull requests merged in the last `hours`. */
 export const recentlyMerged = async (hours: number): Promise<number[]> => {
   const since = Temporal.Now.instant().subtract({ hours })
-  return records(await gh(['pr', 'list', '--repo', REPO, '--state', 'merged', '--limit', '20', '--json', 'number,mergedAt']))
-    .filter(pr => Temporal.Instant.compare(Temporal.Instant.from(textOf(pr.mergedAt)), since) > 0)
+  return records(await ghRest(`repos/${REPO}/pulls?state=closed&sort=updated&direction=desc&per_page=100`))
+    .filter(pr => hasText(textOf(pr.merged_at)) && Temporal.Instant.compare(Temporal.Instant.from(textOf(pr.merged_at)), since) > 0)
     .map(pr => count(pr.number))
 }
 
@@ -276,7 +276,7 @@ export const mainAhead = async (head: string): Promise<{ ahead: number, newest: 
 }
 
 export const mainHead = async (): Promise<{ sha: string, subject: string }> => {
-  const value = record(await gh(['api', `repos/${REPO}/commits/main`]))
+  const value = record(await ghRest(`repos/${REPO}/commits/main`))
   return { sha: textOf(value.sha), subject: textOf(record(value.commit).message).split('\n')[0] ?? '' }
 }
 
