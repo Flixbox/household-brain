@@ -50,18 +50,21 @@ const append = (scan: Scan, text: string) => {
 }
 
 /**
- * Text that may be arithmetic or a subshell, failing closed (#373): read as commands, where a `<<`
- * may be a shift and so opens no here-document, and searched for substitutions whatever quotes them,
- * as arithmetic runs one even in single quotes.
+ * Text in `((…))`: only its substitutions are read if it is surely arithmetic, each whole, here-documents
+ * included (#373). Else it fails closed: it is also read as commands, where a `<<` may be a shift and
+ * so opens no here-document, and substitutions count whatever quotes them, as arithmetic runs one even in single quotes. It may recurse into its own text, so charging it each time bounds both the work and the depth: `substitutionsIn` stops at a spent budget, and the line is denied (#496).
  */
-const unsureArithmetic = (scan: Scan, inner: string) => {
-  scan.nested.push(inner.replaceAll('<<', '  '))
+const readArithmetic = (scan: Scan, inner: string, sure: boolean) => {
+  spent(scan.work, inner)
+  if (!sure) {
+    scan.nested.push(inner.replaceAll('<<', '  '))
+  }
   substitutionsIn(scan, inner)
 }
 
 /**
  * A `$(…)` or backtick substitution starting at `at`: its text is kept to be read as a command line
- * of its own, and the word gets it, marked as dynamic; surely arithmetic `$((…))` is data. Returns
+ * of its own, and the word gets it, marked as dynamic; surely arithmetic `$((…))` is data but for its own substitutions. Returns
  * that text and where the next thing starts.
  */
 const substitution = (scan: Scan, text: string, at: number): [string, number] => {
@@ -69,10 +72,10 @@ const substitution = (scan: Scan, text: string, at: number): [string, number] =>
   const from = at + (backtick ? 1 : 2)
   const end = backtick ? indexOrEnd(text, '`', from) : closingParen(text, from)
   const inner = text.slice(from, end)
-  if (!text.startsWith('$((', at)) {
+  if (text.startsWith('$((', at)) {
+    readArithmetic(scan, inner, opensArithmetic(text, at + 1, scan.work))
+  } else {
     scan.nested.push(inner)
-  } else if (!opensArithmetic(text, at + 1)) {
-    unsureArithmetic(scan, inner)
   }
   return [dynamic + text.slice(at, end + 1), end + 1]
 }
@@ -184,12 +187,10 @@ const redirect: Reader = (scan, text, at) => {
   return at + 1
 }
 
-/** `((`: surely arithmetic is data; anything else fails closed. Arithmetic also runs a substitution hidden in a variable's array subscript (`x='a[$(…)]'; $(( x ))`); the guard can't see that, and the gap is accepted (#375). */
+/** `((`: surely arithmetic is data but for its substitutions; anything else fails closed. Arithmetic also runs a substitution hidden in a variable's array subscript (`x='a[$(…)]'; $(( x ))`); the guard can't see that, and the gap is accepted (#375). */
 const doubleParen: Reader = (scan, text, at) => {
   const end = closingParen(text, at + 1)
-  if (!opensArithmetic(text, at)) {
-    unsureArithmetic(scan, text.slice(at + 2, end - 1))
-  }
+  readArithmetic(scan, text.slice(at + 2, end - 1), opensArithmetic(text, at, scan.work))
   return end + 1
 }
 
@@ -224,10 +225,10 @@ const heredocOpen: Reader = (scan, text, at) => {
   return at + match[0].length
 }
 
-/** Reads only the `$(…)` and backtick substitutions of a text the shell otherwise takes as data. */
+/** Reads only the `$(…)` and backtick substitutions of a text the shell otherwise takes as data; a spent budget ends that, as the line is denied anyway (review on #476). */
 const substitutionsIn = (scan: Scan, text: string) => {
   let at = 0
-  while (at < text.length) {
+  while (at < text.length && scan.work.left >= 0) {
     const escape = text[at] === '\\' ? 2 : 1
     at = startsSubstitution(text, at) ? substitution(scan, text, at)[1] : at + escape
   }

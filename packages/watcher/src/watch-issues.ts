@@ -5,7 +5,7 @@ import { currentOpenIssues } from './watch-open-issues'
 import { perIssue } from './watch-per-issue'
 import type { IssueEvent } from './watch-issue-events'
 import { type IssueEventRead, issueEventLines, subscribedIssueEvents } from './watch-comments'
-import { isUnwritten, markSeen, queue } from './watch-output'
+import { deliveredLines, isUnwritten, markSeen, queue, writeDelivered } from './watch-output'
 import { endIssue, exists, oneAtATime, readLines, subscriptions, writeLines, writtenAt } from './watch-state'
 
 const byNumber = (first: number, second: number) => first - second
@@ -79,7 +79,7 @@ export const checkIssues = async (fresh = false): Promise<boolean> => oneAtATime
  * Issue lines for what was closed or reopened between `before` and `now`; null when a lookup failed.
  * An issue that is gone (deleted or transferred) doesn't fail it (#263): it would fail every round.
  */
-const issueChanges = async (before: string[], now: string[]): Promise<{ closed: boolean, issue: number, line: string }[] | null> =>
+const issueChanges = async (before: readonly string[], now: readonly string[]): Promise<{ closed: boolean, issue: number, line: string }[] | null> =>
   Promise.all([
     ...before.filter(issue => !now.includes(issue)).map(async issue => ({ closed: true, issue: Number(issue), line: await issueLine(Number(issue), 'closed') })),
     ...now.filter(issue => !before.includes(issue)).map(async issue => ({ closed: false, issue: Number(issue), line: await issueLine(Number(issue), 'reopened') })),
@@ -92,13 +92,13 @@ const issueChanges = async (before: string[], now: string[]): Promise<{ closed: 
  */
 const checkLinkCycles = async (issues: readonly OpenIssue[]): Promise<void> => {
   const now = linkCycles(issues)
-  const fresh = newCycles(await readLines('link-cycles'), now)
-  await writeLines('link-cycles', now)
+  const fresh = newCycles(await deliveredLines('link-cycles'), now)
   if (fresh.length > 0) {
     // At the cap, more cycles may hide behind these; they come as news once these are fixed.
     const more = now.length >= MAX_CYCLES ? [`(at least ${MAX_CYCLES} cycles; more may come once these are fixed: run issue-links audit)`] : []
     queue([...fresh.map(cycle => `LINK_CYCLE ${cycle}`), ...more])
   }
+  await writeDelivered('link-cycles', now)
 }
 
 /** Issues closed or reopened since the open list `now` was last stored; the first list is stored as it is. */
@@ -106,15 +106,15 @@ const checkOpenList = async (now: string[]): Promise<void> => {
   if (await firstRun('open-issues', now)) {
     return
   }
-  const before = await readLines('open-issues')
+  const before = await deliveredLines('open-issues')
   const lines = await issueChanges(before, now)
   if (!lines) {
     return
   }
-  await writeLines('open-issues', now)
   for (const { issue, line } of lines) {
     queue([line], { issue })
   }
+  await writeDelivered('open-issues', now)
 }
 
 /**
