@@ -13,7 +13,7 @@ const FAKE_GH = String.raw`
   const home = process.env.FIXTURE_HOME
   appendFileSync(home + '/calls', text + '\n')
   if (text.includes('graphql')) {
-    const blockers = existsSync(home + '/cycle') ? [{ number: 5 }] : []
+    const blockers = existsSync(home + '/cycle') ? [{ number: 5, repository: { nameWithOwner: 'owner/repo' } }] : []
     const issues = { nodes: [{ blockedBy: { nodes: blockers }, number: 5 }], pageInfo: { endCursor: null, hasNextPage: false } }
     console.log(JSON.stringify({ data: { repository: { created: { nodes: [] }, createdPrs: { nodes: [] }, issues, updated: { nodes: [] }, updatedPrs: { nodes: [] } } } }))
     process.exit(0)
