@@ -35,6 +35,7 @@ const UNNAMED_WAIT_MS = 60_000
 /** A body can't fake these: gh logs JSON pretty-printed, so its lines are indented or start with a bracket. */
 const STATUS_LINE = /^< HTTP\/\S+ (?<status>\d{3})/u
 const HEADER_LINE = /^< (?<name>x-ratelimit-(?:limit|remaining|reset|resource)|retry-after): *(?<value>\S+)/iu
+// Quotes inside a string are escaped in the log, so a comment quoting this can't match it.
 const GRAPHQL_REFUSAL = /"type":\s*"RATE_LIMITED"/u
 const REFUSAL = /rate limit/iu
 const SECONDARY_REFUSAL = /secondary rate limit/iu
@@ -66,9 +67,8 @@ const budgetOf = (response: GhResponse, known: Budget | undefined, nowMs: number
 }
 
 const isRefused = (response: GhResponse, log: string, failed: boolean): boolean => {
-  if (numberOf(response, 'x-ratelimit-remaining') === 0) { return true }
-  if (!failed) { return false }
-  return GRAPHQL_REFUSAL.test(log) || ([403, 429].includes(response.status) && REFUSAL.test(log))
+  if (numberOf(response, 'x-ratelimit-remaining') === 0 || GRAPHQL_REFUSAL.test(log)) { return true }
+  return failed && [403, 429].includes(response.status) && REFUSAL.test(log)
 }
 
 /** Until when this response says to stop asking; 0 when it doesn't. */
@@ -128,6 +128,8 @@ const scope = { owner: '' }
 export const setLimitsOwner = (repo: string) => { scope.owner = repo.split('/')[0] ?? '' }
 
 const limitsFile = (cli: string) => `${LIMITS_DIR}/${Bun.hash(JSON.stringify([cli, scope.owner])).toString(36)}`
+/** The wait has a file of its own, written only for a refusal: a successful call in another watcher can't undo it. */
+const blockFile = (cli: string) => `${limitsFile(cli)}.block`
 
 const isBudget = (value: unknown): value is Budget =>
   isRecord(value) && typeof value.limit === 'number' && typeof value.remaining === 'number' && typeof value.resetMs === 'number'
@@ -139,8 +141,13 @@ const parsedLimits = (text: string): Limits => {
 }
 
 /** What is known about this `gh`'s limit; nothing, when no watcher has written it or it can't be read. */
-const readLimits = async (cli: string): Promise<Limits> =>
-  Bun.file(limitsFile(cli)).text().then(parsedLimits).catch(() => NO_LIMITS)
+const readLimits = async (cli: string): Promise<Limits> => {
+  const [limits, blocked] = await Promise.all([
+    Bun.file(limitsFile(cli)).text().then(parsedLimits).catch(() => NO_LIMITS),
+    Bun.file(blockFile(cli)).text().then(Number).catch(() => 0),
+  ])
+  return { ...limits, blockedUntilMs: Number.isFinite(blocked) ? Math.max(limits.blockedUntilMs, blocked) : limits.blockedUntilMs }
+}
 
 /** The `gh`s this watcher has asked with: each has a limit of its own. */
 const asking = new Set<string>()
@@ -151,6 +158,7 @@ export const noteLimits = async (cli: string, log: string, failed: boolean): Pro
   if (!log.includes('< HTTP/')) { return }
   const known = await readLimits(cli)
   const updated = updatedLimits(known, log, { failed, nowMs: Temporal.Now.instant().epochMilliseconds })
+  if (updated.blockedUntilMs > known.blockedUntilMs) { await writeWhole(blockFile(cli), String(updated.blockedUntilMs)).catch(ignoreFailure) }
   await writeWhole(limitsFile(cli), JSON.stringify(updated)).catch(ignoreFailure)
 }
 

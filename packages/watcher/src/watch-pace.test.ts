@@ -2,7 +2,7 @@
 import { afterAll, describe, expect, it } from 'bun:test'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { type Limits, NO_LIMITS, pauseMs, stretchFor, updatedLimits } from './watch-pace'
+import { type Limits, NO_LIMITS, blockedUntil, noteLimits, pauseMs, stretchFor, updatedLimits } from './watch-pace'
 import { ghText } from './watch-gh'
 
 const folder = await mkdtemp(`${tmpdir()}/watch-pace-`)
@@ -59,6 +59,12 @@ describe('updatedLimits (#400)', () => {
   it('waits for the reset after GraphQL refuses with budget left on the counter that answered', () => {
     const log = `${answer('200 OK', ...budgetHeaders(10, NOW_SECONDS + 400))}\n{ "errors": [{ "type": "RATE_LIMITED" }] }`
     expect(after(log, true).blockedUntilMs).toBe(NOW_MS + 400_000 + MARGIN_MS)
+  })
+
+  it('stops for a GraphQL refusal even when gh exits successfully, but not for a comment quoting one', () => {
+    const budget = answer('200 OK', ...budgetHeaders(10, NOW_SECONDS + 400))
+    expect(after(`${budget}\n{ "errors": [{ "type": "RATE_LIMITED" }] }`).blockedUntilMs).toBe(NOW_MS + 400_000 + MARGIN_MS)
+    expect(after(`${budget}\n${JSON.stringify({ body: '"type": "RATE_LIMITED"' })}`).blockedUntilMs).toBe(0)
   })
 
   it('is not stopped by a 403 for another reason, or by a comment that talks about limits', () => {
@@ -135,6 +141,15 @@ describe('ghText and the limit (#400)', () => {
     await expect(ghText(['one'], gh, true)).rejects.toThrow('exit 1')
     await expect(ghText(['two'], gh, true)).rejects.toThrow('rate limit')
     expect(await linesOf(calls)).toEqual(['api'])
+  })
+
+  it('keeps a refusal when other watchers note successes at the same moment', async () => {
+    const cli = `${folder}/racing`
+    const refusal = answer('403 Forbidden', 'Retry-After: 120')
+    const success = answer('200 OK', ...budgetHeaders(4000, NOW_SECONDS + 300))
+    await Promise.all([noteLimits(cli, success, false), noteLimits(cli, refusal, true), noteLimits(cli, success, false), noteLimits(cli, success, false)])
+    await noteLimits(cli, success, false)
+    expect(await blockedUntil(cli)).not.toBeNull()
   })
 
   it('runs two calls at once by default', async () => {
