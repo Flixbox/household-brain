@@ -6,9 +6,9 @@ import { changeTracker } from './watch-change-gate'
 import { ACTIVITY_GH, IGNORED, OWNER, SELF, openPrNumbers, perPr, recentlyMerged } from './watch-github'
 import { type Json, at, count, records } from './watch-text'
 import { perIssue } from './watch-per-issue'
-import { appendLines, exists, oneAtATime, readLines, subscriptions, writeLines } from './watch-state'
+import { exists, oneAtATime, readLines, subscriptions, writeLines } from './watch-state'
 import { allSettled, hasText, textOf } from './read'
-import { queue } from './watch-output'
+import { isUnwritten, markSeen, queue } from './watch-output'
 
 export { changedStates } from './watch-change-gate'
 
@@ -79,10 +79,10 @@ export const checkActivity = async (pr: number, items: Activity[] | undefined): 
   if (!items) {
     return false
   }
-  const fresh = newActivity(await seenActivity(pr, items), items)
+  const fresh = newActivity(await seenActivity(pr, items), items).filter(item => !isUnwritten(`pr-${pr}-seen`, item.id))
   if (fresh.length > 0) {
-    await appendLines(`pr-${pr}-seen`, fresh.map(item => item.id))
     queue([`PR #${pr}: ACTIVITY:`, ...fresh.flatMap(item => item.lines)], { key: `activity:${pr}:${fresh.map(item => item.id).join(',')}`, pr })
+    await markSeen(`pr-${pr}-seen`, fresh.map(item => item.id))
   }
   return true
 })
