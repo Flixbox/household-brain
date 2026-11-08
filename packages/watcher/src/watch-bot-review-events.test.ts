@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { awaitsBotReview, botReviewEvent, botReviewStateOf, notAskingBecause } from './watch-bot-review-events'
+import { awaitsBotReview, botReviewEvent, botReviewStateOf, botReviewUnreadEvent, notAskingBecause } from './watch-bot-review-events'
 import { botNames, resolveCommand } from './watch-review-events'
 
 const botReview = (login: string, oid = 'abcdef1') => ({ author: { login }, commit: { oid }, state: 'COMMENTED' })
@@ -86,7 +86,7 @@ describe('botReviewEvent', () => {
   })
 
   it('reports a failure and a skip under keys of their own', () => {
-    expect(botReviewEvent({ bot: 'coderabbitai', label: 'restored', outcome: { asked: false }, pr: 7 }).key).toBe('pr-7 bot-review-failed coderabbitai')
+    expect(botReviewEvent({ bot: 'coderabbitai', label: 'restored', outcome: { asked: false }, pr: 7 }).key).toBe('pr-7 bot-review-failed coderabbitai restored')
     const skipped = botReviewEvent({ bot: 'coderabbitai', label: 'removed', outcome: { skipped: 'it reviewed this PR already' }, pr: 7 })
     expect(skipped.key).toBe('pr-7 bot-review-skipped coderabbitai')
   })
@@ -94,5 +94,35 @@ describe('botReviewEvent', () => {
   it('says what became of the label, which comes back after a failed ask (#325)', () => {
     expect(botReviewEvent({ bot: 'coderabbitai', label: 'restored', outcome: { asked: false }, pr: 7 }).lines[0]).toContain('put the label `bot-review` back, so the next look tries again')
     expect(botReviewEvent({ bot: 'coderabbitai', label: 'lost', outcome: { asked: false }, pr: 7 }).lines[0]).toContain("couldn't put the label `bot-review` back: add it again to ask again")
+  })
+
+  it('reports a lost label after an earlier restored one, each fate once (#488)', () => {
+    // `report` sends each key once, so a look that repeats a fate stays quiet and a new fate speaks.
+    const seen = new Set<string>()
+    const reported = (['restored', 'restored', 'lost', 'lost'] as const).filter(label => {
+      const { key } = botReviewEvent({ bot: 'coderabbitai', label, outcome: { asked: false }, pr: 7 })
+      const fresh = !seen.has(key)
+      seen.add(key)
+      return fresh
+    })
+    expect(reported).toEqual(['restored', 'lost'])
+  })
+})
+
+describe('botReviewUnreadEvent', () => {
+  it('reports a lost label after an earlier restored one, each fate once (#484)', () => {
+    // `report` sends each key once, so a look that repeats a fate stays quiet and a new fate speaks.
+    const seen = new Set<string>()
+    const reported = (['restored', 'restored', 'lost', 'lost'] as const).filter(fate => {
+      const { key } = botReviewUnreadEvent(7, fate)
+      const fresh = !seen.has(key)
+      seen.add(key)
+      return fresh
+    })
+    expect(reported).toEqual(['restored', 'lost'])
+  })
+
+  it('tells who has to act when the label is lost', () => {
+    expect(botReviewUnreadEvent(7, 'lost').lines[0]).toContain("couldn't put the label `bot-review` back: add it again to ask again")
   })
 })
