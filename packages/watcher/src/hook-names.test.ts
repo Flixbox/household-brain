@@ -12,7 +12,9 @@ const manifestPaths = new Bun.Glob('*/{.claude-plugin/plugin.json,.codex-plugin/
 /** The events of a manifest: `hooks.hooks` in Codex's plugin.json, `hooks` in hooks.json or Claude's plugin.json. */
 const eventsOf = (manifest: unknown): Record<string, unknown> => {
   const hooks = isRecord(manifest) ? manifest.hooks : null
-  if (!isRecord(hooks)) return {}
+  if (!isRecord(hooks)) {
+    return {}
+  }
   return isRecord(hooks.hooks) ? hooks.hooks : hooks
 }
 
@@ -30,7 +32,7 @@ const handlersIn = async (path: string) => {
 
 const registeredHandlers = async () => {
   const paths = await Array.fromAsync(manifestPaths.scan({ cwd: packagesRoot, dot: true }))
-  return (await Promise.all(paths.map(path => handlersIn(path)))).flat()
+  return (await Promise.all(paths.map(async path => handlersIn(path)))).flat()
 }
 
 describe('the hooks this repository registers (#503)', () => {
