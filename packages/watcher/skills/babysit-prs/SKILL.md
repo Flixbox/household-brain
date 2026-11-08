@@ -88,8 +88,9 @@ default branch's CI, new issues, the owner's comments on issues, and issues clos
     owner; when an organisation owns it, its one human admin (bots left out, #295). With no human
     admin or several, it stays the organisation, so no approval counts, and the watcher says so once
     at the start: set `OWNER` then.
-  - `ACTIVITY_GH`: the `gh` that reads comments; plain `gh` by default, because only the owner's own
-    login sees their pending (unsubmitted) review.
+  - `ACTIVITY_GH`: the owner's `gh`, plain `gh` by default. It is asked only for the owner's pending
+    (unsubmitted) review, which only their own login sees, and for the comments of a PR `GH` couldn't
+    read; `GH` reads the rest (#403). Set to the same as `GH`, one read covers both.
   - `GH_TIMEOUT_SECONDS`: how long one `gh` call may take (30 by default); a slower one counts as a
     failed read and is tried again next look, so one slow endpoint doesn't hold up the rest. A `GH`
     wrapper has to answer within it too, also when it first makes a token: one that never does
