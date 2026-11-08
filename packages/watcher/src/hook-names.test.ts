@@ -20,14 +20,31 @@ const eventsOf = (manifest: unknown): Record<string, unknown> => {
 
 const asList = (value: unknown): unknown[] => (Array.isArray(value) ? value : [])
 
-/** Each handler of a manifest, labelled so that a failure says which one has no name. */
-const handlersIn = async (path: string) => {
-  const manifest: unknown = JSON.parse(await Bun.file(`${packagesRoot}/${path}`).text())
-  return Object.entries(eventsOf(manifest)).flatMap(([event, entries]) =>
+const readJson = async (path: string): Promise<unknown> => JSON.parse(await Bun.file(`${packagesRoot}/${path}`).text())
+
+/** The hook files a manifest points to: its `hooks` can be a path, or a list of them, from the plugin's folder. */
+const referencedFiles = (path: string, manifest: unknown) => {
+  const plugin = path.split('/')[0]
+  return [isRecord(manifest) ? manifest.hooks : null]
+    .flat()
+    .filter(reference => typeof reference === 'string')
+    .map(reference => `${plugin}/${reference}`)
+}
+
+/** Each handler written in a manifest, labelled so that a failure says which one has no name. */
+const handlersWritten = (path: string, manifest: unknown) =>
+  Object.entries(eventsOf(manifest)).flatMap(([event, entries]) =>
     asList(entries)
       .flatMap(entry => (isRecord(entry) ? asList(entry.hooks) : []))
       .map(handler => ({ handler, label: `${path} ${event}` })),
   )
+
+const handlersIn = async (path: string) => {
+  const manifest = await readJson(path)
+  const referenced = await Promise.all(
+    referencedFiles(path, manifest).map(async file => handlersWritten(file, await readJson(file))),
+  )
+  return [...handlersWritten(path, manifest), ...referenced.flat()]
 }
 
 const registeredHandlers = async () => {
