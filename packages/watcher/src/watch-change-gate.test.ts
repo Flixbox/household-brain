@@ -111,7 +111,7 @@ test('a PR is due when never read, not in the gate, changed, or read too long ag
 })
 
 test('a thread the watcher resolved is not resolved again from what it remembers (#404)', async () => {
-  // The all-events watcher is the one that writes; it never exits by itself, so it is stopped.
-  const { calls } = await run(following, { CI_DONE_AT: '0' }, 4000)
+  // The all-events watcher is the one that writes; it never exits by itself, so run's limit stops it.
+  const { calls } = await run(following, { CI_DONE_AT: '0' })
   expect(calls.filter(call => call.includes('resolveReviewThread'))).toHaveLength(1)
 }, 30_000)
