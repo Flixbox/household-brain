@@ -93,73 +93,14 @@ export interface IssueEvent {
 }
 
 const AUTHOR = 'author{login kind:__typename}'
-const NEWEST = 'orderBy:{field:CREATED_AT,direction:DESC}'
-const UPDATED = 'orderBy:{field:UPDATED_AT,direction:DESC}'
 const ISSUE_COMMENTS = `comments(last:20){nodes{databaseId body url createdAt ${AUTHOR}}}`
-/**
- * New issues and issue comments, as GraphQL names them (#314), in one query instead of two
- * repository-wide REST lists, sparing the REST quota agents share (#306): the fifty newest issues and
- * the times of the fifty newest PRs, and the comments on the fifty issues and PRs updated last (a new
- * comment updates its issue): an issue's last twenty, and only the times of a PR's last fifty, so
- * that one busy PR can't hide where the fifty newest comments start. Issues and PRs come in every
- * state: GraphQL's connections filter by state only when asked to.
- */
-export const ISSUE_EVENT_FIELDS = `created: issues(first:50,${NEWEST}){nodes{number title createdAt ${AUTHOR}}}`
-  + ` createdPrs: pullRequests(first:50,${NEWEST}){nodes{createdAt}}`
-  + ` updated: issues(first:50,${UPDATED}){nodes{number ${ISSUE_COMMENTS}}}`
-  + ` updatedPrs: pullRequests(first:50,${UPDATED}){nodes{comments(last:50){nodes{createdAt}}}}`
-
-/**
- * How far back news goes: the fifty newest issues and PRs, and the fifty newest comments on either,
- * as the REST lists gave them. An older one isn't news, also when it was never reported: an old issue
- * or comment that only now comes up (a label added) would be reported long after the fact.
- */
-const WINDOW = 50
-
-/** Newest first; GitHub's timestamps all have one format, so their text sorts by time. */
-const byNewest = (first: Json, second: Json) => textOf(second.createdAt).localeCompare(textOf(first.createdAt))
-
-/** Those of `onIssues` (issues, or comments on them) among the fifty newest of them and `onPrs`. */
-const newest = (onIssues: Json[], onPrs: Json[]): Json[] => {
-  const kept = new Set([...onIssues, ...onPrs].toSorted(byNewest).slice(0, WINDOW))
-  return onIssues.filter(item => kept.has(item))
-}
-
-/** The newest issues among the fifty newest issues and PRs, not the agent's own. */
-const newIssues = (repository: Json, self: string): IssueEvent[] =>
-  newest(records(at(repository, 'created', 'nodes')), records(at(repository, 'createdPrs', 'nodes')))
-    .filter(issue => actor(issue.author) !== self)
-    .map(issue => ({ at: issue.createdAt, issue: count(issue.number), key: `issue #${count(issue.number)}`, lines: [`NEW_ISSUE #${count(issue.number)} ${oneLine(issue.title, 200)}`] }))
-
-/** Each comment on the issues read, with its issue's number. */
-const issueOfComments = (repository: Json): Map<Json, number> => {
-  const issues = records(at(repository, 'updated', 'nodes'))
-  return new Map(issues.flatMap(issue => records(at(issue, 'comments', 'nodes')).map((comment): [Json, number] => [comment, count(issue.number)])))
-}
-
 /** The event for the owner's `comment` on `issue`, remembered by its id. */
-const commentEvent = (comment: Json, issue: number, owner: string): IssueEvent => ({
+export const commentEvent = (comment: Json, issue: number, owner: string): IssueEvent => ({
   at: comment.createdAt,
   issue,
   key: `issue-comment ${count(comment.databaseId)}`,
   lines: [`ISSUE_COMMENT ${count(comment.databaseId)} #${issue}:`, ...commentText(comment, { author: owner, owner })],
 })
-
-/** The owner's comments on issues, among the fifty newest comments on issues and PRs. */
-const ownerComments = (repository: Json, owner: string): IssueEvent[] => {
-  const issueOf = issueOfComments(repository)
-  const onPrs = records(at(repository, 'updatedPrs', 'nodes')).flatMap(pr => records(at(pr, 'comments', 'nodes')))
-  return newest([...issueOf.keys()], onPrs).filter(comment => actor(comment.author) === owner)
-    .map(comment => commentEvent(comment, issueOf.get(comment) ?? 0, owner))
-}
-
-/**
- * New issues (not the agent's own) and the owner's comments on issues, newest first, from
- * `ISSUE_EVENT_FIELDS`, each remembered by its id, never its text (#247). A comment comes whole,
- * under its event line (#255).
- */
-export const issueEventsFrom = (repository: Json, { owner, self }: { owner: string, self: string }): IssueEvent[] =>
-  [...newIssues(repository, self), ...ownerComments(repository, owner)]
 
 /**
  * What a scoped watcher reads of each subscribed issue (#357): its last twenty comments, instead of
