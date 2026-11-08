@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { type Rest, askedSince, commentsBase, issuesBase, mergeOpen, newIssueEvents, nextCursor, ownerCommentEvents, parseSnapshot, readSince, reconcileDue } from './watch-issue-rest'
+import { type Rest, askedSince, commentsBase, issuesBase, mergeOpen, newIssueEvents, nextPosition, ownerCommentEvents, parseSnapshot, readSince, reconcileDue } from './watch-issue-rest'
 
 const CURSOR = '2026-11-08T12:00:00Z'
 const ASKED = '2026-11-08T11:58:00Z'
@@ -14,26 +14,36 @@ describe('the since boundary (#412)', () => {
     expect(askedSince('2026-11-08T12:00:00.750Z')).toBe(ASKED)
   })
 
+  const at = (cursor: string | null, capped: string | null = null) => ({ capped, cursor })
+  const stuck = [issue(1, { updated_at: CURSOR })]
+  const later = (updated_at: string) => [issue(2, { updated_at })]
+
   it('moves the cursor to the newest update of the first page, and never back', () => {
-    expect(nextCursor(CURSOR, [[issue(1), issue(2, { updated_at: '2026-11-08T12:05:00Z' })]])).toBe('2026-11-08T12:05:00Z')
-    expect(nextCursor(CURSOR, [[issue(1, { updated_at: '2026-11-08T11:00:00Z' })]])).toBe(CURSOR)
-    expect(nextCursor(CURSOR, [[]])).toBe(CURSOR)
-    expect(nextCursor(null, [[]])).toBeNull()
+    expect(nextPosition(at(CURSOR), [[issue(1), issue(2, { updated_at: '2026-11-08T12:05:00Z' })]])).toEqual(at('2026-11-08T12:05:00Z'))
+    expect(nextPosition(at(CURSOR), [[issue(1, { updated_at: '2026-11-08T11:00:00Z' })]])).toEqual(at(CURSOR))
+    expect(nextPosition(at(CURSOR), [[]])).toEqual(at(CURSOR))
+    expect(nextPosition(at(null), [[]])).toEqual(at(null))
   })
 
   it('leaves later pages for the next round: a list that shifted while it was paged is read again', () => {
-    const second = [issue(3, { updated_at: '2026-11-08T13:00:00Z' })]
-    expect(nextCursor(CURSOR, [[issue(1, { updated_at: '2026-11-08T12:10:00Z' })], second])).toBe('2026-11-08T12:10:00Z')
+    expect(nextPosition(at(CURSOR), [[issue(1, { updated_at: '2026-11-08T12:10:00Z' })], later('2026-11-08T13:00:00Z')])).toEqual(at('2026-11-08T12:10:00Z'))
   })
 
-  it('goes on past a first page that lies wholly inside the overlap, so a burst can\'t hold the cursor', () => {
-    const stuck = [issue(1, { updated_at: CURSOR })]
-    expect(nextCursor(CURSOR, [stuck, [issue(2, { updated_at: '2026-11-08T12:01:00Z' })]])).toBe('2026-11-08T12:01:00Z')
+  it('holds the cursor for one round after a stuck first page, so the old overlap is asked for again (#469)', () => {
+    expect(nextPosition(at(CURSOR), [stuck, later('2026-11-08T12:01:00Z')])).toEqual(at(CURSOR, '2026-11-08T12:01:00Z'))
   })
 
-  it('moves past a stuck first page only by the overlap, so what paging skipped is asked for again', () => {
-    const stuck = [issue(1, { updated_at: CURSOR })]
-    expect(nextCursor(CURSOR, [stuck, [issue(2, { updated_at: '2026-11-08T13:00:00Z' })]])).toBe('2026-11-08T12:02:00Z')
+  it('caps a later page at one overlap past where it has got to', () => {
+    expect(nextPosition(at(CURSOR), [stuck, later('2026-11-08T13:00:00Z')])).toEqual(at(CURSOR, '2026-11-08T12:02:00Z'))
+    expect(nextPosition(at(CURSOR, '2026-11-08T12:02:00Z'), [stuck, later('2026-11-08T13:00:00Z')])).toEqual(at('2026-11-08T12:02:00Z', '2026-11-08T12:04:00Z'))
+  })
+
+  it('takes the capped position once the burst is over, so nothing holds the cursor', () => {
+    expect(nextPosition(at(CURSOR, '2026-11-08T12:01:00Z'), [stuck, later('2026-11-08T12:01:00Z')])).toEqual(at('2026-11-08T12:01:00Z'))
+  })
+
+  it('drops the capped position when the first page moves the cursor by itself', () => {
+    expect(nextPosition(at(CURSOR, '2026-11-08T12:02:00Z'), [[issue(1, { updated_at: '2026-11-08T12:05:00Z' })]])).toEqual(at('2026-11-08T12:05:00Z'))
   })
 })
 
@@ -112,15 +122,16 @@ describe('the open list (#412)', () => {
   })
 
   it('reads a stored snapshot, and takes a damaged one for none', () => {
-    const snapshot = { cursor: CURSOR, fullAt: 5, issues: known }
+    const snapshot = { capped: '2026-11-08T12:02:00Z', cursor: CURSOR, fullAt: 5, issues: known }
     expect(parseSnapshot(JSON.stringify(snapshot))).toEqual(snapshot)
+    expect(parseSnapshot(JSON.stringify({ cursor: CURSOR, fullAt: 5, issues: known }))).toEqual({ capped: null, cursor: CURSOR, fullAt: 5, issues: known })
     expect(parseSnapshot('{')).toBeNull()
     expect(parseSnapshot('{"cursor":1}')).toBeNull()
     expect(parseSnapshot(null)).toBeNull()
   })
 
   it('reads the whole list again after a while, for deletions and blockers no update shows', () => {
-    expect(reconcileDue({ cursor: CURSOR, fullAt: 1000, issues: [] }, 1000 + 14 * 60_000)).toBe(false)
-    expect(reconcileDue({ cursor: CURSOR, fullAt: 1000, issues: [] }, 1000 + 15 * 60_000)).toBe(true)
+    expect(reconcileDue({ capped: null, cursor: CURSOR, fullAt: 1000, issues: [] }, 1000 + 14 * 60_000)).toBe(false)
+    expect(reconcileDue({ capped: null, cursor: CURSOR, fullAt: 1000, issues: [] }, 1000 + 15 * 60_000)).toBe(true)
   })
 })
