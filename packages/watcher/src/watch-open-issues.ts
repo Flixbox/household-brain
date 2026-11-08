@@ -2,7 +2,7 @@
  * The open issues (#412): one full read, then `since=` merged into it, kept in `open-issue-snapshot`,
  * so a restart goes on where it stopped. A full read comes back every so often (see `reconcileDue`).
  */
-import { type IssueSnapshot, type Rest, issuesBase, mergeOpen, nextCursor, parseSnapshot, readSince, reconcileDue } from './watch-issue-rest'
+import { type IssueSnapshot, type Rest, issuesBase, mergeOpen, nextPosition, parseSnapshot, readSince, reconcileDue } from './watch-issue-rest'
 import type { OpenIssue } from './watch-link-cycles'
 import { REPO, openIssues } from './watch-github'
 import { ghRest } from './watch-gh'
@@ -24,10 +24,10 @@ const stored = async (snapshot: IssueSnapshot): Promise<OpenIssue[]> => {
  * a failed read (#261), and isn't kept.
  */
 const fullRead = async (previous: IssueSnapshot | null): Promise<OpenIssue[] | null> => {
-  const cursor = previous?.cursor ?? nextCursor(null, await readSince(rest, BASE, null))
+  const cursor = previous?.cursor ?? nextPosition({ capped: null, cursor: null }, await readSince(rest, BASE, null)).cursor
   const fullAt = nowMs()
   const issues = await openIssues()
-  return issues.length === 0 ? null : stored({ cursor, fullAt, issues })
+  return issues.length === 0 ? null : stored({ capped: previous?.capped ?? null, cursor, fullAt, issues })
 }
 
 /** Every open issue with its blockers; null when the list couldn't be read. */
@@ -37,5 +37,5 @@ export const currentOpenIssues = async (): Promise<OpenIssue[] | null> => {
     return fullRead(snapshot)
   }
   const pages = await readSince(rest, BASE, snapshot.cursor)
-  return stored({ ...snapshot, cursor: nextCursor(snapshot.cursor, pages), issues: mergeOpen(snapshot.issues, pages.flat()) })
+  return stored({ ...snapshot, ...nextPosition(snapshot, pages), issues: mergeOpen(snapshot.issues, pages.flat()) })
 }
