@@ -106,7 +106,7 @@ const checkOpenList = async (now: string[]): Promise<void> => {
     return
   }
   const before = await readLines('open-issues')
-  const lines = before.length === 0 ? [] : await issueChanges(before, now)
+  const lines = await issueChanges(before, now)
   if (!lines) {
     return
   }
@@ -119,8 +119,8 @@ const checkOpenList = async (now: string[]): Promise<void> => {
 /**
  * Issues closed or reopened since the last round, and new cycles in their links. A failed lookup
  * leaves the state as it was, so the next round tries again; a gone issue isn't a failed lookup
- * (#263). An empty list counts as a failed one, and an empty stored list as none (#261): compared
- * with either, every issue would look closed or reopened.
+ * (#263). A full read that comes back empty is a failed one (#261), and `currentOpenIssues` gives
+ * null for it; an empty list here is what the updates said, the last open issue closing (#412).
  */
 export const checkIssueStates = async (): Promise<void> => {
   // A scoped watcher reports no cycles and no other issue's closing (#357), and its own issues'
@@ -129,7 +129,7 @@ export const checkIssueStates = async (): Promise<void> => {
     return
   }
   const issues = await currentOpenIssues().catch(() => null)
-  if (!issues || issues.length === 0) {
+  if (!issues) {
     return
   }
   await checkLinkCycles(issues)
