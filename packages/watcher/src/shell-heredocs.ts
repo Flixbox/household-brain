@@ -11,14 +11,24 @@ export interface Heredoc {
   tabs: boolean
 }
 
-/** `<<`, `<<-`, and the delimiter, quoted or not. */
-const plainOpener = /^<<(?<tabs>-?)[\t ]*(?:'(?<single>[^']*)'|"(?<double>[^"]*)"|(?<escape>\\)?(?<bare>[^\s"&'();<>|-][^\s"&'();<>|]*))/u
+/**
+ * `<<`, `<<-`, and a delimiter read whole: one quoted part or one bare one, and the word ends there.
+ * Anything else (`<<E'O'F`, `<<"E\\"`, `<<"$(x)"`, `<<$(x)`) doesn't match, and the reader refuses it (#381): bash's
+ * rules for the word are many, and a delimiter read wrong hides the commands after it.
+ */
+const plainOpener = /^<<(?<tabs>-?)[\t ]*(?:'(?<single>[^']*)'|"(?<double>[^!"$\\`]*)"|(?<escape>\\)?(?<bare>[^\s!"#$&'();<>\\`|-][^\s!"$&'();<>\\`|]*))/u
 
 /** `<<` and a `$'…'` delimiter (#378), whose `\\'` and `\\\\` stay inside it; tried first, as a bare `$` would match the other. */
 const ansiCOpener = /^<<(?<tabs>-?)[\t ]*\$'(?<ansi>(?:[^'\\]|\\[\s\S])*)'/u
 
-/** The here-document opener a text starts with, if any. */
-export const heredocOpener = (text: string) => ansiCOpener.exec(text) ?? plainOpener.exec(text)
+/** What may stand after a delimiter read whole: a blank or operator, but no `<(` or `>(`, which bash keeps in the word. */
+const wordEnd = /^(?![<>]\()(?:[\t\n &);<>|]|$)/u
+
+/** The here-document opener a text starts with, if its delimiter is read whole. */
+export const heredocOpener = (text: string) => {
+  const match = ansiCOpener.exec(text) ?? plainOpener.exec(text)
+  return match !== null && wordEnd.test(text.slice(match[0].length)) ? match : null
+}
 
 /**
  * A `$'…'` delimiter's value. Bash compares bytes, and the decoder can't spell bytes above 0x7F as the

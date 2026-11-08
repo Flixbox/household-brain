@@ -196,10 +196,14 @@ const noteHeredoc = (scan: Scan, match: RegExpExecArray) => {
   }
 }
 
+/** A here-document opener that can't be read for certain, as a command word the shell fills in, which the guard refuses (#381). */
+const unreadable = (rest: string) => dynamic + (/^\S*/u.exec(rest)?.[0] ?? '')
+
 const heredocOpen: Reader = (scan, text, at) => {
   const match = heredocOpener(text.slice(at))
   endWordBeforeRedirection(scan)
   if (match === null) {
+    scan.commands.push([unreadable(text.slice(at))])
     append(scan, '<<')
     return at + 2
   }
