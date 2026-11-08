@@ -10,7 +10,7 @@
 import { type Enclosures, type Heredoc, bodyAsRead, bodyExpands, closingLine, countEnclosure, hereStringOperator, heredocOf, heredocOpener, opensHereString, opensHeredoc, quoteInExpansion, unsureInEnclosure } from './shell-heredocs'
 import { closingParen, indexOrEnd, isSeparator, opensArithmetic } from './shell-parens'
 import { ansiCValue, closingQuote, dynamic, standIn } from './shell-ansi-c'
-import { type Work, spent, unreadableLine } from './shell-work'
+import { type Work, charged, spent, unreadableLine } from './shell-work'
 
 /** Whether the shell may change a word before the command sees it (a variable, `$(…)`, backticks). */
 export const isDynamic = (word: string) => word.includes(dynamic)
@@ -68,6 +68,10 @@ const substitution = (scan: Scan, text: string, at: number): [string, number] =>
   const backtick = text[at] === '`'
   const from = at + (backtick ? 1 : 2)
   const end = backtick ? indexOrEnd(text, '`', from) : closingParen(text, from)
+  // `$((` may recurse into its own text: charging its span each time bounds both the work and the depth, and a spent budget denies the line (#496).
+  if (text.startsWith('$((', at) && charged(scan.work, end - from + 1)) {
+    return [dynamic + text.slice(at, end + 1), end + 1]
+  }
   const inner = text.slice(from, end)
   if (!text.startsWith('$((', at)) {
     scan.nested.push(inner)

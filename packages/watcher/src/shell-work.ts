@@ -26,3 +26,15 @@ export const spent = (work: Work, text: string) => charged(work, text.length + 1
 
 /** A `gh` command the shell fills in, so a write: what the guard reports for a line it can't read. */
 export const unreadableLine = () => [['gh', `${dynamic}$unreadable`]]
+
+/** What `read` finds, or an unreadable line if the stack ran out: a hook that crashes denies nothing (#496). */
+export const unreadableOnOverflow = (read: () => string[][]) => {
+  try {
+    return read()
+  } catch (error) {
+    if (error instanceof RangeError) {
+      return unreadableLine()
+    }
+    throw error
+  }
+}
