@@ -6,8 +6,10 @@
  *   tracked        pull requests followed until their deploy or closing is reported
  *   issue-events   the new issues and issue comments already reported, by id (`issue #12`,
  *                  `issue-comment 345`); `issues`, keyed by their text, is no longer read (#247)
+ *   issue-event-cursors  how far REST's issues and comments were read for those (#412)
  *   main           the newest commit on main already reported
  *   open-issues    the open issues seen last round
+ *   open-issue-snapshot  the open issues with their blockers and REST's cursor (#412)
  *   queued         the PRs in the merge queue, each with when it entered (#251)
  *   unqueued       the PRs that should be in the merge queue but aren't, with their head and since when (#305)
  *   usage          the last usage line this watcher posted: its numbers and when, as JSON (#318)
