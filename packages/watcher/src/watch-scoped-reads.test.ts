@@ -138,3 +138,9 @@ test('the merge that ends the last subject says the subscription completed (#477
   expect(output).toContain('MERGED: merge7; subscription completed')
   expect(code).toBe(3)
 }, 30_000)
+
+test('two subscribed PRs merging in one look still say the subscription completed, once (#477)', async () => {
+  const { code, output } = await runScoped('pr:6,pr:7')
+  expect(output.match(/subscription completed/gu)?.length).toBe(1)
+  expect(code).toBe(3)
+}, 30_000)
