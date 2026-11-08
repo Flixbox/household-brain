@@ -1,4 +1,4 @@
-import { ansiCValue } from './shell-ansi-c'
+import { ansiCValue, dynamic } from './shell-ansi-c'
 
 /** Here-documents as the owner-write guard's shell reader (shell-commands.ts) sees them (#368). */
 
@@ -20,11 +20,20 @@ const ansiCOpener = /^<<(?<tabs>-?)[\t ]*\$'(?<ansi>(?:[^'\\]|\\[\s\S])*)'/u
 /** The here-document opener a text starts with, if any. */
 export const heredocOpener = (text: string) => ansiCOpener.exec(text) ?? plainOpener.exec(text)
 
+/**
+ * A `$'…'` delimiter's value. Bash compares bytes, and the decoder can't spell bytes above 0x7F as the
+ * line they'd match, so such a delimiter counts as one the shell may change, which the reader refuses (review on #379).
+ */
+const ansiCDelimiter = (ansi: string) => {
+  const value = ansiCValue(ansi)
+  return /\P{ASCII}/u.test(value) ? dynamic + value : value
+}
+
 /** The here-document an opener names. */
 export const heredocOf = (match: RegExpExecArray): Heredoc => {
   const { ansi, bare, double, escape, single, tabs } = match.groups ?? {}
   return {
-    delimiter: single ?? double ?? (typeof ansi === 'string' ? ansiCValue(ansi) : null) ?? bare ?? '',
+    delimiter: single ?? double ?? (typeof ansi === 'string' ? ansiCDelimiter(ansi) : null) ?? bare ?? '',
     quoted: typeof escape === 'string' || typeof bare !== 'string',
     tabs: tabs === '-',
   }
