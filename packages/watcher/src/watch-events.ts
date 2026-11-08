@@ -161,7 +161,7 @@ const approvalProblem = (pr: OpenPr, repo: string, awaitingBot: boolean): string
  * main or in conflict (#226), approved with failed CI, or with green CI and auto-merge off (#224), unless it
  * is `awaitingBot`, a review bot's review (#299). Parked PRs don't count, nor the branch of one in `branchSaid` (#508).
  */
-export const reminderLines = (prs: readonly OpenPr[], repo: string, awaitingBot: ReadonlySet<number> = new Set(), branchSaid: ReadonlySet<number> = new Set()): string[] => prs
+export const reminderLines = (prs: readonly OpenPr[], repo: string, { awaitingBot = new Set(), branchSaid = new Set() }: { awaitingBot?: ReadonlySet<number>, branchSaid?: ReadonlySet<number> } = {}): string[] => prs
   .filter(pr => !pr.parked)
   .flatMap(pr => [branchSaid.has(pr.number) ? null : branchProblem(pr), approvalProblem(pr, repo, awaitingBot.has(pr.number))].filter(line => line !== null))
 

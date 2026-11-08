@@ -183,7 +183,7 @@ const claimBehind = async (prs: readonly OpenPr[]): Promise<{ keys: string[], sa
 const reminders = async (prs: OpenPr[]): Promise<{ keys: string[], lines: string[] }> => {
   const waits = await Promise.all(prs.map(async pr => awaitsBotReview({ asked: await askedBots(pr.number), state: pr.bot })))
   const { keys, said } = await claimBehind(prs)
-  return { keys, lines: reminderLines(prs, REPO, new Set(prs.filter((_pr, index) => waits[index] === true).map(pr => pr.number)), said) }
+  return { keys, lines: reminderLines(prs, REPO, { awaitingBot: new Set(prs.filter((_pr, index) => waits[index] === true).map(pr => pr.number)), branchSaid: said }) }
 }
 
 /**
@@ -202,10 +202,8 @@ const dueUsage = async (): Promise<string[]> => oneAtATime('usage-due', async ()
   return [agentUsageText(usage, at)]
 })
 
-/** The reminders, and the active agent's usage when it is due (#233, #318); nothing when neither has a line. */
-const sayClosing = async (): Promise<void> => {
-  if (subscriptions.scoped) { return }
-  const { keys, lines } = await openPrsThisLook().then(reminders, () => ({ keys: [], lines: [] }))
+/** Prints the reminders with the usage when it is due, then records the claimed `keys`. */
+const sayClaimed = async (keys: readonly string[], lines: readonly string[]): Promise<void> => {
   try {
     const closing = [...lines, ...await dueUsage()]
     if (closing.length > 0) {
@@ -219,6 +217,13 @@ const sayClosing = async (): Promise<void> => {
   // Written here: the round's marks were written before these lines, and a one-shot watcher exits next.
   await markSeen(REPORTED, keys)
   await writeMarks()
+}
+
+/** The reminders, and the active agent's usage when it is due (#233, #318); nothing when neither has a line. */
+const sayClosing = async (): Promise<void> => {
+  if (subscriptions.scoped) { return }
+  const { keys, lines } = await openPrsThisLook().then(reminders, () => ({ keys: [], lines: [] }))
+  await sayClaimed(keys, lines)
 }
 
 /** Prints what the round kept, then writes what waited for that; whether the round printed anything. */

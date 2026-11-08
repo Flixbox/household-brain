@@ -195,7 +195,7 @@ describe('reminderLines (#224)', () => {
   })
 
   it('holds the auto-merge reminder for a PR waiting on a review bot, not its failed CI (#299)', () => {
-    expect(reminderLines([pr({ number: 3 }), pr({ checks: ['FAILURE'], number: 4 })], 'owner/repo', new Set([3, 4]))).toEqual(['REMINDER: PR #4 is approved and CI failed: fix it.'])
+    expect(reminderLines([pr({ number: 3 }), pr({ checks: ['FAILURE'], number: 4 })], 'owner/repo', { awaitingBot: new Set([3, 4]) })).toEqual(['REMINDER: PR #4 is approved and CI failed: fix it.'])
   })
 })
 
