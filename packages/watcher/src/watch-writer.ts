@@ -34,6 +34,10 @@ const hashed = (text: string) => Bun.hash(text).toString(36)
 
 const failuresIn = async (path: string): Promise<number> => Number(await Bun.file(path).text().catch(() => '0'))
 
+/** Whether the write at `path` still waits. A write that never failed doesn't: a missing file has no real time. */
+const isWaiting = (path: string, failures: number): boolean =>
+  failures > 0 && Temporal.Now.instant().epochMilliseconds - Bun.file(path).lastModified < retryDelayMs(failures)
+
 /**
  * Runs `write` when this watcher is the writer and the write's wait is over, and keeps count of its
  * failures (`false`). Null when it didn't run; otherwise what `write` answered (its own null means
@@ -42,7 +46,7 @@ const failuresIn = async (path: string): Promise<number> => Number(await Bun.fil
 export const attemptWrite = async (key: string, write: () => Promise<boolean | null>): Promise<boolean | null> => {
   const path = `${RETRIES_DIR}/${hashed(key)}`
   const failures = await failuresIn(path)
-  if (!IS_WRITER || Temporal.Now.instant().epochMilliseconds - Bun.file(path).lastModified < retryDelayMs(failures)) {
+  if (!IS_WRITER || isWaiting(path, failures)) {
     return null
   }
   const result = await write()

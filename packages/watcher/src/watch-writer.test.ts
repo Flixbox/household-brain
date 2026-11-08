@@ -36,7 +36,8 @@ const setUp = async () => {
   const gh = `${home}/gh`
   await Bun.write(gh, `#!/bin/sh\necho "$*" >> "${home}/calls"\nexit 1\n`)
   await Bun.spawn(['chmod', '+x', gh]).exited
-  const calls = async () => (await Bun.file(`${home}/calls`).text().catch(() => '')).split('\n').filter(line => line !== '')
+  // Only the writes: a watcher also reads (the merge queue on loading, the open PRs for its reminders).
+  const calls = async () => (await Bun.file(`${home}/calls`).text().catch(() => '')).split('\n').filter(line => line.includes('mutation{') || line.startsWith('pr ready'))
   return { calls, gh, home }
 }
 
