@@ -43,6 +43,15 @@ interface Push {
 /** The directory after a `cd` or `-C` to this word; one the shell fills in changes nothing. */
 const moveTo = (dir: string, word: string) => (isDynamic(word) ? dir : path.resolve(dir, word.replace(/^~(?=\/|$)/u, Bun.env.HOME ?? '~')))
 
+/** The `git push` this git call is, if it is one, run from this directory. */
+const pushOf = (gitArgs: readonly string[], from: string, moved: boolean): Push[] => {
+  const call = readGit(gitArgs)
+  if (call.subcommand !== 'push') {
+    return []
+  }
+  return [{ args: call.args, dir: call.dirs.reduce(moveTo, from), unclear: moved || call.otherOptions || call.dirs.some(word => isDynamic(word)) }]
+}
+
 /** Each `git push` in the line, following the `cd`s before it. */
 const pushesIn = (commands: readonly (readonly string[])[], cwd: string) => {
   let dir = cwd
@@ -50,14 +59,10 @@ const pushesIn = (commands: readonly (readonly string[])[], cwd: string) => {
   const pushes: Push[] = []
   for (const [name = '', ...args] of commands) {
     if (name === 'cd' && args.length > 0) {
-      const target = args.at(-1) ?? ''
-      moved ||= isDynamic(target)
-      dir = moveTo(dir, target)
+      moved ||= isDynamic(args.at(-1) ?? '')
+      dir = moveTo(dir, args.at(-1) ?? '')
     } else if (baseName(name) === 'git') {
-      const call = readGit(args)
-      if (call.subcommand === 'push') {
-        pushes.push({ args: call.args, dir: call.dirs.reduce(moveTo, dir), unclear: moved || call.otherOptions || call.dirs.some(word => isDynamic(word)) })
-      }
+      pushes.push(...pushOf(args, dir, moved))
     }
   }
   return pushes
