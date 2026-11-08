@@ -68,7 +68,7 @@ const budgetOf = (response: GhResponse, known: Budget | undefined, nowMs: number
 
 const isRefused = (response: GhResponse, log: string, failed: boolean): boolean => {
   if (numberOf(response, 'x-ratelimit-remaining') === 0 || GRAPHQL_REFUSAL.test(log)) { return true }
-  return failed && [403, 429].includes(response.status) && REFUSAL.test(log)
+  return failed && (response.status === 429 || (response.status === 403 && REFUSAL.test(log)))
 }
 
 /** Until when this response says to stop asking; 0 when it doesn't. */

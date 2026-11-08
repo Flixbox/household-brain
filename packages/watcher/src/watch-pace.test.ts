@@ -56,6 +56,10 @@ describe('updatedLimits (#400)', () => {
     expect(after(log, true).blockedUntilMs).toBe(NOW_MS + MINUTE_MS + MARGIN_MS)
   })
 
+  it('waits a minute after a 429 that says nothing else', () => {
+    expect(after(answer('429 Too Many Requests'), true).blockedUntilMs).toBe(NOW_MS + MINUTE_MS + MARGIN_MS)
+  })
+
   it('waits for the reset after GraphQL refuses with budget left on the counter that answered', () => {
     const log = `${answer('200 OK', ...budgetHeaders(10, NOW_SECONDS + 400))}\n{ "errors": [{ "type": "RATE_LIMITED" }] }`
     expect(after(log, true).blockedUntilMs).toBe(NOW_MS + 400_000 + MARGIN_MS)
