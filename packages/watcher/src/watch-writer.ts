@@ -1,6 +1,6 @@
 /**
  * One writer, few retries (#402, A7 of #357). A watcher's writes to GitHub (resolving a thread, marking
- * a draft ready, dismissing a review, `@bot resolve`) come only from an all-events watcher; a
+ * a draft ready, dismissing a review, `@bot resolve`, `@bot review`, taking `question` off) come only from an all-events watcher; a
  * subscribed one leaves them to it. Until the shared poller (A2) exists, that is what keeps a dozen
  * watchers from each making the same write.
  *

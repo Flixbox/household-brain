@@ -43,7 +43,7 @@
  *                                    took the label off; READY_TO_MERGE and its reminder then wait for that review
  *                                    (or for one in progress), and only then. BOT_REVIEW_SKIPPED: the bot reviewed
  *                                    the PR or was asked already, so it isn't asked again. BOT_REVIEW_FAILED: the
- *                                    comment failed (it tries again on every look, the label stays)
+ *                                    comment failed (it tries again with backoff, the label stays)
  *   PR #<n>: THREAD_RESOLVED         the watcher resolved a review thread whose last comment, from anyone,
  *                                    starts `Resolved: <reason>` (#279), with its `GH` token; agents never
  *                                    resolve threads themselves. THREAD_RESOLVE_FAILED: it couldn't (it
@@ -100,7 +100,9 @@
  * Following, two pollers run side by side (#240): one for what someone waits for an answer to (new
  * issues, the owner's comments, every followed PR's comments and reviews), every 30 s; one for main
  * and each PR's CI, reviews and deploy, every 60 s. The PRs are checked at once, with at most
- * GH_PARALLEL `gh` calls running, so one slow call holds back only its own events.
+ * GH_PARALLEL `gh` calls running, so one slow call holds back only its own events. Those are the
+ * shortest pauses: they grow while nothing happens and while GitHub's rate limit runs short, and
+ * after a refusal no watcher asks GitHub until the wait is over (watch-pace.ts, #400).
  * A PR is read in full only when the change gate says so (watch-change-gate.ts, #404).
  */
 // Which code this watcher runs is read before the rest of it is loaded (#265): a pull that finishes

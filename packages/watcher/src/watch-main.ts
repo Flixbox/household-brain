@@ -1,3 +1,4 @@
+/* oxlint-disable import/max-dependencies -- this file is where the watcher's parts meet; pacing adds one */
 /* oxlint-disable eslint/no-await-in-loop -- each poller's looks run one after another, on purpose */
 /** The project watcher's looks, started by watch-project.ts once it has read which code it runs (#265). */
 import { type Activity, mainRunEvent, queueCommand } from './watch-events'
@@ -10,6 +11,7 @@ import { activitiesOf, changedActivities, changedStates, checkActivity as checkP
 import { checkQueue, preparePr } from './watch-queue'
 import { checkIssueStates, checkIssues, checkSubscribedIssues } from './watch-issues'
 import { allSettled, hasText, ignoreFailure } from './read'
+import { nextPauseMs, setLimitsOwner } from './watch-pace'
 
 const [limitMinutes = '20', maxHours = '12'] = process.argv.slice(2).filter(arg => arg !== '--follow')
 if (!/^\d+$/u.test(limitMinutes) || !/^\d+$/u.test(maxHours)) {
@@ -165,9 +167,11 @@ interface Poller {
   /** Whether this poller prints the IDLE heartbeat: only one does, or both would. */
   heartbeat: boolean
   pauseSeconds: number
+  /** The longest pause that quiet looks grow to, before any rate-limit stretch; the owner's comments keep it short. */
+  quietCapSeconds: number
 }
 
-/** One look; true when it printed events, so the next look comes at once. */
+/** One look; true when it printed events, so the next look comes after only a short gap (#400). */
 const lookOnce = async ({ checks, heartbeat }: Poller): Promise<boolean> => {
   await inOrder(checks, async check => check())
   const busy = await flush()
@@ -191,7 +195,7 @@ const lookSafely = async (poller: Poller): Promise<boolean> => lookOnce(poller).
   return false
 })
 
-/** Looks again and again, `pauseSeconds` apart after a look that found nothing. */
+/** Looks again and again, paced by what it found and by GitHub's rate limit (watch-pace.ts, #400). */
 const poll = async (poller: Poller): Promise<never> => {
   // A loop rather than a function awaiting itself: following, the watcher runs for a whole session.
   for (;;) {
@@ -201,15 +205,16 @@ const poll = async (poller: Poller): Promise<never> => {
     await (poller.heartbeat ? reportLookups().catch(ignoreFailure) : Promise.resolve())
     // A failed read or write leaves the line for the next look.
     await (poller.heartbeat ? reportUsage().catch(ignoreFailure) : Promise.resolve())
-    await (busy ? Promise.resolve() : Bun.sleep(poller.pauseSeconds * 1000))
+    await Bun.sleep(await nextPauseMs(poller, busy))
   }
 }
 
+setLimitsOwner(REPO)
 await start()
 await startSubscriptions()
 finishSubscriptions()
-// Following, two pollers run side by side (#240): the answers every 30 s, never waiting for a slow
+// Following, two pollers run side by side (#240): the answers from every 30 s, never waiting for a slow
 // look at CI and deploys. Without `--follow`, one look at everything, the answers first (#235).
 await (FOLLOW
-  ? Promise.all([poll({ checks: ANSWER_CHECKS, heartbeat: false, pauseSeconds: 30 }), poll({ checks: PROJECT_CHECKS, heartbeat: true, pauseSeconds: 60 })])
-  : poll({ checks: [...ANSWER_CHECKS, ...PROJECT_CHECKS], heartbeat: true, pauseSeconds: 60 }))
+  ? Promise.all([poll({ checks: ANSWER_CHECKS, heartbeat: false, pauseSeconds: 30, quietCapSeconds: 60 }), poll({ checks: PROJECT_CHECKS, heartbeat: true, pauseSeconds: 60, quietCapSeconds: 300 })])
+  : poll({ checks: [...ANSWER_CHECKS, ...PROJECT_CHECKS], heartbeat: true, pauseSeconds: 60, quietCapSeconds: 300 }))
