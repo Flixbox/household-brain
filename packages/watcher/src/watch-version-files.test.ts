@@ -108,3 +108,44 @@ describe('codeVersion: when it can\'t tell what the watcher runs, any change in 
     expectChanged(await versionsAround({ 'src/watch-main.ts': 'this is ( not code\n' }, elsewhere))
   })
 })
+
+describe('codeVersion: code loaded in ways it can\'t follow counts as can\'t tell (#515)', () => {
+  const elsewhere = { 'src/guard.ts': 'export const guard = 2\n' }
+  const loading = async (code: string): Promise<[string, string]> => versionsAround({ 'src/watch-main.ts': code }, elsewhere)
+
+  it('an import built from a string and a value', async () => {
+    expectChanged(await loading("const suffix = process.argv[2]\nawait import('./gu' + suffix)\n"))
+  })
+
+  it('a require built from a string and a value', async () => {
+    expectChanged(await loading("const suffix = process.argv[2]\nconsole.log(require('./gu' + suffix))\n"))
+  })
+
+  it('an import of two strings the transpiler joins', async () => {
+    expectChanged(await loading("await import('./gu' + 'ard')\n"))
+  })
+
+  it('import.meta.require', async () => {
+    expectChanged(await loading("console.log(import.meta.require('./guard'))\n"))
+  })
+
+  it('import.meta.require kept in a variable', async () => {
+    expectChanged(await loading("const load = import.meta.require\nconsole.log(load('./guard'))\n"))
+  })
+
+  it('a Worker', async () => {
+    expectChanged(await loading("console.log(new Worker(new URL('./guard.ts', import.meta.url)))\n"))
+  })
+
+  it('a Worker under another name', async () => {
+    expectChanged(await loading("import { Worker as Thread } from 'node:worker_threads'\nconsole.log(new Thread(new URL('./guard.ts', import.meta.url)))\n"))
+  })
+
+  it('createRequire', async () => {
+    expectChanged(await loading("import { createRequire } from 'node:module'\nconsole.log(createRequire(import.meta.url)('./guard'))\n"))
+  })
+
+  it('createRequire under another name', async () => {
+    expectChanged(await loading("import { createRequire as make } from 'node:module'\nconsole.log(make(import.meta.url)('./guard'))\n"))
+  })
+})
