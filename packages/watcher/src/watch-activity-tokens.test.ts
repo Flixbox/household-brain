@@ -119,8 +119,8 @@ test('on an open PR, a refused pending check holds back none of the submitted co
 }, 30_000)
 
 test('a refused pending check on the final look keeps the subscription open until it answers (#403)', async () => {
-  // The look's own read and the final read are refused; the next look's are answered.
-  const { code, output } = await runWatcher({ refusePending: 2 })
+  // Enough refusals for every pending check of the first look, the final read's among them.
+  const { code, output } = await runWatcher({ refusePending: 6 })
   expect(output).toContain('OWNER_PENDING_REVIEW')
   expect(code).toBe(3)
 }, 30_000)
