@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 const dirs: string[] = []
 afterEach(async () => { await Promise.all(dirs.splice(0).map(async dir => rm(dir, { force: true, recursive: true }))) })
 
-/** A `gh` with REST's issue lists from the file `list`, GraphQL's open list, and one issue's lookup. */
+/** A `gh` with REST's issue lists from the file `list` (a later page from `list-<page>`), GraphQL's open list, and one issue's lookup. */
 const FAKE_GH = String.raw`
   import { appendFileSync, readFileSync } from 'node:fs'
   const text = process.argv.slice(2).join(' ')
@@ -18,7 +18,8 @@ const FAKE_GH = String.raw`
     process.exit(0)
   }
   if (text.startsWith('api repos')) { console.log(JSON.stringify({ closed_by: { login: 'someone' }, state: 'closed', state_reason: 'completed', title: 'Done' })); process.exit(0) }
-  const body = text.includes('issues/comments') ? '[]' : readFileSync(home + '/list', 'utf8')
+  const page = /[?&]page=(\d+)/.exec(text)?.[1] ?? '1'
+  const body = text.includes('issues/comments') ? '[]' : readFileSync(home + (page === '1' ? '/list' : '/list-' + page), 'utf8')
   const etag = 'W/"' + Bun.hash(body).toString(36) + '"'
   if (text.includes('If-None-Match: ' + etag)) { process.stdout.write('HTTP/2.0 304 Not Modified\r\nEtag: ' + etag + '\r\n\r\n'); process.exit(1) }
   process.stdout.write('HTTP/2.0 200 OK\r\nEtag: ' + etag + '\r\n\r\n' + body)
@@ -144,4 +145,26 @@ test('a comment two checks of one round find is reported once (#435)', async () 
   const { out } = await script(home, `await checkActivity(7, ${ACTIVITY})\nawait checkActivity(7, ${ACTIVITY})\nawait flush()`)
   expect(out.split('the owner asks')).toHaveLength(2)
   expect(await lines(home, 'pr-7-seen')).toEqual(['comment 0', 'comment 1'])
+})
+
+test('after a capped move the next read still asks below the old cursor, and a burst can\'t hold it (#469)', async () => {
+  const cursor = '2026-11-08T12:00:00Z'
+  const older = { created_at: '2026-01-01T00:00:00Z', state: 'open', title: 'Old', user: { login: 'someone' } }
+  const stuck = Array.from({ length: 100 }, (_item, number) => ({ ...older, number, updated_at: cursor }))
+  const home = await fixture(stuck)
+  await Bun.write(`${home}/list-2`, JSON.stringify([{ ...older, number: 200, updated_at: '2026-11-08T13:00:00Z' }]))
+  await Bun.write(`${home}/state/issue-events`, 'issue #1\n')
+  await Bun.write(`${home}/state/issue-event-cursors`, `${JSON.stringify({ comments: cursor, issues: cursor })}\n`)
+  await run(home, 'checkIssues')
+  const skipped = { ...older, created_at: '2026-11-08T11:59:00Z', number: 700, updated_at: '2026-11-08T11:59:00Z' }
+  await Bun.write(`${home}/list`, JSON.stringify([skipped, ...stuck.slice(1)]))
+  await run(home, 'checkIssues')
+  const late = { ...older, created_at: '2026-11-08T11:59:30Z', number: 701, updated_at: '2026-11-08T11:59:30Z' }
+  await Bun.write(`${home}/list`, JSON.stringify([late, ...stuck.slice(1)]))
+  await run(home, 'checkIssues')
+  const asked = (await calls(home)).filter(call => call.includes('issues?state=all') && call.endsWith('&page=1')).map(call => /since=(?<since>[^&]+)/u.exec(call)?.groups?.since)
+  expect(asked).toEqual(['2026-11-08T11:58:00Z', '2026-11-08T11:58:00Z', '2026-11-08T11:59:00Z'])
+  const reported = await lines(home, 'issue-events')
+  expect(reported).toContain('issue #700')
+  expect(reported).toContain('issue #701')
 })
