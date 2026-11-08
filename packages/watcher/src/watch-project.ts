@@ -43,7 +43,8 @@
  *                                    took the label off; READY_TO_MERGE and its reminder then wait for that review
  *                                    (or for one in progress), and only then. BOT_REVIEW_SKIPPED: the bot reviewed
  *                                    the PR or was asked already, so it isn't asked again. BOT_REVIEW_FAILED: the
- *                                    comment failed (it tries again with backoff, the label stays)
+ *                                    comment failed, the label couldn't be taken off to claim the ask, or the PR
+ *                                    couldn't be read after the claim (#461); it tries again with backoff while the label is on
  *   PR #<n>: THREAD_RESOLVED         the watcher resolved a review thread whose last comment, from anyone,
  *                                    starts `Resolved: <reason>` (#279), with its `GH` token; agents never
  *                                    resolve threads themselves. THREAD_RESOLVE_FAILED: it couldn't (it
