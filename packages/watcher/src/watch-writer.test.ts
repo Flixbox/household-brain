@@ -35,6 +35,13 @@ const QUESTION = `
   import { preparePr } from '${import.meta.dir}/watch-queue'
   await preparePr(7, ${MERGED_STATE})
   await flush()`
+/** A subscribed watcher's look at the merged PR; prints whether its subscription may go on to end. `now`: the look's time, in epoch milliseconds. */
+const terminalLook = (state = MERGED_STATE, now = 'Temporal.Now.instant().epochMilliseconds') => `
+  import { flush } from '${import.meta.dir}/watch-output'
+  import { preparePr } from '${import.meta.dir}/watch-queue'
+  const ends = await preparePr(7, ${state}, ${now})
+  await flush()
+  console.log(ends ? 'LOOK_ENDS' : 'LOOK_HOLDS')`
 const ASKER = `
   import { askBotReviews } from '${import.meta.dir}/watch-bot-review'
   import { flush } from '${import.meta.dir}/watch-output'
@@ -227,6 +234,38 @@ describe('the bot-review ask and the question label come from the writer too (#4
     await run({ gh, home, script: QUESTION })
     expect(await run({ gh, home, scoped: true, script: QUESTION })).toContain('PR #7: QUESTION_CLEAR_FAILED')
     expect((await calls()).filter(call => call.includes('-X DELETE'))).toHaveLength(1)
+  }, 30_000)
+
+  it('a subscribed watcher holds a merged PR that still carries the label while a writer runs (#440)', async () => {
+    const { gh, home } = await setUp()
+    await run({ gh, home, script: lookAtWriter() })
+    expect(await run({ gh, home, scoped: true, script: terminalLook() })).toContain('LOOK_HOLDS')
+  }, 30_000)
+
+  it('it lets go once the outcome has been relayed', async () => {
+    const { gh, home } = await setUp()
+    await run({ gh, home, script: lookAtWriter() })
+    await run({ gh, home, scoped: true, script: terminalLook() })
+    await run({ gh, home, script: QUESTION })
+    const look = await run({ gh, home, scoped: true, script: terminalLook() })
+    expect(look).toContain('PR #7: QUESTION_CLEAR_FAILED')
+    expect(look).toContain('LOOK_ENDS')
+  }, 30_000)
+
+  it('it waits a bounded time: past the bound the look ends without an outcome', async () => {
+    const { gh, home } = await setUp()
+    await run({ gh, home, script: lookAtWriter() })
+    const tenMinutesAgo = String(Temporal.Now.instant().epochMilliseconds - 10 * MINUTE)
+    expect(await run({ gh, home, scoped: true, script: terminalLook(MERGED_STATE, tenMinutesAgo) })).toContain('LOOK_HOLDS')
+    expect(await run({ gh, home, scoped: true, script: terminalLook() })).toContain('LOOK_ENDS')
+  }, 30_000)
+
+  it('it does not wait when no writer is running, or the label is off', async () => {
+    const { gh, home } = await setUp()
+    expect(await run({ gh, home, scoped: true, script: terminalLook() })).toContain('LOOK_ENDS')
+    await run({ gh, home, script: lookAtWriter() })
+    const unlabelled = MERGED_STATE.replace("labels: ['question']", 'labels: []')
+    expect(await run({ gh, home, scoped: true, script: terminalLook(unlabelled) })).toContain('LOOK_ENDS')
   }, 30_000)
 
   it('a claim on the bot-review label that fails waits instead of being tried on the next look', async () => {
