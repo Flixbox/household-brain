@@ -23,14 +23,13 @@ const allActivity = async (prs: readonly number[], cli: string, fresh: boolean) 
  * neither could read is missing.
  */
 export const activitiesOf = async (prs: readonly number[], fresh = false): Promise<Map<number, Activity[]>> => {
-  const read = await allActivity(prs, GH, fresh)
   if (GH === ACTIVITY_GH) {
-    return read
+    return allActivity(prs, GH, fresh)
   }
-  const [theirs, pending] = await Promise.all([
-    allActivity(prs.filter(pr => !read.has(pr)), ACTIVITY_GH, fresh),
-    perPr([...read.keys()], { cli: ACTIVITY_GH, fields: PENDING_FIELDS, fresh, parse: parseActivity, size: 50 }),
-  ])
+  // Pending first: a review submitted between the two reads is then in the second, and in neither the other way round.
+  const pending = await perPr(prs, { cli: ACTIVITY_GH, fields: PENDING_FIELDS, fresh, parse: parseActivity, size: 50 })
+  const read = await allActivity(prs, GH, fresh)
+  const theirs = await allActivity(prs.filter(pr => !read.has(pr)), ACTIVITY_GH, fresh)
   return new Map([...theirs, ...[...read].map(([pr, items]): [number, Activity[]] => [pr, addPending(items, pending.get(pr) ?? [])])])
 }
 
