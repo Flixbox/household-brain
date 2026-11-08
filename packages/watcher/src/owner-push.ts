@@ -47,6 +47,9 @@ interface Push {
 /** The directory after a `cd` or `-C` to this word; one the shell fills in changes nothing. */
 const moveTo = (dir: string, word: string) => (isDynamic(word) ? dir : path.resolve(dir, word.replace(/^~(?=\/|$)/u, Bun.env.HOME ?? '~')))
 
+/** Whether `pushesIn` reads a command with this first word. */
+export const movesOrPushes = (name: string) => name === 'cd' || baseName(name) === 'git'
+
 /** The `git push` this git call is, if it is one, run from this directory. */
 const pushOf = (gitArgs: readonly string[], from: string, moved: boolean): Push[] => {
   const call = readGit(withoutRedirections(gitArgs))
