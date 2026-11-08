@@ -156,6 +156,29 @@ test('a 200 that isn\'t JSON is not shared with the next read (#418)', async () 
   expect(await inWatcher(home, READ, { GH_SHARE_SECONDS: '60' })).toBe('[7,8]')
 })
 
+test('a non-JSON answer already kept is not served, and the next read asks without its ETag (#424)', async () => {
+  const home = await fixture()
+  await inWatcher(home, READ)
+  const dir = `${home}/watch-project/gh-etags`
+  const [name = ''] = await readdir(dir)
+  await Bun.write(`${dir}/${name}`, JSON.stringify({ body: '<html>Unicorn!</html>', etag: 'W/"8"' }))
+  expect(await inWatcher(home, READ)).toBe('[7,8]')
+  expect((await restCalls(home))[1]).not.toContain('If-None-Match')
+})
+
+test('the answer read in place of a non-JSON kept one is kept with its ETag (#424)', async () => {
+  const home = await fixture()
+  await inWatcher(home, READ)
+  const dir = `${home}/watch-project/gh-etags`
+  const [name = ''] = await readdir(dir)
+  await Bun.write(`${dir}/${name}`, JSON.stringify({ body: '<html>Unicorn!</html>', etag: 'W/"8"' }))
+  await inWatcher(home, READ)
+  expect(await inWatcher(home, READ)).toBe('[7,8]')
+  expect((await restCalls(home))[2]).toContain('If-None-Match: W/"8"')
+  expect(await Bun.file(`${dir}/${name}`).json()).toMatchObject({ etag: 'W/"8"' })
+  expect(await Bun.file(`${dir}/${name}`).text()).not.toContain('Unicorn')
+})
+
 test('the merged list, a commit\'s run and main\'s head read the REST answers (#405)', async () => {
   const home = await fixture()
   expect(await inWatcher(home, 'console.log(JSON.stringify(await github.recentlyMerged(24)))')).toBe('[3]')

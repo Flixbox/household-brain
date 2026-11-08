@@ -202,10 +202,19 @@ const etagFile = (path: string, cli: string) => {
   return `${ETAGS_DIR}/${new Bun.CryptoHasher('sha256').update(identity).digest('hex')}`
 }
 
-/** The kept answer for an ETag file; null when there is none, or it can't be read. */
+const isJson = (text: string): boolean => {
+  try {
+    JSON.parse(text)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** The kept answer for an ETag file; null when there is none, it can't be read, or its body isn't JSON (#424), so the next read asks without its ETag. */
 const keptAnswer = async (file: string): Promise<{ body: string, etag: string } | null> => {
   const value: unknown = await Bun.file(file).json().catch(() => null)
-  return isRecord(value) && typeof value.body === 'string' && typeof value.etag === 'string' ? { body: value.body, etag: value.etag } : null
+  return isRecord(value) && typeof value.body === 'string' && typeof value.etag === 'string' && isJson(value.body) ? { body: value.body, etag: value.etag } : null
 }
 
 /** Keeps an answer, or marks a kept one as used. Only a saving, like sharing: without it the next read costs a call. */
