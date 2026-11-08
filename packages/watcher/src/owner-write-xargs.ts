@@ -5,10 +5,7 @@
  * judged by those words as any gh call. Flags the input might add to a read go unseen.
  */
 import { isDynamic } from './shell-commands'
-
-export const baseName = (word: string) => word.replace(/^.*[/\\]/u, '')
-
-export const isGh = (word: string) => /(?:^|[/\\])gh(?:\.exe)?$/u.test(word)
+import { baseName, isGh } from './shell-interpreters'
 
 /** The arguments that are no flag, leaving out the value of `-R`/`--repo`, the one flag gh takes before the subcommand. */
 export const positionals = (args: readonly string[]) =>
