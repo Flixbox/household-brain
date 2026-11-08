@@ -20,6 +20,7 @@ import { IS_WRITER, attemptWrite, reportWrite } from './watch-writer'
 
 // Resolving threads on `Resolved:` replies comes before what the approval asks (#279).
 export { resolveAsked } from './watch-dismiss'
+export { checkWriter } from './watch-writer'
 
 /** What the APPROVED event says about a draft: who marks it ready. */
 export const APPROVED_DRAFT_NOTE = draftNote(READY_APPROVED_DRAFTS)
