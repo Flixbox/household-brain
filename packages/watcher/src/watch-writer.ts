@@ -1,3 +1,4 @@
+/* oxlint-disable eslint/capitalized-comments -- fallow reads its ignore comments in lower case; this stand-in goes with the fix */
 /** Stand-in until #402's fix: every watcher writes, every look, and relays nothing. */
 import type { Event } from './watch-events'
 import { report } from './watch-output'
