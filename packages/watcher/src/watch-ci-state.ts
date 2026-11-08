@@ -6,13 +6,22 @@ export const ciPassedKey = (pr: number, sha: string, attempt: number): string =>
   return attempt > 1 ? `${key} ${attempt}` : key
 }
 
-/** The highest attempt reported under `key`: a line without a number is attempt 1, none at all 0. */
-const highestAttempt = (reported: readonly string[], key: string): number =>
-  Math.max(0, ...reported.filter(line => line === key || line.startsWith(`${key} `)).map(line => Number(line.slice(key.length + 1)) || 1))
+/** The highest attempt reported under `key` and its line: a line without a number is attempt 1, none at all attempt 0. */
+const latestAttempt = (reported: readonly string[], key: string): { attempt: number, index: number } =>
+  reported.reduce((latest, line, index) => {
+    const attempt = line === key || line.startsWith(`${key} `) ? Number(line.slice(key.length + 1)) || 1 : 0
+    return attempt > 0 && attempt >= latest.attempt ? { attempt, index } : latest
+  }, { attempt: 0, index: -1 })
 
-/** Whether `head`'s latest reported attempt passed (#419): a pass stops counting once a later attempt fails. */
-export const reportedPassed = (reported: readonly string[], pr: number, head: string): boolean =>
-  highestAttempt(reported, ciPassedKey(pr, head, 1)) > highestAttempt(reported, `pr-${pr} ci-failed ${head}`)
+/**
+ * Whether `head`'s latest reported result passed (#419): a pass stops counting once a later attempt fails.
+ * Attempts only order one run's results, and a new run on the head starts again at 1, so on a tie the later line wins (#430).
+ */
+export const reportedPassed = (reported: readonly string[], pr: number, head: string): boolean => {
+  const pass = latestAttempt(reported, ciPassedKey(pr, head, 1))
+  const fail = latestAttempt(reported, `pr-${pr} ci-failed ${head}`)
+  return pass.attempt === fail.attempt ? pass.index > fail.index : pass.attempt > fail.attempt
+}
 
 interface HeadRun {
   conclusion: string
