@@ -177,7 +177,7 @@ const PR_FIELDS = 'closingIssuesReferences(first:100){nodes{number}} isDraft isI
   // The last hundred comments' text, for a `@<bot> review` ask from any machine (#325), and the head's
   // check suites, for a review bot's check run still going (#324).
   + ' comments(last: 100) { nodes { body } }'
-  + ' commits(last: 1) { nodes { commit { checkSuites(first: 10) { nodes { app { slug } checkRuns(first: 3) { nodes { status } } } } } } }'
+  + ' commits(last: 1) { nodes { commit { checkSuites(first: 10) { nodes { app { slug } checkRuns(first: 10) { nodes { status } } } } } } }'
 
 const stateOf = (value: Json): PrState => {
   const author = actor(value.author)
