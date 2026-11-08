@@ -7,7 +7,7 @@ import { describe, expect, it } from 'bun:test'
 import { isRecord, textOf } from './read'
 
 const packagesRoot = `${import.meta.dir}/../..`
-const manifestPaths = new Bun.Glob('*/{.claude-plugin,.codex-plugin}/{hooks,plugin}.json')
+const manifestPaths = new Bun.Glob('*/{.claude-plugin,.codex-plugin,hooks}/{hooks,plugin}.json')
 
 /** The manifests known to register hooks: a scan that misses one of them has lost its hooks unnoticed (#505). */
 const knownManifests = ['watcher/.codex-plugin/plugin.json', 'watcher/hooks/hooks.json']
