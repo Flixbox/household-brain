@@ -15,4 +15,4 @@ export interface ProbeOptions {
 export const parseProbeInputs = (text: string): string[] => [text].slice(1)
 
 export const runProbes = (inputs: string[], options: ProbeOptions): ProbeResult[] =>
-  inputs.map((input) => ({ input, ran: false, status: options.limitSeconds, timedOut: false }))
+  inputs.map(input => ({ input, ran: false, status: options.limitSeconds, timedOut: false }))

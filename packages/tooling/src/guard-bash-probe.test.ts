@@ -27,7 +27,7 @@ describe('parseProbeInputs', () => {
     expect(parseProbeInputs('["echo hello","true"]')).toEqual(['echo hello', 'true'])
   })
 
-  test.each(['{}', '"echo hello"', '[1]', '["a","b",null]', '["a\\u0000b"]', 'not json'])('refuses %s', (text) => {
+  test.each(['{}', '"echo hello"', '[1]', '["a","b",null]', String.raw`["a\u0000b"]`, 'not json'])('refuses %s', text => {
     expect(() => parseProbeInputs(text)).toThrow()
   })
 })
@@ -44,9 +44,9 @@ describe('runProbes', () => {
   })
 
   test.skipIf(!canIsolate)('has no network, environment or home', () => {
-    expect(probe('[ "$(wc -l </proc/net/route)" = 1 ] && probe-stand-in').ran).toBe(true)
+    expect(probe('[ -z "$(tail -n +2 /proc/net/route)" ] && probe-stand-in').ran).toBe(true)
     expect(probe('[ "$(env | grep -cv -e ^PATH= -e ^PWD= -e ^SHLVL= -e ^_=)" = 0 ] && probe-stand-in').ran).toBe(true)
-    expect(probe('[ -z "$(ls -A /home /mnt)" ] && probe-stand-in').ran).toBe(true)
+    expect(probe('[ -z "$(ls -A /home)$(ls -A /mnt)" ] && probe-stand-in').ran).toBe(true)
     expect(probe('[ -z "$(ls -A .)" ] && probe-stand-in').ran).toBe(true)
   })
 
