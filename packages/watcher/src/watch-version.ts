@@ -17,10 +17,10 @@ const COMPUTED_IMPORT = /\b(?:import|require)\s*\(\s*(?!['"])/u
 
 const scanner = new Bun.Transpiler({ loader: 'ts' })
 
-/** Every file of the package at HEAD: path to [blob id, text]. Empty where it can't be read. */
+/** Every regular file of the package at HEAD: path to [blob id, text]; a symlink isn't one, so it can't be followed. Empty where it can't be read. */
 const readPackage = async (): Promise<Map<string, [string, string]>> => {
   const listing = await $`git -C ${PACKAGE} ls-tree -r HEAD`.quiet().nothrow()
-  const entries = listing.stdout.toString().split('\n').filter(line => line.includes(' blob '))
+  const entries = listing.stdout.toString().split('\n').filter(line => line.startsWith('100'))
     .map(line => line.split('\t'))
     .map(([meta = '', path = '']) => ({ id: meta.split(' ')[2] ?? '', path }))
   const blobs = await $`git -C ${PACKAGE} cat-file --batch < ${new Response(entries.map(entry => entry.id).join('\n'))}`.quiet().nothrow()
