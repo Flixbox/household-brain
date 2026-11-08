@@ -111,6 +111,7 @@ const TERMINAL_GH = String.raw`
     }
     process.exit(0)
   }
+  if (args.startsWith('api -i')) { process.stdout.write('HTTP/2.0 200 OK\r\n\r\n' + (args.includes('runs?head_sha=') ? '{"workflow_runs":[]}' : args.includes('pulls?') ? '[]' : '{}')); process.exit(0) }
   if (args.startsWith('pr list') || args.startsWith('run list')) { console.log('[]'); process.exit(0) }
   console.log(JSON.stringify({ data: { repository: { issues: { nodes: [], pageInfo: { hasNextPage: false } } } } }))
 `
