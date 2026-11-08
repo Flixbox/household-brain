@@ -32,12 +32,17 @@ const baseFiles: Files = {
 }
 
 /** The checkout's code version before and after a commit that changes `change`. */
-const versionsAround = async (files: Files, change: Files): Promise<[string, string]> => {
+const checkout = async (files: Files): Promise<string> => {
   const repo = await mkdtemp(`${tmpdir()}/watch-version-`)
   made.push(repo)
   await $`git -C ${repo} init -q`.quiet()
   await Bun.write(`${repo}/print.ts`, printer)
   await commit(repo, { ...baseFiles, ...files })
+  return repo
+}
+
+const versionsAround = async (files: Files, change: Files): Promise<[string, string]> => {
+  const repo = await checkout(files)
   const before = await versionIn(repo)
   await commit(repo, change)
   return [before, await versionIn(repo)]
@@ -84,6 +89,15 @@ describe('codeVersion: when it can\'t tell what the watcher runs, any change in 
 
   it('an import of a file that isn\'t there', async () => {
     expectChanged(await versionsAround({ 'src/watch-main.ts': "import './missing'\n" }, elsewhere))
+  })
+
+  it('an import of a symlink, whose target the scanner never sees', async () => {
+    const repo = await checkout({ 'src/linked.ts': 'export const used = 1\n' })
+    await $`ln -sf linked.ts ${repo}/packages/watcher/src/used.ts`.quiet()
+    await commit(repo, {})
+    const before = await versionIn(repo)
+    await commit(repo, { 'src/linked.ts': 'export const used = 2\n' })
+    expectChanged([before, await versionIn(repo)])
   })
 
   it('a file that can\'t be parsed', async () => {
