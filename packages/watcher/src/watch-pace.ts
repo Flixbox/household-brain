@@ -76,9 +76,14 @@ const isRefused = (response: GhResponse, log: string, failed: boolean): boolean 
   return failed && (response.status === 429 || (response.status === 403 && REFUSAL.test(log)))
 }
 
-/** Whether the hourly budget ran out, as against a secondary limit, which a bare 429 is taken for. */
-const isPrimary = (response: GhResponse, log: string): boolean =>
-  numberOf(response, 'x-ratelimit-remaining') === 0 || GRAPHQL_REFUSAL.test(log) || (response.status === 403 && !SECONDARY_REFUSAL.test(log))
+/**
+ * Whether the hourly budget ran out, as against a secondary limit, which a bare 429 is taken for, and
+ * so is a retry-after with budget left.
+ */
+const isPrimary = (response: GhResponse, log: string, retries: boolean): boolean => {
+  if (SECONDARY_REFUSAL.test(log)) { return false }
+  return numberOf(response, 'x-ratelimit-remaining') === 0 || (!retries && (GRAPHQL_REFUSAL.test(log) || response.status === 403))
+}
 
 interface Wait {
   key: string
@@ -87,11 +92,11 @@ interface Wait {
 
 /** Which calls this response stops, and until when; null when it stops none. */
 const waitAfter = ({ failed, log, nowMs, resetMs, resource, response }: Call & { log: string, resetMs: number, resource: string, response: GhResponse }): Wait | null => {
-  const retryAfter = response.status >= 400 ? numberOf(response, 'retry-after') : null
-  if (retryAfter !== null && retryAfter > 0) { return { key: ALL_RESOURCES, untilMs: nowMs + (retryAfter * 1000) } }
-  if (!isRefused(response, log, failed)) { return null }
-  if (isPrimary(response, log) && resetMs > nowMs) { return { key: resource, untilMs: resetMs } }
-  return { key: ALL_RESOURCES, untilMs: nowMs + UNNAMED_WAIT_MS }
+  const retryMs = response.status >= 400 ? (numberOf(response, 'retry-after') ?? 0) * 1000 : 0
+  if (retryMs <= 0 && !isRefused(response, log, failed)) { return null }
+  const primary = isPrimary(response, log, retryMs > 0) && resetMs > nowMs
+  if (retryMs > 0) { return { key: primary ? resource : ALL_RESOURCES, untilMs: nowMs + retryMs } }
+  return primary ? { key: resource, untilMs: resetMs } : { key: ALL_RESOURCES, untilMs: nowMs + UNNAMED_WAIT_MS }
 }
 
 /** A wait with its margin, and never over an hour: a window is no longer, whatever a header says. */

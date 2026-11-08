@@ -60,6 +60,17 @@ describe('updatedLimits (#400)', () => {
     expect(after(answer('429 Too Many Requests'), true).waits.all).toBe(NOW_MS + MINUTE_MS + MARGIN_MS)
   })
 
+  it('keeps a secondary limit on every call, even with the budget at zero', () => {
+    const log = `${answer('403 Forbidden', ...budgetHeaders(0, NOW_SECONDS + 700))}\n{ "message": "You have exceeded a secondary rate limit" }`
+    expect(after(log, true).waits).toEqual({ all: NOW_MS + MINUTE_MS + MARGIN_MS })
+  })
+
+  it('keeps retry-after on its own resource when that budget ran out, and on every call when it did not', () => {
+    const headers = (remaining: number) => answer('403 Forbidden', 'Retry-After: 120', ...budgetHeaders(remaining, NOW_SECONDS + 700))
+    expect(after(headers(0), true).waits).toEqual({ graphql: NOW_MS + 120_000 + MARGIN_MS })
+    expect(after(headers(4000), true).waits).toEqual({ all: NOW_MS + 120_000 + MARGIN_MS })
+  })
+
   it('takes a 429 with budget left for a short limit, not the hourly reset', () => {
     expect(after(answer('429 Too Many Requests', ...budgetHeaders(4000, NOW_SECONDS + 700)), true).waits).toEqual({ all: NOW_MS + MINUTE_MS + MARGIN_MS })
   })
