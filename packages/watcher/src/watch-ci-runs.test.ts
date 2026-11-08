@@ -36,7 +36,7 @@ const FAKE = String.raw`
   const attempt = Number(await Bun.file(home + '/attempt').text().catch(() => '1'))
   const scenario = process.env.SCENARIO
   const status = scenario === 'running' || (scenario === 'finishing' && attempt === 1) ? 'in_progress' : 'completed'
-  const jobsDone = !['finishing', 'lagging'].includes(scenario) || attempt === 2
+  const jobsDone = scenario !== 'stuck' && (!['finishing', 'lagging'].includes(scenario) || attempt === 2)
   const replaced = scenario === 'replaced' && attempt === 2
   if (args.startsWith('api -i')) {
     if (scenario === 'refused' && attempt === 2) { process.exit(1) }
@@ -47,7 +47,7 @@ const FAKE = String.raw`
     const newer = args.includes('head_sha=def')
     const finished = scenario === 'cancelled' || scenario === 'replaced' ? 'cancelled' : 'success'
     const conclusion = status === 'completed' ? (newer ? 'success' : finished) : null
-    console.log('HTTP/2.0 200 OK\r\nEtag: "e' + attempt + '"\r\n\r\n' + JSON.stringify({ workflow_runs: [{ conclusion, id: newer ? 6 : 5, run_attempt: attempt, run_started_at: Temporal.Now.instant().toString(), status }] }))
+    console.log('HTTP/2.0 200 OK\r\nEtag: "e' + attempt + '"\r\n\r\n' + JSON.stringify({ workflow_runs: [{ conclusion, id: newer ? 6 : 5, run_attempt: scenario === 'stuck' ? 1 : attempt, run_started_at: Temporal.Now.instant().toString(), status }] }))
     process.exit(0)
   }
   if (args.startsWith('run view')) { console.log(JSON.stringify({ jobs: [{ conclusion: jobsDone ? 'success' : null, name: 'Lint', status: jobsDone ? 'completed' : 'in_progress' }] })); process.exit(0) }
@@ -127,4 +127,12 @@ test('a passed run whose jobs still read as running waits a look (#493)', async 
   expect(result.output).not.toContain('Lint: in_progress')
   expect(result.output).not.toContain('"pr-7 ci-passed abc"')
   expect(result.output).toContain('"pr-7 ci-passed abc 2"')
+}, 30_000)
+
+test('a passed run whose jobs never finish is reported after a few looks, with the jobs as they are (#493)', async () => {
+  const result = await looks('stuck')
+  // Held for three looks, reported on the fourth, and then finished with.
+  expect(result.views).toBe(4)
+  expect(result.output).toContain('"pr-7 ci-passed abc"')
+  expect(result.output).toContain('Lint: in_progress')
 }, 30_000)
