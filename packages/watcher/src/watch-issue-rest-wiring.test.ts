@@ -8,12 +8,13 @@ afterEach(async () => { await Promise.all(dirs.splice(0).map(async dir => rm(dir
 
 /** A `gh` with REST's issue lists from the file `list` (a later page from `list-<page>`), GraphQL's open list, and one issue's lookup. */
 const FAKE_GH = String.raw`
-  import { appendFileSync, readFileSync } from 'node:fs'
+  import { appendFileSync, existsSync, readFileSync } from 'node:fs'
   const text = process.argv.slice(2).join(' ')
   const home = process.env.FIXTURE_HOME
   appendFileSync(home + '/calls', text + '\n')
   if (text.includes('graphql')) {
-    const issues = { nodes: [{ blockedBy: { nodes: [] }, number: 5 }], pageInfo: { endCursor: null, hasNextPage: false } }
+    const blockers = existsSync(home + '/cycle') ? [{ number: 5 }] : []
+    const issues = { nodes: [{ blockedBy: { nodes: blockers }, number: 5 }], pageInfo: { endCursor: null, hasNextPage: false } }
     console.log(JSON.stringify({ data: { repository: { created: { nodes: [] }, createdPrs: { nodes: [] }, issues, updated: { nodes: [] }, updatedPrs: { nodes: [] } } } }))
     process.exit(0)
   }
@@ -42,7 +43,7 @@ const fixture = async (list: unknown[]) => {
 const envOf = (home: string) => ({ ...process.env, FIXTURE_HOME: home, GH: `${home}/gh`, GH_SHARE_SECONDS: '0', GH_TOKEN: 'token-a', GITHUB_TOKEN: '', OWNER: 'someone', REPO: 'owner/repo', SELF: 'helper[bot]', STATE_DIR: `${home}/state`, XDG_STATE_HOME: home })
 const IMPORTS = `const { checkIssues, checkIssueStates } = await import('${import.meta.dir}/watch-issues')
 const { checkActivity } = await import('${import.meta.dir}/watch-activity')
-const { flush } = await import('${import.meta.dir}/watch-output')`
+const { flush, report, reportedLines } = await import('${import.meta.dir}/watch-output')`
 
 /** Runs a script as a watcher process would, on the folder's state, so a second call is a restart. */
 const script = async (home: string, body: string) => {
@@ -167,4 +168,68 @@ test('after a capped move the next read still asks below the old cursor, and a b
   const reported = await lines(home, 'issue-events')
   expect(reported).toContain('issue #700')
   expect(reported).toContain('issue #701')
+})
+
+const CI_EVENT = "{ key: 'pr-7 event', lines: ['the event'] }"
+
+test('a look that dies before printing leaves its event unreported, and the next look reports it (#482)', async () => {
+  const home = await fixture([])
+  await Bun.write(`${home}/state/reported`, 'older\n')
+  await script(home, `await report(${CI_EVENT}, 7)\n${DIE}`)
+  expect(await lines(home, 'reported')).toEqual(['older'])
+  const { out } = await script(home, `await report(${CI_EVENT}, 7)\nawait flush()`)
+  expect(out).toContain('the event')
+  expect(await lines(home, 'reported')).toEqual(['older', 'pr-7 event'])
+})
+
+test('an event two pollers find at once is reported once, and counts as reported before it is written (#482)', async () => {
+  const home = await fixture([])
+  const { code, error, out } = await script(home, `await Promise.all([report(${CI_EVENT}, 7), report(${CI_EVENT}, 7)])
+await report(${CI_EVENT}, 7)
+console.log('HELD', JSON.stringify(await reportedLines()))
+await flush()`)
+  expect({ code, error }).toEqual({ code: 0, error: '' })
+  expect(out.split('the event')).toHaveLength(2)
+  expect(out).toContain('HELD ["pr-7 event"]')
+  expect(await lines(home, 'reported')).toEqual(['pr-7 event'])
+})
+
+test('following, an event is printed before it is recorded as reported (#482)', async () => {
+  const home = await fixture([])
+  await Bun.write(`${home}/state/reported`, 'older\n')
+  const body = `process.stdout.write = () => { require('node:fs').appendFileSync('${home}/at-print', require('node:fs').readFileSync('${home}/state/reported')); return true }
+await report(${CI_EVENT}, 7)`
+  const child = Bun.spawn([process.execPath, '-e', `process.argv.push('--follow')\n${IMPORTS}\n${body}\nprocess.exit(0)`], { env: envOf(home), stderr: 'pipe', stdout: 'ignore' })
+  expect({ code: await child.exited, error: await new Response(child.stderr).text() }).toEqual({ code: 0, error: '' })
+  expect(await Bun.file(`${home}/at-print`).text()).toBe('older\n')
+  expect(await lines(home, 'reported')).toEqual(['older', 'pr-7 event'])
+})
+
+test('a look that dies before printing keeps the old open list, and the next look reports the closing (#482)', async () => {
+  const home = await fixture([listed(5, 'open')])
+  await run(home, 'checkIssueStates')
+  await Bun.write(`${home}/list`, JSON.stringify([listed(5, 'closed')]))
+  await script(home, `await checkIssueStates()\n${DIE}`)
+  expect(await lines(home, 'open-issues')).toEqual(['5'])
+  const { out } = await script(home, 'await checkIssueStates()\nawait flush()')
+  expect(out).toContain('#5')
+  expect(await lines(home, 'open-issues')).toEqual([])
+})
+
+test('a closing two looks of one round find is reported once (#482)', async () => {
+  const home = await fixture([listed(5, 'open')])
+  await run(home, 'checkIssueStates')
+  await Bun.write(`${home}/list`, JSON.stringify([listed(5, 'closed')]))
+  await script(home, 'await checkIssueStates()\nawait checkIssueStates()\nawait flush()')
+  expect((await calls(home)).filter(call => call.startsWith('api repos/owner/repo/issues/5'))).toHaveLength(1)
+})
+
+test('a look that dies before printing keeps the cycle new, and the next look reports it, once a round (#482)', async () => {
+  const home = await fixture([listed(5, 'open')])
+  await Bun.write(`${home}/cycle`, '')
+  await script(home, `await checkIssueStates()\n${DIE}`)
+  expect(await Bun.file(`${home}/state/link-cycles`).exists()).toBe(false)
+  const { out } = await script(home, 'await checkIssueStates()\nawait checkIssueStates()\nawait flush()')
+  expect(out.split('LINK_CYCLE')).toHaveLength(2)
+  expect(await lines(home, 'link-cycles')).toEqual(['#5 → #5'])
 })
