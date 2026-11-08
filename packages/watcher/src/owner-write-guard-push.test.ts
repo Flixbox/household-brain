@@ -62,6 +62,7 @@ describe('a git push under the wrong credential helper (#455)', () => {
   it('reads the clone the push runs in, not the hook\'s folder', () => {
     expect(denied(`git -C ${wrong} push`, right)).toBe(true)
     expect(denied(`cd ${wrong} && git push`, right)).toBe(true)
+    expect(denied(`env cd ${wrong} && timeout 60 git push`, right)).toBe(true)
     expect(denied(`git -C ${right} push`, wrong)).toBe(false)
     expect(denied(`cd ${right} && git push`, wrong)).toBe(false)
   })

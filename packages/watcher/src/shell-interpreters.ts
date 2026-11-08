@@ -51,6 +51,12 @@ const inlinePrograms = ([word = '', ...args]: readonly string[]) => {
 
 const isInterpreter = (name: string) => awk.test(name) || inlineFlags.some(([interpreter]) => interpreter.test(name))
 
+/** Whether this first word makes `programCommands` read a command's arguments as programs. */
+export const runsPrograms = (word: string) => {
+  const name = nameOf(word)
+  return isInterpreter(name) || make.test(name)
+}
+
 /** Whether `make`'s arguments name its input as the makefile (`-f -`, `-f-`, `--file=-`, `--makefile /dev/stdin`). */
 const makefileFromInput = (args: readonly string[]) =>
   args.some((arg, at) => {
