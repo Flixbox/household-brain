@@ -107,7 +107,7 @@ test('after a capped move the next read still asks below the old cursor, and a b
   await Bun.write(`${home}/list`, JSON.stringify([skipped, ...stuck.slice(1)]))
   await run(home, 'checkIssues')
   await run(home, 'checkIssues')
-  const asked = (await calls(home)).filter(call => call.includes('issues?state=all') && call.includes('page=1')).map(call => /since=(?<since>[^&]+)/u.exec(call)?.groups?.since)
+  const asked = (await calls(home)).filter(call => call.includes('issues?state=all') && call.endsWith('&page=1')).map(call => /since=(?<since>[^&]+)/u.exec(call)?.groups?.since)
   expect(asked).toEqual(['2026-11-08T11:58:00Z', '2026-11-08T11:58:00Z', '2026-11-08T12:00:00Z'])
   expect(await lines(home, 'issue-events')).toContain('issue #700')
 })
