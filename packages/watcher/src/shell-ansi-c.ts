@@ -9,6 +9,12 @@
 /** Put in a word the shell may change, before each `$` it expands or for what can't be read for certain; a private-use character. */
 export const dynamic = '\u{E000}'
 
+/** What a text's own U+E000 stands as. Two different characters then read alike, so a here-document delimiter holding it is refused (clearing review of #475). */
+export const standIn = '\uFFFD'
+
+/** A text as written on a command line, or decoded from one: its own U+E000 is plain text, so no mark means anything but an expansion (#390). */
+export const withoutMarks = (text: string) => text.replaceAll(dynamic, standIn)
+
 /** Where the `quote` that closes a string whose text starts at `from` is, a backslash escaping the character after it. */
 export const closingQuote = (text: string, from: number, quote: string) => {
   let at = from
@@ -35,7 +41,7 @@ const control = (char: string) => {
   return String.fromCodePoint(char === '?' ? 0x7F : (char.toUpperCase().codePointAt(0) ?? 0) % 32)
 }
 
-const codePoint = (value: number) => (value <= 0x10_FF_FF && (value < 0xD8_00 || value > 0xDF_FF) ? String.fromCodePoint(value) : '\uFFFD')
+const codePoint = (value: number) => (value <= 0x10_FF_FF && (value < 0xD8_00 || value > 0xDF_FF) ? withoutMarks(String.fromCodePoint(value)) : '\uFFFD')
 
 /**
  * The escapes with digits or a character after their letter: octal and `\x` give a byte (bash 5.3's
