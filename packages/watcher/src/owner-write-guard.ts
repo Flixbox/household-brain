@@ -11,12 +11,13 @@
  * `ownerWrite` reads the command as a shell would, closely enough: every simple command of a
  * pipeline, list, group, subshell, `$(…)`, backticks, `bash -c '…'`, `eval` or what a here-document
  * or here-string feeds a shell, with quotes and escapes, and only the word in command position (after variable assignments and wrappers such as
- * `env` or `timeout`). A word naming `gh` (or a path ending in `/gh`) is the owner's login;
+ * `env` or `timeout`), and the programs interpreters and `make` run (shell-interpreters.ts). A word naming `gh` (or a path ending in `/gh`) is the owner's login;
  * `agent-gh` never is.
  */
 import { isRecord, textOf } from './read'
 import { commandsOf } from './shell-braces'
 import { isDynamic, plainWord } from './shell-commands'
+import { baseName, isGh, programCommands } from './shell-interpreters'
 import { type Work, newWork } from './shell-work'
 
 /** `gh pr` and `gh issue` subcommands that change something on GitHub. */
@@ -164,10 +165,6 @@ const ghWrites = (args: readonly string[]) => {
   return (group === 'pr' || group === 'issue') && prIssueWrites.has(subcommand)
 }
 
-const isGh = (word: string) => /(?:^|[/\\])gh(?:\.exe)?$/u.test(word)
-
-const baseName = (word: string) => word.replace(/^.*[/\\]/u, '')
-
 /** How many words a leading word takes up: an assignment or keyword one, a redirection one or two (with its target), a command none. */
 const leadingLength = (word: string) => {
   if (/^[A-Za-z_]\w*=/u.test(word) || keywords.has(word)) {
@@ -254,6 +251,7 @@ const runCommands = (text: string, work: Work): string[][] => {
       return script === null ? [command] : runCommands(script, work)
     }),
     ...fed.flatMap(script => (isDynamic(script) ? [[script]] : runCommands(script, work))),
+    ...programCommands(commands.map(command => withoutRedirections(command)), simple.flatMap(words => hereStringsOf(words))),
   ]
 }
 
