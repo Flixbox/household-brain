@@ -162,7 +162,7 @@ const asked = async (args: string[], cli: string): Promise<string> => {
 }
 
 /** The answer shared under `key` within GH_SHARE_SECONDS, or what `ask` gets, kept for the others. */
-const sharedOr = async (key: string[], cli: string, fresh: boolean, ask: () => Promise<string>): Promise<string> => {
+const sharedOr = async ({ cli, fresh, key }: { cli: string, fresh: boolean, key: string[] }, ask: () => Promise<string>): Promise<string> => {
   if (fresh || SHARE_MS === 0) {
     return ask()
   }
@@ -184,7 +184,7 @@ const sharedOr = async (key: string[], cli: string, fresh: boolean, ask: () => P
  * also asks GitHub again for what has to be known now, not some seconds ago.
  */
 export const ghText = async (args: string[], cli = GH, fresh = false): Promise<string> =>
-  sharedOr(args, cli, fresh, async () => asked(args, cli))
+  sharedOr({ cli, fresh, key: args }, async () => asked(args, cli))
 
 // What GitHub answered to a REST read, with its ETag (#405): asked again with `If-None-Match`, an
 // unchanged answer is a 304, which costs no rate limit. Kept longer than shared answers, since an
@@ -211,7 +211,7 @@ const keptAnswer = async (file: string): Promise<{ body: string, etag: string } 
 /** Splits what `gh api -i` prints into the body and its ETag ('' without one). */
 const parsedAnswer = (raw: string): { body: string, etag: string } => {
   const end = raw.indexOf('\r\n\r\n')
-  if (end < 0) {
+  if (end === -1) {
     throw new Error('gh api -i printed no headers')
   }
   const etag = /^etag: *(?<etag>\S.*)$/imu.exec(raw.slice(0, end))?.groups?.etag ?? ''
@@ -240,4 +240,4 @@ const revalidated = async (path: string, cli: string): Promise<string> => {
 
 /** The JSON at the REST `path`, asked for with its ETag (#405); shared like any answer, and `fresh` skips that. */
 export const ghRest = async (path: string, cli = GH, fresh = false): Promise<unknown> =>
-  JSON.parse(await sharedOr(['rest', path], cli, fresh, async () => revalidated(path, cli)))
+  JSON.parse(await sharedOr({ cli, fresh, key: ['rest', path] }, async () => revalidated(path, cli)))
