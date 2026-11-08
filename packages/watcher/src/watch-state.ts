@@ -109,14 +109,15 @@ export const updateLines = async (name: string, change: (lines: string[]) => rea
 
 export const appendLines = async (name: string, lines: readonly string[]): Promise<void> => updateLines(name, old => [...old, ...lines])
 
-/** Adds a line unless it is there already; true when it was added. */
-export const addLine = async (name: string, line: string): Promise<boolean> => oneAtATime(name, async () => {
+/** Adds a line unless it is there already, or `adopt` finds it under an older form and rewrites the lines; true when it was added. */
+export const addLine = async (name: string, line: string, adopt: (lines: readonly string[], line: string) => readonly string[] | null = () => null): Promise<boolean> => oneAtATime(name, async () => {
   const lines = await readLines(name)
   if (lines.includes(line)) {
     return false
   }
-  await write(name, [...lines, line])
-  return true
+  const adopted = adopt(lines, line)
+  await write(name, adopted ?? [...lines, line])
+  return adopted === null
 })
 
 /**

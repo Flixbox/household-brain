@@ -11,6 +11,7 @@ import { agentUsageText, readAgentUsage } from './agent-usage'
 import { type Event, type OpenPr, answerFirst, clockTime, listsOpenPrs, openPrLines, reminderLines, stamped } from './watch-events'
 import { lookupNews, lookups } from './watch-gh'
 import { REPO, endOpenPrsLook, openPrsThisLook } from './watch-open-prs'
+import { adoptOldCiKey } from './watch-ci-state'
 import { addLine, askedBots, oneAtATime, readLines, subscriptions, writeLines } from './watch-state'
 import { awaitsBotReview } from './watch-bot-review-events'
 import { codeVersion, outdatedLine, startedOn } from './watch-version'
@@ -66,7 +67,7 @@ export const queue = (lines: readonly string[], options: QueueOptions = {}): voi
 export const report = async (event: Event | null, pr: number | null = null): Promise<void> => {
   // Checked and recorded in one step: two pollers finding the same event report it once.
   const audience = pr === null ? {} : { pr }
-  if (!event || !subscriptions.accepts({ ...audience, quiet: event.quiet === true }) || !await addLine('reported', event.key)) {
+  if (!event || !subscriptions.accepts({ ...audience, quiet: event.quiet === true }) || !await addLine('reported', event.key, adoptOldCiKey)) {
     return
   }
   const [first = '', ...rest] = event.lines

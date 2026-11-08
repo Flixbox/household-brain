@@ -1,26 +1,67 @@
 /** What a PR's CI comes to, for the open-PR list and its reminders (watch-events.ts), and NOT_QUEUED (watch-queue-events.ts). */
 
-/** A passed run's report line (#401): a later attempt has its own, so a rerun that passes reports too. */
-export const ciPassedKey = (pr: number, sha: string, attempt: number): string => {
-  const key = `pr-${pr} ci-passed ${sha}`
-  return attempt > 1 ? `${key} ${attempt}` : key
+interface RunResult {
+  attempt: number
+  outcome: string
+  pr: string
+  /** 0 on a line recorded before the keys held the run id (#486), older than any run. */
+  run: number
+  sha: string
 }
 
-/** The highest attempt reported under `key` and its line: a line without a number is attempt 1, none at all attempt 0. */
-const latestAttempt = (reported: readonly string[], key: string): { attempt: number, index: number } =>
-  reported.reduce((latest, line, index) => {
-    const attempt = line === key || line.startsWith(`${key} `) ? Number(line.slice(key.length + 1)) || 1 : 0
-    return attempt > 0 && attempt >= latest.attempt ? { attempt, index } : latest
-  }, { attempt: 0, index: -1 })
+/** A CI result's report line: each run and attempt has its own (#401, #486), so a rerun or another run on the sha reports too. */
+export const ciResultKey = (outcome: 'passed' | 'failed', { pr, sha }: { pr: number, sha: string }, { attempt, id }: { attempt: number, id: number }): string =>
+  `pr-${pr} ci-${outcome} ${sha} ${id} ${attempt}`
+
+const RESULT_LINE = /^pr-(\d+) ci-(passed|failed) (\S+)((?: \d+)*)$/u
+
+/** A result line, in either form: `<run> <attempt>`, or from before the run id just `[<attempt>]`. */
+const resultOf = (line: string): RunResult[] => {
+  const [, pr = '', outcome = '', sha = '', numbers = ''] = RESULT_LINE.exec(line) ?? []
+  if (pr === '') {
+    return []
+  }
+  const [first = 1, second = 0] = numbers.trim().split(' ').filter(Boolean).map(Number)
+  return numbers.trim().includes(' ') ? [{ attempt: second, outcome, pr, run: first, sha }] : [{ attempt: first, outcome, pr, run: 0, sha }]
+}
+
+const isOlder = (result: RunResult, next: RunResult): boolean =>
+  result.run === next.run ? result.attempt <= next.attempt : result.run < next.run
 
 /**
- * Whether `head`'s latest reported result passed (#419): a pass stops counting once a later attempt fails.
- * Attempts only order one run's results, and a new run on the head starts again at 1, so on a tie the later line wins (#430).
+ * Whether `head`'s latest reported result passed (#419): by run, then attempt, as a run's attempts
+ * start again at 1 (#486). Among lines from before the run id, the later one wins a tie (#430).
  */
 export const reportedPassed = (reported: readonly string[], pr: number, head: string): boolean => {
-  const pass = latestAttempt(reported, ciPassedKey(pr, head, 1))
-  const fail = latestAttempt(reported, `pr-${pr} ci-failed ${head}`)
-  return pass.attempt === fail.attempt ? pass.index > fail.index : pass.attempt > fail.attempt
+  const results = reported.flatMap(resultOf).filter(result => result.pr === String(pr) && result.sha === head)
+  const latest = results.reduce<RunResult | null>((found, result) => (!found || isOlder(found, result) ? result : found), null)
+  return latest?.outcome === 'passed'
+}
+
+/** What the line for this result said before the run id. */
+const oldKey = ({ attempt, outcome, pr, sha }: RunResult): string => {
+  const key = `pr-${pr} ci-${outcome} ${sha}`
+  return outcome === 'passed' && attempt === 1 ? key : `${key} ${attempt}`
+}
+
+/**
+ * The reported lines with this result's old line taken over by `key` (#486), or null when there is
+ * none. So a watcher that restarts on this code doesn't report again every result it recorded in the
+ * old form. The sha's other old lines go too: they are older runs, and left behind one would pass for
+ * a later run's result and swallow its report.
+ */
+export const adoptOldCiKey = (lines: readonly string[], key: string): readonly string[] | null => {
+  const [result] = resultOf(key)
+  if (!result || result.run === 0 || !lines.includes(oldKey(result))) {
+    return null
+  }
+  const isOldOfSha = (line: string) => resultOf(line).some(old => old.run === 0 && old.pr === result.pr && old.sha === result.sha)
+  return lines.flatMap(line => {
+    if (line === oldKey(result)) {
+      return [key]
+    }
+    return isOldOfSha(line) ? [] : [line]
+  })
 }
 
 interface HeadRun {
