@@ -65,6 +65,8 @@
  *   WATCHER_ERROR                    a look failed (e.g. a state file stayed locked); it goes on with the next
  *   WATCHER_OUTDATED                 its code changed in its checkout after it started (#265); it exits:
  *                                    start it again
+ *   NO_WRITER                        a subscribed watcher: no all-events watcher has looked for a while (#432), so
+ *                                    nothing resolves threads or readies approved drafts; once per absence
  *   LOOKUPS_FAILING / LOOKUPS_RECOVERED  no `gh` call has succeeded for minutes (on every look while it
  *                                    lasts), or they succeed again (#253)
  *   Usage (<provider>): session <n>% used (<m>% left, resets …), week <n>% used (<m>% left, resets …)

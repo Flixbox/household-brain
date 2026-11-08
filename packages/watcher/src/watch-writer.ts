@@ -10,18 +10,25 @@
  * A subscribed agent still hears how each write went: the writer leaves each event in a shared folder,
  * and a subscribed watcher reports the ones for its PR, once each. No call to GitHub; a watcher that
  * starts later doesn't hear what was written over an hour before.
+ *
+ * With no all-events watcher those writes wait unseen, so the writer marks each look and a subscribed
+ * watcher says once when none has come for a while (#432).
  */
-import { REPO_DIR, subscriptions } from './watch-state'
+import { REPO_DIR, addLine, subscriptions } from './watch-state'
 import { filesIn, removeOlder, unclaim, writeWhole } from './watch-files'
 import { allSettled, ignoreFailure, textOf } from './read'
-import type { Event } from './watch-events'
+import { type Event, clockTime } from './watch-events'
 import { record } from './watch-text'
-import { report } from './watch-output'
+import { queue, report } from './watch-output'
 import { retryDelayMs } from './watch-write-retry'
 
 const RETRIES_DIR = `${REPO_DIR}/write-retries`
 const OUTCOMES_DIR = `${REPO_DIR}/write-outcomes`
 const OUTCOME_LIFE = Temporal.Duration.from({ hours: 1 })
+const WRITER_SEEN = `${REPO_DIR}/writer-seen`
+/** Must stay above the writer's longest pause between looks (paced, #407), and a restart: a live writer never counts as gone. */
+const WRITER_GONE_AFTER_MS = Temporal.Duration.from({ minutes: 30 }).total('milliseconds')
+const STARTED_AT = Temporal.Now.instant().epochMilliseconds
 
 // Only room: a retry forgotten after a day is simply due.
 await removeOlder(RETRIES_DIR, Temporal.Duration.from({ hours: 24 }))
@@ -78,4 +85,30 @@ export const relayWrites = async (pr: number): Promise<void> => {
   const files = await filesIn(`${OUTCOMES_DIR}/pr-${pr}`)
   const fresh = files.filter(file => file.changed >= since).toSorted((one, other) => one.changed - other.changed)
   await allSettled(fresh.map(async file => report(eventFrom(file.text), pr)))
+}
+
+const writerSeenAt = async (): Promise<number | null> => {
+  const file = Bun.file(WRITER_SEEN)
+  return (await file.exists()) ? file.lastModified : null
+}
+
+const noWriterLine = (seen: number | null): string => {
+  const since = seen === null ? 'yet' : `since ${clockTime(Temporal.Instant.fromEpochMilliseconds(seen)) ?? '?'}`
+  return `NO_WRITER: no all-events watcher has looked at this repository on this machine ${since}, so \`Resolved:\` replies stay unresolved and approved drafts stay drafts until one runs`
+}
+
+/**
+ * The writer marks that it looked; a subscribed watcher reports once per absence (the key is the last
+ * mark) when neither that mark nor its own start (`started`, in epoch milliseconds) is recent.
+ */
+export const checkWriter = async (started = STARTED_AT): Promise<void> => {
+  if (IS_WRITER) {
+    await writeWhole(WRITER_SEEN, 'seen').catch(ignoreFailure)
+    return
+  }
+  const seen = await writerSeenAt()
+  const fresh = Temporal.Now.instant().epochMilliseconds - Math.max(seen ?? 0, started) < WRITER_GONE_AFTER_MS
+  if (!fresh && await addLine('reported', `no-writer ${seen ?? 'never'}`)) {
+    queue([noWriterLine(seen)], { system: true })
+  }
 }
