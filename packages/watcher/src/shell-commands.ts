@@ -10,7 +10,7 @@
 import { type Enclosures, type Heredoc, bodyAsRead, bodyExpands, closingLine, countEnclosure, hereStringOperator, heredocOf, heredocOpener, opensHereString, opensHeredoc, quoteInExpansion, unsureInEnclosure } from './shell-heredocs'
 import { closingParen, indexOrEnd, isSeparator, opensArithmetic } from './shell-parens'
 import { ansiCValue, closingQuote, dynamic, standIn } from './shell-ansi-c'
-import { type Work, charged, spent, unreadableLine } from './shell-work'
+import { type Work, spent, unreadableLine } from './shell-work'
 
 /** Whether the shell may change a word before the command sees it (a variable, `$(…)`, backticks). */
 export const isDynamic = (word: string) => word.includes(dynamic)
@@ -52,9 +52,10 @@ const append = (scan: Scan, text: string) => {
 /**
  * Text in `((…))`: only its substitutions are read if it is surely arithmetic, each whole, here-documents
  * included (#373). Else it fails closed: it is also read as commands, where a `<<` may be a shift and
- * so opens no here-document, and substitutions count whatever quotes them, as arithmetic runs one even in single quotes.
+ * so opens no here-document, and substitutions count whatever quotes them, as arithmetic runs one even in single quotes. It may recurse into its own text, so charging it each time bounds both the work and the depth: `substitutionsIn` stops at a spent budget, and the line is denied (#496).
  */
 const readArithmetic = (scan: Scan, inner: string, sure: boolean) => {
+  spent(scan.work, inner)
   if (!sure) {
     scan.nested.push(inner.replaceAll('<<', '  '))
   }
@@ -70,10 +71,6 @@ const substitution = (scan: Scan, text: string, at: number): [string, number] =>
   const backtick = text[at] === '`'
   const from = at + (backtick ? 1 : 2)
   const end = backtick ? indexOrEnd(text, '`', from) : closingParen(text, from)
-  // `$((` may recurse into its own text: charging its span each time bounds both the work and the depth, and a spent budget denies the line (#496).
-  if (text.startsWith('$((', at) && charged(scan.work, end - from + 1)) {
-    return [dynamic + text.slice(at, end + 1), end + 1]
-  }
   const inner = text.slice(from, end)
   if (text.startsWith('$((', at)) {
     readArithmetic(scan, inner, opensArithmetic(text, at + 1, scan.work))
