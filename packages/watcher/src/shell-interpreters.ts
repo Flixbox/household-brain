@@ -1,3 +1,4 @@
+import { type Work, spent, unreadableLine } from './shell-work'
 import { plainWord } from './shell-commands'
 
 /**
@@ -87,9 +88,12 @@ const ghCommandsIn = (piece: string) => {
 /**
  * The `gh` commands in the programs on a command line: those given inline, and the here-documents and
  * here-strings when anything on the line runs its input, as the guard reads for shells (#382).
- * `commands` come without their redirections.
+ * `commands` come without their redirections. Each program is charged to the budget, as a program behind a
+ * wrapper is otherwise read once per word.
  */
-export const programCommands = (commands: readonly (readonly string[])[], fed: readonly string[]) =>
-  [...commands.flatMap(command => inlinePrograms(command)), ...(commands.some(command => runsInput(command)) ? fed : [])]
-    .flatMap(program => program.split(commandEnd))
-    .flatMap(piece => ghCommandsIn(piece))
+export const programCommands = (commands: readonly (readonly string[])[], fed: readonly string[], work: Work) => {
+  const programs = [...commands.flatMap(command => inlinePrograms(command)), ...(commands.some(command => runsInput(command)) ? fed : [])]
+  return programs.some(program => spent(work, program))
+    ? unreadableLine()
+    : programs.flatMap(program => program.split(commandEnd)).flatMap(piece => ghCommandsIn(piece))
+}
