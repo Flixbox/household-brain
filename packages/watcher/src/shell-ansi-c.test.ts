@@ -10,6 +10,9 @@ const wide = '\u0801'
 /** The private-use character the reader marks an expansion with (#390), as a word can really hold it. */
 const mark = '\u{E000}'
 
+/** What the reader writes for that character: a here-document delimiter holding either must not end at the other (clearing review of #475). */
+const standIn = '\uFFFD'
+
 describe('ownerWrite on $\'…\' (#378)', () => {
   it('reads $\'…\' strings with their escapes, in substitutions and as here-document delimiters too (#378)', () => {
     expect(refused([
@@ -53,7 +56,6 @@ describe('ownerWrite on $\'…\' (#378)', () => {
       String.raw`gh pr $'\U0000E000' 1`,
       `gh issue close${mark} 1`,
       `${mark} pr close 1`,
-      `cat <<${mark}\nbody\n${mark}`,
     ])).toEqual([])
   })
 
@@ -63,6 +65,10 @@ describe('ownerWrite on $\'…\' (#378)', () => {
       `gh issue close 1 ${mark}`,
       `bash -c $'gh\\c${wide} issue close 1'`,
       `eval $'gh\\c${wide}' issue close 1`,
+      `cat <<${mark}\n${standIn}\nit's\n${mark}\ngh issue close 1\n'`,
+      `cat <<'${mark}'\n${standIn}\nit's\n${mark}\ngh issue close 1\n'`,
+      `cat <<${standIn}\n${mark}\nit's\n${standIn}\ngh issue close 1\n'`,
+      String.raw`bash -c $'cat <<\uE000\n\uFFFD\nit\'s\n\uE000\ngh issue close 1\n\''`,
     ])).toEqual([])
   })
 })
