@@ -5,7 +5,7 @@
 import { MERGE_QUEUE, type PrState, dequeueReason, graphql, prStates, queueEntries, runOf } from './watch-github'
 import { type QueueEntry, dequeuedEvent, notQueuedEvent, notQueuedKey, queueChanges, queueLine, queuedEvent, unqueuedLines, waitingId, waitingValueId } from './watch-queue-events'
 import { exists, readLines, rememberPr, subscriptions, updateLines, writeLines } from './watch-state'
-import { clearQuestion } from './watch-question'
+import { awaitsQuestionOutcome, clearQuestion } from './watch-question'
 import { GH } from './watch-gh'
 import { relayWrites } from './watch-writer'
 import { report } from './watch-output'
@@ -75,8 +75,8 @@ export const checkNotQueued = async (pr: number, state: PrState): Promise<void> 
   await report(id === null ? null : notQueuedEvent({ gh: GH, head: state.head, id, pr }), pr)
 }
 
-/** What every look does first for a PR; false when this watcher doesn't follow it. */
-export const preparePr = async (pr: number, state: PrState): Promise<boolean> => {
+/** What every look does first for a PR; false when this watcher doesn't follow it, or holds a finished PR for the writer's outcome (#440). */
+export const preparePr = async (pr: number, state: PrState, nowMs = Temporal.Now.instant().epochMilliseconds): Promise<boolean> => {
   await rememberPr(pr, state.closingIssues ?? [], state.state === 'OPEN')
   if (!subscriptions.accepts({ pr })) { return false }
   await checkNotQueued(pr, state)
@@ -84,5 +84,5 @@ export const preparePr = async (pr: number, state: PrState): Promise<boolean> =>
   await clearQuestion(pr, state)
   // Here, for a merged or closed PR too: the writer takes `question` off those as well (#415).
   await relayWrites(pr)
-  return true
+  return !await awaitsQuestionOutcome(pr, state, nowMs)
 }

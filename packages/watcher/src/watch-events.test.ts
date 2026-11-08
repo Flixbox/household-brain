@@ -7,8 +7,8 @@ const context = { jobs: ['  Lint: completed success'], limitSeconds: 1200, pr: 1
 
 describe('runEvent', () => {
   it('reports a PR run that passed or failed, keyed so a re-run that fails again is news', () => {
-    expect(runEvent({ ...context, label: 'pr', run: run() })).toEqual({ key: `pr-12 ci-passed ${SHA}`, lines: ['CI_PASSED for abcdef1 (run 7)', '  Lint: completed success'] })
-    expect(runEvent({ ...context, label: 'pr', run: run({ attempt: 2, conclusion: 'failure' }) })).toMatchObject({ key: `pr-12 ci-failed ${SHA} 2` })
+    expect(runEvent({ ...context, label: 'pr', run: run() })).toEqual({ key: `pr-12 ci-passed ${SHA} 7 1`, lines: ['CI_PASSED for abcdef1 (run 7)', '  Lint: completed success'] })
+    expect(runEvent({ ...context, label: 'pr', run: run({ attempt: 2, conclusion: 'failure' }) })).toMatchObject({ key: `pr-12 ci-failed ${SHA} 7 2` })
   })
 
   it('ignores a PR run a newer push cancelled, and one still running within the limit', () => {

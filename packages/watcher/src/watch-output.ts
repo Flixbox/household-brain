@@ -11,7 +11,7 @@ import { agentUsageText, readAgentUsage } from './agent-usage'
 import { type Event, type OpenPr, answerFirst, clockTime, listsOpenPrs, openPrLines, reminderLines, stamped } from './watch-events'
 import { lookupNews, lookups } from './watch-gh'
 import { REPO, endOpenPrsLook, openPrsThisLook } from './watch-open-prs'
-import { addLine, askedBots, oneAtATime, readLines, subscriptions, writeLines } from './watch-state'
+import { addReported, appendLines, askedBots, oneAtATime, readLines, subscriptions, writeLines } from './watch-state'
 import { awaitsBotReview } from './watch-bot-review-events'
 import { codeVersion, outdatedLine, startedOn } from './watch-version'
 import { postedFrom, shownUsage, usageDue } from './watch-usage'
@@ -34,7 +34,8 @@ const printed = { any: false }
 /**
  * An event is recorded as reported when it is found, before the round prints it. So a round that
  * ends early (an error, a stop signal: both end in `exit`) still prints what it found, rather than
- * leaving events recorded but never shown. Synchronously: an exit handler can't wait.
+ * leaving events recorded but never shown. Synchronously: an exit handler can't wait. A seen file
+ * written through `markSeen` isn't written on that path, so such an event may come again next run.
  */
 const printFound = () => {
   for (const lines of answerFirst(found)) {
@@ -62,11 +63,38 @@ export const queue = (lines: readonly string[], options: QueueOptions = {}): voi
   found.push(event)
 }
 
+/** Writes that wait until what was queued before them has been printed (not following). */
+const afterPrint: (() => Promise<void>)[] = []
+/** Keys handed to `markSeen` and not written yet, so a second look of the round doesn't report them again. */
+const unwritten = new Set<string>()
+const unwrittenKey = (file: string, key: string) => `${file} ${key}`
+
+const writeMarks = async (): Promise<void> => {
+  await Promise.all(afterPrint.splice(0).map(async work => work()))
+}
+
+export const isUnwritten = (file: string, key: string): boolean => unwritten.has(unwrittenKey(file, key))
+
+/**
+ * Records `keys` in the seen file `file`, then runs `then`, once the events just queued are printed
+ * (#435): a crash before that reports them again rather than losing them. Queue the events first.
+ */
+export const markSeen = async (file: string, keys: readonly string[], then: () => Promise<void> = async () => Promise.resolve()): Promise<void> => {
+  const held = keys.map(key => unwrittenKey(file, key))
+  for (const key of held) { unwritten.add(key) }
+  const write = async () => {
+    await appendLines(file, keys)
+    await then()
+    for (const key of held) { unwritten.delete(key) }
+  }
+  await (FOLLOW ? write() : Promise.resolve(afterPrint.push(write)))
+}
+
 /** Keeps the event for this round's `flush`, unless there is none or it was reported before. */
 export const report = async (event: Event | null, pr: number | null = null): Promise<void> => {
   // Checked and recorded in one step: two pollers finding the same event report it once.
   const audience = pr === null ? {} : { pr }
-  if (!event || !subscriptions.accepts({ ...audience, quiet: event.quiet === true }) || !await addLine('reported', event.key)) {
+  if (!event || !subscriptions.accepts({ ...audience, quiet: event.quiet === true }) || !await addReported(event.key)) {
     return
   }
   const [first = '', ...rest] = event.lines
@@ -106,18 +134,25 @@ const sayClosing = async (): Promise<void> => {
   }
 }
 
+/** Prints what the round kept, then writes what waited for that; whether the round printed anything. */
+const printRound = async (): Promise<boolean> => {
+  const any = found.length > 0 || printed.any
+  printFound()
+  printed.any = false
+  await writeMarks()
+  return any
+}
+
 /**
  * Ends a round that found events: prints the ones kept (not following), answers first, and after them
  * a reminder for each open PR waiting on the agent (#224, #226); then exits, or when following, ends
  * with `---` and returns whether anything was printed, so the next round can start at once.
  */
 export const flush = async (): Promise<boolean> => {
-  if (found.length === 0 && !printed.any) {
+  // The events first: a slow listing must not hold them back.
+  if (!await printRound()) {
     return false
   }
-  // The events first: a slow listing must not hold them back.
-  printFound()
-  printed.any = false
   await sayClosing()
   endOpenPrsLook()
   quiet.since = Temporal.Now.instant()
