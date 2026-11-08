@@ -17,9 +17,9 @@ const COMPUTED_IMPORT = /\b(?:import|require)\s*\(\s*(?!['"])/u
 
 const scanner = new Bun.Transpiler({ loader: 'ts' })
 
-/** Every regular file of the package at HEAD: path to [blob id, text]; a symlink isn't one, so it can't be followed. Empty where it can't be read. */
-const readPackage = async (): Promise<Map<string, [string, string]>> => {
-  const listing = await $`git -C ${PACKAGE} ls-tree -r HEAD`.quiet().nothrow()
+/** Every regular file of the package at a commit: path to [blob id, text]; a symlink isn't one, so it can't be followed. Empty where it can't be read. */
+const readPackage = async (commit: string): Promise<Map<string, [string, string]>> => {
+  const listing = await $`git -C ${PACKAGE} ls-tree -r ${commit}`.quiet().nothrow()
   const entries = listing.stdout.toString().split('\n').filter(line => line.startsWith('100'))
     .map(line => line.split('\t'))
     .map(([meta = '', path = '']) => ({ id: meta.split(' ')[2] ?? '', path }))
@@ -77,8 +77,8 @@ const loadedFiles = (files: Map<string, [string, string]>): Set<string> | null =
 const pathAndBlob = (path: string, files: Map<string, [string, string]>): string => `${path}:${files.get(path)?.[0] ?? ''}`
 
 /** The blobs of the files that make up what the watcher runs, as one comparable string; null when that can't be told. */
-const runningCode = async (): Promise<string | null> => {
-  const files = await readPackage()
+const runningCode = async (commit: string): Promise<string | null> => {
+  const files = await readPackage(commit)
   const loaded = loadedFiles(files)
   if (loaded === null) { return null }
   const counted = [...loaded, ...SETTINGS.filter(path => files.has(path))].toSorted()
@@ -86,31 +86,20 @@ const runningCode = async (): Promise<string | null> => {
 }
 
 /**
- * The code the watcher runs in its checkout's current commit; '' where that can't be read (the plugin's
+ * The code the watcher runs in a commit of its checkout, by default the current one; '' where that can't be read (the plugin's
  * copy is no git checkout). When it can't tell which files it runs, the version is the git tree of the
  * whole package, so any change there counts, and that never equals a list of files.
  */
-export const codeVersion = async (): Promise<string> => {
-  const tree = await $`git -C ${PACKAGE} rev-parse HEAD:./`.quiet().nothrow()
+export const codeVersion = async (commit = 'HEAD'): Promise<string> => {
+  const tree = await $`git -C ${PACKAGE} rev-parse ${commit}:./`.quiet().nothrow()
     .then(result => (result.exitCode === 0 ? result.stdout.toString().trim() : ''), () => '')
-  return tree === '' ? '' : (await runningCode().catch(() => null)) ?? tree
+  return tree === '' ? '' : (await runningCode(commit).catch(() => null)) ?? tree
 }
 
-/** The code this watcher started on: read by watch-project.ts before it loads the rest (#265). */
+/** The code this watcher started on, at the commit watch-project.ts read before it loaded any of this (#265, #512). */
 const startState = { on: '' }
-export const readStartedOn = async (): Promise<void> => {
-  const handedOver = process.env.WATCHER_STARTED_ON
-  delete process.env.WATCHER_STARTED_ON
-  startState.on = handedOver ?? await codeVersion()
-  if (typeof handedOver === 'string') { return }
-  // The files loaded so far may be older than this version (#512): replace this process, same pid and
-  // output, so that all the code is loaded after the version was read. Where that's refused (Windows),
-  // it carries on with the files it has.
-  try {
-    process.execve?.(process.execPath, [process.execPath, ...process.execArgv, ...process.argv.slice(1)], { ...process.env, WATCHER_STARTED_ON: startState.on })
-  } catch {
-    // Carries on as it is.
-  }
+export const readStartedOn = async (commit: string): Promise<void> => {
+  startState.on = commit === '' ? '' : await codeVersion(commit)
 }
 export const startedOn = (): string => startState.on
 
