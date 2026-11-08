@@ -7,7 +7,7 @@
  * Merging still waits for CI and, where a review bot was asked (#324), its review. Which drafts is
  * `marksReady` (watch-ready-events.ts). The `GH` token must then be allowed to write pull requests.
  */
-import { DISMISS_STALE_BOT_REVIEWS, askBotsToResolve, dismissCleared, dismissStale, reviewBlockers } from './watch-dismiss'
+import { DISMISS_STALE_BOT_REVIEWS, askBotsToResolve, dismissCleared, dismissStale, reportedPassed, reviewBlockers } from './watch-dismiss'
 import { type PrState, REPO, SELF, readyCommand } from './watch-github'
 import { READY_APPROVED_DRAFTS, draftNote, draftReadiedEvent, marksReady } from './watch-ready-events'
 import { approvedEvent, blockedByReviewEvent } from './watch-review-events'
@@ -74,7 +74,7 @@ export const checkApproval = async (pr: number, state: PrState): Promise<void> =
   // A review bot asked for once, on the label (#324), before what waits on it.
   await (state.bot.requested ? askBotReviews(pr) : Promise.resolve())
   const reported = await readLines('reported')
-  const green = reported.includes(`pr-${pr} ci-passed ${state.head}`)
+  const green = reportedPassed(reported, pr, state.head)
   await checkAutoMergeOff({ green, pr, state })
   // The owner's own approval, not the decision: a stale change request, one of the causes it names,
   // keeps GitHub's decision at CHANGES_REQUESTED (#286).
