@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'bun:test'
-import { outdatedLine } from './watch-version'
+import { codeVersion, outdatedLine } from './watch-version'
+
+describe('codeVersion on the real watcher (#506)', () => {
+  it('can tell which files the watcher runs: an import it can\'t follow would stop it on every change again', async () => {
+    expect(await codeVersion()).toStartWith('files ')
+  })
+})
 
 describe('outdatedLine (#265)', () => {
   it('stops a watcher started on the code from before a pull that moved its checkout on', () => {
