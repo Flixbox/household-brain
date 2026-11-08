@@ -1,7 +1,10 @@
-import { describe, expect, it } from 'bun:test'
+import { afterAll, describe, expect, it } from 'bun:test'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { type Limits, NO_LIMITS, pauseMs, stretchFor, updatedLimits } from './watch-pace'
 import { ghText } from './watch-gh'
 
+const folder = await mkdtemp(`${tmpdir()}/watch-pace-`)
 const NOW_MS = 1_800_000_000_000
 const NOW_SECONDS = NOW_MS / 1000
 const MARGIN_MS = 5000
@@ -116,7 +119,7 @@ describe('pauseMs (#400)', () => {
 })
 
 describe('ghText and the limit (#400)', () => {
-  const folder = `${process.env.TMPDIR ?? '/tmp'}/watch-pace-${process.pid}`
+  afterAll(async () => rm(folder, { force: true, recursive: true }))
   const fakeGh = async (name: string, script: string) => {
     const path = `${folder}/${name}`
     await Bun.write(path, `#!/bin/sh\n${script}\n`)
@@ -137,7 +140,10 @@ describe('ghText and the limit (#400)', () => {
     const log = `${folder}/parallel`
     const gh = await fakeGh('parallel', `echo start >> ${log}\nsleep 0.2\necho end >> ${log}`)
     await Promise.all(['a', 'b', 'c', 'd'].map(async id => ghText([id], gh, true)))
-    const running = (await linesOf(log)).reduce<number[]>((seen, line) => [...seen, (seen.at(-1) ?? 0) + (line === 'start' ? 1 : -1)], [])
-    expect(Math.max(...running)).toBe(2)
+    const running = (await linesOf(log)).reduce((seen, line) => {
+      const now = seen.now + (line === 'start' ? 1 : -1)
+      return { most: Math.max(seen.most, now), now }
+    }, { most: 0, now: 0 })
+    expect(running.most).toBe(2)
   })
 })
