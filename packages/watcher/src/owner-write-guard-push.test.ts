@@ -267,10 +267,10 @@ describe('a git push under the wrong credential helper, by where it goes (#467)'
       'env FOO=1 git push origin HEAD',
       'env -i git push origin HEAD',
       'env -u FOO git push origin HEAD',
-      'env FOO=1 git -C . push origin HEAD',
       'echo $GIT_DIR; git push origin HEAD',
     ]
     const toSsh = origin(ssh)
+    commands.push(`env FOO=1 git -C ${toSsh} push origin HEAD`)
     expect(commands.filter(command => denied(command, toSsh))).toEqual([])
   })
 
