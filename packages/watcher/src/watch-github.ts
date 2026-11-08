@@ -4,6 +4,7 @@ import type { QueueEntry } from './watch-queue-events'
 import { type BotReviewState, REVIEW_BOTS, botReviewStateOf } from './watch-bot-review-events'
 import { type ReviewThread, threadsToResolve } from './watch-review-events'
 import { CLEARED_LABEL } from './watch-cleared-events'
+import { holdsLagging } from './watch-ci-cache'
 import { OPEN_ISSUE_FIELDS, allOpenIssues, goneIssueLine, isGone, isMoved, issueEventLine, issuePage } from './watch-issue-events'
 import { GH, failedStatus, ghRest, ghText } from './watch-gh'
 import type { OpenIssue } from './watch-link-cycles'
@@ -92,11 +93,12 @@ export const newestMainRun = async (): Promise<MainRun | null> => (await mainRun
 /**
  * The lines for a run's jobs. A run that has completed is asked about afresh (#493): the job list shared
  * while it ran can outlive the run's own shared answer, and would contradict the verdict. A run that
- * passed with a job still unfinished is GitHub's answer lagging: null, so the result waits a look.
+ * passed with a job still unfinished is GitHub's answer lagging: null, so the result waits a look, for
+ * a few looks at most, and then comes out with the jobs as they are.
  */
-export const jobLines = async ({ conclusion, id, status }: Run): Promise<string[] | null> => {
-  const jobs = records(record(await gh(['run', 'view', String(id), '--repo', REPO, '--json', 'jobs'], GH, status === 'completed')).jobs)
-  return conclusion === 'success' && jobs.some(job => job.status !== 'completed')
+export const jobLines = async (run: Run): Promise<string[] | null> => {
+  const jobs = records(record(await gh(['run', 'view', String(run.id), '--repo', REPO, '--json', 'jobs'], GH, run.status === 'completed')).jobs)
+  return run.conclusion === 'success' && jobs.some(job => job.status !== 'completed') && holdsLagging(run)
     ? null
     : jobs.map(job => `  ${textOf(job.name)}: ${textOf(job.status)} ${textOf(job.conclusion)}`)
 }

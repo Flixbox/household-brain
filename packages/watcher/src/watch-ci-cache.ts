@@ -32,6 +32,17 @@ export const keepJobs = (run: RunId, jobs: string[]): void => {
   cancelledJobs.set(attemptOf(run), jobs)
 }
 
+/** How many looks a passed run whose jobs still read as unfinished is held back (#493). */
+const LAGGING_LOOKS = 3
+const laggingLooks = new Map<string, number>()
+
+/** Counts this look at a run whose jobs lag behind it; false once it has been held long enough, so its result still comes out. */
+export const holdsLagging = (run: RunId): boolean => {
+  const looks = (laggingLooks.get(attemptOf(run)) ?? 0) + 1
+  laggingLooks.set(attemptOf(run), looks)
+  return looks <= LAGGING_LOOKS
+}
+
 /** Whether this is the run already finished with at this place. */
 export const isSettled = (place: RunPlace, { attempt, id }: RunId): boolean => {
   const known = settled.get(placeOf(place))
