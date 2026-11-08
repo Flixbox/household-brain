@@ -209,9 +209,9 @@ describe('a git push under the wrong credential helper, by where it goes (#467)'
   it('keeps refusing past quotes spliced into a variable or xargs', () => {
     const commands = [
       'env G"IT_DIR"=/x git push origin HEAD',
-      'env GIT\\_DIR=/x git push origin HEAD',
+      String.raw`env GIT\_DIR=/x git push origin HEAD`,
       `echo ${github} | x"args" git push`,
-      `echo ${github} | xa\\rgs git push`,
+      String.raw`echo ${github} | xa\rgs git push`,
     ]
     const toSsh = origin(ssh)
     expect(commands.filter(command => !denied(command, toSsh))).toEqual([])
