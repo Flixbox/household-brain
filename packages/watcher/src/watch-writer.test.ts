@@ -83,6 +83,33 @@ describe('how long a failed write waits (#402)', () => {
   })
 })
 
+/** The retry count left after a write answers `answer`, for a write that had failed twice and whose wait is over. */
+const countAfter = async (answer: string) => {
+  const { gh, home } = await setUp()
+  const count = `${home}/watch-project/owner_repo/write-retries/${Bun.hash('a-write').toString(36)}`
+  await Bun.write(count, '2')
+  const old = Temporal.Now.instant().subtract({ hours: 1 }).epochMilliseconds / 1000
+  await utimes(count, old, old)
+  await run({ gh, home, script: `
+    import { attemptWrite } from '${import.meta.dir}/watch-writer'
+    await attemptWrite('a-write', async () => ${answer})` })
+  return Bun.file(count).text().catch(() => 'gone')
+}
+
+describe('the retry count (#431)', () => {
+  it('stays when the write answers that nothing was attempted', async () => {
+    expect(await countAfter('null')).toBe('2')
+  }, 30_000)
+
+  it('goes up on a failure', async () => {
+    expect(await countAfter('false')).toBe('3')
+  }, 30_000)
+
+  it('goes on a success', async () => {
+    expect(await countAfter('true')).toBe('gone')
+  }, 30_000)
+})
+
 describe('one writer (#402)', () => {
   it('the all-events watcher resolves a thread, and a failed one waits instead of being tried on the next look', async () => {
     const { calls, gh, home } = await setUp()

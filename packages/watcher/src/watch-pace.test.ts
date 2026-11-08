@@ -2,7 +2,7 @@
 import { afterAll, describe, expect, it } from 'bun:test'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { type Limits, NO_LIMITS, blockedUntil, noteLimits, pauseMs, resourceOf, stretchFor, updatedLimits } from './watch-pace'
+import { type Limits, NO_LIMITS, PACES, blockedUntil, noteLimits, pauseMs, resourceOf, stretchFor, updatedLimits } from './watch-pace'
 import { ghText } from './watch-gh'
 
 const folder = await mkdtemp(`${tmpdir()}/watch-pace-`)
@@ -58,6 +58,11 @@ describe('updatedLimits (#400)', () => {
 
   it('waits a minute after a 429 that says nothing else', () => {
     expect(after(answer('429 Too Many Requests'), true).waits.all).toBe(NOW_MS + MINUTE_MS + MARGIN_MS)
+  })
+
+  it('reads no secondary limit into the words of a call that succeeded (#457)', () => {
+    const log = `${answer('200 OK', ...budgetHeaders(0, NOW_SECONDS + 700))}\n{ "body": "secondary rate limit" }`
+    expect(after(log).waits).toEqual({ graphql: NOW_MS + 700_000 + MARGIN_MS })
   })
 
   it('keeps a secondary limit on every call, even with the budget at zero', () => {
@@ -136,6 +141,11 @@ describe('pauseMs (#400)', () => {
 
   it('keeps a minimum gap after a busy look', () => {
     expect(pauseMs({ baseMs: 60_000, busy: true, capMs: 300_000, quietLooks: 0, stretch: 1 })).toBe(10_000)
+  })
+
+  it('keeps the answers within their cap without --follow too (#457)', () => {
+    const { pauseSeconds, quietCapSeconds } = PACES.everything
+    expect(pauseMs({ baseMs: pauseSeconds * 1000, busy: false, capMs: quietCapSeconds * 1000, quietLooks: 5, stretch: 1 })).toBe(PACES.answers.quietCapSeconds * 1000)
   })
 
   it('stretches quiet and busy pauses alike', () => {
