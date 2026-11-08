@@ -81,7 +81,6 @@ const isRefused = (response: GhResponse, log: string, failed: boolean): boolean 
  * so is a retry-after with budget left.
  */
 const isPrimary = (response: GhResponse, log: string, retries: boolean): boolean => {
-  if (SECONDARY_REFUSAL.test(log)) { return false }
   return numberOf(response, 'x-ratelimit-remaining') === 0 || (!retries && (GRAPHQL_REFUSAL.test(log) || response.status === 403))
 }
 
@@ -94,7 +93,8 @@ interface Wait {
 const waitAfter = ({ failed, log, nowMs, resetMs, resource, response }: Call & { log: string, resetMs: number, resource: string, response: GhResponse }): Wait | null => {
   const retryMs = response.status >= 400 ? (numberOf(response, 'retry-after') ?? 0) * 1000 : 0
   if (retryMs <= 0 && !isRefused(response, log, failed)) { return null }
-  const primary = isPrimary(response, log, retryMs > 0) && resetMs > nowMs
+  // Only a failed call's words count: a successful answer can quote them.
+  const primary = !(failed && SECONDARY_REFUSAL.test(log)) && isPrimary(response, log, retryMs > 0) && resetMs > nowMs
   if (retryMs > 0) { return { key: primary ? resource : ALL_RESOURCES, untilMs: nowMs + retryMs } }
   return primary ? { key: resource, untilMs: resetMs } : { key: ALL_RESOURCES, untilMs: nowMs + UNNAMED_WAIT_MS }
 }
@@ -137,7 +137,7 @@ export const stretchFor = (limits: Limits, nowMs: number): number =>
 export const PACES = {
   answers: { pauseSeconds: 30, quietCapSeconds: 60 },
   /** Without `--follow`: one look at everything, which holds the answers too. */
-  everything: { pauseSeconds: 60, quietCapSeconds: 300 },
+  everything: { pauseSeconds: 60, quietCapSeconds: 60 },
   project: { pauseSeconds: 60, quietCapSeconds: 300 },
 } as const
 
