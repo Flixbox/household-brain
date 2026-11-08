@@ -26,7 +26,7 @@ const allActivity = async (prs: readonly number[], cli: string, fresh: boolean) 
  * `ACTIVITY_GH` whole, so the owner's comments still arrive while the bot is out of points. A PR that
  * neither could read is missing.
  */
-export const activitiesOf = async (prs: readonly number[], fresh = false): Promise<Map<number, Activity[]>> => {
+export const activitiesOf = async (prs: readonly number[], fresh = false, needsPending = fresh): Promise<Map<number, Activity[]>> => {
   if (GH === ACTIVITY_GH) {
     return allActivity(prs, GH, fresh)
   }
@@ -35,7 +35,7 @@ export const activitiesOf = async (prs: readonly number[], fresh = false): Promi
   const read = await allActivity(prs, GH, fresh)
   const theirs = await allActivity(prs.filter(pr => !read.has(pr)), ACTIVITY_GH, fresh)
   const withPending = ([pr, items]: [number, Activity[]]): [number, Activity[]] => [pr, addPending(items, pending.get(pr) ?? [])]
-  return new Map([...theirs, ...[...read].filter(([pr]) => !fresh || pending.has(pr))].map(entry => withPending(entry)))
+  return new Map([...theirs, ...[...read].filter(([pr]) => !needsPending || pending.has(pr))].map(entry => withPending(entry)))
 }
 
 const activityReads = changeTracker()
@@ -51,7 +51,8 @@ export const changedActivities = async (prs: readonly number[]): Promise<Map<num
   const { due, settle } = await activityReads.look(prs)
   const rest = prs.filter(pr => !due.includes(pr))
   const [full, pending] = await Promise.all([
-    activitiesOf(due, true),
+    // Fresh, but a refused pending check holds nothing back: it is asked again next look.
+    activitiesOf(due, true, false),
     perPr(rest, { cli: ACTIVITY_GH, fields: PENDING_FIELDS, parse: parseActivity, size: 50 }),
   ])
   settle(full.keys())
