@@ -6,6 +6,9 @@
  * after `pre-tool-use.command.input` in Codex 0.166), and check its answer is one Codex accepts.
  * Whether Codex runs the hook for calls code mode makes (`tools.exec_command({cmd})`) is a live
  * check, #377.
+ *
+ * Only Claude Code has `onFailure` (#393): Codex 0.166's command handler has no such field, so there a
+ * guard that times out or crashes still lets the call through.
  */
 import { describe, expect, it } from 'bun:test'
 import { isRecord, textOf } from './read'
@@ -30,11 +33,21 @@ const claudeHooks = async () => {
   return preToolUse(isRecord(file) ? file.hooks : null)
 }
 
+const handlersOf = (entry: unknown): unknown[] => (isRecord(entry) && Array.isArray(entry.hooks) ? entry.hooks : [])
+
+/** A handler without `onFailure`, the one field only Claude Code reads. */
+const withoutOnFailure = (handler: unknown) =>
+  isRecord(handler) ? Object.fromEntries(Object.entries(handler).filter(([key]) => key !== 'onFailure')) : handler
+
+/** Claude Code's entries with only what Codex reads too: the Codex manifest must match this exactly. */
+const sharedEntries = (entries: readonly unknown[]) =>
+  entries.map(entry => (isRecord(entry) ? { ...entry, hooks: handlersOf(entry).map(handler => withoutOnFailure(handler)) } : entry))
+
 /** The commands Codex runs before a Bash call: those of every entry whose matcher matches "Bash". */
 const bashCommands = (entries: readonly unknown[]) =>
   entries
     .filter(entry => isRecord(entry) && new RegExp(textOf(entry.matcher), 'u').test('Bash'))
-    .flatMap((entry): unknown[] => (isRecord(entry) && Array.isArray(entry.hooks) ? entry.hooks : []))
+    .flatMap(entry => handlersOf(entry))
     .map(hook => (isRecord(hook) && hook.type === 'command' ? textOf(hook.command) : ''))
 
 /** What Codex sends a PreToolUse hook for a shell command. */
@@ -64,7 +77,7 @@ describe('the owner-write guard as a Codex hook (#370)', () => {
   it('is registered in the Codex manifest as it is in hooks.json, matcher and command alike', async () => {
     const codex = await codexHooks()
     expect(codex).not.toEqual([])
-    expect(codex).toEqual(await claudeHooks())
+    expect(codex).toEqual(sharedEntries(await claudeHooks()))
   })
 
   it('denies a write through plain gh with an answer Codex accepts', async () => {
@@ -90,5 +103,13 @@ describe('the owner-write guard as a Codex hook (#370)', () => {
     for (const hookCommand of commands) {
       expect(runHook(hookCommand, 'gh pr view 1')).toEqual({ exitCode: 0, stdout: '' })
     }
+  })
+})
+
+describe('the owner-write guard failing in Claude Code (#393)', () => {
+  it('blocks the call when the hook times out or crashes', async () => {
+    const handlers = (await claudeHooks()).flatMap(entry => handlersOf(entry))
+    const failureSettings = handlers.map(handler => (isRecord(handler) ? handler.onFailure : null))
+    expect(failureSettings).toEqual(['block'])
   })
 })
