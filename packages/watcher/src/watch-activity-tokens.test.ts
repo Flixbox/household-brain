@@ -12,7 +12,8 @@ afterEach(async () => { await Promise.all(dirs.splice(0).map(async dir => rm(dir
  * review, as GitHub answers. FAIL names the reads that are refused (`bot-activity`, `owner-pending`).
  * LATE_SUBMIT: the owner submits the review just after the bot's second read, the last before a
  * merged PR's subscription ends (the first look's answer is read again, fresh): that read lacks it,
- * and it is no longer pending for any read after it.
+ * and it is no longer pending for any read after it. OPEN leaves the PR open. REFUSE_PENDING: the
+ * first so many pending checks are refused.
  */
 const FAKE_GH = String.raw`
   import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
@@ -36,11 +37,18 @@ const FAKE_GH = String.raw`
   const visible = who === 'owner' && !submittedLate ? [pending] : []
   const failing = (process.env.FAIL ?? '').split(',')
   const read = name => { if (failing.includes(who + '-' + name)) { process.exit(1) } }
-  const state = { author: { login: 'agent' }, closingIssuesReferences: { nodes: [] }, headRefOid: 'head7', mergeCommit: { oid: 'merge7' }, mergeable: 'MERGEABLE', state: 'MERGED', title: 'PR 7' }
+  const refusalsFile = process.env.FIXTURE_HOME + '/pending-checks'
+  const refusePending = () => {
+    const made = existsSync(refusalsFile) ? Number(readFileSync(refusalsFile, 'utf8')) : 0
+    writeFileSync(refusalsFile, String(made + 1))
+    if (made < Number(process.env.REFUSE_PENDING ?? 0)) { process.exit(1) }
+  }
+  const open = process.env.OPEN === '1'
+  const state = { author: { login: 'agent' }, closingIssuesReferences: { nodes: [] }, headRefOid: 'head7', mergeCommit: open ? null : { oid: 'merge7' }, mergeable: 'MERGEABLE', state: open ? 'OPEN' : 'MERGED', title: 'PR 7' }
   if (text.includes('pr7: pullRequest')) {
     let value = state
     if (text.includes('reviews(last:100){nodes{databaseId')) { read('activity'); if (late && who === 'bot') { writeFileSync(readsFile, String(botReads() + 1)) } value = { comments: { nodes: [comment] }, reviews: { nodes: [submitted, ...visible] } } }
-    if (text.includes('states:PENDING')) { read('pending'); value = { reviews: { nodes: visible } } }
+    if (text.includes('states:PENDING')) { read('pending'); refusePending(); value = { reviews: { nodes: visible } } }
     answer({ data: { repository: { pr7: value } } })
   }
   answer({ data: { repository: { issues: { nodes: [], pageInfo: { hasNextPage: false } } } } })
@@ -60,15 +68,15 @@ const fakeGh = async (home: string, name: string, who: string) => {
 }
 
 /** Runs a watcher subscribed to the merged PR 7; `oneLogin` gives it the owner's `gh` for both reads. */
-const runWatcher = async ({ fail = '', late = false, oneLogin = false }: { fail?: string, late?: boolean, oneLogin?: boolean } = {}) => {
+const runWatcher = async ({ fail = '', late = false, oneLogin = false, open = false, refusePending = 0, timeout = 8000 }: { fail?: string, late?: boolean, oneLogin?: boolean, open?: boolean, refusePending?: number, timeout?: number } = {}) => {
   const home = await mkdtemp(`${tmpdir()}/watch-tokens-`)
   dirs.push(home)
   await Bun.write(`${home}/fake.ts`, FAKE_GH)
   await Promise.all([fakeGh(home, 'bot', 'bot'), fakeGh(home, 'owner', 'owner')])
   // Not the first look ever: what is on the PR is news.
   await Bun.write(`${home}/state/initialized`, '')
-  const env = { ...process.env, ACTIVITY_GH: `${home}/owner`, AGENT_USAGE_PROVIDER: 'claude', CLAUDE_CODE_SESSION_ID: '', CLAUDE_CONFIG_DIR: home, CODEX_THREAD_ID: '', CODEX_WATCH_THREAD: '', FAIL: fail, FIXTURE_HOME: home, GH: `${home}/${oneLogin ? 'owner' : 'bot'}`, GH_SHARE_SECONDS: '0', LATE_SUBMIT: late ? '1' : '', OWNER: 'owner', REPO: 'owner/repo', SELF: 'agent', STATE_DIR: `${home}/state`, WATCHER_SUBSCRIPTIONS: 'pr:7', XDG_STATE_HOME: home }
-  const watcher = Bun.spawn([process.execPath, '-e', WATCHER], { env, stderr: 'pipe', stdout: 'pipe', timeout: 8000 })
+  const env = { ...process.env, ACTIVITY_GH: `${home}/owner`, AGENT_USAGE_PROVIDER: 'claude', CLAUDE_CODE_SESSION_ID: '', CLAUDE_CONFIG_DIR: home, CODEX_THREAD_ID: '', CODEX_WATCH_THREAD: '', FAIL: fail, FIXTURE_HOME: home, GH: `${home}/${oneLogin ? 'owner' : 'bot'}`, GH_SHARE_SECONDS: '0', LATE_SUBMIT: late ? '1' : '', OPEN: open ? '1' : '', OWNER: 'owner', REFUSE_PENDING: String(refusePending), REPO: 'owner/repo', SELF: 'agent', STATE_DIR: `${home}/state`, WATCHER_SUBSCRIPTIONS: 'pr:7', XDG_STATE_HOME: home }
+  const watcher = Bun.spawn([process.execPath, '-e', WATCHER], { env, stderr: 'pipe', stdout: 'pipe', timeout })
   const [output, code] = await Promise.all([new Response(watcher.stdout).text(), watcher.exited])
   const calls = (await Bun.file(`${home}/calls`).text()).split('\n').filter(Boolean)
   return { calls, code, output }
@@ -104,10 +112,16 @@ test('when the bot cannot read the activity, the owner\'s login does: their comm
   expect(fullReads(calls).some(call => call.startsWith('owner: '))).toBe(true)
 }, 30_000)
 
-test('a refused pending check holds back none of the submitted comments (#403)', async () => {
-  const { code, output } = await runWatcher({ fail: 'owner-pending' })
+test('on an open PR, a refused pending check holds back none of the submitted comments (#403)', async () => {
+  const { output } = await runWatcher({ fail: 'owner-pending', open: true, timeout: 3000 })
   expect(output).toContain('OWNER_SUBMITTED_COMMENT')
   expect(output).toContain('OWNER_SUBMITTED_REVIEW')
+}, 30_000)
+
+test('a refused pending check on the final look keeps the subscription open until it answers (#403)', async () => {
+  // The look's own read and the final read are refused; the next look's are answered.
+  const { code, output } = await runWatcher({ refusePending: 2 })
+  expect(output).toContain('OWNER_PENDING_REVIEW')
   expect(code).toBe(3)
 }, 30_000)
 
