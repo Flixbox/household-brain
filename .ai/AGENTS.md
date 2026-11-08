@@ -31,6 +31,10 @@ repository), never with the owner's account.
   plugin's PreToolUse hook (`packages/watcher/hooks/`) refuses plain `gh` writes in Claude Code. It is
   registered for Codex too, where it runs only once trusted in `/hooks`, but whether it fires for code mode's
   `exec_command` calls is unconfirmed until #377's live check: don't rely on it there yet (#370).
+  The hook catches accidents and is no boundary against every spelling (owner's pick, #389): plain
+  `gh` stays logged in as the owner because agents read with it, so a write the hook misses acts as
+  the owner. What keeps writes off that login is this rule, and `agent-gh` stopping instead of
+  falling back when it has no token. File a new bypass spelling only if agents really write it.
 - **Every pull request is assigned to the owner:** `agent-gh pr create --assignee Flixbox …`.
 - **The bot can't**, on purpose: change settings or rulesets, merge past checks, approve, cancel or
   re-run CI. Those use the owner's `gh` login, when the owner asks.
