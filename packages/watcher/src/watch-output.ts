@@ -134,6 +134,20 @@ export const claimReported = async (key: string): Promise<boolean> => claimRepor
 
 export const markReported = async (key: string): Promise<void> => markSeen(REPORTED, [key])
 
+/**
+ * Queues the event claimed under `claimed`. A print that fails gives the claim back, so the next look
+ * reports the event instead of it waiting for a restart (#498). Only then: nothing was printed yet for
+ * another poller to have missed, and the outbox takes a stable key once.
+ */
+export const queueClaimed = (claimed: string, lines: readonly string[], options: QueueOptions = {}): void => {
+  try {
+    queue(lines, options)
+  } catch (error) {
+    unwritten.delete(unwrittenKey(REPORTED, claimed))
+    throw error
+  }
+}
+
 /** Keeps the event for this round's `flush`, unless there is none or it was reported before. */
 export const report = async (event: Event | null, pr: number | null = null): Promise<void> => {
   const audience = pr === null ? {} : { pr }
@@ -143,7 +157,7 @@ export const report = async (event: Event | null, pr: number | null = null): Pro
   const [first = '', ...rest] = event.lines
   // Every CI result comes with where each open PR stands, so no approval goes unnoticed.
   const prs = !subscriptions.scoped && listsOpenPrs(event.key) ? await openPrsThisLook().then(openPrLines, () => ['Open PRs: (listing failed)']) : []
-  queue([pr === null ? first : `PR #${pr}: ${first}`, ...rest, ...prs], { ...audience, key: `event:${pr}:${event.key}`, quiet: event.quiet === true })
+  queueClaimed(event.key, [pr === null ? first : `PR #${pr}: ${first}`, ...rest, ...prs], { ...audience, key: `event:${pr}:${event.key}`, quiet: event.quiet === true })
   await markReported(event.key)
 }
 
