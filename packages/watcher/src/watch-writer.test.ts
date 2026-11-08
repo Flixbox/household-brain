@@ -40,8 +40,8 @@ const terminalLook = (state = MERGED_STATE, now = 'Temporal.Now.instant().epochM
   import { flush } from '${import.meta.dir}/watch-output'
   import { preparePr } from '${import.meta.dir}/watch-queue'
   const ends = await preparePr(7, ${state}, ${now})
-  await flush()
-  console.log(ends ? 'LOOK_ENDS' : 'LOOK_HOLDS')`
+  console.log(ends ? 'LOOK_ENDS' : 'LOOK_HOLDS')
+  await flush()`
 const ASKER = `
   import { askBotReviews } from '${import.meta.dir}/watch-bot-review'
   import { flush } from '${import.meta.dir}/watch-output'

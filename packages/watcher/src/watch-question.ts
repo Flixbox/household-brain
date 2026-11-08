@@ -4,13 +4,15 @@
  * the `GH` token, and only once GitHub says that token is a bot's: never with the owner's login. A
  * removal another watcher made first (404) is theirs to report; a failed one is reported once per head
  * and tried again with backoff. Only the writer does this (#415), and only it asks who `GH` is; a
- * subscribed watcher hears how it went from `relayWrites`.
+ * subscribed watcher hears how it went from `relayWrites`, and holds a merged or closed PR a bounded
+ * time for that (#440): ending on the same look would lose the outcome.
  */
-import { CLEAR_QUESTION_LABEL, QUESTION_LABEL, clearsQuestion, isBotLogin, questionClearedEvent, questionUncheckedEvent } from './watch-question-events'
+import { CLEAR_QUESTION_LABEL, QUESTION_LABEL, clearsQuestion, isBotLogin, questionClearedEvent, questionOutcomeKeys, questionUncheckedEvent } from './watch-question-events'
 import { GH, failedStatus } from './watch-gh'
 import { type PrState, REPO, gh } from './watch-github'
 import { at } from './watch-text'
-import { attemptWrite, reportWrite } from './watch-writer'
+import { IS_WRITER, attemptWrite, reportWrite, writerRuns } from './watch-writer'
+import { readLines, updateLines } from './watch-state'
 import { textOf } from './read'
 
 /** Whether `GH` is a bot's token, once GitHub answered. */
@@ -50,8 +52,37 @@ const removeAndReport = async (pr: number, state: PrState): Promise<boolean | nu
   return outcome === 'removed'
 }
 
+const factsOf = (state: PrState) => ({ approvedCommit: state.ownerApprovalCommit, enabled: CLEAR_QUESTION_LABEL, labelled: state.labels.includes(QUESTION_LABEL), state: state.state })
+
 /** Takes the label off PR `pr` where `clearsQuestion` says so, and reports it. */
 export const clearQuestion = async (pr: number, state: PrState): Promise<void> => {
-  const facts = { approvedCommit: state.ownerApprovalCommit, enabled: CLEAR_QUESTION_LABEL, labelled: state.labels.includes(QUESTION_LABEL), state: state.state }
-  await (clearsQuestion(facts) ? attemptWrite(`question-${pr}`, async () => removeAndReport(pr, state)) : Promise.resolve())
+  await (clearsQuestion(factsOf(state)) ? attemptWrite(`question-${pr}`, async () => removeAndReport(pr, state)) : Promise.resolve())
+}
+
+/** How long a subscribed watcher holds a finished PR for the writer's outcome: just over the writer's longest quiet pause (PACES.project, 5 min). */
+const OUTCOME_WAIT_MS = Temporal.Duration.from({ minutes: 6 }).total('milliseconds')
+const WAITS = 'question-waits'
+
+/** When this watcher first held PR `pr`, kept so a restarted watcher doesn't wait all over again. */
+const heldSince = async (pr: number, nowMs: number): Promise<number> => {
+  const held = { since: nowMs }
+  await updateLines(WAITS, lines => {
+    const known = lines.find(line => line.startsWith(`${pr} `))
+    held.since = known === undefined ? nowMs : Number(known.split(' ')[1])
+    return known === undefined ? [...lines, `${pr} ${nowMs}`] : lines
+  })
+  return held.since
+}
+
+/**
+ * Whether a subscribed watcher should stay on a merged or closed PR for the writer's word on the label
+ * (#440): only while it is still labelled and unreported, a writer is running, and the bound isn't over.
+ * Past the bound the look goes on: the all-events watcher still reports the outcome.
+ */
+export const awaitsQuestionOutcome = async (pr: number, state: PrState, nowMs: number): Promise<boolean> => {
+  if (IS_WRITER || state.state === 'OPEN' || !clearsQuestion(factsOf(state)) || !await writerRuns()) {
+    return false
+  }
+  const reported = await readLines('reported')
+  return !questionOutcomeKeys(pr, state.head).some(key => reported.includes(key)) && nowMs - await heldSince(pr, nowMs) < OUTCOME_WAIT_MS
 }

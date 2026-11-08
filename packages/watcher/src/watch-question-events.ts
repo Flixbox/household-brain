@@ -40,6 +40,10 @@ export const questionClearedEvent = ({ approved, head, pr, removed, state }: { a
   ? { key: `pr-${pr} question-cleared ${head}`, lines: [`QUESTION_CLEARED: ${because(approved, state)}, so the watcher took the \`${QUESTION_LABEL}\` label off (CLEAR_QUESTION_LABEL). Nothing to do.`] }
   : { key: `pr-${pr} question-clear-failed ${head}`, lines: [`QUESTION_CLEAR_FAILED: couldn't take the \`${QUESTION_LABEL}\` label off (it tries again, with backoff); check the GH token may write issues (labels are an issue's, also on a PR)`] })
 
+/** The keys of every outcome the writer reports for this head: any of them says it has spoken. */
+export const questionOutcomeKeys = (pr: number, head: string): string[] =>
+  ['question-cleared', 'question-clear-failed', 'question-unchecked'].map(outcome => `pr-${pr} ${outcome} ${head}`)
+
 /**
  * Where the watcher can't confirm the `GH` token is a bot's (#371): GitHub's `viewer` is a person
  * (`person`), or the question failed. The label stays; once per head, and it asks again, with backoff.
