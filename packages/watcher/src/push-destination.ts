@@ -25,6 +25,9 @@ const repositoryAt = (args: readonly string[]) => {
 const repoOption = (options: readonly string[]) => {
   const at = options.findLastIndex(word => /^--repo?(?:=|$)/u.test(word))
   const word = options[at] ?? ''
+  if (at === -1) {
+    return ''
+  }
   return word.includes('=') ? word.slice(word.indexOf('=') + 1) : (options[at + 1] ?? '')
 }
 
@@ -63,13 +66,19 @@ const pushUrls = (dir: string, args: readonly string[]) => {
   return urls.length > 0 ? urls : locationUrls(dir, remote)
 }
 
+/** GitHub's host or one of its subdomains, with DNS's optional trailing dot. */
+const isGithubHost = (hostname: string) => {
+  const host = hostname.replace(/\.$/u, '')
+  return host === 'github.com' || host.endsWith('.github.com')
+}
+
 const remoteSchemes = new Set(['file', 'git', 'git+ssh', 'ssh', 'ssh+git'])
 
 /** Whether this URL clearly doesn't go to GitHub over HTTP(S): another scheme or host, an scp-like address, or a path. */
 const goesElsewhere = (url: string) => {
   if (url.includes('://')) {
     const scheme = url.slice(0, url.indexOf('://')).toLowerCase()
-    return remoteSchemes.has(scheme) || (['http', 'https'].includes(scheme) && URL.canParse(url) && new URL(url).hostname.replace(/\.$/u, '') !== 'github.com')
+    return remoteSchemes.has(scheme) || (['http', 'https'].includes(scheme) && URL.canParse(url) && !isGithubHost(new URL(url).hostname))
   }
   return !url.includes('::')
 }

@@ -99,8 +99,11 @@ const pushReason = (dir: string) => [
   'The config is shared by every worktree of the clone and another agent may be setting it up: retry shortly, and if it stays wrong report it, rather than changing it from a worktree.',
 ].join(' ')
 
-/** Whether the line sets a variable git reads or feeds a command through xargs, either of which can change where a push goes unseen in its words. */
-const hidesDestination = (line: string) => /\bGIT_\w+=|\bxargs\b/u.test(line)
+/**
+ * Whether the line can change where a push goes unseen in its words: it sets a variable git reads, feeds a command through xargs,
+ * sources a file or moves with `pushd`/`popd`. Read with quotes and backslashes removed, as they can splice a word together.
+ */
+const hidesDestination = (line: string) => /\bGIT_\w+=|\bxargs\b|(?:^|[\s;&|(])(?:source|\.|pushd|popd)(?=[\s;&|)]|$)/u.test(line.replaceAll(/["'\\]/gu, ''))
 
 /** Why the first `git push` among these commands, the ones this line runs, that would not go out as the bot is refused, or null when there is none. */
 export const pushRefusal = (commands: readonly (readonly string[])[], cwd: string, line: string) => {
