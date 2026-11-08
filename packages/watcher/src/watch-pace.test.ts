@@ -1,3 +1,4 @@
+/* oxlint-disable import/no-nodejs-modules -- a temporary folder holds the fake gh these tests run */
 import { afterAll, describe, expect, it } from 'bun:test'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
