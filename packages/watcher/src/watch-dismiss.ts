@@ -17,17 +17,13 @@ import { CLEARED_LABEL, clearedAt, coveredByClearance } from './watch-cleared-ev
 import { OWNER, type PrState, REPO, SELF, gh, graphql, resolveThread, threadsFrom } from './watch-github'
 import { GH, ghText } from './watch-gh'
 import { report } from './watch-output'
-import { ciPassedKey } from './watch-ci-state'
+import { reportedPassed } from './watch-ci-state'
 import { readLines } from './watch-state'
 import { WATCHERS_DIR, claim, removeOlder, unclaim } from './watch-files'
 import { allSettled, textOf } from './read'
 import { actor, at, count, record, records } from './watch-text'
 
-/** Whether any attempt on `head` was reported passed. */
-export const reportedPassed = (reported: readonly string[], pr: number, head: string): boolean => {
-  const key = ciPassedKey(pr, head, 1)
-  return reported.some(line => line === key || line.startsWith(`${key} `))
-}
+export { reportedPassed } from './watch-ci-state'
 
 export const DISMISS_STALE_BOT_REVIEWS = process.env.DISMISS_STALE_BOT_REVIEWS === '1'
 
