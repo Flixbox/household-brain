@@ -144,8 +144,9 @@ export const checkSubscribedIssues = async (): Promise<void> => {
   const closed = issues.filter(issue => states.get(issue)?.state === 'CLOSED')
   // A failed final activity lookup cannot close a subscription or discard an owner's comment.
   if (closed.length === 0 || !await checkIssues(true)) { return }
+  const completed = subscriptions.endedBy(closed.map(issue => `issue:${issue}`)) ? ': subscription completed' : ''
   await Promise.all(closed.map(async issue => {
-    queue([`ISSUE_CLOSED #${issue}: subscription completed`], { issue, key: `subscription-issue-closed:${issue}` })
+    queue([`ISSUE_CLOSED #${issue}${completed}`], { issue, key: `subscription-issue-closed:${issue}` })
     await endIssue(issue)
   }))
 }

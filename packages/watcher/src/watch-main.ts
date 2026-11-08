@@ -82,7 +82,8 @@ const checkMerged = async (pr: number, mergeSha: string, items: Activity[] | und
     return
   }
   if (subscriptions.scoped) {
-    await report({ key: `pr-${pr} merged ${mergeSha}`, lines: [`MERGED: ${short(mergeSha)}; subscription completed`] }, pr)
+    const completed = subscriptions.endedBy([`pr:${pr}`]) ? '; subscription completed' : ''
+    await report({ key: `pr-${pr} merged ${mergeSha}`, lines: [`MERGED: ${short(mergeSha)}${completed}`] }, pr)
     await endPr(pr)
     await untrack(pr)
     return
