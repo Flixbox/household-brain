@@ -1,4 +1,5 @@
 import { ansiCValue, dynamic } from './shell-ansi-c'
+import { type Work, spent } from './shell-work'
 
 /** Here-documents as the owner-write guard's shell reader (shell-commands.ts) sees them (#368). */
 
@@ -139,13 +140,16 @@ const expansionUnfollowable = (rest: string) => {
   return true
 }
 
+const startsBracket = /\$(?:\\\n)*\[/uy
+
 /**
  * Whether a `$[` in double quotes starts at `from` and holds a quote or substitution: bash pairs a `"`
- * inside it, where the reader would end the string (clearing review of #391). `${…}` is #380's, in shell-braces.ts.
+ * inside it, where the reader would end the string (clearing review of #391). `${…}` is #380's, in
+ * shell-braces.ts. Each read is charged to the budget, as many `$[` would make it quadratic.
  */
-export const quoteInExpansion = (text: string, from: number) => {
-  const rest = text[from] === '$' ? text.slice(from).replaceAll('\\\n', '') : ''
-  return rest.startsWith('$[') && expansionUnfollowable(rest)
+export const quoteInExpansion = (text: string, from: number, work: Work) => {
+  startsBracket.lastIndex = from
+  return startsBracket.test(text) && (spent(work, text.slice(from)) || expansionUnfollowable(text.slice(from).replaceAll('\\\n', '')))
 }
 
 const insideEnclosure = (open: Enclosures) => open.braces > 0 || open.brackets > 0

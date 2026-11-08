@@ -27,6 +27,7 @@ interface Scan extends Enclosures {
   /** The word being read, null between words. */
   word: string | null
   words: string[]
+  work: Work
 }
 
 const endWord = (scan: Scan) => {
@@ -78,14 +79,18 @@ const substitution = (scan: Scan, text: string, at: number): [string, number] =>
 
 const startsSubstitution = (text: string, at: number) => text[at] === '`' || text.startsWith('$(', at)
 
-/** What the guard can't read for certain: a command word the shell fills in, so the whole command line is refused. */
+/**
+ * What the guard can't read for certain, as a `<<` inside an open `[` or `${` (a shift or a here-document, and read
+ * wrongly either hides what follows, #385): a command word the shell fills in, so the whole line is refused.
+ */
 const refuse = (scan: Scan, text: string, at: number) => {
-  scan.commands.push([dynamic + (/^\S*/u.exec(text.slice(at))?.[0] ?? '')])
+  scan.commands.push([dynamic + (/^\S{0,40}/u.exec(text.slice(at))?.[0] ?? '')])
+  return at + 2
 }
 
 /** One piece of a double-quoted string: its text and where the next piece starts. */
 const doubleQuotedPart = (scan: Scan, text: string, at: number): [string, number] => {
-  if (quoteInExpansion(text, at)) {
+  if (quoteInExpansion(text, at, scan.work)) {
     refuse(scan, text, at)
   }
   if (text[at] === '\\') {
@@ -197,12 +202,6 @@ const noteHeredoc = (scan: Scan, match: RegExpExecArray) => {
   }
 }
 
-/** A `<<` there may be a shift, and read either way wrongly it hides what follows (a quote in a real here-document's body, say): refused (#385). */
-const refuseUnsureShift: Reader = (scan, text, at) => {
-  refuse(scan, text, at)
-  return at + 2
-}
-
 /** `<<<`: a word of its own, so the word after it, attached or not and even empty, is the next word; no body follows on the next lines. */
 const hereString: Reader = (scan, _text, at) => {
   endWordBeforeRedirection(scan)
@@ -270,7 +269,7 @@ const readerRules: readonly (readonly [Test, Reader])[] = [
   [(_scan, text, at) => text[at] === ' ' || text[at] === '\t', blank],
   [(_scan, text, at) => text[at] === '\n', newline],
   [(_scan, text, at) => opensHereString(text, at), hereString],
-  [unsureInEnclosure, refuseUnsureShift],
+  [unsureInEnclosure, refuse],
   [(_scan, text, at) => opensHeredoc(text, at), heredocOpen],
   [(_scan, text, at) => text[at] === '<' || text[at] === '>', redirect],
   [(scan, text, at) => scan.word === null && text.startsWith('((', at), doubleParen],
@@ -290,7 +289,7 @@ export const scanned = (text: string, readNested: (inner: string) => string[][],
   if (spent(work, text)) {
     return unreadableLine()
   }
-  const scan: Scan = { braces: 0, brackets: 0, commands: [], heredocs: [], nested: [], word: null, words: [] }
+  const scan: Scan = { braces: 0, brackets: 0, commands: [], heredocs: [], nested: [], word: null, words: [], work }
   let at = 0
   while (at < text.length) {
     at = readerAt(scan, text, at)(scan, text, at)
