@@ -33,6 +33,13 @@ describe('reportedPassed', () => {
     expect(green(passed(9), failed(10))).toBe(false)
   })
 
+  it('lets the later line win a tie, as when a new run on the head starts again at attempt 1 (#430)', () => {
+    expect(green(failed(1), passed(1))).toBe(true)
+    expect(green(passed(1), failed(1))).toBe(false)
+    expect(green(failed(2), passed(2))).toBe(true)
+    expect(green(passed(2), failed(2))).toBe(false)
+  })
+
   it('ignores a failure on another head or PR', () => {
     expect(green(passed(1), failed(2, OTHER))).toBe(true)
     expect(green(passed(1), `pr-13 ci-failed ${HEAD} 2`)).toBe(true)
