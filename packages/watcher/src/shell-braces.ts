@@ -13,7 +13,7 @@ const unfollowableBrace = /\$\{[^}]*(?:["'\\`]|\$[([{])/u
 const withoutContinuations = (text: string) => text.replaceAll('\\\n', '')
 
 /** Whether a command line has a `${…}` the guard can't tell the end of. */
-export const hasUnfollowableBrace = (text: string) => unfollowableBrace.test(withoutContinuations(text))
+const hasUnfollowableBrace = (text: string) => unfollowableBrace.test(withoutContinuations(text))
 
 /** A text with everything taken off that could hide what follows: quotes, escapes, `#` (a comment) and `<<` (a here-document). */
 const flattened = (text: string) => text.replaceAll(/["'\\#]/gu, '').replaceAll('<<', '  ')
@@ -23,7 +23,7 @@ const flattened = (text: string) => text.replaceAll(/["'\\#]/gu, '').replaceAll(
  * too little. Read twice, as a backslash before a newline joins the lines (`g\` and `h`), except
  * in a comment or after another backslash, where the newline ends the command.
  */
-export const flatReadings = (text: string) => [flattened(withoutContinuations(text)), flattened(text)]
+const flatReadings = (text: string) => [flattened(withoutContinuations(text)), flattened(text)]
 
 /**
  * Whether a flat reading names plain `gh` anywhere (`agent-gh` is no match), also split over lines:
@@ -31,7 +31,7 @@ export const flatReadings = (text: string) => [flattened(withoutContinuations(te
  * joined. Flattening loses what was one argument, as the script of `bash -c "gh pr close 1"`, so a
  * mention has to be enough.
  */
-export const namesGh = (reading: string) => /(?<![\w.-])g\n*h(?![\w-])/u.test(reading)
+const namesGh = (reading: string) => /(?<![\w.-])g\n*h(?![\w-])/u.test(reading)
 
 /** A flat reading and its substitutions, which have nothing in them to flatten again. */
 const scannedFlat = (text: string, work: Work): string[][] => scanned(text, inner => scannedFlat(inner, work), work)
