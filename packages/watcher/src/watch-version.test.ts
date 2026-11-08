@@ -5,6 +5,12 @@ describe('codeVersion on the real watcher (#506)', () => {
   it('can tell which files the watcher runs: an import it can\'t follow would stop it on every change again', async () => {
     expect(await codeVersion()).toStartWith('files ')
   })
+
+  it('counts the files watch-project.ts reaches only through its dynamic imports (#517)', async () => {
+    const version = await codeVersion()
+    expect(version).toContain('src/watch-version.ts:')
+    expect(version).toContain('src/watch-main.ts:')
+  })
 })
 
 describe('outdatedLine (#265)', () => {
