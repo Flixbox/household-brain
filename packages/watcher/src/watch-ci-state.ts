@@ -13,11 +13,11 @@ interface RunResult {
 export const ciResultKey = (outcome: 'passed' | 'failed', { pr, sha }: { pr: number, sha: string }, { attempt, id }: { attempt: number, id: number }): string =>
   `pr-${pr} ci-${outcome} ${sha} ${id} ${attempt}`
 
-const RESULT_LINE = /^pr-(\d+) ci-(passed|failed) (\S+)((?: \d+)*)$/u
+const RESULT_LINE = /^pr-(?<pr>\d+) ci-(?<outcome>passed|failed) (?<sha>\S+)(?<numbers>(?: \d+)*)$/u
 
 /** A result line, in either form: `<run> <attempt>`, or from before the run id just `[<attempt>]`. */
 const resultOf = (line: string): RunResult[] => {
-  const [, pr = '', outcome = '', sha = '', numbers = ''] = RESULT_LINE.exec(line) ?? []
+  const { numbers = '', outcome = '', pr = '', sha = '' } = RESULT_LINE.exec(line)?.groups ?? {}
   if (pr === '') {
     return []
   }
@@ -33,7 +33,7 @@ const isOlder = (result: RunResult, next: RunResult): boolean =>
  * start again at 1 (#486). Among lines from before the run id, the later one wins a tie (#430).
  */
 export const reportedPassed = (reported: readonly string[], pr: number, head: string): boolean => {
-  const results = reported.flatMap(resultOf).filter(result => result.pr === String(pr) && result.sha === head)
+  const results = reported.flatMap(line => resultOf(line)).filter(result => result.pr === String(pr) && result.sha === head)
   const latest = results.reduce<RunResult | null>((found, result) => (!found || isOlder(found, result) ? result : found), null)
   return latest?.outcome === 'passed'
 }
