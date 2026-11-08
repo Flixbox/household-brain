@@ -8,7 +8,7 @@ import { exists, readLines, rememberPr, subscriptions, updateLines, writeLines }
 import { awaitsQuestionOutcome, clearQuestion } from './watch-question'
 import { GH } from './watch-gh'
 import { relayWrites } from './watch-writer'
-import { report } from './watch-output'
+import { report, reportedLines } from './watch-output'
 import { at, record } from './watch-text'
 
 /** A PR that left the queue: nothing to say when it merged; still open, it fell off. */
@@ -70,7 +70,7 @@ export const checkNotQueued = async (pr: number, state: PrState): Promise<void> 
     return after.lines
   })
   // A fresh state that can't be read reports nothing: the next look asks again.
-  const reported = (await readLines('reported')).includes(notQueuedKey(pr, state.head))
+  const reported = (await reportedLines()).includes(notQueuedKey(pr, state.head))
   const id = found.overdue && !reported ? await stillWaiting(pr, state.head).catch(() => null) : null
   await report(id === null ? null : notQueuedEvent({ gh: GH, head: state.head, id, pr }), pr)
 }

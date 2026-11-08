@@ -11,7 +11,7 @@ import { agentUsageText, readAgentUsage } from './agent-usage'
 import { type Event, type OpenPr, answerFirst, clockTime, listsOpenPrs, openPrLines, reminderLines, stamped } from './watch-events'
 import { lookupNews, lookups } from './watch-gh'
 import { REPO, endOpenPrsLook, openPrsThisLook } from './watch-open-prs'
-import { addLine, appendLines, askedBots, oneAtATime, readLines, subscriptions, writeLines } from './watch-state'
+import { appendLines, askedBots, claimReportedLine, oneAtATime, readLines, subscriptions, writeLines } from './watch-state'
 import { awaitsBotReview } from './watch-bot-review-events'
 import { codeVersion, outdatedLine, startedOn } from './watch-version'
 import { postedFrom, shownUsage, usageDue } from './watch-usage'
@@ -32,10 +32,9 @@ const eventKeys = new WeakMap<readonly string[], string>()
 const printed = { any: false }
 
 /**
- * An event is recorded as reported when it is found, before the round prints it. So a round that
- * ends early (an error, a stop signal: both end in `exit`) still prints what it found, rather than
- * leaving events recorded but never shown. Synchronously: an exit handler can't wait. A seen file
- * written through `markSeen` isn't written on that path, so such an event may come again next run.
+ * A round that ends early (an error, a stop signal: both end in `exit`) still prints what it found.
+ * Synchronously: an exit handler can't wait. What waits for the print through `afterDelivery` isn't
+ * written on that path, so such an event may come again next run: twice rather than never (#435, #482).
  */
 const printFound = () => {
   for (const lines of answerFirst(found)) {
@@ -73,6 +72,11 @@ const writeMarks = async (): Promise<void> => {
   await Promise.all(afterPrint.splice(0).map(async work => work()))
 }
 
+/** Runs `write` once the events queued so far are printed: now when following, at the round's print otherwise. */
+const afterDelivery = async (write: () => Promise<void>): Promise<void> => {
+  await (FOLLOW ? write() : Promise.resolve(afterPrint.push(write)))
+}
+
 export const isUnwritten = (file: string, key: string): boolean => unwritten.has(unwrittenKey(file, key))
 
 /**
@@ -87,20 +91,60 @@ export const markSeen = async (file: string, keys: readonly string[], then: () =
     await then()
     for (const key of held) { unwritten.delete(key) }
   }
-  await (FOLLOW ? write() : Promise.resolve(afterPrint.push(write)))
+  await afterDelivery(write)
 }
+
+/** Whole-file states waiting for their print, so a second look of the round compares with them. */
+const unwrittenFiles = new Map<string, readonly string[]>()
+
+/** Replaces the state file `file` with `lines` once the events just queued are printed (#482). Queue the events first. */
+export const writeDelivered = async (file: string, lines: readonly string[]): Promise<void> => {
+  unwrittenFiles.set(file, lines)
+  await afterDelivery(async () => {
+    await writeLines(file, lines)
+    if (unwrittenFiles.get(file) === lines) { unwrittenFiles.delete(file) }
+  })
+}
+
+/** A file written through `writeDelivered`, with what still waits for its print. */
+export const deliveredLines = async (file: string): Promise<readonly string[]> => unwrittenFiles.get(file) ?? readLines(file)
+
+const REPORTED = 'reported'
+const heldReported = () => [...unwritten].filter(key => key.startsWith(`${REPORTED} `)).map(key => key.slice(REPORTED.length + 1))
+
+/** What counts as reported: the file, and what was claimed and waits for its print (#482). */
+export const reportedLines = async (): Promise<string[]> => {
+  // Held first: a key written while the file is read is then in one of them at least.
+  const held = heldReported()
+  const lines = await readLines(REPORTED)
+  return [...lines, ...held.filter(key => !lines.includes(key))]
+}
+
+/**
+ * Claims `key` for this watcher unless it was reported before; true when it is news. Checked and held
+ * in one step, so two pollers finding the same event report it once. The caller queues the event and
+ * then records it with `markReported`, so a crash before the print reports it again (#482).
+ * A CI result recorded before its key held the run id isn't news (#486).
+ */
+export const claimReported = async (key: string): Promise<boolean> => claimReportedLine(key, () => {
+  if (isUnwritten(REPORTED, key)) { return false }
+  unwritten.add(unwrittenKey(REPORTED, key))
+  return true
+})
+
+export const markReported = async (key: string): Promise<void> => markSeen(REPORTED, [key])
 
 /** Keeps the event for this round's `flush`, unless there is none or it was reported before. */
 export const report = async (event: Event | null, pr: number | null = null): Promise<void> => {
-  // Checked and recorded in one step: two pollers finding the same event report it once.
   const audience = pr === null ? {} : { pr }
-  if (!event || !subscriptions.accepts({ ...audience, quiet: event.quiet === true }) || !await addLine('reported', event.key)) {
+  if (!event || !subscriptions.accepts({ ...audience, quiet: event.quiet === true }) || !await claimReported(event.key)) {
     return
   }
   const [first = '', ...rest] = event.lines
   // Every CI result comes with where each open PR stands, so no approval goes unnoticed.
   const prs = !subscriptions.scoped && listsOpenPrs(event.key) ? await openPrsThisLook().then(openPrLines, () => ['Open PRs: (listing failed)']) : []
   queue([pr === null ? first : `PR #${pr}: ${first}`, ...rest, ...prs], { ...audience, key: `event:${pr}:${event.key}`, quiet: event.quiet === true })
+  await markReported(event.key)
 }
 
 /** The reminders for the open PRs, holding auto-merge for those that wait on a review bot asked for or reviewing (#299, #324). */

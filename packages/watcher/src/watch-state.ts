@@ -25,6 +25,7 @@
  * remembers in a folder of its own, by its WATCHER_ID.
  */
 import { Subscription } from './watch-subscription-model'
+import { adoptOldCiKey } from './watch-ci-state'
 import { REPO } from './watch-github'
 import { WATCHERS_DIR, removeOlder, writeWhole } from './watch-files'
 import { hasText, ignoreFailure } from './read'
@@ -118,6 +119,23 @@ export const addLine = async (name: string, line: string): Promise<boolean> => o
   }
   await write(name, [...lines, line])
   return true
+})
+
+/**
+ * Whether the report line `key` is news, with `claim` deciding in the same step: no if the file has
+ * it, or has it in its form from before the run id, which it then takes over (#486).
+ */
+export const claimReportedLine = async (key: string, claim: () => boolean): Promise<boolean> => oneAtATime('reported', async () => {
+  const lines = await readLines('reported')
+  if (lines.includes(key)) {
+    return false
+  }
+  const adopted = adoptOldCiKey(lines, key)
+  if (adopted) {
+    await write('reported', adopted)
+    return false
+  }
+  return claim()
 })
 
 /**
