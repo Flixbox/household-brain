@@ -1,13 +1,13 @@
 /* oxlint-disable eslint/no-await-in-loop -- each poller's looks run one after another, on purpose */
 /** The project watcher's looks, started by watch-project.ts once it has read which code it runs (#265). */
-import { type Activity, FOLLOW_NEWER, type MainRun, type Run, cancelledDeployEvent, mainRunEvent, queueCommand, replacementCandidates, runEvent } from './watch-events'
-import { type PrState, REPO, containsCommit, jobLines, mainAhead, mainHead, mainRuns, newestMainRun, prStates, runOf } from './watch-github'
+import { type Activity, mainRunEvent, queueCommand } from './watch-events'
+import { type PrState, REPO, mainAhead, mainHead, newestMainRun, prStates } from './watch-github'
+import { checkRun } from './watch-ci-runs'
 import { APPROVED_DRAFT_NOTE, checkApproval, resolveAsked } from './watch-approval'
 import { FOLLOW, checkCode, finishSubscriptions, flush, queue, quiet, report, reportLookups, reportUsage } from './watch-output'
-import { addLine, endPr, readLines, rememberPr, start, startSubscriptions, subscriptions, updateLines, writeLines } from './watch-state'
+import { addLine, endPr, readLines, start, startSubscriptions, subscriptions, updateLines, writeLines } from './watch-state'
 import { activitiesOf, checkActivity as checkPrActivity, checkTrackedActivity, watchedPrs } from './watch-activity'
-import { checkNotQueued, checkQueue } from './watch-queue'
-import { clearQuestion } from './watch-question'
+import { checkQueue, preparePr } from './watch-queue'
 import { checkIssueStates, checkIssues, checkSubscribedIssues } from './watch-issues'
 import { allSettled, hasText, ignoreFailure } from './read'
 
@@ -34,51 +34,6 @@ const checkActivity = async (pr: number, items: Activity[] | undefined): Promise
   const read = await checkPrActivity(pr, items)
   round.complete &&= read
   return read
-}
-
-/** A finished or slow CI run of `sha`: a PR's head, or a merged PR's commit on main (`deploy`). */
-const checkRun = async (pr: number, sha: string, label: 'pr' | 'deploy'): Promise<void> => {
-  const run = await runOf(sha).catch(() => null)
-  // Jobs that can't be read yet: the result waits a look rather than coming out without them.
-  const jobs = run ? await jobLines(run.id).catch(() => null) : null
-  if (!run || !jobs) {
-    return
-  }
-  const outcome = runEvent({ jobs, label, limitSeconds: LIMIT_SECONDS, pr, repo: REPO, run, sha })
-  if (outcome !== FOLLOW_NEWER) {
-    await report(outcome, pr)
-    return
-  }
-  await followNewer({ jobs, pr, run, sha })
-}
-
-/**
- * The deploy job keeps at most one deploy waiting: a newer merge cancels an older one still waiting,
- * and the newer run deploys this commit too. Follow a newer run on main whose commit contains this
- * one, one that passed or still runs before any other (#270); without one, it is a failure. A question
- * that fails reports nothing: the next look asks again.
- */
-const followNewer = async ({ jobs, pr, run, sha }: { jobs: string[], pr: number, run: Run, sha: string }): Promise<void> => {
-  const runs = await mainRuns().catch(() => null)
-  const replacement = runs ? await firstContaining(replacementCandidates(run, sha, runs), sha) : UNKNOWN
-  if (replacement === UNKNOWN) {
-    return
-  }
-  await (replacement ? checkRun(pr, replacement.sha, 'deploy') : report(cancelledDeployEvent({ jobs, pr, run, sha }), pr))
-}
-
-/** A question to GitHub that failed: the next look asks again. */
-const UNKNOWN = 'unknown'
-
-/** The first of the runs whose commit contains `sha`: null when none does. */
-const firstContaining = async (candidates: readonly MainRun[], sha: string): Promise<MainRun | null | typeof UNKNOWN> => {
-  for (const candidate of candidates) {
-    const contains = await containsCommit(candidate.sha, sha).catch(() => UNKNOWN)
-    if (contains !== false) {
-      return contains === UNKNOWN ? UNKNOWN : candidate
-    }
-  }
-  return null
 }
 
 const checkMain = async (): Promise<void> => {
@@ -131,7 +86,7 @@ const checkMerged = async (pr: number, mergeSha: string, items: Activity[] | und
     return
   }
   const deployed = (await readLines('reported')).some(line => line.startsWith(`pr-${pr} deployed `))
-  await (deployed ? untrack(pr) : checkRun(pr, mergeSha, 'deploy'))
+  await (deployed ? untrack(pr) : checkRun({ label: 'deploy', limitSeconds: LIMIT_SECONDS, pr, sha: mergeSha }))
 }
 
 const checkClosed = async (pr: number, items: Activity[] | undefined): Promise<void> => {
@@ -165,15 +120,8 @@ const checkOpen = async (pr: number, state: PrState, items: Activity[] | undefin
   // Before the merge checks, so a thread resolved now no longer blocks the merge.
   await resolveAsked(pr, state)
   await (reviewNews ? checkReview(pr, state) : Promise.resolve())
-  await checkRun(pr, state.head, 'pr')
+  await checkRun({ label: 'pr', limitSeconds: LIMIT_SECONDS, pr, sha: state.head })
   await (reviewNews ? checkApproval(pr, state).then(async () => { if (!subscriptions.scoped) { await checkMoved(pr, state.head) } }) : Promise.resolve())
-}
-
-const preparePr = async (pr: number, state: PrState): Promise<boolean> => {
-  await rememberPr(pr, state.closingIssues ?? [], state.state === 'OPEN')
-  const selected = subscriptions.accepts({ pr })
-  if (selected) { await checkNotQueued(pr, state) }
-  return selected
 }
 
 const checkPr = async (pr: number, state: PrState | undefined, items: Activity[] | undefined): Promise<void> => {
@@ -182,8 +130,6 @@ const checkPr = async (pr: number, state: PrState | undefined, items: Activity[]
     return
   }
   if (!await preparePr(pr, state)) { return }
-  // Approved, merged or closed: it no longer waits on the owner (#371).
-  await clearQuestion(pr, state)
   if (state.state === 'MERGED') {
     await checkMerged(pr, state.mergeSha, items)
     return

@@ -1,5 +1,11 @@
 /** What a PR's CI comes to, for the open-PR list and its reminders (watch-events.ts), and NOT_QUEUED (watch-queue-events.ts). */
 
+/** A passed run's report line (#401): a later attempt has its own, so a rerun that passes reports too. */
+export const ciPassedKey = (pr: number, sha: string, attempt: number): string => {
+  const key = `pr-${pr} ci-passed ${sha}`
+  return attempt > 1 ? `${key} ${attempt}` : key
+}
+
 interface HeadRun {
   conclusion: string
   status: string
