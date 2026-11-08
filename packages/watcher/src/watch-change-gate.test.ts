@@ -73,14 +73,14 @@ const following = `
 const oneLook = `await import('${import.meta.dir}/watch-project')`
 
 /** Runs the watcher against the fake `gh` until it exits by itself. */
-const run = async (script: string, settings: Record<string, string>) => {
+const run = async (script: string, settings: Record<string, string>, timeout = 15_000) => {
   const home = await mkdtemp(`${tmpdir()}/watch-gate-`)
   dirs.push(home)
   await Bun.write(`${home}/fake.ts`, FAKE_GH)
   await Bun.write(`${home}/gh`, `#!/bin/sh\nexec "${process.execPath}" "${home}/fake.ts" "$@"\n`)
   await Bun.spawn(['chmod', '+x', `${home}/gh`]).exited
   const env = { ...process.env, ACTIVITY_GH: `${home}/gh`, AGENT_USAGE_PROVIDER: 'claude', CLAUDE_CODE_SESSION_ID: '', CLAUDE_CONFIG_DIR: home, CODEX_THREAD_ID: '', CODEX_WATCH_THREAD: '', FIXTURE_HOME: home, GH: `${home}/gh`, GH_SHARE_SECONDS: '0', OWNER: 'owner', REPO: 'owner/repo', SELF: 'agent', STATE_DIR: `${home}/state`, WATCHER_SUBSCRIPTIONS: '', XDG_STATE_HOME: home, ...settings }
-  const watcher = Bun.spawn([process.execPath, '-e', script], { env, stderr: 'pipe', stdout: 'pipe', timeout: 15_000 })
+  const watcher = Bun.spawn([process.execPath, '-e', script], { env, stderr: 'pipe', stdout: 'pipe', timeout })
   const [output, code] = await Promise.all([new Response(watcher.stdout).text(), watcher.exited])
   const calls = (await Bun.file(`${home}/calls`).text()).split('\n').filter(Boolean)
   return { calls, code, output }
@@ -93,8 +93,6 @@ test('a PR that did not change is not read in full, yet its pending review and C
   expect(quiet.filter(call => call.includes('reviewThreads(') || call.includes('reviews(last:'))).toEqual([])
   expect(output).toContain('OWNER_PENDING')
   expect(output).toContain('CI_PASSED')
-  // A resolved thread stays resolved in what the watcher remembers: no second mutation.
-  expect(calls.filter(call => call.includes('resolveReviewThread'))).toHaveLength(1)
   expect(code).toBe(3)
 }, 30_000)
 
@@ -111,3 +109,9 @@ test('a PR is due when never read, not in the gate, changed, or read too long ag
   expect(duePrs({ known, now: 100, prints, prs: [1, 2, 3, 4], refreshMs: 1000 })).toEqual([2, 3, 4])
   expect(duePrs({ known, now: 1000, prints, prs: [1, 5], refreshMs: 1000 })).toEqual([1, 5])
 })
+
+test('a thread the watcher resolved is not resolved again from what it remembers (#404)', async () => {
+  // The all-events watcher is the one that writes; it never exits by itself, so it is stopped.
+  const { calls } = await run(following, { CI_DONE_AT: '0' }, 4000)
+  expect(calls.filter(call => call.includes('resolveReviewThread'))).toHaveLength(1)
+}, 30_000)
