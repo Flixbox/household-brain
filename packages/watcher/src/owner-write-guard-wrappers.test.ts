@@ -39,6 +39,35 @@ describe('ownerWrite behind a wrapper stays within the work budget (#434)', () =
     expect(ownerWrite(`sudo -u x nice -n 10 gh pr view 1 ${files(500)}`)).toBeNull()
   }, testTimeoutMs)
 
+  it('lets a file list too long to charge per start run behind a wrapper, quickly (#456)', () => {
+    const { found, ms } = timed(`xargs -n1 ls ${files(6000)}`)
+    expect(found).toBeNull()
+    expect(ms).toBeLessThan(boundMs)
+  }, testTimeoutMs)
+
+  // One line per kind of command the guard reads further: a kind left out of what a wrapper's starts are kept for would go unseen here (#456).
+  it.each([
+    'gh issue close 1',
+    '"$X"',
+    'xargs gh',
+    "bash -c 'gh issue close 1'",
+    "eval 'gh issue close 1'",
+    "env -S 'gh issue close 1'",
+    "flock x -c 'gh issue close 1'",
+    "script -c 'gh issue close 1'",
+    "sh <<< 'gh issue close 1'",
+    "source /dev/stdin <<< 'gh issue close 1'",
+    ". /dev/stdin <<< 'gh issue close 1'",
+    "awk 'gh issue close 1'",
+    "python3 -c 'gh issue close 1'",
+    "perl -e 'gh issue close 1'",
+    "ruby -e 'gh issue close 1'",
+    "node -e 'gh issue close 1'",
+    "make -f - <<< 'gh issue close 1'",
+  ])('still finds %s after a file list behind a wrapper', command => {
+    expect(ownerWrite(`timeout 60 ${files(200)} ${command}`)).not.toBeNull()
+  }, testTimeoutMs)
+
   it('still finds a write at the end of a long command behind a wrapper', () => {
     expect(ownerWrite(`env ${files(500)} gh issue close 1`)).not.toBeNull()
   }, testTimeoutMs)
