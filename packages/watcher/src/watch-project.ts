@@ -43,7 +43,7 @@
  *                                    took the label off; READY_TO_MERGE and its reminder then wait for that review
  *                                    (or for one in progress), and only then. BOT_REVIEW_SKIPPED: the bot reviewed
  *                                    the PR or was asked already, so it isn't asked again. BOT_REVIEW_FAILED: the
- *                                    comment failed (it tries again on every look, the label stays)
+ *                                    comment failed (it tries again with backoff, the label stays)
  *   PR #<n>: THREAD_RESOLVED         the watcher resolved a review thread whose last comment, from anyone,
  *                                    starts `Resolved: <reason>` (#279), with its `GH` token; agents never
  *                                    resolve threads themselves. THREAD_RESOLVE_FAILED: it couldn't (it
@@ -65,6 +65,8 @@
  *   WATCHER_ERROR                    a look failed (e.g. a state file stayed locked); it goes on with the next
  *   WATCHER_OUTDATED                 its code changed in its checkout after it started (#265); it exits:
  *                                    start it again
+ *   NO_WRITER                        a subscribed watcher: no all-events watcher has looked for a while (#432), so
+ *                                    nothing resolves threads or readies approved drafts; once per absence
  *   LOOKUPS_FAILING / LOOKUPS_RECOVERED  no `gh` call has succeeded for minutes (on every look while it
  *                                    lasts), or they succeed again (#253)
  *   Usage (<provider>): session <n>% used (<m>% left, resets …), week <n>% used (<m>% left, resets …)
