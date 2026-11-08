@@ -96,6 +96,22 @@ export const checkTrackedActivity = async (): Promise<void> => {
 
 const MERGED_HOURS = Number(process.env.MERGED_HOURS ?? 3)
 
+/** Whether `hours` can be taken off a time: Temporal throws on anything but a whole number in its range. */
+const canGoBack = (hours: number): boolean => {
+  try {
+    Temporal.Now.instant().subtract({ hours })
+    return hours >= 0
+  } catch {
+    return false
+  }
+}
+
+// Temporal throwing in a look would skip every round in silence (#460).
+if (!canGoBack(MERGED_HOURS)) {
+  process.stderr.write('MERGED_HOURS must be a whole number from 0\n')
+  process.exit(64)
+}
+
 const byNumber = (first: number, second: number) => first - second
 
 /** Whether a closing reference's PR merged within MERGED_HOURS. */
