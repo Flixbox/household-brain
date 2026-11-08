@@ -22,6 +22,7 @@ import { isRecord, textOf } from './read'
 import { commandsOf } from './shell-braces'
 import { withoutMarks } from './shell-ansi-c'
 import { isDynamic, plainWord } from './shell-commands'
+import { redirection, withoutRedirections } from './shell-redirections'
 import { baseName, isGh, programCommands } from './shell-interpreters'
 import { type Work, charged, newWork, unreadableLine } from './shell-work'
 import { commandsFrom, scriptFlagRunners, shell, stdinRunners } from './owner-write-wrappers'
@@ -42,9 +43,6 @@ const methodFlags = new Set(['--method', '-X'])
 
 /** Shell keywords that may stand before a command. */
 const keywords = new Set(['!', 'do', 'elif', 'else', 'if', 'then', 'until', 'while', '{', '}'])
-
-/** A redirection: its operator, and its target when attached (`>out`, `2>/dev/null`, `&>log`). */
-const redirection = /^\d*(?:&>>?|>>?|<{1,3}|>&|<&|>\|)(?<target>.*)$/su
 
 /** A here-string, or a here-document's body as shell-commands.ts hands it over. */
 const hereString = /^\d*<<<(?<text>.*)$/su
@@ -163,10 +161,6 @@ const leadingLength = (word: string) => {
   return target === '' ? 2 : 1
 }
 
-/** A command's arguments without its redirections (`>out`, `2>&1`, `< in`), which the command never sees. */
-const withoutRedirections = (words: readonly string[]) =>
-  words.filter((word, at) => !redirection.test(word) && redirection.exec(words[at - 1] ?? '')?.groups?.target !== '')
-
 /** Where the command itself starts: after variable assignments, keywords and redirections. */
 const commandStart = (words: readonly string[]) => {
   let at = 0
@@ -278,7 +272,7 @@ export const verdict = (input: unknown) => {
     return denial(writeReason(found))
   }
   const cwd = isRecord(input) ? textOf(input.cwd) : ''
-  const refusal = pushRefusal(runCommands(command, newWork()), cwd === '' ? process.cwd() : cwd)
+  const refusal = pushRefusal(runCommands(command, newWork()), cwd === '' ? process.cwd() : cwd, command)
   return refusal === null ? null : denial(refusal)
 }
 
