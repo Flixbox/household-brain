@@ -74,13 +74,19 @@ const pagesFrom = async (rest: Rest, path: string, page: number): Promise<Json[]
 export const readSince = async (rest: Rest, base: string, cursor: string | null): Promise<Json[][]> =>
   cursor === null ? [await pageOf(rest, listPath(base, null), 1)] : pagesFrom(rest, listPath(base, cursor), 1)
 
+/** The newest update on a page; null on an empty one. */
+const newestOn = (page: readonly Json[]): string | null =>
+  page.map(item => textOf(item.updated_at)).reduce<string | null>((newest, updated) => (newest === null || updated > newest ? updated : newest), null)
+
 /**
- * The cursor after a read: the newest update on the first page, never earlier than it was. Only the
- * first page, as a list that shifted while it was paged can skip an item at a page's edge, and a
- * cursor past that item would lose it: the rest of the list is simply read again next round.
+ * The cursor after a read: the newest update on the first page that moves it, never earlier than it
+ * was. Not the last page, as a list that shifted while it was paged can skip an item at a page's
+ * edge, and a cursor past that item would lose it: the rest of the list is simply read again next
+ * round. A later page only when the first moves nothing, a burst filling the overlap, which would
+ * otherwise hold the cursor where it is for good.
  */
 export const nextCursor = (cursor: string | null, pages: readonly Json[][]): string | null =>
-  (pages[0] ?? []).map(item => textOf(item.updated_at)).reduce<string | null>((newest, updated) => (newest === null || updated > newest ? updated : newest), cursor)
+  pages.map(page => newestOn(page)).find(newest => newest !== null && (cursor === null || newest > cursor)) ?? cursor
 
 /** Whether something written at `created` is news to a read from `cursor`: an old one that only now came up isn't. */
 const isNew = (created: unknown, cursor: string | null): boolean => cursor === null || textOf(created) >= askedSince(cursor)
