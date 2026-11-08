@@ -7,7 +7,7 @@ import { describe, expect, it } from 'bun:test'
 import { isRecord, textOf } from './read'
 
 const packagesRoot = `${import.meta.dir}/../..`
-const manifestPaths = new Bun.Glob('*/{.claude-plugin/plugin.json,.codex-plugin/plugin.json,hooks/hooks.json}')
+const manifestPaths = new Bun.Glob('*/{.claude-plugin,.codex-plugin,hooks}/{hooks,plugin}.json')
 
 /** The events of a manifest: `hooks.hooks` in Codex's plugin.json, `hooks` in hooks.json or Claude's plugin.json. */
 const eventsOf = (manifest: unknown): Record<string, unknown> => {
