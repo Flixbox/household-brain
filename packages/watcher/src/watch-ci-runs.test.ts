@@ -8,7 +8,7 @@ afterEach(async () => { await Promise.all(dirs.splice(0).map(async dir => rm(dir
 
 const LOOKS = `
   import { checkRun } from '${import.meta.dir}/watch-ci-runs'
-  import { readLines } from '${import.meta.dir}/watch-state'
+  import { reportedLines } from '${import.meta.dir}/watch-output'
   const look = async () => checkRun({ label: process.env.LABEL, limitSeconds: 1200, pr: 7, sha: 'abc' })
   await look()
   await look()
@@ -16,7 +16,7 @@ const LOOKS = `
   await Bun.write(process.env.FIXTURE_HOME + '/attempt', '2')
   await look()
   await look()
-  console.log('REPORTED', JSON.stringify(await readLines('reported')))
+  console.log('REPORTED', JSON.stringify(await reportedLines()))
   process.exit(0)
 `
 

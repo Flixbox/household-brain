@@ -7,7 +7,7 @@
  * Merging still waits for CI and, where a review bot was asked (#324), its review. Which drafts is
  * `marksReady` (watch-ready-events.ts). The `GH` token must then be allowed to write pull requests.
  */
-import { DISMISS_STALE_BOT_REVIEWS, askBotsToResolve, dismissCleared, dismissStale, reportedPassed, reviewBlockers } from './watch-dismiss'
+import { DISMISS_STALE_BOT_REVIEWS, askBotsToResolve, dismissCleared, dismissStale, reportedLines, reportedPassed, reviewBlockers } from './watch-dismiss'
 import { type PrState, REPO, SELF, readyCommand } from './watch-github'
 import { READY_APPROVED_DRAFTS, draftNote, draftReadiedEvent, marksReady } from './watch-ready-events'
 import { approvedEvent, blockedByReviewEvent } from './watch-review-events'
@@ -15,7 +15,7 @@ import { dismissesCleared } from './watch-cleared-events'
 import { askBotReviews } from './watch-bot-review'
 import { awaitsBotReview } from './watch-bot-review-events'
 import { GH, ghText } from './watch-gh'
-import { askedBots, readLines } from './watch-state'
+import { askedBots } from './watch-state'
 import { IS_WRITER, attemptWrite, reportWrite } from './watch-writer'
 
 // Resolving threads on `Resolved:` replies comes before what the approval asks (#279).
@@ -76,7 +76,7 @@ const checkBlocked = async (pr: number, head: string): Promise<void> => {
 export const checkApproval = async (pr: number, state: PrState): Promise<void> => {
   // A review bot asked for once, on the label (#324), before what waits on it.
   await (state.bot.requested ? askBotReviews(pr) : Promise.resolve())
-  const reported = await readLines('reported')
+  const reported = await reportedLines()
   const green = reportedPassed(reported, pr, state.head)
   await checkAutoMergeOff({ green, pr, state })
   // The owner's own approval, not the decision: a stale change request, one of the causes it names,

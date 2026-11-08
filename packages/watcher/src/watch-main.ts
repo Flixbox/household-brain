@@ -5,7 +5,7 @@ import { type Activity, mainRunEvent, queueCommand } from './watch-events'
 import { type PrState, REPO, mainAhead, mainHead, newestMainRun, prStates } from './watch-github'
 import { checkRun } from './watch-ci-runs'
 import { APPROVED_DRAFT_NOTE, checkApproval, checkWriter, resolveAsked } from './watch-approval'
-import { FOLLOW, checkCode, finishSubscriptions, flush, queue, quiet, report, reportLookups, reportUsage } from './watch-output'
+import { FOLLOW, checkCode, finishSubscriptions, flush, queue, quiet, report, reportLookups, reportUsage, reportedLines } from './watch-output'
 import { addLine, endPr, oneAtATime, readLines, start, startSubscriptions, subscriptions, updateLines, writeLines } from './watch-state'
 import { activitiesOf, changedActivities, changedStates, checkActivity as checkPrActivity, checkTrackedActivity, watchedPrs } from './watch-activity'
 import { checkQueue, preparePr } from './watch-queue'
@@ -64,7 +64,7 @@ const checkMoved = async (pr: number, head: string): Promise<void> => {
   // look asks again.
   // Asked only while it is news: a branch left behind main isn't asked about on every look.
   const key = `pr-${pr} main-moved ${newest}`
-  const news = ahead > 0 && !(await readLines('reported')).includes(key)
+  const news = ahead > 0 && !(await reportedLines()).includes(key)
   const stillOpen = news && await prStates([pr], true).then(states => states.get(pr)?.state === 'OPEN', () => false)
   await report(stillOpen ? { key, lines: [`MAIN_MOVED: main is ${ahead} commit(s) ahead of the branch: rebase on main and run the checks again`], quiet: true } : null, pr)
 }
@@ -91,7 +91,7 @@ const checkMerged = async (pr: number, mergeSha: string, items: Activity[] | und
     await untrack(pr)
     return
   }
-  const deployed = (await readLines('reported')).some(line => line.startsWith(`pr-${pr} deployed `))
+  const deployed = (await reportedLines()).some(line => line.startsWith(`pr-${pr} deployed `))
   await (deployed ? untrack(pr) : checkRun({ label: 'deploy', limitSeconds: LIMIT_SECONDS, pr, sha: mergeSha }))
 }
 
