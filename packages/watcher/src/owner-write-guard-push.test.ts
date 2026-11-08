@@ -206,6 +206,29 @@ describe('a git push under the wrong credential helper, by where it goes (#467)'
     expect(commands.filter(command => !denied(command, toSsh))).toEqual([])
   })
 
+  it('keeps refusing past quotes spliced into a variable or xargs', () => {
+    const commands = [
+      'env G"IT_DIR"=/x git push origin HEAD',
+      "env GIT\\_DIR=/x git push origin HEAD",
+      `echo ${github} | x"args" git push`,
+      `echo ${github} | xa\\rgs git push`,
+    ]
+    const toSsh = origin(ssh)
+    expect(commands.filter(command => !denied(command, toSsh))).toEqual([])
+  })
+
+  it('keeps refusing when something on the line can change the shell\'s state unseen', () => {
+    const commands = ['source e.sh; git push origin HEAD', '. e.sh; git push origin HEAD', 'pushd /other && git push origin HEAD', 'popd; git push origin HEAD']
+    const toSsh = origin(ssh)
+    expect(commands.filter(command => !denied(command, toSsh))).toEqual([])
+  })
+
+  it('counts GitHub\'s subdomains as GitHub, but not a host that only looks like it', () => {
+    expect(denied('git push origin HEAD', origin('https://www.github.com/owner-test/repo'))).toBe(true)
+    expect(denied('git push origin HEAD', origin('https://www.github.com./owner-test/repo'))).toBe(true)
+    expect(denied('git push origin HEAD', origin('https://notgithub.com/owner-test/repo'))).toBe(false)
+  })
+
   it('does not count a branch the shell fills in as unclear', () => {
     expect(denied('git push origin "$BRANCH"', origin(ssh))).toBe(false)
   })
