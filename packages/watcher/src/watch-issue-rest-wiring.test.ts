@@ -103,8 +103,8 @@ test('closing the last open issue reports, and so does opening it again (#412)',
 })
 
 /** Dies the hard way once the look is done: no exit handler runs, so what the round held is never printed. */
-const DIE = `process.kill(process.pid, 'SIGKILL')\nawait Bun.sleep(5000)`
-const ACTIVITY = `[{ id: 'comment 1', lines: ['the owner asks'] }]`
+const DIE = "process.kill(process.pid, 'SIGKILL')\nawait Bun.sleep(5000)"
+const ACTIVITY = "[{ id: 'comment 1', lines: ['the owner asks'] }]"
 
 test('a look that dies before printing leaves its issue event unseen, and the next look reports it (#435)', async () => {
   const home = await fixture([listed(9, 'open')])
