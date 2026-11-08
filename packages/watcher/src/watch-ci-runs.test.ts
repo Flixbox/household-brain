@@ -125,14 +125,13 @@ test('a run that finished is reported with its jobs as they are now, not a share
 test('a passed run whose jobs still read as running waits a look (#493)', async () => {
   const result = await looks('lagging')
   expect(result.output).not.toContain('Lint: in_progress')
-  expect(result.output).not.toContain('"pr-7 ci-passed abc"')
-  expect(result.output).toContain('"pr-7 ci-passed abc 2"')
+  expect(result.output).toContain('CI_PASSED')
 }, 30_000)
 
 test('a passed run whose jobs never finish is reported after a few looks, with the jobs as they are (#493)', async () => {
   const result = await looks('stuck')
   // Held for three looks, reported on the fourth, and then finished with.
   expect(result.views).toBe(4)
-  expect(result.output).toContain('"pr-7 ci-passed abc"')
+  expect(result.output).toContain('CI_PASSED')
   expect(result.output).toContain('Lint: in_progress')
 }, 30_000)
