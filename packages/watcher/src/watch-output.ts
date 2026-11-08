@@ -134,20 +134,25 @@ const sayClosing = async (): Promise<void> => {
   }
 }
 
+/** Prints what the round kept, then writes what waited for that; whether the round printed anything. */
+const printRound = async (): Promise<boolean> => {
+  const any = found.length > 0 || printed.any
+  printFound()
+  printed.any = false
+  await writeMarks()
+  return any
+}
+
 /**
  * Ends a round that found events: prints the ones kept (not following), answers first, and after them
  * a reminder for each open PR waiting on the agent (#224, #226); then exits, or when following, ends
  * with `---` and returns whether anything was printed, so the next round can start at once.
  */
 export const flush = async (): Promise<boolean> => {
-  if (found.length === 0 && !printed.any) {
-    await writeMarks()
+  // The events first: a slow listing must not hold them back.
+  if (!await printRound()) {
     return false
   }
-  // The events first: a slow listing must not hold them back.
-  printFound()
-  printed.any = false
-  await writeMarks()
   await sayClosing()
   endOpenPrsLook()
   quiet.since = Temporal.Now.instant()
