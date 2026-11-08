@@ -7,6 +7,9 @@ const allowed = (commands: readonly string[]) => commands.filter(command => owne
 /** A character whose first UTF-8 byte (0xE0) is what bash's `\\c` takes, written so no transpiler rewrites it in a raw string. */
 const wide = '\u0801'
 
+/** The private-use character the reader marks an expansion with (#390), as a word can really hold it. */
+const mark = '\u{E000}'
+
 describe('ownerWrite on $\'…\' (#378)', () => {
   it('reads $\'…\' strings with their escapes, in substitutions and as here-document delimiters too (#378)', () => {
     expect(refused([
@@ -39,6 +42,27 @@ describe('ownerWrite on $\'…\' (#378)', () => {
       String.raw`echo $'a\\'; gh pr view 1`,
       String.raw`git commit -m $'line\nline \'gh pr close 1\''`,
       "cat <<$'EOF'\ngh issue close 1\nEOF",
+    ])).toEqual([])
+  })
+
+  it('takes the reader\'s own mark as plain text where a word really holds it (#390)', () => {
+    expect(allowed([
+      `gh pr ${mark} 1`,
+      `gh pr $'${mark}' 1`,
+      String.raw`gh pr $'\uE000' 1`,
+      String.raw`gh pr $'\U0000E000' 1`,
+      `gh issue close${mark} 1`,
+      `${mark} pr close 1`,
+      `cat <<${mark}\nbody\n${mark}`,
+    ])).toEqual([])
+  })
+
+  it('still counts what the shell fills in beside a literal mark, and marks read again from a script (#390)', () => {
+    expect(refused([
+      `gh pr ${mark}$x 1`,
+      `gh issue close 1 ${mark}`,
+      `bash -c $'gh\\c${wide} issue close 1'`,
+      `eval $'gh\\c${wide}' issue close 1`,
     ])).toEqual([])
   })
 })
