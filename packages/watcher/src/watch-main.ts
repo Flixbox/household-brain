@@ -1,3 +1,4 @@
+/* oxlint-disable import/max-dependencies -- this file is where the watcher's parts meet; pacing adds one */
 /* oxlint-disable eslint/no-await-in-loop -- each poller's looks run one after another, on purpose */
 /** The project watcher's looks, started by watch-project.ts once it has read which code it runs (#265). */
 import { type Activity, FOLLOW_NEWER, type MainRun, type Run, cancelledDeployEvent, mainRunEvent, queueCommand, replacementCandidates, runEvent } from './watch-events'
@@ -10,7 +11,7 @@ import { checkNotQueued, checkQueue } from './watch-queue'
 import { clearQuestion } from './watch-question'
 import { checkIssueStates, checkIssues, checkSubscribedIssues } from './watch-issues'
 import { allSettled, hasText, ignoreFailure } from './read'
-import { nextPauseMs, useLimitsOf } from './watch-pace'
+import { nextPauseMs, setLimitsOwner } from './watch-pace'
 
 const [limitMinutes = '20', maxHours = '12'] = process.argv.slice(2).filter(arg => arg !== '--follow')
 if (!/^\d+$/u.test(limitMinutes) || !/^\d+$/u.test(maxHours)) {
@@ -260,7 +261,7 @@ const poll = async (poller: Poller): Promise<never> => {
   }
 }
 
-useLimitsOf(REPO)
+setLimitsOwner(REPO)
 await start()
 await startSubscriptions()
 finishSubscriptions()

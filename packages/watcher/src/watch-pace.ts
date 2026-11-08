@@ -125,7 +125,7 @@ await removeOlder(LIMITS_DIR, Temporal.Duration.from({ hours: 2 }))
 
 /** Whose limits these are; the first calls, before the repository is known, are kept apart. */
 const scope = { owner: '' }
-export const useLimitsOf = (repo: string) => { scope.owner = repo.split('/')[0] ?? '' }
+export const setLimitsOwner = (repo: string) => { scope.owner = repo.split('/')[0] ?? '' }
 
 const limitsFile = (cli: string) => `${LIMITS_DIR}/${Bun.hash(JSON.stringify([cli, scope.owner])).toString(36)}`
 
