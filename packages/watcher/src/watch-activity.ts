@@ -107,7 +107,8 @@ const canGoBack = (hours: number): boolean => {
 }
 
 // Temporal throwing in a look would skip every round in silence (#460).
-if (!canGoBack(MERGED_HOURS)) {
+// A blank value would read as 0, leaving out every merged PR.
+if (process.env.MERGED_HOURS?.trim() === '' || !canGoBack(MERGED_HOURS)) {
   process.stderr.write('MERGED_HOURS must be a whole number from 0\n')
   process.exit(64)
 }

@@ -19,7 +19,7 @@ const load = (value: string | null) => {
 }
 
 describe('MERGED_HOURS (#460)', () => {
-  it.each(['abc', '-1', '1.5', '1e30', '1e10', 'Infinity'])('stops the watcher at the start for %s', value => {
+  it.each(['', ' ', 'abc', '-1', '1.5', '1e30', '1e10', 'Infinity'])('stops the watcher at the start for %s', value => {
     expect(load(value)).toEqual({ code: 64, stderr: 'MERGED_HOURS must be a whole number from 0\n' })
   })
 
