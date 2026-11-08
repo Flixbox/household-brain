@@ -43,3 +43,42 @@ describe('ownerWrite behind a wrapper stays within the work budget (#434)', () =
     expect(ownerWrite(`env ${files(500)} gh issue close 1`)).not.toBeNull()
   }, testTimeoutMs)
 })
+
+describe('ownerWrite and a variable behind a wrapper (#436)', () => {
+  it.each([
+    'timeout 5 agent-gh issue close "$N"',
+    'timeout 5 make "$X"',
+    'flock x agent-gh issue close "$N"',
+    'flock x echo "$X"',
+    'timeout "$SECONDS_LEFT" agent-gh issue close "$N"',
+    'sudo -u x agent-gh issue close "$N"',
+    'env A=1 agent-gh issue close "$N"',
+    'nohup timeout 5 agent-gh issue close "$N" 2>/dev/null',
+  ])('lets %s run: the variable is an argument', command => {
+    expect(ownerWrite(command)).toBeNull()
+  })
+
+  it.each([
+    'timeout 5 "$CMD"',
+    'timeout -k 5 10 "$CMD"',
+    'flock x "$CMD"',
+    'sudo -u x "$CMD"',
+    'env A=1 "$CMD"',
+    'nice "$CMD"',
+    'sudo timeout 5 "$CMD"',
+    'nohup sudo -u x nice -n 10 "$CMD"',
+    'timeout "$OPTION" 5 "$CMD"',
+    'timeout 5 2>/dev/null "$CMD"',
+    'timeout 5 "$GH" issue close 1',
+  ])('still refuses %s: the variable may be the command', command => {
+    expect(ownerWrite(command)).not.toBeNull()
+  })
+
+  it.each([
+    'timeout 5 gh issue close "$N"',
+    'sudo -u x gh issue close "$N"',
+    'timeout 5 agent-gh issue view 1 && gh issue close "$N"',
+  ])('still refuses %s: a real gh write', command => {
+    expect(ownerWrite(command)).not.toBeNull()
+  })
+})
