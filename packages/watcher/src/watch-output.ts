@@ -173,7 +173,8 @@ const claimBehind = async (prs: readonly OpenPr[]): Promise<{ keys: string[], sa
   const [head = ''] = await readLines('main')
   const claims = await Promise.all(prs.filter(pr => saidOncePerHead(pr)).map(async pr => {
     const key = `pr-${pr.number} behind ${head}`
-    return { key, news: head !== '' && await claimReported(key), pr: pr.number }
+    // A claim that can't be read holds nothing: that PR is left out, and the next look asks again.
+    return { key, news: head !== '' && await claimReported(key).catch(() => false), pr: pr.number }
   }))
   return { keys: claims.filter(claim => claim.news).map(claim => claim.key), said: new Set(claims.filter(claim => !claim.news).map(claim => claim.pr)) }
 }
