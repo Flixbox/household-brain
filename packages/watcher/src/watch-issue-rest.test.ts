@@ -25,6 +25,11 @@ describe('the since boundary (#412)', () => {
     const second = [issue(3, { updated_at: '2026-11-08T13:00:00Z' })]
     expect(nextCursor(CURSOR, [[issue(1, { updated_at: '2026-11-08T12:10:00Z' })], second])).toBe('2026-11-08T12:10:00Z')
   })
+
+  it('goes on past a first page that lies wholly inside the overlap, so a burst can\'t hold the cursor', () => {
+    const stuck = [issue(1, { updated_at: CURSOR })]
+    expect(nextCursor(CURSOR, [stuck, [issue(2, { updated_at: '2026-11-08T12:01:00Z' })]])).toBe('2026-11-08T12:01:00Z')
+  })
 })
 
 describe('reading the lists (#412)', () => {
