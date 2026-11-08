@@ -38,13 +38,13 @@ const because = (approved: string, state: string): string => {
 /** The event for the label taken off (`removed`), or not: once per head, a failure under its own key. */
 export const questionClearedEvent = ({ approved, head, pr, removed, state }: { approved: string, head: string, pr: number, removed: boolean, state: string }): Event => (removed
   ? { key: `pr-${pr} question-cleared ${head}`, lines: [`QUESTION_CLEARED: ${because(approved, state)}, so the watcher took the \`${QUESTION_LABEL}\` label off (CLEAR_QUESTION_LABEL). Nothing to do.`] }
-  : { key: `pr-${pr} question-clear-failed ${head}`, lines: [`QUESTION_CLEAR_FAILED: couldn't take the \`${QUESTION_LABEL}\` label off (it tries again on every look); check the GH token may write issues (labels are an issue's, also on a PR)`] })
+  : { key: `pr-${pr} question-clear-failed ${head}`, lines: [`QUESTION_CLEAR_FAILED: couldn't take the \`${QUESTION_LABEL}\` label off (it tries again, with backoff); check the GH token may write issues (labels are an issue's, also on a PR)`] })
 
 /**
  * Where the watcher can't confirm the `GH` token is a bot's (#371): GitHub's `viewer` is a person
- * (`person`), or the question failed. The label stays; once per head, and it asks again on every look.
+ * (`person`), or the question failed. The label stays; once per head, and it asks again, with backoff.
  */
 export const questionUncheckedEvent = ({ head, person, pr }: { head: string, person: boolean, pr: number }): Event => ({
   key: `pr-${pr} question-unchecked ${head}`,
-  lines: [`QUESTION_CLEAR_FAILED: the \`${QUESTION_LABEL}\` label stays: ${person ? "the GH token isn't a bot's (GitHub's viewer is a person), and the watcher never writes as the owner: set GH to the agent's bot" : "couldn't ask GitHub whether the GH token is a bot's (it asks again on every look)"}`],
+  lines: [`QUESTION_CLEAR_FAILED: the \`${QUESTION_LABEL}\` label stays: ${person ? "the GH token isn't a bot's (GitHub's viewer is a person), and the watcher never writes as the owner: set GH to the agent's bot" : "couldn't ask GitHub whether the GH token is a bot's (it asks again, with backoff)"}`],
 })

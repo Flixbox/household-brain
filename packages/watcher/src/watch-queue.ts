@@ -7,6 +7,7 @@ import { type QueueEntry, dequeuedEvent, notQueuedEvent, notQueuedKey, queueChan
 import { exists, readLines, rememberPr, subscriptions, updateLines, writeLines } from './watch-state'
 import { clearQuestion } from './watch-question'
 import { GH } from './watch-gh'
+import { relayWrites } from './watch-writer'
 import { report } from './watch-output'
 import { at, record } from './watch-text'
 
@@ -81,5 +82,7 @@ export const preparePr = async (pr: number, state: PrState): Promise<boolean> =>
   await checkNotQueued(pr, state)
   // Approved, merged or closed: it no longer waits on the owner (#371).
   await clearQuestion(pr, state)
+  // Here, for a merged or closed PR too: the writer takes `question` off those as well (#415).
+  await relayWrites(pr)
   return true
 }
