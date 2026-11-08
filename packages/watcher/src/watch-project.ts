@@ -106,9 +106,13 @@
  * after a refusal no watcher asks GitHub until the wait is over (watch-pace.ts, #400).
  * A PR is read in full only when the change gate says so (watch-change-gate.ts, #404).
  */
-// Which code this watcher runs is read before the rest of it is loaded (#265): a pull that finishes
-// while it loads then shows as a change, never as the version it started on.
-import { readStartedOn } from './watch-version'
+// Which commit this watcher runs is read before any other file of it is loaded (#265, #512), so this
+// file imports nothing up front: a pull that finishes while the rest loads then shows as a change,
+// never as the version it started on. Only a stale copy of this file can slip through, and once the
+// imports below have run it has nothing left to do.
+const head = await Bun.$`git -C ${import.meta.dir} rev-parse HEAD`.quiet().nothrow()
+  .then(result => (result.exitCode === 0 ? result.stdout.toString().trim() : ''), () => '')
 
-await readStartedOn()
+const { readStartedOn } = await import('./watch-version')
+await readStartedOn(head)
 await import('./watch-main')
