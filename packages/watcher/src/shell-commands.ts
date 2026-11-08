@@ -49,22 +49,29 @@ const append = (scan: Scan, text: string) => {
 }
 
 /**
+ * Text that may be arithmetic or a subshell, failing closed (#373): read as commands, where a `<<`
+ * may be a shift and so opens no here-document, and searched for substitutions whatever quotes them,
+ * as arithmetic runs one even in single quotes.
+ */
+const unsureArithmetic = (scan: Scan, inner: string) => {
+  scan.nested.push(inner.replaceAll('<<', '  '))
+  substitutionsIn(scan, inner)
+}
+
+/**
  * A `$(…)` or backtick substitution starting at `at`: its text is kept to be read as a command line
- * of its own, and the word gets it, marked as dynamic. `$((…))` arithmetic is data, but for the
- * substitutions in it (#373); text that only looks like it is read both ways, failing closed, as the
- * shell runs a substitution in quotes in arithmetic. Returns that text and where the next thing starts.
+ * of its own, and the word gets it, marked as dynamic; surely arithmetic `$((…))` is data. Returns
+ * that text and where the next thing starts.
  */
 const substitution = (scan: Scan, text: string, at: number): [string, number] => {
   const backtick = text[at] === '`'
   const from = at + (backtick ? 1 : 2)
   const end = backtick ? indexOrEnd(text, '`', from) : closingParen(text, from)
   const inner = text.slice(from, end)
-  const arithmeticLike = text.startsWith('$((', at)
-  if (!arithmeticLike || !opensArithmetic(text, at + 1)) {
+  if (!text.startsWith('$((', at)) {
     scan.nested.push(inner)
-  }
-  if (arithmeticLike) {
-    substitutionsIn(scan, inner)
+  } else if (!opensArithmetic(text, at + 1)) {
+    unsureArithmetic(scan, inner)
   }
   return [dynamic + text.slice(at, end + 1), end + 1]
 }
@@ -160,23 +167,13 @@ const redirect: Reader = (scan, text, at) => {
   return at + 1
 }
 
-/** `((…))` arithmetic: data, but for the substitutions in it, so a `<<` there opens no here-document (#373). */
-const arithmetic: Reader = (scan, text, at) => {
-  const end = closingParen(text, at + 1)
-  substitutionsIn(scan, text.slice(at + 2, end - 1))
-  return end + 1
-}
-
-/**
- * `((`: arithmetic, or else the start of a subshell, whose text is also searched for substitutions,
- * failing closed, as in `substitution`.
- */
+/** `((`: surely arithmetic is data; anything else fails closed. */
 const doubleParen: Reader = (scan, text, at) => {
-  if (opensArithmetic(text, at)) {
-    return arithmetic(scan, text, at)
+  const end = closingParen(text, at + 1)
+  if (!opensArithmetic(text, at)) {
+    unsureArithmetic(scan, text.slice(at + 2, end - 1))
   }
-  substitutionsIn(scan, text.slice(at + 2, closingParen(text, at + 1)))
-  return separator(scan, text, at)
+  return end + 1
 }
 
 const heredocOpen: Reader = (scan, text, at) => {

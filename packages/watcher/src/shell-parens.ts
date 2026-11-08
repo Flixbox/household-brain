@@ -48,18 +48,17 @@ export const closingParen = (text: string, from: number) => {
 }
 
 /**
- * Quotes, escapes, comments and newlines (which here-document bodies need): where they sit,
- * `closingParen` may find a `)` other than the shell's (#378).
+ * Quotes, escapes, comments, newlines (which here-document bodies need) and parentheses (a `case`
+ * pattern's `)` in a substitution): where they sit, `closingParen` may find a `)` other than the shell's.
  */
-const quoting = /["#'\\`\n]/u
+const unsure = /["#'(\\`\n]/u
 
 /**
- * Whether the `((` at `at` is arithmetic: the `)` that closes its second `(` is followed by another.
- * Otherwise the shell reads a subshell in it, as `((gh pr close 1) )` (review on #374). Any quote,
- * escape, comment or newline before that `)` reads it as a subshell too, failing closed:
- * `closingParen` reads backticks, `$'…'`, comments and here-documents other than the shell does.
+ * Whether the `((` at `at` is surely arithmetic: the `)` that closes its second `(` is followed by
+ * another, and nothing between them could move that `)`. Otherwise it may be a subshell, as
+ * `((gh pr close 1) )` is (review on #374), and fails closed.
  */
 export const opensArithmetic = (text: string, at: number) => {
   const close = closingParen(text, at + 2)
-  return text.startsWith('((', at) && text[close + 1] === ')' && !quoting.test(text.slice(at, close))
+  return text.startsWith('((', at) && text[close + 1] === ')' && !unsure.test(text.slice(at + 2, close))
 }

@@ -170,9 +170,10 @@ describe('ownerWrite (#368)', () => {
   })
 
   it('reads arithmetic as data but for its substitutions (#373)', () => {
-    expect(allowed(['echo $(( $(echo 1) ))', '(( $(echo 1) + 1 ))'])).toEqual([])
+    expect(allowed(['echo $(( 1 + 2 ))', 'echo $(( (1+2)*3 ))', '(( $(echo 1) + 1 ))'])).toEqual([])
     expect(refused([
-      // A here-document needs a newline, which fails closed (review on #374): still a false denial.
+      // Known false denials (#373): a substitution or a here-document in arithmetic fails closed.
+      'echo $(( $(echo 1) ))',
       "echo $(( $(sed -n '1p' <<'EOF'\n1\ngh issue close 1\nEOF\n) ))",
       "(( $(sed -n '1p' <<'EOF'\n1\ngh issue close 1\nEOF\n) ))",
       'echo $(( $(cat <<EOF\n$(gh issue close 1)\nEOF\n) ))',
