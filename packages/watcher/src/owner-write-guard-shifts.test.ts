@@ -48,6 +48,7 @@ describe('ownerWrite and a << that may be a shift (#385)', () => {
     const lines = [
       `(( ${'$(#'.repeat(31_000)} ${')'.repeat(31_000)} ))`,
       `(( ${'$('.repeat(42_000)}#${')'.repeat(42_000)} ))`,
+      `(( $(gh issue close 1${'\n'.repeat(120_000)}) ))`,
     ]
     const start = performance.now()
     expect(refused(lines)).toEqual([])

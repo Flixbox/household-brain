@@ -1,5 +1,6 @@
 /** Parentheses and quotes as the owner-write guard's shell reader (shell-commands.ts) matches them (#368, #373). */
 import { closingQuote } from './shell-ansi-c'
+import { type Work, charged } from './shell-work'
 
 export const indexOrEnd = (text: string, search: string, from: number) => {
   const at = text.indexOf(search, from)
@@ -50,24 +51,28 @@ export const closingParen = (text: string, from: number) => {
  * `case` pattern's `)`, a `)` in a `[[ =~ ]]` regex, what `${…}` or `$[…]` takes as text, or a quote, parenthesis or backslash
  * in a here-document's body, which is all that follows the first newline may be (#373).
  */
-const unsureSubstitution = /[#`]|=~|\$[[{]|\bcase\b|\n.*["'()\\]/su
+const unsureAnywhere = /[#`]|=~|\$[[{]|\bcase\b/u
+const unsureInBody = /["'()\\]/u
 
-/** Where what follows the `$(…)` at `at` starts, if there is one and its `)` is surely the shell's; else `at`. */
-const pastSubstitution = (text: string, at: number) => {
+const unsureSubstitution = (inner: string) =>
+  unsureAnywhere.test(inner) || unsureInBody.test(inner.slice(indexOrEnd(inner, '\n', 0)))
+
+/** Where what follows the `$(…)` at `at` starts, if there is one and its `)` is surely the shell's; else `at`. Its reading is charged, twice over its span (#489). */
+const pastSubstitution = (text: string, at: number, work: Work) => {
   if (!text.startsWith('$(', at)) {
     return at
   }
   const end = closingParen(text, at + 2)
-  return unsureSubstitution.test(text.slice(at + 2, end)) ? at : end + 1
+  return charged(work, 2 * (end - at) + 1) || unsureSubstitution(text.slice(at + 2, end)) ? at : end + 1
 }
 
-/** A text without the substitutions whose `)` is surely the shell's. `$$` is the process id, whose second `$` opens none. */
-const outsideSubstitutions = (text: string) => {
+/** A text without the substitutions whose `)` is surely the shell's, as far as the budget reaches. `$$` is the process id, whose second `$` opens none. */
+const outsideSubstitutions = (text: string, work: Work) => {
   let at = 0
   let kept = ''
-  while (at < text.length) {
+  while (at < text.length && work.left >= 0) {
     const step = text.startsWith('$$', at) ? 2 : 1
-    const past = step === 2 ? at : pastSubstitution(text, at)
+    const past = step === 2 ? at : pastSubstitution(text, at, work)
     kept += past === at ? text.slice(at, at + step) : ''
     at = past === at ? at + step : past
   }
@@ -81,14 +86,20 @@ const outsideSubstitutions = (text: string) => {
  */
 const unsure = /["#'(\\`\n]/u
 
+/** Whether nothing outside its substitutions could move the `)`; a budget spent on finding out means no, and the reader fails closed (#489). */
+const surelyData = (text: string, work: Work) => {
+  const outside = outsideSubstitutions(text, work)
+  return work.left >= 0 && !unsure.test(outside)
+}
+
 /**
  * Whether the `((` at `at` is surely arithmetic: the `)` that closes its second `(` is followed by
  * another, and nothing between them could move that `)`. Otherwise it may be a subshell, as
  * `((gh pr close 1) )` is (review on #374), and fails closed.
  */
-export const opensArithmetic = (text: string, at: number) => {
+export const opensArithmetic = (text: string, at: number, work: Work) => {
   const close = closingParen(text, at + 2)
-  return text.startsWith('((', at) && text[close + 1] === ')' && !unsure.test(outsideSubstitutions(text.slice(at + 2, close)))
+  return text.startsWith('((', at) && text[close + 1] === ')' && surelyData(text.slice(at + 2, close), work)
 }
 
 /** `&` ends a command, but not in a redirection (`2>&1`, `&>file`). */

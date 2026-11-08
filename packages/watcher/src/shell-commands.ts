@@ -72,7 +72,7 @@ const substitution = (scan: Scan, text: string, at: number): [string, number] =>
   const end = backtick ? indexOrEnd(text, '`', from) : closingParen(text, from)
   const inner = text.slice(from, end)
   if (text.startsWith('$((', at)) {
-    readArithmetic(scan, inner, opensArithmetic(text, at + 1))
+    readArithmetic(scan, inner, opensArithmetic(text, at + 1, scan.work))
   } else {
     scan.nested.push(inner)
   }
@@ -189,7 +189,7 @@ const redirect: Reader = (scan, text, at) => {
 /** `((`: surely arithmetic is data but for its substitutions; anything else fails closed. Arithmetic also runs a substitution hidden in a variable's array subscript (`x='a[$(…)]'; $(( x ))`); the guard can't see that, and the gap is accepted (#375). */
 const doubleParen: Reader = (scan, text, at) => {
   const end = closingParen(text, at + 1)
-  readArithmetic(scan, text.slice(at + 2, end - 1), opensArithmetic(text, at))
+  readArithmetic(scan, text.slice(at + 2, end - 1), opensArithmetic(text, at, scan.work))
   return end + 1
 }
 
