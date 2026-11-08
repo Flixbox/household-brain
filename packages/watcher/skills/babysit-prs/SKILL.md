@@ -105,9 +105,9 @@ default branch's CI, new issues, the owner's comments on issues, and issues clos
     several watchers cost hardly more than one.
   - `GH_PARALLEL`: how many `gh` calls run at once (2 by default); the pull requests are checked in
     parallel, and the cap keeps the bursts within GitHub's rate limits.
-  - `FULL_READ_MINUTES`: how long a pull request goes without a full read at most (10 by default; 0,
-    or set empty, reads every one in full on every look; anything else but a number from 0 stops the
-    watcher at the start). Each look asks one cheap question about what changed, and a PR it shows as changed is
+  - `FULL_READ_MINUTES`: how long a pull request goes without a full read at most (10 by default; 0
+    reads every one in full on every look; anything else but a number from 0, a blank value included,
+    stops the watcher at the start). Each look asks one cheap question about what changed, and a PR it shows as changed is
     read in full at once (#404); this limit is for what that question can't see.
   - `MERGED_HOURS`: how far back a merged pull request still counts as recent (3 by default), so one
     opened and merged between two looks is still reported. It applies to the repository's merged PRs
@@ -249,6 +249,7 @@ approved one whose auto-merge is still off and that isn't in the merge queue, no
 | `CLOSED` | Closed without merging: stop working on it. |
 | `LOOKUPS_FAILING` | No `gh` call has succeeded for minutes, with the latest failure (a timeout, an exit code): the watcher can't see anything, so its silence means nothing. Comes on every look while it lasts. Check `gh` (logged in, its token, a slow `GH` wrapper) and tell the owner. |
 | `LOOKUPS_RECOVERED` | Calls succeed again; the events held back come next. |
+| `NO_WRITER` | A subscribed watcher found no all-events watcher looking for a while (#432), so `Resolved:` replies stay unresolved and approved drafts stay drafts. Tell the main session to start its all-events watcher. Reported once per absence. |
 | `WATCHER_ERROR` | A look failed (for example a state file another program held locked); the watcher carries on with the next look. Repeated, it needs a look: tell the owner. |
 | `WATCHER_OUTDATED` | The watcher's checkout moved to other watcher code after it started (a pull, or a restart that raced another one's pull), so it exits: start it again right away, alone, so its pull finishes before it starts. |
 | `REMINDER` | Comes after every notification while a PR waits on you: its branch is behind main or in conflict (rebase it, run the checks, push once), or it is approved with CI green and auto-merge off (queue it with the `agent-queue` command the reminder names, after reading its comments) or with CI failed (fix it). None comes for a PR in the merge queue: there, `DEQUEUED` says when it needs you. It repeats until that is done. No approval reminder comes for `CI not reported` in the open-PR list (#342): `WORKFLOW` has no run on the head, its run can't be read, or its run ran nothing (skipped or neutral). That is not green and may never turn green, so if it lasts, check that the workflow runs on this branch and that `WORKFLOW` names it. |

@@ -3,7 +3,8 @@
 // FULL_READ_MINUTES: how long a PR goes without a full read at most, for what moves nothing in the gate.
 const FULL_READ_MS = Number(process.env.FULL_READ_MINUTES ?? 10) * 60_000
 // Not a number would never be due again, leaving what moves nothing in the gate stale for good.
-if (!Number.isFinite(FULL_READ_MS) || FULL_READ_MS < 0) {
+// A blank value would read as 0, reading every PR in full on every look.
+if (process.env.FULL_READ_MINUTES?.trim() === '' || !Number.isFinite(FULL_READ_MS) || FULL_READ_MS < 0) {
   process.stderr.write('FULL_READ_MINUTES must be a number from 0\n')
   process.exit(64)
 }

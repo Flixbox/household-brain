@@ -4,14 +4,14 @@
 import { type Activity, mainRunEvent, queueCommand } from './watch-events'
 import { type PrState, REPO, mainAhead, mainHead, newestMainRun, prStates } from './watch-github'
 import { checkRun } from './watch-ci-runs'
-import { APPROVED_DRAFT_NOTE, checkApproval, resolveAsked } from './watch-approval'
+import { APPROVED_DRAFT_NOTE, checkApproval, checkWriter, resolveAsked } from './watch-approval'
 import { FOLLOW, checkCode, finishSubscriptions, flush, queue, quiet, report, reportLookups, reportUsage } from './watch-output'
 import { addLine, endPr, readLines, start, startSubscriptions, subscriptions, updateLines, writeLines } from './watch-state'
 import { activitiesOf, changedActivities, changedStates, checkActivity as checkPrActivity, checkTrackedActivity, watchedPrs } from './watch-activity'
 import { checkQueue, preparePr } from './watch-queue'
 import { checkIssueStates, checkIssues, checkSubscribedIssues } from './watch-issues'
 import { allSettled, hasText, ignoreFailure } from './read'
-import { nextPauseMs, setLimitsOwner } from './watch-pace'
+import { PACES, nextPauseMs, setLimitsOwner } from './watch-pace'
 
 const [limitMinutes = '20', maxHours = '12'] = process.argv.slice(2).filter(arg => arg !== '--follow')
 if (!/^\d+$/u.test(limitMinutes) || !/^\d+$/u.test(maxHours)) {
@@ -158,9 +158,9 @@ type Check = () => Promise<unknown>
 
 /** What someone waits for an answer to: issues, the owner's comments on them and on the PRs followed. */
 const ANSWER_CHECKS: Check[] = [checkIssues, checkIssueStates, checkTrackedActivity]
-/** The rest: the watcher's own code, main, the merge queue, and each PR's CI, reviews and deploy. */
+/** The rest: the watcher's own code, main, the merge queue, each PR's CI, reviews and deploy, and whether a writer runs. */
 // PR relationships precede queue events, so first-look issue subscriptions route their closing PRs.
-const PROJECT_CHECKS: Check[] = [checkCode, checkMain, checkMainHead, checkPrs, checkQueue, checkSubscribedIssues]
+const PROJECT_CHECKS: Check[] = [checkCode, checkMain, checkMainHead, checkPrs, checkQueue, checkSubscribedIssues, checkWriter]
 
 interface Poller {
   checks: readonly Check[]
@@ -216,5 +216,5 @@ finishSubscriptions()
 // Following, two pollers run side by side (#240): the answers from every 30 s, never waiting for a slow
 // look at CI and deploys. Without `--follow`, one look at everything, the answers first (#235).
 await (FOLLOW
-  ? Promise.all([poll({ checks: ANSWER_CHECKS, heartbeat: false, pauseSeconds: 30, quietCapSeconds: 60 }), poll({ checks: PROJECT_CHECKS, heartbeat: true, pauseSeconds: 60, quietCapSeconds: 300 })])
-  : poll({ checks: [...ANSWER_CHECKS, ...PROJECT_CHECKS], heartbeat: true, pauseSeconds: 60, quietCapSeconds: 300 }))
+  ? Promise.all([poll({ checks: ANSWER_CHECKS, heartbeat: false, ...PACES.answers }), poll({ checks: PROJECT_CHECKS, heartbeat: true, ...PACES.project })])
+  : poll({ checks: [...ANSWER_CHECKS, ...PROJECT_CHECKS], heartbeat: true, ...PACES.everything }))

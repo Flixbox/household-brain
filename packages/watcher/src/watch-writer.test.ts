@@ -23,6 +23,12 @@ const RELAY = `
   import { relayWrites } from '${import.meta.dir}/watch-writer'
   await relayWrites(7)
   await flush()`
+/** A look at the writer's freshness; `started` is when the watcher started, in epoch milliseconds (long ago unless given). */
+const lookAtWriter = (started = '0') => `
+  import { flush } from '${import.meta.dir}/watch-output'
+  import { checkWriter } from '${import.meta.dir}/watch-writer'
+  await checkWriter(${started})
+  await flush()`
 const MERGED_STATE = "{ autoMerge: false, closingIssues: [], draft: false, head: 'abc1234', labels: ['question'], mergeState: 'CLEAN', ownerApprovalCommit: '', ownerApproved: false, parked: false, queued: false, state: 'MERGED' }"
 const QUESTION = `
   import { flush } from '${import.meta.dir}/watch-output'
@@ -75,6 +81,33 @@ describe('how long a failed write waits (#402)', () => {
   })
 })
 
+/** The retry count left after a write answers `answer`, for a write that had failed twice and whose wait is over. */
+const countAfter = async (answer: string) => {
+  const { gh, home } = await setUp()
+  const count = `${home}/watch-project/owner_repo/write-retries/${Bun.hash('a-write').toString(36)}`
+  await Bun.write(count, '2')
+  const old = Temporal.Now.instant().subtract({ hours: 1 }).epochMilliseconds / 1000
+  await utimes(count, old, old)
+  await run({ gh, home, script: `
+    import { attemptWrite } from '${import.meta.dir}/watch-writer'
+    await attemptWrite('a-write', async () => ${answer})` })
+  return Bun.file(count).text().catch(() => 'gone')
+}
+
+describe('the retry count (#431)', () => {
+  it('stays when the write answers that nothing was attempted', async () => {
+    expect(await countAfter('null')).toBe('2')
+  }, 30_000)
+
+  it('goes up on a failure', async () => {
+    expect(await countAfter('false')).toBe('3')
+  }, 30_000)
+
+  it('goes on a success', async () => {
+    expect(await countAfter('true')).toBe('gone')
+  }, 30_000)
+})
+
 describe('one writer (#402)', () => {
   it('the all-events watcher resolves a thread, and a failed one waits instead of being tried on the next look', async () => {
     const { calls, gh, home } = await setUp()
@@ -122,6 +155,49 @@ describe('one writer (#402)', () => {
     await Promise.all(names.map(async name => utimes(`${outcomes}/${name}`, old, old)))
     expect(names.length).toBeGreaterThan(0)
     expect(await run({ gh, home, scoped: true, script: RELAY })).not.toContain('THREAD_RESOLVE')
+  }, 30_000)
+})
+
+describe('no writer (#432)', () => {
+  const age = async (home: string, minutes: number) => {
+    const old = Temporal.Now.instant().subtract({ minutes }).epochMilliseconds / 1000
+    const mark = `${home}/watch-project/owner_repo/writer-seen`
+    expect(await Bun.file(mark).exists()).toBe(true)
+    await utimes(mark, old, old)
+  }
+
+  it('a subscribed watcher says so once when no writer has looked for a while, and an all-events watcher never does', async () => {
+    const { gh, home } = await setUp()
+    expect(await run({ gh, home, script: lookAtWriter() })).not.toContain('NO_WRITER')
+    await age(home, 60)
+    expect(await run({ gh, home, scoped: true, script: lookAtWriter() })).toContain('NO_WRITER')
+    expect(await run({ gh, home, scoped: true, script: lookAtWriter() })).not.toContain('NO_WRITER')
+  }, 30_000)
+
+  it('counts a repository no writer ever looked at', async () => {
+    const { gh, home } = await setUp()
+    expect(await run({ gh, home, scoped: true, script: lookAtWriter() })).toContain('NO_WRITER')
+  }, 30_000)
+
+  it('stays quiet while the writer is fresh, and while the subscribed watcher has only just started', async () => {
+    const { gh, home } = await setUp()
+    await run({ gh, home, script: lookAtWriter() })
+    expect(await run({ gh, home, scoped: true, script: lookAtWriter() })).not.toContain('NO_WRITER')
+    // A paced writer's longest pause (#407) is no absence.
+    await age(home, 25)
+    expect(await run({ gh, home, scoped: true, script: lookAtWriter() })).not.toContain('NO_WRITER')
+    await age(home, 60)
+    expect(await run({ gh, home, scoped: true, script: lookAtWriter('Temporal.Now.instant().epochMilliseconds') })).not.toContain('NO_WRITER')
+  }, 30_000)
+
+  it('says so again when a writer came back and went away again', async () => {
+    const { gh, home } = await setUp()
+    await run({ gh, home, script: lookAtWriter() })
+    await age(home, 60)
+    expect(await run({ gh, home, scoped: true, script: lookAtWriter() })).toContain('NO_WRITER')
+    await run({ gh, home, script: lookAtWriter() })
+    await age(home, 120)
+    expect(await run({ gh, home, scoped: true, script: lookAtWriter() })).toContain('NO_WRITER')
   }, 30_000)
 })
 
