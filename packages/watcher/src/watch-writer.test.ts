@@ -235,7 +235,7 @@ describe('a bot-review ask that never got as far as a comment says so (#461)', (
   }, 30_000)
 
   it('a claim another watcher holds reports nothing', async () => {
-    const { gh, home } = await setUp(String.raw`*labels/bot-review*) echo 'HTTP 404: Label does not exist' >&2; exit 1 ;;`)
+    const { gh, home } = await setUp(String.raw`*labels/bot-review*) echo '{"message":"Label does not exist","status":"404"}'; exit 1 ;;`)
     expect(await run({ gh, home, script: ASKER })).not.toContain('BOT_REVIEW')
   }, 30_000)
 
