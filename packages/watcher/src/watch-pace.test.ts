@@ -2,7 +2,7 @@
 import { afterAll, describe, expect, it } from 'bun:test'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { type Limits, NO_LIMITS, blockedUntil, noteLimits, pauseMs, stretchFor, updatedLimits } from './watch-pace'
+import { type Limits, NO_LIMITS, blockedUntil, noteLimits, pauseMs, resourceOf, stretchFor, updatedLimits } from './watch-pace'
 import { ghText } from './watch-gh'
 
 const folder = await mkdtemp(`${tmpdir()}/watch-pace-`)
@@ -25,11 +25,11 @@ describe('updatedLimits (#400)', () => {
     const body = '{ "text": "< X-Ratelimit-Remaining: 0" }'
     const log = ['* Request at 19:23', answer('200 OK', ...budgetHeaders(4000, NOW_SECONDS + 1800)), body, answer('200 OK', ...budgetHeaders(900, NOW_SECONDS + 600, 'core'))].join('\n')
     expect(after(log)).toEqual({
-      blockedUntilMs: 0,
       budgets: {
         core: { limit: 5000, remaining: 900, resetMs: NOW_MS + 600_000 },
         graphql: { limit: 5000, remaining: 4000, resetMs: NOW_MS + 1_800_000 },
       },
+      waits: {},
     })
   })
 
@@ -44,51 +44,55 @@ describe('updatedLimits (#400)', () => {
   })
 
   it('waits for retry-after, plus a margin, after a refusal', () => {
-    expect(after(answer('403 Forbidden', 'Retry-After: 120'), true).blockedUntilMs).toBe(NOW_MS + 120_000 + MARGIN_MS)
+    expect(after(answer('403 Forbidden', 'Retry-After: 120'), true).waits.all).toBe(NOW_MS + 120_000 + MARGIN_MS)
   })
 
   it('waits for the reset once the budget is used up', () => {
-    expect(after(answer('403 Forbidden', ...budgetHeaders(0, NOW_SECONDS + 700)), true).blockedUntilMs).toBe(NOW_MS + 700_000 + MARGIN_MS)
+    expect(after(answer('403 Forbidden', ...budgetHeaders(0, NOW_SECONDS + 700)), true).waits.graphql).toBe(NOW_MS + 700_000 + MARGIN_MS)
   })
 
   it('waits a minute after a secondary limit that names no time', () => {
     const log = `${answer('403 Forbidden')}\n{ "message": "You have exceeded a secondary rate limit" }`
-    expect(after(log, true).blockedUntilMs).toBe(NOW_MS + MINUTE_MS + MARGIN_MS)
+    expect(after(log, true).waits.all).toBe(NOW_MS + MINUTE_MS + MARGIN_MS)
   })
 
   it('waits a minute after a 429 that says nothing else', () => {
-    expect(after(answer('429 Too Many Requests'), true).blockedUntilMs).toBe(NOW_MS + MINUTE_MS + MARGIN_MS)
+    expect(after(answer('429 Too Many Requests'), true).waits.all).toBe(NOW_MS + MINUTE_MS + MARGIN_MS)
+  })
+
+  it('takes a 429 with budget left for a short limit, not the hourly reset', () => {
+    expect(after(answer('429 Too Many Requests', ...budgetHeaders(4000, NOW_SECONDS + 700)), true).waits).toEqual({ all: NOW_MS + MINUTE_MS + MARGIN_MS })
   })
 
   it('waits for the reset after GraphQL refuses with budget left on the counter that answered', () => {
     const log = `${answer('200 OK', ...budgetHeaders(10, NOW_SECONDS + 400))}\n{ "errors": [{ "type": "RATE_LIMITED" }] }`
-    expect(after(log, true).blockedUntilMs).toBe(NOW_MS + 400_000 + MARGIN_MS)
+    expect(after(log, true).waits.graphql).toBe(NOW_MS + 400_000 + MARGIN_MS)
   })
 
   it('stops for a GraphQL refusal even when gh exits successfully, but not for a comment quoting one', () => {
     const budget = answer('200 OK', ...budgetHeaders(10, NOW_SECONDS + 400))
-    expect(after(`${budget}\n{ "errors": [{ "type": "RATE_LIMITED" }] }`).blockedUntilMs).toBe(NOW_MS + 400_000 + MARGIN_MS)
-    expect(after(`${budget}\n${JSON.stringify({ body: '"type": "RATE_LIMITED"' })}`).blockedUntilMs).toBe(0)
+    expect(after(`${budget}\n{ "errors": [{ "type": "RATE_LIMITED" }] }`).waits.graphql).toBe(NOW_MS + 400_000 + MARGIN_MS)
+    expect(after(`${budget}\n${JSON.stringify({ body: '"type": "RATE_LIMITED"' })}`).waits).toEqual({})
   })
 
   it('is not stopped by a 403 for another reason, or by a comment that talks about limits', () => {
-    expect(after(`${answer('403 Forbidden')}\n{ "message": "Resource not accessible by integration" }`, true).blockedUntilMs).toBe(0)
-    expect(after(`${answer('200 OK')}\n{ "body": "secondary rate limit" }`).blockedUntilMs).toBe(0)
-    expect(after(`${answer('200 OK', ...budgetHeaders(10, NOW_SECONDS + 400))}\n{ "body": "a comment" }`, true).blockedUntilMs).toBe(0)
+    expect(after(`${answer('403 Forbidden')}\n{ "message": "Resource not accessible by integration" }`, true).waits).toEqual({})
+    expect(after(`${answer('200 OK')}\n{ "body": "secondary rate limit" }`).waits).toEqual({})
+    expect(after(`${answer('200 OK', ...budgetHeaders(10, NOW_SECONDS + 400))}\n{ "body": "a comment" }`, true).waits).toEqual({})
   })
 
   it('never waits for more than an hour, whatever a header says', () => {
-    expect(after(answer('403 Forbidden', 'Retry-After: 999999'), true).blockedUntilMs).toBe(NOW_MS + 3_600_000 + MARGIN_MS)
+    expect(after(answer('403 Forbidden', 'Retry-After: 999999'), true).waits.all).toBe(NOW_MS + 3_600_000 + MARGIN_MS)
   })
 
   it('keeps a later wait another watcher already wrote', () => {
-    const blocked = { ...NO_LIMITS, blockedUntilMs: NOW_MS + 900_000 }
-    expect(after(answer('403 Forbidden', 'Retry-After: 10'), true, blocked).blockedUntilMs).toBe(NOW_MS + 900_000)
+    const blocked = { ...NO_LIMITS, waits: { all: NOW_MS + 900_000 } }
+    expect(after(answer('403 Forbidden', 'Retry-After: 10'), true, blocked).waits.all).toBe(NOW_MS + 900_000)
   })
 })
 
 describe('stretchFor (#400)', () => {
-  const left = (remaining: number, minutes: number): Limits => ({ blockedUntilMs: 0, budgets: { graphql: { limit: 5000, remaining, resetMs: NOW_MS + (minutes * MINUTE_MS) } } })
+  const left = (remaining: number, minutes: number): Limits => ({ budgets: { graphql: { limit: 5000, remaining, resetMs: NOW_MS + (minutes * MINUTE_MS) } }, waits: {} })
 
   it('leaves the pauses alone while the budget lasts', () => {
     expect(stretchFor(NO_LIMITS, NOW_MS)).toBe(1)
@@ -106,26 +110,26 @@ describe('stretchFor (#400)', () => {
   })
 
   it('goes by the tightest resource', () => {
-    const limits = { blockedUntilMs: 0, budgets: { ...left(4000, 50).budgets, core: { limit: 5000, remaining: 100, resetMs: NOW_MS + (50 * MINUTE_MS) } } }
+    const limits = { budgets: { ...left(4000, 50).budgets, core: { limit: 5000, remaining: 100, resetMs: NOW_MS + (50 * MINUTE_MS) } }, waits: {} }
     expect(stretchFor(limits, NOW_MS)).toBe(4)
   })
 })
 
 describe('pauseMs (#400)', () => {
-  const pause = (baseMs: number, quietLooks: number, stretch = 1) => pauseMs({ baseMs, busy: false, quietLooks, stretch })
+  const pause = (baseMs: number, quietLooks: number, { capMs = 300_000, stretch = 1 } = {}) => pauseMs({ baseMs, busy: false, capMs, quietLooks, stretch })
 
   it('backs off while nothing changes', () => {
     expect([1, 2, 3, 9].map(looks => pause(60_000, looks))).toEqual([60_000, 120_000, 300_000, 300_000])
-    expect([1, 2, 3].map(looks => pause(30_000, looks))).toEqual([30_000, 60_000, 150_000])
+    expect([1, 2, 3].map(looks => pause(30_000, looks, { capMs: 60_000 }))).toEqual([30_000, 60_000, 60_000])
   })
 
   it('keeps a minimum gap after a busy look', () => {
-    expect(pauseMs({ baseMs: 60_000, busy: true, quietLooks: 0, stretch: 1 })).toBe(10_000)
+    expect(pauseMs({ baseMs: 60_000, busy: true, capMs: 300_000, quietLooks: 0, stretch: 1 })).toBe(10_000)
   })
 
   it('stretches quiet and busy pauses alike', () => {
-    expect(pause(60_000, 1, 2)).toBe(120_000)
-    expect(pauseMs({ baseMs: 60_000, busy: true, quietLooks: 0, stretch: 4 })).toBe(40_000)
+    expect(pause(60_000, 1, { stretch: 2 })).toBe(120_000)
+    expect(pauseMs({ baseMs: 60_000, busy: true, capMs: 300_000, quietLooks: 0, stretch: 4 })).toBe(40_000)
   })
 })
 
@@ -153,7 +157,22 @@ describe('ghText and the limit (#400)', () => {
     const success = answer('200 OK', ...budgetHeaders(4000, NOW_SECONDS + 300))
     await Promise.all([noteLimits(cli, success, false), noteLimits(cli, refusal, true), noteLimits(cli, success, false), noteLimits(cli, success, false)])
     await noteLimits(cli, success, false)
-    expect(await blockedUntil(cli)).not.toBeNull()
+    expect(await blockedUntil(cli, 'core')).not.toBeNull()
+  })
+
+  it('names the budget each kind of call spends', () => {
+    expect(['api graphql -f x', 'api -i repos/o/n/pulls', 'run list', 'pr list', 'issue view 1'].map(call => resourceOf(call.split(' ')))).toEqual(['graphql', 'core', 'core', 'graphql', 'graphql'])
+  })
+
+  it('stops only the calls on the resource that ran out', async () => {
+    const calls = `${folder}/core-calls`
+    const reset = (Temporal.Now.instant().epochMilliseconds / 1000) + 600
+    const headers = budgetHeaders(0, Math.floor(reset), 'core').map(header => `echo '< ${header}' >&2`).join('\n')
+    const gh = await fakeGh('core-out', `echo "$1" >> ${calls}\necho '< HTTP/2.0 403 Forbidden' >&2\n${headers}\nif [ "$1" = api ]; then exit 1; fi`)
+    await expect(ghText(['api', 'repos/o/n/pulls'], gh, true)).rejects.toThrow('exit 1')
+    await expect(ghText(['run', 'list'], gh, true)).rejects.toThrow('rate limit')
+    await ghText(['pr', 'list'], gh, true)
+    expect(await linesOf(calls)).toEqual(['api', 'pr'])
   })
 
   it('runs two calls at once by default', async () => {

@@ -167,6 +167,8 @@ interface Poller {
   /** Whether this poller prints the IDLE heartbeat: only one does, or both would. */
   heartbeat: boolean
   pauseSeconds: number
+  /** The longest pause that quiet looks grow to, before any rate-limit stretch; the owner's comments keep it short. */
+  quietCapSeconds: number
 }
 
 /** One look; true when it printed events, so the next look comes after only a short gap (#400). */
@@ -214,5 +216,5 @@ finishSubscriptions()
 // Following, two pollers run side by side (#240): the answers from every 30 s, never waiting for a slow
 // look at CI and deploys. Without `--follow`, one look at everything, the answers first (#235).
 await (FOLLOW
-  ? Promise.all([poll({ checks: ANSWER_CHECKS, heartbeat: false, pauseSeconds: 30 }), poll({ checks: PROJECT_CHECKS, heartbeat: true, pauseSeconds: 60 })])
-  : poll({ checks: [...ANSWER_CHECKS, ...PROJECT_CHECKS], heartbeat: true, pauseSeconds: 60 }))
+  ? Promise.all([poll({ checks: ANSWER_CHECKS, heartbeat: false, pauseSeconds: 30, quietCapSeconds: 60 }), poll({ checks: PROJECT_CHECKS, heartbeat: true, pauseSeconds: 60, quietCapSeconds: 300 })])
+  : poll({ checks: [...ANSWER_CHECKS, ...PROJECT_CHECKS], heartbeat: true, pauseSeconds: 60, quietCapSeconds: 300 }))

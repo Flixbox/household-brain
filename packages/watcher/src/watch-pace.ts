@@ -3,7 +3,8 @@
  * GH_DEBUG=api, for every kind of call, so watch-gh.ts hands that log here. What it says is kept in a
  * file per `gh` and repository owner (the limit belongs to the login or installation behind them), so
  * every watcher on this machine knows it: after a refusal none asks GitHub until the wait is over,
- * and all stretch their pauses while the budget runs short.
+ * and all stretch their pauses while the budget runs short. A used-up primary limit stops only calls
+ * on its own resource (`core` and `graphql` are separate buckets); a secondary limit stops them all.
  */
 import { WATCHERS_DIR, removeOlder, writeWhole } from './watch-files'
 import { hasText, ignoreFailure, isRecord } from './read'
@@ -14,10 +15,14 @@ interface Budget {
   resetMs: number
 }
 export interface Limits {
-  blockedUntilMs: number
   budgets: Record<string, Budget>
+  /** Until when calls wait, by resource; ALL_RESOURCES for a limit on every call. */
+  waits: Record<string, number>
 }
-export const NO_LIMITS: Limits = { blockedUntilMs: 0, budgets: {} }
+export const NO_LIMITS: Limits = { budgets: {}, waits: {} }
+const ALL_RESOURCES = 'all'
+const CALL_RESOURCES = ['core', 'graphql'] as const
+type CallResource = typeof CALL_RESOURCES[number]
 
 interface GhResponse {
   headers: Map<string, string>
@@ -71,29 +76,42 @@ const isRefused = (response: GhResponse, log: string, failed: boolean): boolean 
   return failed && (response.status === 429 || (response.status === 403 && REFUSAL.test(log)))
 }
 
-/** Until when this response says to stop asking; 0 when it doesn't. */
-const waitAfter = ({ failed, log, nowMs, resetMs, response }: Call & { log: string, resetMs: number, response: GhResponse }): number => {
+/** Whether the hourly budget ran out, as against a secondary limit, which a bare 429 is taken for. */
+const isPrimary = (response: GhResponse, log: string): boolean =>
+  numberOf(response, 'x-ratelimit-remaining') === 0 || GRAPHQL_REFUSAL.test(log) || (response.status === 403 && !SECONDARY_REFUSAL.test(log))
+
+interface Wait {
+  key: string
+  untilMs: number
+}
+
+/** Which calls this response stops, and until when; null when it stops none. */
+const waitAfter = ({ failed, log, nowMs, resetMs, resource, response }: Call & { log: string, resetMs: number, resource: string, response: GhResponse }): Wait | null => {
   const retryAfter = response.status >= 400 ? numberOf(response, 'retry-after') : null
-  if (retryAfter !== null && retryAfter > 0) { return nowMs + (retryAfter * 1000) }
-  if (!isRefused(response, log, failed)) { return 0 }
-  const secondary = failed && SECONDARY_REFUSAL.test(log)
-  return !secondary && resetMs > nowMs ? resetMs : nowMs + UNNAMED_WAIT_MS
+  if (retryAfter !== null && retryAfter > 0) { return { key: ALL_RESOURCES, untilMs: nowMs + (retryAfter * 1000) } }
+  if (!isRefused(response, log, failed)) { return null }
+  if (isPrimary(response, log) && resetMs > nowMs) { return { key: resource, untilMs: resetMs } }
+  return { key: ALL_RESOURCES, untilMs: nowMs + UNNAMED_WAIT_MS }
 }
 
 /** A wait with its margin, and never over an hour: a window is no longer, whatever a header says. */
-const waitUntil = (untilMs: number, nowMs: number) => untilMs === 0 ? 0 : Math.min(untilMs, nowMs + HOUR_MS) + MARGIN_MS
+const waitUntil = (untilMs: number, nowMs: number) => Math.min(untilMs, nowMs + HOUR_MS) + MARGIN_MS
+
+/** The entry a wait makes in `waits`, never earlier than one already there; nothing without a wait. */
+const laterWait = (waits: Limits['waits'], wait: Wait | null, nowMs: number): Limits['waits'] =>
+  wait ? { [wait.key]: Math.max(waits[wait.key] ?? 0, waitUntil(wait.untilMs, nowMs)) } : {}
 
 /** What is known once a call's GH_DEBUG log has been read. */
 export const updatedLimits = (limits: Limits, log: string, call: Call): Limits => {
   const budgets = { ...limits.budgets }
-  const waits = [limits.blockedUntilMs]
+  const waits = { ...limits.waits }
   for (const response of responsesIn(log)) {
     const resource = response.headers.get('x-ratelimit-resource') ?? 'core'
     const budget = budgetOf(response, budgets[resource], call.nowMs)
     if (budget) { budgets[resource] = budget }
-    waits.push(waitUntil(waitAfter({ ...call, log, resetMs: budget?.resetMs ?? 0, response }), call.nowMs))
+    Object.assign(waits, laterWait(waits, waitAfter({ ...call, log, resetMs: budget?.resetMs ?? 0, resource, response }), call.nowMs))
   }
-  return { blockedUntilMs: Math.max(...waits), budgets }
+  return { budgets, waits }
 }
 
 const LOW_SHARE = 0.4
@@ -114,9 +132,9 @@ const BUSY_GAP_MS = 10_000
 /** A poller's pause, times this, for its first, second and later quiet looks in a row. */
 const QUIET_STEPS = [1, 2, 5]
 
-export const pauseMs = ({ baseMs, busy, quietLooks, stretch }: { baseMs: number, busy: boolean, quietLooks: number, stretch: number }): number => {
+export const pauseMs = ({ baseMs, busy, capMs, quietLooks, stretch }: { baseMs: number, busy: boolean, capMs: number, quietLooks: number, stretch: number }): number => {
   const step = QUIET_STEPS[Math.min(Math.max(quietLooks, 1), QUIET_STEPS.length) - 1] ?? 1
-  return (busy ? BUSY_GAP_MS : baseMs * step) * stretch
+  return (busy ? BUSY_GAP_MS : Math.min(baseMs * step, capMs)) * stretch
 }
 
 const LIMITS_DIR = `${WATCHERS_DIR}/rate-limits`
@@ -128,25 +146,36 @@ const scope = { owner: '' }
 export const setLimitsOwner = (repo: string) => { scope.owner = repo.split('/')[0] ?? '' }
 
 const limitsFile = (cli: string) => `${LIMITS_DIR}/${Bun.hash(JSON.stringify([cli, scope.owner])).toString(36)}`
-/** The wait has a file of its own, written only for a refusal: a successful call in another watcher can't undo it. */
-const blockFile = (cli: string) => `${limitsFile(cli)}.block`
+/** Each wait has a file of its own, written only for a refusal: a successful call in another watcher can't undo it. */
+const waitFile = (cli: string, key: string) => `${limitsFile(cli)}.wait-${key}`
 
 const isBudget = (value: unknown): value is Budget =>
   isRecord(value) && typeof value.limit === 'number' && typeof value.remaining === 'number' && typeof value.resetMs === 'number'
 
 const parsedLimits = (text: string): Limits => {
   const value: unknown = JSON.parse(text)
-  if (!isRecord(value) || typeof value.blockedUntilMs !== 'number' || !isRecord(value.budgets)) { return NO_LIMITS }
-  return { blockedUntilMs: value.blockedUntilMs, budgets: Object.fromEntries(Object.entries(value.budgets).filter((entry): entry is [string, Budget] => isBudget(entry[1]))) }
+  if (!isRecord(value) || !isRecord(value.budgets)) { return NO_LIMITS }
+  return { budgets: Object.fromEntries(Object.entries(value.budgets).filter((entry): entry is [string, Budget] => isBudget(entry[1]))), waits: {} }
+}
+
+const readWait = async (cli: string, key: string): Promise<[string, number]> => {
+  const untilMs = await Bun.file(waitFile(cli, key)).text().then(Number).catch(() => 0)
+  return [key, Number.isFinite(untilMs) ? untilMs : 0]
 }
 
 /** What is known about this `gh`'s limit; nothing, when no watcher has written it or it can't be read. */
 const readLimits = async (cli: string): Promise<Limits> => {
-  const [limits, blocked] = await Promise.all([
+  const [limits, waits] = await Promise.all([
     Bun.file(limitsFile(cli)).text().then(parsedLimits).catch(() => NO_LIMITS),
-    Bun.file(blockFile(cli)).text().then(Number).catch(() => 0),
+    Promise.all([ALL_RESOURCES, ...CALL_RESOURCES].map(async key => readWait(cli, key))),
   ])
-  return { ...limits, blockedUntilMs: Number.isFinite(blocked) ? Math.max(limits.blockedUntilMs, blocked) : limits.blockedUntilMs }
+  return { ...limits, waits: Object.fromEntries(waits) }
+}
+
+/** Writes the waits this call moved later. */
+const writeWaits = async (cli: string, known: Limits, updated: Limits): Promise<void> => {
+  const later = Object.entries(updated.waits).filter(([key, untilMs]) => untilMs > (known.waits[key] ?? 0))
+  await Promise.all(later.map(async ([key, untilMs]) => writeWhole(waitFile(cli, key), String(untilMs)).catch(ignoreFailure)))
 }
 
 /** The `gh`s this watcher has asked with: each has a limit of its own. */
@@ -158,24 +187,32 @@ export const noteLimits = async (cli: string, log: string, failed: boolean): Pro
   if (!log.includes('< HTTP/')) { return }
   const known = await readLimits(cli)
   const updated = updatedLimits(known, log, { failed, nowMs: Temporal.Now.instant().epochMilliseconds })
-  if (updated.blockedUntilMs > known.blockedUntilMs) { await writeWhole(blockFile(cli), String(updated.blockedUntilMs)).catch(ignoreFailure) }
+  await writeWaits(cli, known, updated)
   await writeWhole(limitsFile(cli), JSON.stringify(updated)).catch(ignoreFailure)
 }
 
-/** When GitHub may be asked again with this `gh`, if that is still to come; otherwise null. */
-export const blockedUntil = async (cli: string): Promise<Temporal.Instant | null> => {
-  const { blockedUntilMs } = await readLimits(cli)
-  return blockedUntilMs > Temporal.Now.instant().epochMilliseconds ? Temporal.Instant.fromEpochMilliseconds(blockedUntilMs) : null
+/** Which budget a `gh` call spends: `run` and REST paths use `core`, the other commands GraphQL. */
+export const resourceOf = (args: readonly string[]): CallResource => {
+  const [command] = args
+  if (command === 'api') { return args.includes('graphql') ? 'graphql' : 'core' }
+  return command === 'run' ? 'core' : 'graphql'
+}
+
+/** When GitHub may be asked again on this resource with this `gh`, if that is still to come; otherwise null. */
+export const blockedUntil = async (cli: string, resource: CallResource): Promise<Temporal.Instant | null> => {
+  const { waits } = await readLimits(cli)
+  const untilMs = Math.max(waits[ALL_RESOURCES] ?? 0, waits[resource] ?? 0)
+  return untilMs > Temporal.Now.instant().epochMilliseconds ? Temporal.Instant.fromEpochMilliseconds(untilMs) : null
 }
 
 /** Quiet looks in a row, per poller; any look with events starts every poller over. */
 const quietRuns = new Map<object, number>()
 
 /** How long a poller pauses after a look. */
-export const nextPauseMs = async (poller: { pauseSeconds: number }, busy: boolean): Promise<number> => {
+export const nextPauseMs = async (poller: { pauseSeconds: number, quietCapSeconds: number }, busy: boolean): Promise<number> => {
   if (busy) { quietRuns.clear() } else { quietRuns.set(poller, (quietRuns.get(poller) ?? 0) + 1) }
   const nowMs = Temporal.Now.instant().epochMilliseconds
   const known = await Promise.all([...asking].map(async cli => readLimits(cli)))
   const stretch = Math.max(1, ...known.map(limits => stretchFor(limits, nowMs)))
-  return pauseMs({ baseMs: poller.pauseSeconds * 1000, busy, quietLooks: quietRuns.get(poller) ?? 0, stretch })
+  return pauseMs({ baseMs: poller.pauseSeconds * 1000, busy, capMs: poller.quietCapSeconds * 1000, quietLooks: quietRuns.get(poller) ?? 0, stretch })
 }

@@ -3,7 +3,7 @@
  * many at once, and sharing each answer with the other watchers on this machine for a moment.
  */
 import { WATCHERS_DIR, removeOlder, writeWhole } from './watch-files'
-import { blockedUntil, noteLimits } from './watch-pace'
+import { blockedUntil, noteLimits, resourceOf } from './watch-pace'
 import { ignoreFailure, isRecord } from './read'
 
 // GH: the `gh` to ask with, e.g. a wrapper logged in as a bot (GH=agent-gh). Defaults to plain gh.
@@ -165,8 +165,8 @@ const sharedAnswer = async (path: string): Promise<string | null> => {
 }
 
 /** Refused and told to wait (#400): the call fails here, costing GitHub nothing, and the next look tries again. */
-const refuseWhileLimited = async (cli: string): Promise<void> => {
-  const until = await blockedUntil(cli)
+const refuseWhileLimited = async (args: string[], cli: string): Promise<void> => {
+  const until = await blockedUntil(cli, resourceOf(args))
   if (until) {
     lookups.lastFailure = `waiting for GitHub's rate limit until ${until.toString()}`
     throw new Error(`${cli}: ${lookups.lastFailure}`, { cause: { status: null } })
@@ -176,7 +176,7 @@ const refuseWhileLimited = async (cli: string): Promise<void> => {
 const asked = async (args: string[], cli: string): Promise<string> => {
   await take()
   try {
-    await refuseWhileLimited(cli)
+    await refuseWhileLimited(args, cli)
     return await ghCall(args, cli)
   } finally {
     release()
