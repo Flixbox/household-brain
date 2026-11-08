@@ -10,6 +10,7 @@
 import { type Heredoc, bodyAsRead, bodyExpands, closingLine, hereStringOperator, heredocOf, heredocOpener } from './shell-heredocs'
 import { closingParen, indexOrEnd, opensArithmetic } from './shell-parens'
 import { ansiCValue, closingQuote, dynamic } from './shell-ansi-c'
+import { type Work, spent, unreadableLine } from './shell-work'
 
 /** Whether the shell may change a word before the command sees it (a variable, `$(…)`, backticks). */
 export const isDynamic = (word: string) => word.includes(dynamic)
@@ -283,13 +284,16 @@ const readerRules: readonly (readonly [Test, Reader])[] = [
 const readerAt = (scan: Scan, text: string, at: number): Reader =>
   readerRules.find(([test]) => test(scan, text, at))?.[1] ?? readers.get(text[at] ?? '') ?? plain
 
-/** Every simple command of a command line, as its words. */
-export const commandsOf = (text: string): string[][] => {
+/** The simple commands of a command line as the scan reads it, with those of its substitutions. */
+export const scanned = (text: string, readNested: (inner: string) => string[][], work: Work): string[][] => {
+  if (spent(work, text)) {
+    return unreadableLine()
+  }
   const scan: Scan = { commands: [], heredocs: [], nested: [], word: null, words: [] }
   let at = 0
   while (at < text.length) {
     at = readerAt(scan, text, at)(scan, text, at)
   }
   endCommand(scan)
-  return [...scan.commands, ...scan.nested.flatMap(inner => commandsOf(inner))]
+  return [...scan.commands, ...scan.nested.flatMap(inner => readNested(inner))]
 }

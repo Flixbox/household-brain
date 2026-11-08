@@ -15,7 +15,9 @@
  * `agent-gh` never is.
  */
 import { isRecord, textOf } from './read'
-import { commandsOf, isDynamic, plainWord } from './shell-commands'
+import { commandsOf } from './shell-braces'
+import { isDynamic, plainWord } from './shell-commands'
+import { type Work, newWork } from './shell-work'
 
 /** `gh pr` and `gh issue` subcommands that change something on GitHub. */
 const prIssueWrites = new Set([
@@ -238,11 +240,10 @@ const readsScriptFromInput = ([name = '']: readonly string[]) =>
  * Every simple command a command line runs, from its command word on, with the scripts of `bash -c` and
  * `eval` read too. When anything on the line may run its input as commands (`eval` and `env -S` too), every here-document and
  * here-string on it counts as commands, not only one on that command itself: pipes, groups and
- * `bash -c bash` hand input on in ways this reader doesn't follow (#382), and a false denial costs less than a missed write.
- * Text the shell expands first may become any commands, so it counts as a command the shell fills in.
+ * `bash -c bash` hand input on in ways this reader doesn't follow (#382), and a false denial costs less than a missed write. Text the shell expands first may become any commands, so it counts as a command the shell fills in.
  */
-const runCommands = (text: string): string[][] => {
-  const simple = commandsOf(text)
+const runCommands = (text: string, work: Work): string[][] => {
+  const simple = commandsOf(text, work)
   const commands = simple
     .map(words => words.slice(commandStart(words)))
     .flatMap(command => startsOf(command).map(at => command.slice(at)))
@@ -250,9 +251,9 @@ const runCommands = (text: string): string[][] => {
   return [
     ...commands.flatMap(command => {
       const script = innerScript(command)
-      return script === null ? [command] : runCommands(script)
+      return script === null ? [command] : runCommands(script, work)
     }),
-    ...fed.flatMap(script => (isDynamic(script) ? [[script]] : runCommands(script))),
+    ...fed.flatMap(script => (isDynamic(script) ? [[script]] : runCommands(script, work))),
   ]
 }
 
@@ -268,7 +269,7 @@ const writes = ([name = '', ...words]: readonly string[]) => {
 
 /** The first command in a Bash command line that writes to GitHub through plain `gh`, as its words joined, or null when there is none. */
 export const ownerWrite = (command: string): string | null => {
-  const found = runCommands(command).find(words => writes(words))
+  const found = runCommands(command, newWork()).find(words => writes(words))
   return found ? found.map(word => plainWord(word)).join(' ') : null
 }
 
