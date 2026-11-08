@@ -105,9 +105,9 @@ default branch's CI, new issues, the owner's comments on issues, and issues clos
     several watchers cost hardly more than one.
   - `GH_PARALLEL`: how many `gh` calls run at once (2 by default); the pull requests are checked in
     parallel, and the cap keeps the bursts within GitHub's rate limits.
-  - `FULL_READ_MINUTES`: how long a pull request goes without a full read at most (10 by default; 0,
-    or set empty, reads every one in full on every look; anything else but a number from 0 stops the
-    watcher at the start). Each look asks one cheap question about what changed, and a PR it shows as changed is
+  - `FULL_READ_MINUTES`: how long a pull request goes without a full read at most (10 by default; 0
+    reads every one in full on every look; anything else but a number from 0, a blank value included,
+    stops the watcher at the start). Each look asks one cheap question about what changed, and a PR it shows as changed is
     read in full at once (#404); this limit is for what that question can't see.
   - `MERGED_HOURS`: how far back a merged pull request still counts as recent (3 by default), so one
     opened and merged between two looks is still reported. It applies to the repository's merged PRs
