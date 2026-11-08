@@ -8,7 +8,7 @@ import { type Json, at, count, records } from './watch-text'
 import { perIssue } from './watch-per-issue'
 import { exists, oneAtATime, readLines, subscribedSince, subscriptions, writeLines } from './watch-state'
 import { allSettled, hasText, textOf } from './read'
-import { isUnwritten, markSeen, queue } from './watch-output'
+import { isUnwritten, markSeen, queue, reportedLines } from './watch-output'
 
 export { changedStates } from './watch-change-gate'
 
@@ -157,7 +157,7 @@ export const watchedPrs = async (): Promise<number[] | null> => {
     openPrNumbers(),
     recentlyMerged(MERGED_HOURS),
     readLines('tracked').then(lines => lines.map(Number)),
-    readLines('reported'),
+    reportedLines(),
   ]).catch(() => null)
   if (!lists) {
     return null

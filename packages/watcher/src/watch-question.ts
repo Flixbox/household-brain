@@ -12,7 +12,8 @@ import { GH, failedStatus } from './watch-gh'
 import { type PrState, REPO, gh } from './watch-github'
 import { at } from './watch-text'
 import { IS_WRITER, attemptWrite, reportWrite, writerRuns } from './watch-writer'
-import { readLines, updateLines } from './watch-state'
+import { reportedLines } from './watch-output'
+import { updateLines } from './watch-state'
 import { textOf } from './read'
 
 /** Whether `GH` is a bot's token, once GitHub answered. */
@@ -92,7 +93,7 @@ export const awaitsQuestionOutcome = async (pr: number, state: PrState, nowMs: n
   if (IS_WRITER || state.state === 'OPEN' || !await writerRuns()) {
     return false
   }
-  const reported = await readLines('reported')
+  const reported = await reportedLines()
   if (questionOutcomeKeys(pr, state.head).some(key => reported.includes(key))) {
     return false
   }
