@@ -32,7 +32,7 @@ export const activitiesOf = async (prs: readonly number[], fresh = false): Promi
   const read = await allActivity(prs, GH, fresh)
   const theirs = await allActivity(prs.filter(pr => !read.has(pr)), ACTIVITY_GH, fresh)
   const withPending = ([pr, items]: [number, Activity[]]): [number, Activity[]] => [pr, addPending(items, pending.get(pr) ?? [])]
-  return new Map([...theirs, ...[...read].filter(([pr]) => !fresh || pending.has(pr))].map(withPending))
+  return new Map([...theirs, ...[...read].filter(([pr]) => !fresh || pending.has(pr))].map(entry => withPending(entry)))
 }
 
 /** The comments of a PR already reported. On the very first round, the ones already there are old news. */
