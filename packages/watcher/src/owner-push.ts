@@ -6,49 +6,73 @@
  * ahead of the bot's for a moment, and another agent's push went out as the owner.
  *
  * A catch for accidents (#389), not a boundary: a clone none of whose helpers is the bot's is left
- * alone, since not every repository has a bot, and a directory the shell fills in is ignored.
+ * alone, since not every repository has a bot, and a directory the shell fills in is ignored. A push
+ * that goes elsewhere than GitHub over HTTPS never asks those helpers, so it passes (#467).
  */
 import path from 'node:path'
+import { mayUseGithubHelpers } from './push-destination'
 import { isDynamic } from './shell-commands'
 import { baseName } from './shell-interpreters'
+import { withoutRedirections } from './shell-redirections'
 
 /** Git's own options that take the next word as their value, before the subcommand. */
 const valueOptions = new Set(['--attr-source', '--config-env', '--git-dir', '--namespace', '--super-prefix', '--work-tree', '-C', '-c'])
 
-/** The directories of a git call's `-C` options, and its subcommand. */
+/** Git's own options that can't change where a push goes. */
+const inertOptions = new Set(['--no-pager', '--paginate', '-P', '-p'])
+
+/** The directories of a git call's `-C` options, whether it has options that may change where a push goes, its subcommand and that subcommand's arguments. */
 const readGit = (args: readonly string[]) => {
   const dirs: string[] = []
+  let otherOptions = false
   let at = 0
   while (args[at]?.startsWith('-') === true) {
     if (args[at] === '-C') {
       dirs.push(args[at + 1] ?? '')
+    } else if (!inertOptions.has(args[at] ?? '')) {
+      otherOptions = true
     }
     at += valueOptions.has(args[at] ?? '') ? 2 : 1
   }
-  return { dirs, subcommand: args[at] ?? '' }
+  return { args: args.slice(at + 1), dirs, otherOptions, subcommand: args[at] ?? '' }
+}
+
+/** A `git push` in a line: where it runs, its arguments, and whether something before it (a directory the shell fills in, a git option such as `-c`) keeps its destination from being read. */
+interface Push {
+  args: readonly string[]
+  dir: string
+  unclear: boolean
 }
 
 /** The directory after a `cd` or `-C` to this word; one the shell fills in changes nothing. */
 const moveTo = (dir: string, word: string) => (isDynamic(word) ? dir : path.resolve(dir, word.replace(/^~(?=\/|$)/u, Bun.env.HOME ?? '~')))
 
-/** Whether `pushDirs` reads a command with this first word. */
+/** Whether `pushesIn` reads a command with this first word. */
 export const movesOrPushes = (name: string) => name === 'cd' || baseName(name) === 'git'
 
-/** The directory each `git push` runs in, following the `cd`s before it in the line. */
-const pushDirs = (commands: readonly (readonly string[])[], cwd: string) => {
+/** The `git push` this git call is, if it is one, run from this directory. */
+const pushOf = (gitArgs: readonly string[], from: string, moved: boolean): Push[] => {
+  const call = readGit(withoutRedirections(gitArgs))
+  if (call.subcommand !== 'push') {
+    return []
+  }
+  return [{ args: call.args, dir: call.dirs.reduce(moveTo, from), unclear: moved || call.otherOptions || call.dirs.some(word => isDynamic(word)) }]
+}
+
+/** Each `git push` in the line, following the `cd`s before it. */
+const pushesIn = (commands: readonly (readonly string[])[], cwd: string) => {
   let dir = cwd
-  const dirs: string[] = []
+  let moved = false
+  const pushes: Push[] = []
   for (const [name = '', ...args] of commands) {
     if (name === 'cd' && args.length > 0) {
+      moved ||= isDynamic(args.at(-1) ?? '')
       dir = moveTo(dir, args.at(-1) ?? '')
     } else if (baseName(name) === 'git') {
-      const call = readGit(args)
-      if (call.subcommand === 'push') {
-        dirs.push(call.dirs.reduce(moveTo, dir))
-      }
+      pushes.push(...pushOf(args, dir, moved))
     }
   }
-  return dirs
+  return pushes
 }
 
 /** The helpers git would see for github.com in this directory, in its order: system, global, local. None outside a repository's reach. */
@@ -75,8 +99,15 @@ const pushReason = (dir: string) => [
   'The config is shared by every worktree of the clone and another agent may be setting it up: retry shortly, and if it stays wrong report it, rather than changing it from a worktree.',
 ].join(' ')
 
-/** Why the first `git push` among these commands that would not go out as the bot is refused, or null when there is none. */
-export const pushRefusal = (commands: readonly (readonly string[])[], cwd: string) => {
-  const dir = pushDirs(commands, cwd).find(candidate => wrongOrder(helpersOf(candidate)))
-  return typeof dir === 'undefined' ? null : pushReason(dir)
+/**
+ * Whether the line can change where a push goes unseen in its words: it sets a variable git reads, feeds a command through xargs,
+ * sources a file or moves with `pushd`/`popd`. Read with quotes and backslashes removed, as they can splice a word together.
+ */
+const hidesDestination = (line: string) => /\bGIT_\w+=|\bxargs\b|(?:^|[\s;&|(])(?:source|\.|pushd|popd)(?=[\s;&|)]|$)/u.test(line.replaceAll(/["'\\]/gu, ''))
+
+/** Why the first `git push` among these commands, the ones this line runs, that would not go out as the bot is refused, or null when there is none. */
+export const pushRefusal = (commands: readonly (readonly string[])[], cwd: string, line: string) => {
+  const hidden = hidesDestination(line)
+  const push = pushesIn(commands, cwd).find(({ args, dir, unclear }) => wrongOrder(helpersOf(dir)) && (hidden || unclear || mayUseGithubHelpers(dir, args)))
+  return typeof push === 'undefined' ? null : pushReason(push.dir)
 }
