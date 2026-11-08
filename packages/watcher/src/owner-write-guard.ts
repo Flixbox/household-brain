@@ -38,15 +38,14 @@ const methodFlags = new Set(['--method', '-X'])
 /** Shell keywords that may stand before a command. */
 const keywords = new Set(['!', 'do', 'elif', 'else', 'if', 'then', 'until', 'while', '{', '}'])
 
-/**
- * Commands that run a command given in their arguments, after options that may take values
- * (`sudo -u x gh …`, `nice -n 10 gh …`). Their options aren't read: every later word counts as
- * where the command may start.
- */
+/** Commands that run a command given in their arguments, after options that may take values (`sudo -u x gh …`, `nice -n 10 gh …`). Their options aren't read: every later word counts as where the command may start. */
 const wrappers = new Set([
-  'builtin', 'busybox', 'command', 'coproc', 'doas', 'env', 'exec', 'ionice', 'nice', 'nohup', 'setsid', 'stdbuf', 'sudo', 'time',
-  'timeout', 'unbuffer', 'watch', 'xargs',
+  'builtin', 'busybox', 'chroot', 'chrt', 'command', 'coproc', 'doas', 'env', 'exec', 'flock', 'ionice', 'nice', 'nohup', 'script', 'setpriv',
+  'setsid', 'stdbuf', 'sudo', 'taskset', 'time', 'timeout', 'unbuffer', 'unshare', 'watch', 'xargs',
 ])
+
+/** Wrappers that also take a whole command line after `-c`, as a shell does (`flock x -c '…'`). */
+const scriptFlagRunners = new Set(['flock', 'script'])
 
 /** A redirection: its operator, and its target when attached (`>out`, `2>/dev/null`, `&>log`). */
 const redirection = /^\d*(?:&>>?|>>?|<{1,3}|>&|<&|>\|)(?<target>.*)$/su
@@ -212,7 +211,7 @@ const innerScript = (words: readonly string[]) => {
   if (baseName(name) === 'env') {
     return envSplitString(args)
   }
-  const at = shell.test(baseName(name)) ? args.findIndex(arg => /^-[abd-z]*c[a-z]*$/u.test(arg)) : -1
+  const at = shell.test(baseName(name)) || scriptFlagRunners.has(baseName(name)) ? args.findIndex(arg => /^-[abd-z]*c[a-z]*$/u.test(arg)) : -1
   return at === -1 ? null : (args[at + 1] ?? null)
 }
 
