@@ -1,12 +1,13 @@
 /**
  * A shell command line read into its simple commands (#368), closely enough for the owner-write
  * guard: the commands of a pipeline, list, group or subshell, of `$(…)` and backticks (also inside
- * double quotes), each as its words with quotes and escapes taken off (`$'…'` decoded, #378), and comments and
- * here-document bodies left out. It
+ * double quotes), each as its words with quotes and escapes taken off (`$'…'` decoded, #378), and comments left out. A
+ * here-document's body is no command, but comes along as a command of one word, a here-string, for
+ * whoever must know what a shell is fed. It
  * expands nothing: a `$` the shell would expand (outside single quotes) stays in the word, after a
  * mark, so `isDynamic` tells a word the shell may change from one it takes as written.
  */
-import { type Heredoc, closingLine, heredocOf, heredocOpener } from './shell-heredocs'
+import { type Heredoc, bodyAsRead, bodyExpands, closingLine, hereStringOperator, heredocOf, heredocOpener } from './shell-heredocs'
 import { closingParen, indexOrEnd, opensArithmetic } from './shell-parens'
 import { ansiCValue, closingQuote, dynamic } from './shell-ansi-c'
 
@@ -163,7 +164,9 @@ const plain: Reader = (scan, text, at) => {
   return at + 1
 }
 
-const opensHeredoc = (text: string, at: number) => text.startsWith('<<', at) && !text.startsWith('<<<', at)
+const opensHereString = (text: string, at: number) => text.startsWith(hereStringOperator, at)
+
+const opensHeredoc = (text: string, at: number) => text.startsWith('<<', at) && !opensHereString(text, at)
 
 /** `<` and `>` end the word before them, as in the shell, unless it is the file descriptor (`2>`) or the operator so far (`>>`, `&>`). */
 const endWordBeforeRedirection = (scan: Scan) => {
@@ -199,6 +202,14 @@ const noteHeredoc = (scan: Scan, match: RegExpExecArray) => {
 /** A here-document opener that can't be read for certain, as a command word the shell fills in, which the guard refuses (#381). */
 const unreadable = (rest: string) => dynamic + (/^\S*/u.exec(rest)?.[0] ?? '')
 
+/** `<<<`: a word of its own, so the word after it, attached or not and even empty, is the next word; no body follows on the next lines. */
+const hereString: Reader = (scan, _text, at) => {
+  endWordBeforeRedirection(scan)
+  append(scan, hereStringOperator)
+  endWord(scan)
+  return at + hereStringOperator.length
+}
+
 const heredocOpen: Reader = (scan, text, at) => {
   const match = heredocOpener(text.slice(at))
   endWordBeforeRedirection(scan)
@@ -222,9 +233,17 @@ const substitutionsIn = (scan: Scan, text: string) => {
   }
 }
 
+/** A here-document's body: the substitutions the shell runs in it, and the body itself as a here-string. */
+const readBody = (scan: Scan, heredoc: Heredoc, body: string) => {
+  if (!heredoc.quoted) {
+    substitutionsIn(scan, body)
+  }
+  scan.commands.push([hereStringOperator + (bodyExpands(heredoc, body) ? dynamic : '') + bodyAsRead(heredoc, body)])
+}
+
 /**
- * Where what follows the here-documents opened on a line starts: their bodies are data, not commands,
- * but for the substitutions the shell runs in an unquoted one.
+ * Where what follows the here-documents opened on a line starts. Their bodies are data, but for the
+ * substitutions the shell runs in an unquoted one; each is kept as a here-string, in case a shell reads it.
  */
 const pastHeredocs = (scan: Scan, text: string, from: number) => {
   const pending = scan.heredocs
@@ -232,9 +251,7 @@ const pastHeredocs = (scan: Scan, text: string, from: number) => {
   let at = from
   for (const heredoc of pending) {
     const { after, start } = closingLine(heredoc, text, at)
-    if (!heredoc.quoted) {
-      substitutionsIn(scan, text.slice(at, start))
-    }
+    readBody(scan, heredoc, text.slice(at, start))
     at = after
   }
   return at
@@ -251,6 +268,7 @@ type Test = (scan: Scan, text: string, at: number) => boolean
 const readerRules: readonly (readonly [Test, Reader])[] = [
   [(_scan, text, at) => text[at] === ' ' || text[at] === '\t', blank],
   [(_scan, text, at) => text[at] === '\n', newline],
+  [(_scan, text, at) => opensHereString(text, at), hereString],
   [(_scan, text, at) => opensHeredoc(text, at), heredocOpen],
   [(_scan, text, at) => text[at] === '<' || text[at] === '>', redirect],
   [(scan, text, at) => scan.word === null && text.startsWith('((', at), doubleParen],
