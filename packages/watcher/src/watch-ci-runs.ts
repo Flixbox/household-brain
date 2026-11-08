@@ -46,7 +46,7 @@ export const checkRun = async (check: RunCheck): Promise<void> => {
     return
   }
   // Jobs that can't be read yet: the result waits a look rather than coming out without them.
-  const jobs = run ? keptJobs(run) ?? await jobLines(run.id).catch(() => null) : null
+  const jobs = run ? keptJobs(run) ?? await jobLines(run).catch(() => null) : null
   await (run && jobs ? reportRun({ check, jobs, run }) : Promise.resolve())
 }
 

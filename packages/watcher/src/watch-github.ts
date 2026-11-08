@@ -89,9 +89,17 @@ export const containsCommit = async (newer: string, older: string): Promise<bool
 /** The newest CI run on main, and its commit. */
 export const newestMainRun = async (): Promise<MainRun | null> => (await mainRuns(1))[0] ?? null
 
-export const jobLines = async (run: number): Promise<string[]> =>
-  records(record(await gh(['run', 'view', String(run), '--repo', REPO, '--json', 'jobs'])).jobs)
-    .map(job => `  ${textOf(job.name)}: ${textOf(job.status)} ${textOf(job.conclusion)}`)
+/**
+ * The lines for a run's jobs. A run that has completed is asked about afresh (#493): the job list shared
+ * while it ran can outlive the run's own shared answer, and would contradict the verdict. A run that
+ * passed with a job still unfinished is GitHub's answer lagging: null, so the result waits a look.
+ */
+export const jobLines = async ({ conclusion, id, status }: Run): Promise<string[] | null> => {
+  const jobs = records(record(await gh(['run', 'view', String(id), '--repo', REPO, '--json', 'jobs'], GH, status === 'completed')).jobs)
+  return conclusion === 'success' && jobs.some(job => job.status !== 'completed')
+    ? null
+    : jobs.map(job => `  ${textOf(job.name)}: ${textOf(job.status)} ${textOf(job.conclusion)}`)
+}
 
 /** Asks for `fields` of the repository through GraphQL, with `cli` (the `GH` token by default). */
 export const graphql = async (fields: string, fresh = false, cli = GH): Promise<Json> => {
