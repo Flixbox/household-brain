@@ -82,3 +82,91 @@ describe('a git push under the wrong credential helper (#455)', () => {
     expect(denied('git -C push status', wrong)).toBe(false)
   })
 })
+
+describe('a git push under the wrong credential helper, by where it goes (#467)', () => {
+  const github = 'https://github.com/owner-test/repo.git'
+  const ssh = 'git@host.test:owner-test/repo.git'
+
+  const config = (dir: string, key: string, value: string) => Bun.spawnSync(['git', '-C', dir, 'config', '--add', key, value])
+
+  /** A clone with its helpers in the wrong order and these settings. */
+  const wrongWith = (...settings: readonly (readonly [string, string])[]) => {
+    const dir = clone(['', owner, bot])
+    for (const [name, value] of settings) {
+      config(dir, name, value)
+    }
+    return dir
+  }
+
+  const origin = (url: string) => wrongWith(['remote.origin.url', url])
+
+  it('lets through a push to a remote that never asks the HTTPS helpers', () => {
+    const urls = [ssh, 'ssh://git@host.test/owner-test/repo.git', `${root}/bare.git`, '../bare.git', 'https://host.test/owner-test/repo.git']
+    expect(urls.filter(url => denied('git push origin HEAD', origin(url)))).toEqual([])
+  })
+
+  it('still refuses a push to GitHub over HTTPS', () => {
+    const urls = [github, 'https://GitHub.com/owner-test/repo', 'https://someone@github.com/owner-test/repo', 'https://github.com:443/owner-test/repo']
+    expect(urls.filter(url => !denied('git push origin HEAD', origin(url)))).toEqual([])
+  })
+
+  it('goes by the push URL, and refuses when any of several reaches GitHub', () => {
+    expect(denied('git push origin HEAD', wrongWith(['remote.origin.url', github], ['remote.origin.pushurl', ssh]))).toBe(false)
+    expect(denied('git push origin HEAD', wrongWith(['remote.origin.url', ssh], ['remote.origin.pushurl', github]))).toBe(true)
+    expect(denied('git push origin HEAD', wrongWith(['remote.origin.url', ssh], ['remote.origin.pushurl', ssh], ['remote.origin.pushurl', github]))).toBe(true)
+  })
+
+  it('reads a URL or path given on the command line', () => {
+    const toGithub = origin(ssh)
+    const toSsh = origin(github)
+    expect(denied(`git push ${github} HEAD`, toGithub)).toBe(true)
+    expect(denied(`git push --repo=${github}`, toGithub)).toBe(true)
+    expect(denied(`git push --repo ${github}`, toGithub)).toBe(true)
+    expect(denied(`git push ${ssh} HEAD`, toSsh)).toBe(false)
+    expect(denied(`git push ${root}/bare.git HEAD`, toSsh)).toBe(false)
+    expect(denied(`git push --repo=${ssh}`, toSsh)).toBe(false)
+  })
+
+  it('does not take an option\'s value for the destination', () => {
+    expect(denied(`git push -o ${ssh} ${github} HEAD`, origin(ssh))).toBe(true)
+    expect(denied(`git push --push-option ${ssh} ${github} HEAD`, origin(ssh))).toBe(true)
+    expect(denied(`git push -u --force-with-lease -- ${ssh} HEAD`, origin(github))).toBe(false)
+  })
+
+  it('follows git\'s choice of remote for a plain push', () => {
+    const bothRemotes = [['remote.origin.url', github], ['remote.away.url', ssh]] as const
+    expect(denied('git push', wrongWith(...bothRemotes))).toBe(true)
+    expect(denied('git push', wrongWith(...bothRemotes, ['remote.pushDefault', 'away']))).toBe(false)
+    expect(denied('git push', wrongWith(['remote.origin.url', ssh]))).toBe(false)
+    expect(denied('git push', wrongWith(['remote.origin.url', ssh], ['remote.away.url', github], ['remote.pushDefault', 'away']))).toBe(true)
+  })
+
+  it('applies URL rewrites', () => {
+    const rewritten = ['url.https://github.com/.insteadOf', 'gh:'] as const
+    expect(denied('git push gh:owner-test/repo HEAD', wrongWith(rewritten))).toBe(true)
+    expect(denied('git push origin HEAD', wrongWith(rewritten, ['remote.origin.url', 'gh:owner-test/repo']))).toBe(true)
+    expect(denied('git push origin HEAD', wrongWith(['url.https://github.com/.pushInsteadOf', 'git@host.test:'], ['remote.origin.url', ssh]))).toBe(true)
+  })
+
+  it('keeps refusing when the destination is unclear', () => {
+    const toSsh = origin(ssh)
+    const commands = [
+      'git push "$REMOTE" HEAD',
+      'git push --repo "$REMOTE"',
+      'git push nowhere HEAD',
+      `git -c remote.origin.pushurl=${github} push origin HEAD`,
+      'cd "$SOMEWHERE" && git push origin HEAD',
+      'git -C "$SOMEWHERE" push origin HEAD',
+      'git push ext::some-command HEAD',
+    ]
+    expect(commands.filter(command => !denied(command, toSsh))).toEqual([])
+  })
+
+  it('does not count a branch the shell fills in as unclear', () => {
+    expect(denied('git push origin "$BRANCH"', origin(ssh))).toBe(false)
+  })
+
+  it('never refuses a clone whose order is right, wherever the push goes', () => {
+    expect(denied(`git push ${github} HEAD`, clone(['', bot]))).toBe(false)
+  })
+})
