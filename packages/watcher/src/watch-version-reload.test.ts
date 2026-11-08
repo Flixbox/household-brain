@@ -10,7 +10,7 @@ afterAll(async () => Promise.all(made.map(async dir => rm(dir, { force: true, re
 const source = async (name: string): Promise<string> => Bun.file(`${import.meta.dir}/${name}`).text()
 const entry = await source('watch-project.ts')
 const version = await source('watch-version.ts')
-const main = "import { marker, startedOn } from './watch-version'\nconsole.log(JSON.stringify({ args: process.argv.slice(2), marker, started: startedOn() }))\n"
+const main = "import { marker, startedOn } from './watch-version'\nconsole.log(JSON.stringify({ args: process.argv.slice(2), hasVersion: startedOn() !== '', marker }))\n"
 const withMarker = (value: number): string => `${version}\nexport const marker = ${value}\n`
 
 const tempDir = async (): Promise<string> => {
@@ -49,12 +49,11 @@ const gitThatPulls = async (dir: string, shims: string): Promise<void> => {
   await $`chmod +x ${shims}/git`.quiet()
 }
 
-interface Report { args: string[], marker: number, started: string }
-
-const runWatcher = async (dir: string, path: string): Promise<Report> => {
+const runWatcher = async (dir: string, path: string): Promise<unknown> => {
   const env = { ...process.env, PATH: path }
   const output = await $`${process.execPath} ${dir}/packages/watcher/src/watch-project.ts --follow`.env(env).quiet().text()
-  return JSON.parse(output) as Report
+  const report: unknown = JSON.parse(output)
+  return report
 }
 
 describe('the version a watcher compares against (#512)', () => {
@@ -65,15 +64,12 @@ describe('the version a watcher compares against (#512)', () => {
     await writeWatcher(dir)
     await commitAll(dir)
     await gitThatPulls(dir, shims)
-    const report = await runWatcher(dir, `${shims}:${process.env.PATH ?? ''}`)
-    expect(report.marker).toBe(2)
-    expect(report.started).not.toBe('')
-    expect(report.args).toEqual(['--follow'])
+    expect(await runWatcher(dir, `${shims}:${process.env.PATH ?? ''}`)).toEqual({ args: ['--follow'], hasVersion: true, marker: 2 })
   })
 
   it('still starts, once, where the version can\'t be read', async () => {
     const dir = await tempDir()
     await writeWatcher(dir)
-    expect(await runWatcher(dir, process.env.PATH ?? '')).toEqual({ args: ['--follow'], marker: 1, started: '' })
+    expect(await runWatcher(dir, process.env.PATH ?? '')).toEqual({ args: ['--follow'], hasVersion: false, marker: 1 })
   })
 })
