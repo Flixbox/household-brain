@@ -74,13 +74,15 @@ const loadedFiles = (files: Map<string, [string, string]>): Set<string> | null =
   return seen
 }
 
+const pathAndBlob = (path: string, files: Map<string, [string, string]>): string => `${path}:${files.get(path)?.[0] ?? ''}`
+
 /** The blobs of the files that make up what the watcher runs, as one comparable string; null when that can't be told. */
 const runningCode = async (): Promise<string | null> => {
   const files = await readPackage()
   const loaded = loadedFiles(files)
   if (loaded === null) { return null }
   const counted = [...loaded, ...SETTINGS.filter(path => files.has(path))].toSorted()
-  return `files ${counted.map(path => `${path}:${files.get(path)?.[0] ?? ''}`).join(' ')}`
+  return `files ${counted.map(path => pathAndBlob(path, files)).join(' ')}`
 }
 
 /**
