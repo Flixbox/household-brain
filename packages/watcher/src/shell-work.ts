@@ -15,11 +15,14 @@ export interface Work {
 
 export const newWork = (): Work => ({ left: workLimit })
 
-/** Takes a reading of this text off the budget, and tells whether the budget is spent. */
-export const spent = (work: Work, text: string) => {
-  work.left -= text.length + 1
+/** Takes this much reading off the budget, and tells whether the budget is spent. */
+export const charged = (work: Work, amount: number) => {
+  work.left -= amount
   return work.left < 0
 }
+
+/** Takes a reading of this text off the budget, and tells whether the budget is spent. */
+export const spent = (work: Work, text: string) => charged(work, text.length + 1)
 
 /** A `gh` command the shell fills in, so a write: what the guard reports for a line it can't read. */
 export const unreadableLine = () => [['gh', `${dynamic}$unreadable`]]
