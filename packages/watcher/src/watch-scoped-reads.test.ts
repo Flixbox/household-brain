@@ -8,14 +8,15 @@ afterEach(async () => { await Promise.all(dirs.splice(0).map(async dir => rm(dir
 
 /**
  * A `gh` for a repository with three open PRs: 7 (subscribed, merged), 8 (unrelated) and 9 (closes the
- * subscribed issue 4). PR 6 closes issue 4 too and has just merged, between two looks; PR 2 merged an
+ * subscribed issue 4). PR 1 closes issue 4 and merged in the second the watcher started, which GitHub's
+ * whole seconds round down to before it (#477). PR 6 closes issue 4 too and has just merged, between two looks; PR 2 merged an
  * hour ago, before the watcher started (#477); PR 3 closed it long ago, before it was reopened. It
  * keeps every call in `calls`. Issue 4 gets the owner's answer
  * from its COMMENT_FROM-th comment read on (the second by default), and is closed from its third, so
  * the subscription completes. Issue 5 is gone: any query that asks about it fails.
  */
 const FAKE_GH = String.raw`
-  import { appendFileSync, readFileSync, writeFileSync } from 'node:fs'
+  import { appendFileSync, readFileSync, statSync, writeFileSync } from 'node:fs'
   const text = process.argv.slice(2).join(' ').replaceAll('\n', ' ')
   const home = process.env.FIXTURE_HOME
   appendFileSync(home + '/calls', text + '\n')
@@ -29,10 +30,10 @@ const FAKE_GH = String.raw`
   if (text.startsWith('api -i')) { rest({ commit: { message: 'main' }, sha: 'main1' }) }
   if (text.startsWith('pr list') || text.startsWith('run list')) { answer([]) }
   if (text.startsWith('api repos/')) { answer({ ahead_by: 0, commit: { message: 'main' }, commits: [], sha: 'main1' }) }
-  const merged = pr => [2, 6, 7].includes(pr)
+  const merged = pr => [1, 2, 6, 7].includes(pr)
   const state = pr => ({
     author: { login: 'agent' },
-    closingIssuesReferences: { nodes: [2, 6, 9].includes(pr) ? [{ number: 4 }] : [] },
+    closingIssuesReferences: { nodes: [1, 2, 6, 9].includes(pr) ? [{ number: 4 }] : [] },
     headRefOid: 'head' + pr,
     mergeCommit: merged(pr) ? { oid: 'merge' + pr } : null,
     mergeable: 'MERGEABLE',
@@ -48,7 +49,9 @@ const FAKE_GH = String.raw`
   if (issues.length > 0) {
     if (text.includes('comments(')) { writeFileSync(home + '/comment-reads', String(reads() + 1)) }
     const comments = reads() >= Number(process.env.COMMENT_FROM ?? 2) ? [{ author: { login: 'owner' }, body: 'OWNER_ISSUE_ANSWER', createdAt: Temporal.Now.instant().toString(), databaseId: 41, url: 'https://comments.test/41' }] : []
+    const started = Math.floor(statSync(home + '/state/subscribed-since').mtimeMs / 1000) * 1000
     const issue = { closedByPullRequestsReferences: { nodes: [
+      { mergedAt: Temporal.Instant.fromEpochMilliseconds(started).toString(), number: 1, state: 'MERGED' },
       { mergedAt: '2026-01-01T00:00:00Z', number: 3, state: 'MERGED' },
       { mergedAt: Temporal.Now.instant().subtract({ hours: 1 }).toString(), number: 2, state: 'MERGED' },
       { mergedAt: Temporal.Now.instant().toString(), number: 6, state: 'MERGED' },
@@ -96,7 +99,7 @@ const prsAskedAbout = (calls: readonly string[]) =>
 test('a scoped watcher reads only its subjects: no open-PR, open-issue or repository-wide lists (#357)', async () => {
   const { calls, code, output } = await runScoped('pr:7,issue:4')
   // PR 7 is subscribed, PRs 6 and 9 close issue 4; PR 8 is none of its business, and the merges of PRs 2 and 3 are old.
-  expect(prsAskedAbout(calls)).toEqual([6, 7, 9])
+  expect(prsAskedAbout(calls)).toEqual([1, 6, 7, 9])
   expect(calls.filter(call => call.startsWith('pr list') || call.includes('pulls?state='))).toEqual([])
   expect(calls.filter(call => call.includes('issues(states:OPEN') || call.includes('created: issues('))).toEqual([])
   // What it reads instead still brings the owner's answer on the issue, and the issue's closing.
@@ -107,7 +110,7 @@ test('a scoped watcher reads only its subjects: no open-PR, open-issue or reposi
 
 test('a gone subscribed issue holds back neither the other issues nor the PRs (#357)', async () => {
   const { calls, code, output } = await runScoped('pr:7,issue:4,issue:5', { timeout: 8000 })
-  expect(prsAskedAbout(calls)).toEqual([6, 7, 9])
+  expect(prsAskedAbout(calls)).toEqual([1, 6, 7, 9])
   expect(output).toContain('PR #7: MERGED')
   expect(output).toContain('OWNER_ISSUE_ANSWER')
   expect(output).toContain('ISSUE_CLOSED #4')
@@ -125,7 +128,7 @@ test('after the upgrade, an owner comment newer than the old issue-events file i
 
 test('an issue subscription hears nothing of a PR merged before it started, and no early completion (#477)', async () => {
   const { calls, code, output } = await runScoped('issue:4')
-  expect(prsAskedAbout(calls)).toEqual([6, 9])
+  expect(prsAskedAbout(calls)).toEqual([1, 6, 9])
   expect(output).not.toContain('PR #2')
   expect(output).toContain('MERGED: merge6')
   expect(output).not.toContain('merge6; subscription completed')
@@ -141,6 +144,12 @@ test('the merge that ends the last subject says the subscription completed (#477
 
 test('two subscribed PRs merging in one look still say the subscription completed, once (#477)', async () => {
   const { code, output } = await runScoped('pr:6,pr:7')
+  expect(output.match(/subscription completed/gu)?.length).toBe(1)
+  expect(code).toBe(3)
+}, 30_000)
+
+test('two subscribed issues closing in one look say the subscription completed once (#477)', async () => {
+  const { code, output } = await runScoped('issue:4,issue:6')
   expect(output.match(/subscription completed/gu)?.length).toBe(1)
   expect(code).toBe(3)
 }, 30_000)
