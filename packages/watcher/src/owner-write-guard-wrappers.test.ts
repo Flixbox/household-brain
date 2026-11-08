@@ -48,7 +48,6 @@ describe('ownerWrite behind a wrapper stays within the work budget (#434)', () =
   // One line per kind of command the guard reads further: a kind left out of what a wrapper's starts are kept for would go unseen here (#456).
   it.each([
     'gh issue close 1',
-    '"$X"',
     'xargs gh',
     "bash -c 'gh issue close 1'",
     "eval 'gh issue close 1'",
@@ -71,4 +70,54 @@ describe('ownerWrite behind a wrapper stays within the work budget (#434)', () =
   it('still finds a write at the end of a long command behind a wrapper', () => {
     expect(ownerWrite(`env ${files(500)} gh issue close 1`)).not.toBeNull()
   }, testTimeoutMs)
+})
+
+describe('ownerWrite and a variable behind a wrapper (#436)', () => {
+  it.each([
+    'timeout 5 agent-gh issue close "$N"',
+    'timeout 5 make "$X"',
+    'flock x agent-gh issue close "$N"',
+    'flock x echo "$X"',
+    'timeout "$SECONDS_LEFT" agent-gh issue close "$N"',
+    'sudo -u x agent-gh issue close "$N"',
+    'env A=1 agent-gh issue close "$N"',
+    'nohup timeout 5 agent-gh issue close "$N" 2>/dev/null',
+  ])('lets %s run: the variable is an argument', command => {
+    expect(ownerWrite(command)).toBeNull()
+  })
+
+  it.each([
+    'timeout 5 "$CMD"',
+    'timeout -k 5 10 "$CMD"',
+    'flock x "$CMD"',
+    'sudo -u x "$CMD"',
+    'env A=1 "$CMD"',
+    'nice "$CMD"',
+    'sudo timeout 5 "$CMD"',
+    'nohup sudo -u x nice -n 10 "$CMD"',
+    'timeout "$OPTION" 5 "$CMD"',
+    'timeout 5 2>/dev/null "$CMD"',
+    'timeout 5 "$GH" issue close 1',
+    'env -i timeout 5 "$CMD"',
+    'env -- timeout 5 "$CMD"',
+    'env -S timeout 5 "$CMD"',
+    'sudo -n timeout 5 "$CMD"',
+    'sudo -uroot timeout 5 "$CMD"',
+    'sudo -n flock x "$CMD"',
+    'timeout -k5 10 flock x "$CMD"',
+    'flock -n x timeout 5 "$CMD"',
+    'taskset -c 1 timeout 5 "$CMD"',
+    'coproc timeout 5 "$CMD"',
+    'nohup 2>/dev/null timeout 5 "$CMD"',
+  ])('still refuses %s: the variable may be the command', command => {
+    expect(ownerWrite(command)).not.toBeNull()
+  })
+
+  it.each([
+    'timeout 5 gh issue close "$N"',
+    'sudo -u x gh issue close "$N"',
+    'timeout 5 agent-gh issue view 1 && gh issue close "$N"',
+  ])('still refuses %s: a real gh write', command => {
+    expect(ownerWrite(command)).not.toBeNull()
+  })
 })

@@ -3,6 +3,8 @@
  * command may start at any of its words, and each start is read as a command of its own. That is
  * quadratic in the words, so a start is only taken when the guard would read its first word further
  * (#456), each one is charged to the work budget (#434), and a line that spends it counts as a write.
+ * A variable counts as a command only where it can be one: at or before the wrapper's real command,
+ * as far as the options can be read (#436).
  */
 import { baseName, isGh } from './shell-interpreters'
 import { type Work, charged } from './shell-work'
@@ -14,6 +16,46 @@ const wrappers = new Set([
   'setsid', 'stdbuf', 'sudo', 'taskset', 'time', 'timeout', 'unbuffer', 'unshare', 'watch', 'xargs',
 ])
 
+/** Wrappers with a word of their own before the command (`timeout 5 …`, `flock file …`). */
+const takesOperand = new Set(['chroot', 'chrt', 'coproc', 'flock', 'script', 'taskset', 'timeout'])
+
+/** A word that isn't the command, and may be followed by its value: an option, a redirection, or a variable that may be either. */
+const optionLike = (word: string) => word.startsWith('-') || isDynamic(word) || /^\d*[<>&]/u.test(word)
+
+const namesWrapper = (word: string) => wrappers.has(baseName(word))
+
+/** Where the next word that isn't a wrapper's own starts, from `from` on: past assignments, options and what may be their values, but never past a word naming a wrapper, which may be the next wrapper. */
+const pastOptions = (command: readonly string[], from: number) => {
+  let at = from
+  while (at < command.length) {
+    const word = command[at] ?? ''
+    if (optionLike(word)) {
+      const next = command[at + 1] ?? ''
+      at += optionLike(next) || namesWrapper(next) ? 1 : 2
+    } else if (/^[A-Za-z_]\w*=/u.test(word)) {
+      at += 1
+    } else {
+      return at
+    }
+  }
+  return at
+}
+
+/** Where a wrapper's real command stands, behind any wrappers nested in it. An operand not taken because a wrapper's name stood there stays owed, so that a misread only moves this later, which keeps more variables as commands. */
+const realCommandAt = (command: readonly string[]) => {
+  let at = 0
+  let owed = 0
+  while (namesWrapper(command[at] ?? '')) {
+    owed += takesOperand.has(baseName(command[at] ?? '')) ? 1 : 0
+    at = pastOptions(command, at + 1)
+    while (owed > 0 && at < command.length && !namesWrapper(command[at] ?? '')) {
+      at = pastOptions(command, at + 1)
+      owed -= 1
+    }
+  }
+  return at
+}
+
 /** How many words of a start cost one character of the budget: a start that is no `gh` is only looked at, so several of them stay well inside it. */
 const wordsPerCharacter = 8
 
@@ -23,16 +65,23 @@ const costOf = (candidate: readonly string[]) => {
   return isGh(name) || isDynamic(name) ? candidate.join(' ').length : Math.ceil(candidate.length / wordsPerCharacter)
 }
 
+/** The words a wrapped command may start at: any written-out word, and a variable only up to the real command. */
+const startsOf = (command: readonly string[]) => {
+  const realCommand = realCommandAt(command)
+  return [...command.keys()].filter(at => at <= realCommand || !isDynamic(command[at] ?? ''))
+}
+
 /**
- * The commands a simple command may be: itself, and behind a wrapper one per word `readFurther` keeps,
- * until the budget is spent. A word it drops costs nothing, so a plain file list can be any length.
+ * The commands a simple command may be: itself, and behind a wrapper one per word it can start at and
+ * `readFurther` keeps, until the budget is spent. A word it drops costs nothing, so a plain file list
+ * can be any length.
  */
 export const commandsFrom = (command: string[], work: Work, readFurther: (name: string) => boolean) => {
   if (!wrappers.has(baseName(command[0] ?? ''))) {
     return [command]
   }
   const candidates: string[][] = []
-  for (let at = 0; at < command.length; at += 1) {
+  for (const at of startsOf(command)) {
     if (!readFurther(command[at] ?? '')) {
       continue
     }
