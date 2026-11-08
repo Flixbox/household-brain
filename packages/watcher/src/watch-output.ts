@@ -161,10 +161,28 @@ export const report = async (event: Event | null, pr: number | null = null): Pro
   await markReported(event.key)
 }
 
-/** The reminders for the open PRs, holding auto-merge for those that wait on a review bot asked for or reviewing (#299, #324). */
-const reminders = async (prs: OpenPr[]): Promise<string[]> => {
+/** A branch only behind main is said once per main head (#508); a queued or conflicting PR's reminder keeps coming. */
+const saidOncePerHead = (pr: OpenPr) => !pr.parked && !pr.queued && pr.mergeState === 'BEHIND'
+
+/**
+ * Claims the behind-main reminders that are news at main's head, the one `checkMainHead` last saw:
+ * `keys` to record once they are printed, `said` the PRs to leave out. While that head is unknown (its
+ * read failed) they are all left out, and the next look says them.
+ */
+const claimBehind = async (prs: readonly OpenPr[]): Promise<{ keys: string[], said: Set<number> }> => {
+  const [head = ''] = await readLines('main')
+  const claims = await Promise.all(prs.filter(pr => saidOncePerHead(pr)).map(async pr => {
+    const key = `pr-${pr.number} behind ${head}`
+    return { key, news: head !== '' && await claimReported(key), pr: pr.number }
+  }))
+  return { keys: claims.filter(claim => claim.news).map(claim => claim.key), said: new Set(claims.filter(claim => !claim.news).map(claim => claim.pr)) }
+}
+
+/** The reminders for the open PRs, holding auto-merge for those that wait on a review bot asked for or reviewing (#299, #324); `keys` are claimed. */
+const reminders = async (prs: OpenPr[]): Promise<{ keys: string[], lines: string[] }> => {
   const waits = await Promise.all(prs.map(async pr => awaitsBotReview({ asked: await askedBots(pr.number), state: pr.bot })))
-  return reminderLines(prs, REPO, new Set(prs.filter((_pr, index) => waits[index] === true).map(pr => pr.number)))
+  const { keys, said } = await claimBehind(prs)
+  return { keys, lines: reminderLines(prs, REPO, new Set(prs.filter((_pr, index) => waits[index] === true).map(pr => pr.number)), said) }
 }
 
 /**
@@ -186,10 +204,20 @@ const dueUsage = async (): Promise<string[]> => oneAtATime('usage-due', async ()
 /** The reminders, and the active agent's usage when it is due (#233, #318); nothing when neither has a line. */
 const sayClosing = async (): Promise<void> => {
   if (subscriptions.scoped) { return }
-  const closing = [...await openPrsThisLook().then(reminders, () => []), ...await dueUsage()]
-  if (closing.length > 0) {
-    say(FOLLOW ? [...closing, '---'] : closing)
+  const { keys, lines } = await openPrsThisLook().then(reminders, () => ({ keys: [], lines: [] }))
+  try {
+    const closing = [...lines, ...await dueUsage()]
+    if (closing.length > 0) {
+      say(FOLLOW ? [...closing, '---'] : closing)
+    }
+  } catch (error) {
+    // Nothing came out: the next look says them (#498).
+    for (const key of keys) { unwritten.delete(unwrittenKey(REPORTED, key)) }
+    throw error
   }
+  // Written here: the round's marks were written before these lines, and a one-shot watcher exits next.
+  await markSeen(REPORTED, keys)
+  await writeMarks()
 }
 
 /** Prints what the round kept, then writes what waited for that; whether the round printed anything. */

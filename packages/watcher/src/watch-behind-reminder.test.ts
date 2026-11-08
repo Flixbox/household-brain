@@ -37,3 +37,11 @@ test('a branch only behind main is reminded of once per main head; a queued or c
     queued: looks.map(output => remindersOf(output, 9)),
   }).toEqual({ behind: [1, 0, 1], conflicting: [1, 1, 1], queued: [1, 1, 1] })
 }, 30_000)
+
+test('a look that doesn\'t know main\'s head holds the reminder back for the next look (#508)', async () => {
+  const { gh, home } = await setUp(ANSWERS)
+  const env = { AGENT_USAGE_PROVIDER: 'claude', GH_SHARE_SECONDS: '0' }
+  const unknown = await run({ env, gh, home, script: lookAt('') })
+  const known = await run({ env, gh, home, script: lookAt('main1') })
+  expect([remindersOf(unknown, 7), remindersOf(known, 7)]).toEqual([0, 1])
+}, 30_000)

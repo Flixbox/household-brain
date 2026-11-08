@@ -66,7 +66,7 @@ const checkMoved = async (pr: number, head: string): Promise<void> => {
   const key = `pr-${pr} main-moved ${newest}`
   const news = ahead > 0 && !(await reportedLines()).includes(key)
   const stillOpen = news && await prStates([pr], true).then(states => states.get(pr)?.state === 'OPEN', () => false)
-  await report(stillOpen ? { key, lines: [`MAIN_MOVED: main is ${ahead} commit(s) ahead of the branch: rebase on main and run the checks again`], quiet: true } : null, pr)
+  await report(stillOpen ? { key, lines: [`MAIN_MOVED: main is ${ahead} commit(s) ahead of the branch: merge main in and run the checks again`], quiet: true } : null, pr)
 }
 
 const untrack = async (pr: number) => updateLines('tracked', lines => lines.filter(line => line !== String(pr)))
@@ -106,7 +106,7 @@ const checkClosed = async (pr: number, items: Activity[] | undefined): Promise<v
 
 /** Conflicts and approvals, which a parked PR (left open on purpose) doesn't report. */
 const checkReview = async (pr: number, state: PrState): Promise<void> => {
-  await report(state.mergeable === 'CONFLICTING' ? { key: `pr-${pr} conflict ${state.head}`, lines: [`CONFLICT at ${short(state.head)}: rebase on main`] } : null, pr)
+  await report(state.mergeable === 'CONFLICTING' ? { key: `pr-${pr} conflict ${state.head}`, lines: [`CONFLICT at ${short(state.head)}: merge main in and resolve it`] } : null, pr)
   // Already in the merge queue, there is no auto-merge to enable (#251).
   const queueIt = `queue it, alone in its own call: ${queueCommand(REPO, pr)}`
   const after = state.queued ? 'It is in the merge queue already.' : `Once it is well reviewed, ${queueIt}`
