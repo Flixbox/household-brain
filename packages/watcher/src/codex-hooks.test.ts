@@ -41,13 +41,13 @@ const withoutOnFailure = (handler: unknown) =>
 
 /** The entries with only what both hosts read, to compare the two manifests. */
 const sharedEntries = (entries: readonly unknown[]) =>
-  entries.map(entry => (isRecord(entry) ? { ...entry, hooks: handlersOf(entry).map(withoutOnFailure) } : entry))
+  entries.map(entry => (isRecord(entry) ? { ...entry, hooks: handlersOf(entry).map(handler => withoutOnFailure(handler)) } : entry))
 
 /** The commands Codex runs before a Bash call: those of every entry whose matcher matches "Bash". */
 const bashCommands = (entries: readonly unknown[]) =>
   entries
     .filter(entry => isRecord(entry) && new RegExp(textOf(entry.matcher), 'u').test('Bash'))
-    .flatMap(handlersOf)
+    .flatMap(entry => handlersOf(entry))
     .map(hook => (isRecord(hook) && hook.type === 'command' ? textOf(hook.command) : ''))
 
 /** What Codex sends a PreToolUse hook for a shell command. */
@@ -108,7 +108,8 @@ describe('the owner-write guard as a Codex hook (#370)', () => {
 
 describe('the owner-write guard failing in Claude Code (#393)', () => {
   it('blocks the call when the hook times out or crashes', async () => {
-    const failureSettings = (await claudeHooks()).flatMap(handlersOf).map(handler => (isRecord(handler) ? handler.onFailure : null))
+    const handlers = (await claudeHooks()).flatMap(entry => handlersOf(entry))
+    const failureSettings = handlers.map(handler => (isRecord(handler) ? handler.onFailure : null))
     expect(failureSettings).toEqual(['block'])
   })
 })
