@@ -8,10 +8,7 @@
  */
 import { type Heredoc, closingLine, heredocOf, heredocOpener } from './shell-heredocs'
 import { closingParen, indexOrEnd, opensArithmetic } from './shell-parens'
-import { ansiCValue, closingQuote } from './shell-ansi-c'
-
-/** Put before each `$` the shell expands; a private-use character, so no command text has it. */
-const dynamic = '\u{E000}'
+import { ansiCValue, closingQuote, dynamic } from './shell-ansi-c'
 
 /** Whether the shell may change a word before the command sees it (a variable, `$(…)`, backticks). */
 export const isDynamic = (word: string) => word.includes(dynamic)
@@ -190,6 +187,15 @@ const doubleParen: Reader = (scan, text, at) => {
   return end + 1
 }
 
+/** Keeps a here-document; where its delimiter can't be read, nothing after it can be either, so it counts as a command the guard refuses (review on #379). */
+const noteHeredoc = (scan: Scan, match: RegExpExecArray) => {
+  const heredoc = heredocOf(match)
+  scan.heredocs.push(heredoc)
+  if (isDynamic(heredoc.delimiter)) {
+    scan.commands.push([dynamic + match[0]])
+  }
+}
+
 const heredocOpen: Reader = (scan, text, at) => {
   const match = heredocOpener(text.slice(at))
   endWordBeforeRedirection(scan)
@@ -197,7 +203,7 @@ const heredocOpen: Reader = (scan, text, at) => {
     append(scan, '<<')
     return at + 2
   }
-  scan.heredocs.push(heredocOf(match))
+  noteHeredoc(scan, match)
   append(scan, match[0])
   endWord(scan)
   return at + match[0].length

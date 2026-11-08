@@ -6,6 +6,9 @@
  * stands as U+FFFD or as the Latin-1 character of the byte.
  */
 
+/** Put in a word the shell may change, before each `$` it expands or for what can't be read for certain; a private-use character. */
+export const dynamic = '\u{E000}'
+
 /** Where the `quote` that closes a string whose text starts at `from` is, a backslash escaping the character after it. */
 export const closingQuote = (text: string, from: number, quote: string) => {
   let at = from
@@ -20,8 +23,17 @@ const simple = new Map([
   ['f', '\f'], ['n', '\n'], ['r', '\r'], ['t', '\t'], ['v', '\v'],
 ])
 
-/** `\c` and the character after it: bash's control character (the low five bits), `\c?` DEL, `\c\` (also `\c\\`) the one of backslash. */
-const control = (char: string) => String.fromCodePoint(char === '?' ? 0x7F : (char.toUpperCase().codePointAt(0) ?? 0) % 32)
+/**
+ * `\c` and the character after it: bash's control character (the low five bits), `\c?` DEL, `\c\`
+ * (also `\c\\`) the one of backslash. Before a non-ASCII character bash takes only its first byte, and may end
+ * the string there, so the word counts as one the shell may change (fails closed, review on #379).
+ */
+const control = (char: string) => {
+  if ((char.codePointAt(0) ?? 0) > 0x7F) {
+    return dynamic
+  }
+  return String.fromCodePoint(char === '?' ? 0x7F : (char.toUpperCase().codePointAt(0) ?? 0) % 32)
+}
 
 const codePoint = (value: number) => (value <= 0x10_FF_FF && (value < 0xD8_00 || value > 0xDF_FF) ? String.fromCodePoint(value) : '\uFFFD')
 
