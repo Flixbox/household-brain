@@ -11,6 +11,8 @@
 // A network namespace alone wouldn't do: under WSL, a Windows gh.exe on /mnt/c or the interop socket
 // in /run runs on the Windows side, which has the network. So those folders, the homes (the real gh,
 // the tokens and keys) and the shared temporary folders are covered with empty ones.
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { spawnSync } from 'bun'
 
 export interface ProbeResult {
@@ -22,6 +24,7 @@ export interface ProbeResult {
 
 export interface ProbeOptions {
   limitSeconds: number
+  setpriv: string
   standIn: string
   unshare: string
 }
@@ -96,6 +99,8 @@ const runOne = (input: string, { limitSeconds, standIn, unshare }: ProbeOptions)
   return { input, ran: ran === 'true', status: Number(status), timedOut: timedOut === 'true' }
 }
 
+export const readProbeFile = (path: string, root: string): string => readFileSync(resolve(root, path), 'utf8')
+
 export const runProbes = (inputs: string[], options: ProbeOptions): ProbeResult[] =>
   inputs.map(input => runOne(input, options))
 
@@ -105,7 +110,7 @@ if (import.meta.main) {
     throw new TypeError('usage: guard-bash-probe <file holding a JSON array of strings>')
   }
   const inputs = parseProbeInputs(await Bun.file(path).text())
-  for (const result of runProbes(inputs, { limitSeconds: 5, standIn: 'gh', unshare: 'unshare' })) {
+  for (const result of runProbes(inputs, { limitSeconds: 5, setpriv: 'setpriv', standIn: 'gh', unshare: 'unshare' })) {
     process.stdout.write(`${JSON.stringify(result)}\n`)
   }
 }
