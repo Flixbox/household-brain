@@ -53,11 +53,12 @@ const FAKE = String.raw`
   console.log('{}')
 `
 
-const looks = async (scenario: string, label = 'pr') => {
+const looks = async (scenario: string, label = 'pr', reported: readonly string[] = []) => {
   const home = await mkdtemp(`${tmpdir()}/watch-ci-runs-`)
   dirs.push(home)
   const gh = `${home}/gh`
   await Bun.write(`${home}/fake.ts`, FAKE)
+  await Bun.write(`${home}/state/reported`, reported.map(line => `${line}\n`).join(''))
   await Bun.write(gh, `#!/bin/sh\nexec "${process.execPath}" "${home}/fake.ts" "$@"\n`)
   await Bun.spawn(['chmod', '+x', gh]).exited
   const child = Bun.spawn([process.execPath, '-e', LOOKS], {
@@ -74,8 +75,16 @@ test('a finished, reported run is not asked for again, and its rerun is (#401)',
   const result = await looks('passed')
   // Each attempt's jobs are read once.
   expect(result.views).toBe(2)
-  expect(result.output).toContain('"pr-7 ci-passed abc"')
-  expect(result.output).toContain('"pr-7 ci-passed abc 2"')
+  expect(result.output).toContain('"pr-7 ci-passed abc 5 1"')
+  expect(result.output).toContain('"pr-7 ci-passed abc 5 2"')
+}, 30_000)
+
+test('a result recorded before the run id is not reported again, and takes the new key (#486)', async () => {
+  const result = await looks('passed', 'pr', ['pr-7 ci-passed abc'])
+  // Attempt 1 is the recorded one; only attempt 2 is news.
+  expect(result.output.match(/CI_PASSED for/gu)).toHaveLength(1)
+  expect(result.output).toContain('"pr-7 ci-passed abc 5 1"')
+  expect(result.output).not.toContain('"pr-7 ci-passed abc"')
 }, 30_000)
 
 test('a run still going is read on every look, for CI_SLOW (#401)', async () => {
@@ -86,7 +95,7 @@ test('a run still going is read on every look, for CI_SLOW (#401)', async () => 
 test('a run list that can\'t be read leaves the run as it was (#401)', async () => {
   const result = await looks('refused')
   expect(result.views).toBe(1)
-  expect(result.output).not.toContain('ci-passed abc 2')
+  expect(result.output).not.toContain('ci-passed abc 5 2')
 }, 30_000)
 
 test('a cancelled deploy with no replacement has its jobs read once, and still asks for a replacement (#417)', async () => {

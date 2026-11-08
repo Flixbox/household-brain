@@ -11,7 +11,7 @@ import { agentUsageText, readAgentUsage } from './agent-usage'
 import { type Event, type OpenPr, answerFirst, clockTime, listsOpenPrs, openPrLines, reminderLines, stamped } from './watch-events'
 import { lookupNews, lookups } from './watch-gh'
 import { REPO, endOpenPrsLook, openPrsThisLook } from './watch-open-prs'
-import { appendLines, askedBots, oneAtATime, readLines, subscriptions, writeLines } from './watch-state'
+import { appendLines, askedBots, claimReportedLine, oneAtATime, readLines, subscriptions, writeLines } from './watch-state'
 import { awaitsBotReview } from './watch-bot-review-events'
 import { codeVersion, outdatedLine, startedOn } from './watch-version'
 import { postedFrom, shownUsage, usageDue } from './watch-usage'
@@ -124,11 +124,10 @@ export const reportedLines = async (): Promise<string[]> => {
  * Claims `key` for this watcher unless it was reported before; true when it is news. Checked and held
  * in one step, so two pollers finding the same event report it once. The caller queues the event and
  * then records it with `markReported`, so a crash before the print reports it again (#482).
+ * A CI result recorded before its key held the run id isn't news (#486).
  */
-export const claimReported = async (key: string): Promise<boolean> => oneAtATime(REPORTED, async () => {
-  if (isUnwritten(REPORTED, key) || (await readLines(REPORTED)).includes(key)) {
-    return false
-  }
+export const claimReported = async (key: string): Promise<boolean> => claimReportedLine(key, () => {
+  if (isUnwritten(REPORTED, key)) { return false }
   unwritten.add(unwrittenKey(REPORTED, key))
   return true
 })

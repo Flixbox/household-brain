@@ -1,6 +1,6 @@
 /** What the project watcher reports, decided from what GitHub answered (pure, so it is tested). */
 import { isRecord } from './read'
-import { ciPassedKey, ciState } from './watch-ci-state'
+import { ciResultKey, ciState } from './watch-ci-state'
 
 export interface Event {
   /** Scoped agents do not wake for housekeeping such as non-conflicting main movement. */
@@ -46,15 +46,14 @@ const finishedEvent = ({ pr, sha, label, run, jobs, repo }: RunContext): Event |
       : { key: `pr-${pr} deploy-failed ${sha} ${run.attempt}`, lines: [`DEPLOY_FAILED: run ${run.id} on main ended ${run.conclusion}: open a follow-up PR`, ...jobs] }
   }
   if (run.conclusion === 'success') {
-    return { key: ciPassedKey(pr, sha, run.attempt), lines: [`CI_PASSED for ${short(sha)} (run ${run.id})`, ...jobs] }
+    return { key: ciResultKey('passed', { pr, sha }, run), lines: [`CI_PASSED for ${short(sha)} (run ${run.id})`, ...jobs] }
   }
   // Cancelled: a newer push superseded it.
   if (run.conclusion === 'cancelled') {
     return null
   }
-  // Keyed by attempt too, so a re-run that fails again is reported again.
   return {
-    key: `pr-${pr} ci-failed ${sha} ${run.attempt}`,
+    key: ciResultKey('failed', { pr, sha }, run),
     lines: [`CI_FAILED for ${short(sha)} (run ${run.id}): ${run.conclusion}. gh run view ${run.id} --repo ${repo} --log-failed`, ...jobs],
   }
 }

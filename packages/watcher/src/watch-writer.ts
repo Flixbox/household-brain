@@ -94,6 +94,12 @@ const writerSeenAt = async (): Promise<number | null> => {
   return (await file.exists()) ? file.lastModified : null
 }
 
+/** Whether an all-events watcher has looked lately (same freshness as `checkWriter`). */
+export const writerRuns = async (): Promise<boolean> => {
+  const seen = await writerSeenAt()
+  return seen !== null && Temporal.Now.instant().epochMilliseconds - seen < WRITER_GONE_AFTER_MS
+}
+
 const noWriterLine = (seen: number | null): string => {
   const since = seen === null ? 'yet' : `since ${clockTime(Temporal.Instant.fromEpochMilliseconds(seen)) ?? '?'}`
   return `NO_WRITER: no all-events watcher has looked at this repository on this machine ${since}, so \`Resolved:\` replies stay unresolved and approved drafts stay drafts until one runs`
