@@ -212,14 +212,16 @@ const keptAnswer = async (file: string): Promise<{ body: string, etag: string } 
 const keepAnswer = async (file: string, answer: { body: string, etag: string }): Promise<void> =>
   writeWhole(file, JSON.stringify(answer)).catch(ignoreFailure)
 
-/** Splits what `gh api -i` prints into the body and its ETag ('' without one). */
+/** Splits what `gh api -i` prints into the body and its ETag ('' without one). A body that isn't JSON throws (#418), so it is neither kept nor shared. */
 const parsedAnswer = (raw: string): { body: string, etag: string } => {
   const end = raw.indexOf('\r\n\r\n')
   if (end === -1) {
     throw new Error('gh api -i printed no headers')
   }
   const etag = /^etag: *(?<etag>\S.*)$/imu.exec(raw.slice(0, end))?.groups?.etag ?? ''
-  return { body: raw.slice(end + 4), etag: etag.trim() }
+  const body = raw.slice(end + 4)
+  JSON.parse(body)
+  return { body, etag: etag.trim() }
 }
 
 /** Asks GitHub for `path`, with the kept ETag if there is one. `gh` exits 1 on a 304, so that failure is the good news. */
