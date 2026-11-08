@@ -2,7 +2,7 @@
 /** What the project watcher does with a CI run of a commit (watch-main.ts asks, for each PR it follows). */
 import { FOLLOW_NEWER, type MainRun, type Run, cancelledDeployEvent, replacementCandidates, runEvent } from './watch-events'
 import { REPO, containsCommit, jobLines, mainRuns, runOf } from './watch-github'
-import { isSettled, settle } from './watch-ci-cache'
+import { isSettled, keepJobs, keptJobs, settle } from './watch-ci-cache'
 import { report } from './watch-output'
 
 interface RunCheck {
@@ -31,6 +31,7 @@ const reportRun = async ({ check, jobs, run }: { check: RunCheck, jobs: string[]
   const { label, limitSeconds, pr, sha } = check
   const outcome = runEvent({ jobs, label, limitSeconds, pr, repo: REPO, run, sha })
   if (outcome === FOLLOW_NEWER) {
+    keepJobs(run, jobs)
     await followNewer({ jobs, limitSeconds, pr, run, sha })
     return
   }
@@ -45,7 +46,7 @@ export const checkRun = async (check: RunCheck): Promise<void> => {
     return
   }
   // Jobs that can't be read yet: the result waits a look rather than coming out without them.
-  const jobs = run ? await jobLines(run.id).catch(() => null) : null
+  const jobs = run ? keptJobs(run) ?? await jobLines(run.id).catch(() => null) : null
   await (run && jobs ? reportRun({ check, jobs, run }) : Promise.resolve())
 }
 
