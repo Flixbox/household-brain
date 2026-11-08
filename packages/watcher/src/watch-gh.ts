@@ -117,11 +117,11 @@ const failure = async (command: string, call: ReturnType<typeof started>, output
   return new Error(`${command}: ${why}`, { cause: { status } })
 }
 
-/** Passes a finished call's log on for pacing, not waiting long for it (see ghCall on a wrapper's child). */
+/** Passes a finished call's log on for pacing. Not waited for long (see ghCall on a wrapper's child), but a late log still counts. */
 const noted = async (cli: string, log: Promise<string>, failed: boolean): Promise<void> => {
-  log.catch(ignoreFailure)
-  const text = await Promise.race([log, Bun.sleep(ANSWER_WAIT_MS).then(() => '')]).catch(() => '')
-  await noteLimits(cli, text, failed)
+  // Pacing is only a saving: a log that can't be read leaves the limits as they were.
+  const noting = log.then(async text => noteLimits(cli, text, failed)).catch(ignoreFailure)
+  await Promise.race([noting, Bun.sleep(ANSWER_WAIT_MS)])
 }
 
 /** What a `gh` call prints; it fails on a non-zero exit, or when it runs out of time. */
