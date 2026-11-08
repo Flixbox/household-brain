@@ -41,8 +41,8 @@ const defaultRemote = (dir: string) => {
   return keys.flatMap(key => gitLines(dir, 'config', '--get', key))[0] ?? 'origin'
 }
 
-/** Whether git would read this word as a URL or a path, not as the name of a remote. */
-const isLocation = (word: string) => /[/:]/u.test(word) || word === '.' || word === '..'
+/** Whether git would read this word as a URL or a path, not as the name of a remote; a redirection the shell reader doesn't know (`{fd}>file`) is neither. */
+const isLocation = (word: string) => !/[<>]/u.test(word) && (/[/:]/u.test(word) || word === '.' || word === '..')
 
 /** Whether a `pushInsteadOf` rule applies to this location. */
 const hasPushRewrite = (dir: string, word: string) =>
@@ -69,7 +69,7 @@ const remoteSchemes = new Set(['file', 'git', 'git+ssh', 'ssh', 'ssh+git'])
 const goesElsewhere = (url: string) => {
   if (url.includes('://')) {
     const scheme = url.slice(0, url.indexOf('://')).toLowerCase()
-    return remoteSchemes.has(scheme) || (['http', 'https'].includes(scheme) && URL.canParse(url) && new URL(url).hostname !== 'github.com')
+    return remoteSchemes.has(scheme) || (['http', 'https'].includes(scheme) && URL.canParse(url) && new URL(url).hostname.replace(/\.$/u, '') !== 'github.com')
   }
   return !url.includes('::')
 }

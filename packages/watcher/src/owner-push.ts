@@ -11,7 +11,7 @@
  */
 import path from 'node:path'
 import { mayUseGithubHelpers } from './push-destination'
-import { isDynamic } from './shell-commands'
+import { isDynamic, withoutRedirections } from './shell-commands'
 import { baseName } from './shell-interpreters'
 
 /** Git's own options that take the next word as their value, before the subcommand. */
@@ -48,7 +48,7 @@ const moveTo = (dir: string, word: string) => (isDynamic(word) ? dir : path.reso
 
 /** The `git push` this git call is, if it is one, run from this directory. */
 const pushOf = (gitArgs: readonly string[], from: string, moved: boolean): Push[] => {
-  const call = readGit(gitArgs)
+  const call = readGit(withoutRedirections(gitArgs))
   if (call.subcommand !== 'push') {
     return []
   }
@@ -95,8 +95,12 @@ const pushReason = (dir: string) => [
   'The config is shared by every worktree of the clone and another agent may be setting it up: retry shortly, and if it stays wrong report it, rather than changing it from a worktree.',
 ].join(' ')
 
-/** Why the first `git push` among these commands that would not go out as the bot is refused, or null when there is none. */
-export const pushRefusal = (commands: readonly (readonly string[])[], cwd: string) => {
-  const push = pushesIn(commands, cwd).find(({ args, dir, unclear }) => wrongOrder(helpersOf(dir)) && (unclear || mayUseGithubHelpers(dir, args)))
+/** Whether the line sets a variable git reads or feeds a command through xargs, either of which can change where a push goes unseen in its words. */
+const hidesDestination = (line: string) => /\bGIT_\w+=|\bxargs\b/u.test(line)
+
+/** Why the first `git push` among these commands, the ones this line runs, that would not go out as the bot is refused, or null when there is none. */
+export const pushRefusal = (commands: readonly (readonly string[])[], cwd: string, line: string) => {
+  const hidden = hidesDestination(line)
+  const push = pushesIn(commands, cwd).find(({ args, dir, unclear }) => wrongOrder(helpersOf(dir)) && (hidden || unclear || mayUseGithubHelpers(dir, args)))
   return typeof push === 'undefined' ? null : pushReason(push.dir)
 }

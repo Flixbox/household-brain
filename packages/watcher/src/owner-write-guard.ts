@@ -20,7 +20,7 @@ import { pushRefusal } from './owner-push'
 import { positionals, xargsFillsIn } from './owner-write-xargs'
 import { isRecord, textOf } from './read'
 import { commandsOf } from './shell-braces'
-import { isDynamic, plainWord } from './shell-commands'
+import { isDynamic, plainWord, redirection, withoutRedirections } from './shell-commands'
 import { baseName, isGh, programCommands } from './shell-interpreters'
 import { type Work, charged, newWork, unreadableLine } from './shell-work'
 import { commandsFrom } from './owner-write-wrappers'
@@ -44,9 +44,6 @@ const keywords = new Set(['!', 'do', 'elif', 'else', 'if', 'then', 'until', 'whi
 
 /** Wrappers that also take a whole command line after `-c`, as a shell does (`flock x -c '…'`). */
 const scriptFlagRunners = new Set(['flock', 'script'])
-
-/** A redirection: its operator, and its target when attached (`>out`, `2>/dev/null`, `&>log`). */
-const redirection = /^\d*(?:&>>?|>>?|<{1,3}|>&|<&|>\|)(?<target>.*)$/su
 
 /** A shell by its name, however it is spelled (`mksh`, `bash-5.2`, `zsh.exe`): matching more than shells costs only a false denial. */
 const shell = /^[a-z]*sh[-.\d]*(?:\.exe)?$/u
@@ -171,10 +168,6 @@ const leadingLength = (word: string) => {
   return target === '' ? 2 : 1
 }
 
-/** A command's arguments without its redirections (`>out`, `2>&1`, `< in`), which the command never sees. */
-const withoutRedirections = (words: readonly string[]) =>
-  words.filter((word, at) => !redirection.test(word) && redirection.exec(words[at - 1] ?? '')?.groups?.target !== '')
-
 /** Where the command itself starts: after variable assignments, keywords and redirections. */
 const commandStart = (words: readonly string[]) => {
   let at = 0
@@ -286,7 +279,7 @@ export const verdict = (input: unknown) => {
     return denial(writeReason(found))
   }
   const cwd = isRecord(input) ? textOf(input.cwd) : ''
-  const refusal = pushRefusal(runCommands(command, newWork()), cwd === '' ? process.cwd() : cwd)
+  const refusal = pushRefusal(runCommands(command, newWork()), cwd === '' ? process.cwd() : cwd, command)
   return refusal === null ? null : denial(refusal)
 }
 
