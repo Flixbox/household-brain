@@ -140,7 +140,7 @@ test('the facts are read only after the owner lookup has waited out its rate lim
   const result = await runFromNonClone('agent-bot[bot]', { FAKE_REST: JSON.stringify({ [REPO_PATH]: [LIMITED, { body: { owner: { type: 'User' } } }] }) })
   const lookups = result.calls.filter(call => call.includes(`api -i ${REPO_PATH}`))
   const lastLookup = result.calls.lastIndexOf(lookups.at(-1) ?? '')
-  expect(lookups.length).toBe(2)
+  expect(lookups).toHaveLength(2)
   expect(result.calls.findIndex(call => call.includes('viewer{login}'))).toBeGreaterThan(lastLookup)
 })
 
