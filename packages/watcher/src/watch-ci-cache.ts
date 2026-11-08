@@ -51,5 +51,6 @@ export const isSettled = (place: RunPlace, { attempt, id }: RunId): boolean => {
 
 /** This completed run has been reported. */
 export const settle = (place: RunPlace, { attempt, id }: RunId): void => {
+  laggingLooks.delete(attemptOf({ attempt, id }))
   settled.set(placeOf(place), { attempt, id, sha: place.sha })
 }
