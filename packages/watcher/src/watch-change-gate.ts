@@ -5,6 +5,7 @@
  * state. A PR whose answer differs, that wasn't in it, or that wasn't read for FULL_READ_MINUTES is
  * read in full; for the others the last answer stands. When the question fails, every PR is read.
  */
+ // Probe for #444, never merged: a line for a review thread to sit on.
 import { type FullRead, duePrs } from './watch-change-due'
 import { type PrState, graphql, lastStates, prStates } from './watch-github'
 import { type Json, at, count, records } from './watch-text'
