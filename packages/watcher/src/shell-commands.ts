@@ -59,9 +59,18 @@ const unsureArithmetic = (scan: Scan, inner: string) => {
   substitutionsIn(scan, inner)
 }
 
+/** Text in `((…))`: surely arithmetic is data but for its substitutions, each read whole, here-documents included (#373). */
+const readArithmetic = (scan: Scan, inner: string, sure: boolean) => {
+  if (sure) {
+    substitutionsIn(scan, inner)
+  } else {
+    unsureArithmetic(scan, inner)
+  }
+}
+
 /**
  * A `$(…)` or backtick substitution starting at `at`: its text is kept to be read as a command line
- * of its own, and the word gets it, marked as dynamic; surely arithmetic `$((…))` is data. Returns
+ * of its own, and the word gets it, marked as dynamic; surely arithmetic `$((…))` is data but for its own substitutions. Returns
  * that text and where the next thing starts.
  */
 const substitution = (scan: Scan, text: string, at: number): [string, number] => {
@@ -71,8 +80,8 @@ const substitution = (scan: Scan, text: string, at: number): [string, number] =>
   const inner = text.slice(from, end)
   if (!text.startsWith('$((', at)) {
     scan.nested.push(inner)
-  } else if (!opensArithmetic(text, at + 1)) {
-    unsureArithmetic(scan, inner)
+  } else {
+    readArithmetic(scan, inner, opensArithmetic(text, at + 1))
   }
   return [dynamic + text.slice(at, end + 1), end + 1]
 }
@@ -184,12 +193,10 @@ const redirect: Reader = (scan, text, at) => {
   return at + 1
 }
 
-/** `((`: surely arithmetic is data; anything else fails closed. Arithmetic also runs a substitution hidden in a variable's array subscript (`x='a[$(…)]'; $(( x ))`); the guard can't see that, and the gap is accepted (#375). */
+/** `((`: surely arithmetic is data but for its substitutions; anything else fails closed. Arithmetic also runs a substitution hidden in a variable's array subscript (`x='a[$(…)]'; $(( x ))`); the guard can't see that, and the gap is accepted (#375). */
 const doubleParen: Reader = (scan, text, at) => {
   const end = closingParen(text, at + 1)
-  if (!opensArithmetic(text, at)) {
-    unsureArithmetic(scan, text.slice(at + 2, end - 1))
-  }
+  readArithmetic(scan, text.slice(at + 2, end - 1), opensArithmetic(text, at))
   return end + 1
 }
 
