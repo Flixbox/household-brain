@@ -37,7 +37,8 @@ const releasedAt = async ({ repo, sha, tag }: { repo: string, sha: string, tag: 
 }
 
 const workflows = await Promise.all([...new Glob('.github/workflows/*.{yml,yaml}').scanSync('.')].map(async path => Bun.file(path).text()))
-const pins = pinnedActions(workflows.join('\n'))
+// One YAML document per file: joined plainly, their top-level keys would collide.
+const pins = pinnedActions(workflows.join('\n---\n'))
 // Every workflow pins its actions by commit: finding none means the scan itself broke.
 if (pins.length === 0) {
   throw new Error('No pinned actions found in .github/workflows')
