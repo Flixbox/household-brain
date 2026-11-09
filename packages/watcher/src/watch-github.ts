@@ -77,8 +77,9 @@ export const runOf = async (sha: string, fresh = false): Promise<Run | null> => 
 /**
  * The run that deploys a merged commit (#549); null until it has started. The merge queue's run has
  * the same commit and never deploys, and it is the only run of that commit until the push run starts.
+ * Only main's: a push of the same commit to another branch doesn't deploy either.
  */
-export const pushRunOf = async (sha: string): Promise<Run | null> => newestRun(`head_sha=${sha}&event=push`, false)
+export const pushRunOf = async (sha: string): Promise<Run | null> => newestRun(`head_sha=${sha}&event=push&branch=main`, false)
 
 /**
  * The newest CI runs on main, newest first, with their commits. A hundred, one page of GitHub's list
