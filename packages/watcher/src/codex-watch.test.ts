@@ -1,9 +1,10 @@
-/* oxlint-disable import/no-nodejs-modules -- a temporary project and Codex home for each supervisor; node:fs and node:os are built into Bun */
+/* oxlint-disable import/no-nodejs-modules, eslint/no-await-in-loop -- a temporary project and Codex home for each supervisor, built into Bun; the test polls until the supervisor is retrying */
 // A bad setting makes the watcher exit 64 at the start, so rearming it could never help (#527):
 // the supervisor has to stop and tell the session, because its log reaches nobody.
 import { afterEach, describe, expect, it } from 'bun:test'
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
+import { isRecord } from './read'
 
 const THREAD = 'thread-under-test'
 const WAIT_MS = 8000
@@ -18,12 +19,13 @@ const tempDir = (): string => {
 }
 
 /** The local Codex daemon, as far as the supervisor talks to it. */
-const fakeDaemon = (home: string, cwd: string): string[] => {
+const fakeDaemon = (home: string, cwd: string, status: string) => {
   const delivered: string[] = []
-  const results: Record<string, (params: { input?: { text: string }[] }) => unknown> = {
+  const reads: string[] = []
+  const results: Record<string, (params: unknown) => unknown> = {
     initialize: () => ({}),
-    'thread/read': () => ({ thread: { canAcceptDirectInput: true, cwd, id: THREAD, status: { type: 'idle' } } }),
-    'turn/start': params => { delivered.push(params.input?.[0]?.text ?? ''); return {} },
+    'thread/read': () => { reads.push(status); return { thread: { canAcceptDirectInput: true, cwd, id: THREAD, status: { type: status } } } },
+    'turn/start': params => { delivered.push(JSON.stringify(params)); return {} },
   }
   mkdirSync(`${home}/app-server-control`)
   const server = Bun.serve({
@@ -31,24 +33,33 @@ const fakeDaemon = (home: string, cwd: string): string[] => {
     unix: `${home}/app-server-control/app-server-control.sock`,
     websocket: {
       message: (socket, text) => {
-        const { id, method, params } = JSON.parse(String(text)) as { id?: number, method: string, params: { input?: { text: string }[] } }
-        if (typeof id === 'number') { socket.send(JSON.stringify({ id, result: results[method]?.(params) ?? {} })) }
+        const message: unknown = JSON.parse(String(text))
+        if (isRecord(message) && typeof message.id === 'number') {
+          socket.send(JSON.stringify({ id: message.id, result: results[String(message.method)]?.(message.params) ?? {} }))
+        }
       },
     },
   })
   cleanups.push(() => { server.stop(true).catch(() => null) })
-  return delivered
+  return { delivered, reads }
+}
+
+const within = async (ending: Promise<number>) => Promise.race([ending, Bun.sleep(WAIT_MS).then(() => 'still running')])
+
+const untilRetrying = async (reads: string[]): Promise<void> => {
+  const deadline = Bun.nanoseconds() + WAIT_MS * 1_000_000
+  while (reads.length < 2 && Bun.nanoseconds() < deadline) { await Bun.sleep(50) }
+}
+
+const supervisorEnv = (home: string) => {
+  const { GH_PARALLEL: _inherited, ...inherited } = process.env
+  return { ...inherited, CODEX_HOME: home, CODEX_THREAD_ID: THREAD, WATCHER_SUBSCRIPTIONS: '', XDG_STATE_HOME: home }
 }
 
 const startSupervisor = (cwd: string, home: string) => {
   mkdirSync(`${cwd}/.claude`)
   writeFileSync(`${cwd}/.claude/watcher.env`, 'GH=false\nGH_PARALLEL=0\nOWNER=owner\nREPO=owner/repo\n')
-  const { GH_PARALLEL: _inherited, ...inherited } = process.env
-  const supervisor = Bun.spawn([process.execPath, `${import.meta.dir}/codex-watch.ts`, '--supervise'], {
-    cwd,
-    env: { ...inherited, CODEX_HOME: home, CODEX_THREAD_ID: THREAD, WATCHER_SUBSCRIPTIONS: '', XDG_STATE_HOME: home },
-    stderr: 'ignore', stdin: 'ignore', stdout: 'ignore',
-  })
+  const supervisor = Bun.spawn([process.execPath, `${import.meta.dir}/codex-watch.ts`, '--supervise'], { cwd, env: supervisorEnv(home), stderr: 'ignore', stdin: 'ignore', stdout: 'ignore' })
   cleanups.push(() => { supervisor.kill() })
   return supervisor
 }
@@ -56,11 +67,20 @@ const startSupervisor = (cwd: string, home: string) => {
 describe('the Codex supervisor on a bad setting (#527)', () => {
   it('stops rearming and tells the session what is wrong', async () => {
     const [cwd, home] = [tempDir(), tempDir()]
-    const delivered = fakeDaemon(home, cwd)
+    const { delivered } = fakeDaemon(home, cwd, 'idle')
     const supervisor = startSupervisor(cwd, home)
-    const ended = await Promise.race([supervisor.exited, Bun.sleep(WAIT_MS).then(() => 'still rearming')])
-    expect(ended).toBe(64)
+    expect(await within(supervisor.exited)).toBe(64)
     expect(delivered).toHaveLength(1)
     expect(delivered[0]).toContain('GH_PARALLEL must be a whole number from 1')
   }, WAIT_MS * 2)
+
+  it('gives up its report as soon as the session has ended', async () => {
+    const [cwd, home] = [tempDir(), tempDir()]
+    // Never ready, so the report keeps being retried.
+    const { reads } = fakeDaemon(home, cwd, 'notLoaded')
+    const supervisor = startSupervisor(cwd, home)
+    await untilRetrying(reads)
+    Bun.spawnSync([process.execPath, `${import.meta.dir}/codex-watch.ts`, '--stop'], { cwd, env: supervisorEnv(home) })
+    expect(await within(supervisor.exited)).toBe(64)
+  }, WAIT_MS * 3)
 })
