@@ -51,27 +51,25 @@ const addCyclesThrough = (start: string, next: (issue: string) => readonly strin
       waiting.set(blocker, (waiting.get(blocker) ?? new Set<string>()).add(issue))
     }
   }
+  const closes = (blocker: string, walk: (issue: string) => boolean): boolean => {
+    if (blocker === start) {
+      cycles.push([...path, start])
+      return true
+    }
+    return !blocked.has(blocker) && walk(blocker)
+  }
   const walk = (issue: string): boolean => {
     blocked.add(issue)
     path.push(issue)
     let found = false
     for (const blocker of next(issue)) {
-      if (cycles.length >= MAX_CYCLES) {
-        break
-      }
-      if (blocker === start) {
-        cycles.push([...path, start])
-        found = true
-      } else if (!blocked.has(blocker) && walk(blocker)) {
-        found = true
+      if (cycles.length < MAX_CYCLES) {
+        found = closes(blocker, walk) || found
       }
     }
     path.pop()
-    if (found) {
-      release(issue)
-    } else {
-      waitOn(issue)
-    }
+    const settle = found ? release : waitOn
+    settle(issue)
     return found
   }
   walk(start)
