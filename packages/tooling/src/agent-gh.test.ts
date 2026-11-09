@@ -141,3 +141,43 @@ describe.each(['bash', 'windows'] as const)('agent-gh (%s)', wrapper => {
     expect(readFileSync(path.join(home, 'token-repo'), 'utf8')).toBe('Owner/repo')
   })
 })
+
+describe('agent-gh-token owner (#538)', () => {
+  const tokenScript = path.join(import.meta.dir, 'agent-gh-token')
+
+  // A token cached under each spelling, so the owner decides the outcome without any key or network.
+  const cached = (repo: string, token: string) => {
+    const folder = path.join(home, '.cache', 'agent-gh')
+    mkdirSync(folder, { recursive: true })
+    writeFileSync(path.join(folder, repo), `${token}\n`)
+  }
+
+  const mint = (repo: string) => {
+    const env = { GH_REPO: repo, HOME: home, LC_ALL: 'C.UTF-8', PATH: process.env.PATH ?? '' }
+    const result = Bun.spawnSync([tokenScript], { cwd: home, env })
+    return { code: result.exitCode, stderr: result.stderr.toString(), stdout: result.stdout.toString() }
+  }
+
+  test.each([
+    ['Flixbox/repo', 'flixbox-token'],
+    ['flixbox/repo', 'flixbox-token'],
+    ['FLIXBOX/repo', 'flixbox-token'],
+    ['Coarisfinia/repo', 'coarisfinia-token'],
+    ['coarisfinia/repo', 'coarisfinia-token'],
+    ['COARISFINIA/repo', 'coarisfinia-token'],
+  ])('%s gets its bot', (repo, token) => {
+    cached('Flixbox_repo', 'flixbox-token')
+    cached('Coarisfinia_repo', 'coarisfinia-token')
+    expect(mint(repo)).toMatchObject({ code: 0, stdout: `${token}\n` })
+  })
+
+  // A cached token under the exact spelling must not rescue an owner without a bot.
+  test.each(['someone', 'flixbox-other', 'xflixbox', 'Fl\u0130xbox'])('%s has no bot', owner => {
+    cached(`${owner}_repo`, 'wrong-token')
+    cached('Flixbox_repo', 'flixbox-token')
+    const { code, stderr, stdout } = mint(`${owner}/repo`)
+    expect(code).not.toBe(0)
+    expect(stdout).toBe('')
+    expect(stderr).toContain(`no agent bot for ${owner}/repo`)
+  })
+})
