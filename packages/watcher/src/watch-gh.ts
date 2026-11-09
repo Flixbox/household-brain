@@ -11,7 +11,14 @@ export const GH = process.env.GH ?? 'gh'
 // GH_TIMEOUT_SECONDS: how long one `gh` call may take (#228). A slow GitHub once held a whole look,
 // and every event behind it, for minutes: a call that runs out fails like any failed read (the caller
 // treats it as unknown and tries again next look), and the other calls' events still come out.
-const GH_TIMEOUT_MS = Number(process.env.GH_TIMEOUT_SECONDS ?? 30) * 1000
+const GH_TIMEOUT_SECONDS = Number(process.env.GH_TIMEOUT_SECONDS ?? 30)
+// 0 (a blank value reads as 0) would be no limit at all, so a hung `gh` would hold its place for good;
+// to Bun.spawn a fraction of a millisecond or a negative number is an error for every call (#519).
+if (!Number.isInteger(GH_TIMEOUT_SECONDS) || GH_TIMEOUT_SECONDS < 1 || GH_TIMEOUT_SECONDS > 3600) {
+  process.stderr.write('GH_TIMEOUT_SECONDS must be a whole number from 1 to 3600\n')
+  process.exit(64)
+}
+const GH_TIMEOUT_MS = GH_TIMEOUT_SECONDS * 1000
 
 // GH_PARALLEL: how many `gh` calls run at once (#240), 2 by default (#400: GitHub allows 100 at once
 // across every watcher and agent of an installation). The pollers and pull requests are checked in
@@ -146,7 +153,8 @@ const ghCall = async (args: string[], cli: string): Promise<string> => {
 // several watchers cost GitHub hardly more than one. Under the time the answers poller pauses, so
 // each look still sees a newer answer than the last.
 const SHARE_MS = Number(process.env.GH_SHARE_SECONDS ?? 20) * 1000
-if (!Number.isFinite(SHARE_MS) || SHARE_MS < 0 || SHARE_MS > 3_600_000) {
+// A blank value would read as 0, silently sharing nothing (#519).
+if (process.env.GH_SHARE_SECONDS?.trim() === '' || !Number.isFinite(SHARE_MS) || SHARE_MS < 0 || SHARE_MS > 3_600_000) {
   process.stderr.write('GH_SHARE_SECONDS must be a number from 0 to 3600\n')
   process.exit(64)
 }
