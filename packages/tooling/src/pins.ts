@@ -8,7 +8,8 @@ export interface Pin {
   tag: string | null
 }
 
-const PINNED = /uses: (?<action>[^\s@]+)@(?<sha>[0-9a-f]{40})(?: # (?<tag>v\S+))?/gu
+// Any spacing YAML allows, and optional quotes, but on one line: a comment below a pin isn't its version (#546).
+const PINNED = /uses:[ \t]+["']?(?<action>[^\s@"']+)@(?<sha>[0-9a-f]{40})["']?(?:[ \t]+#[ \t]*(?<tag>v\S+))?/gu
 
 /** Every action a workflow pins by commit, once each. */
 export const pinnedActions = (workflow: string): Pin[] => {
