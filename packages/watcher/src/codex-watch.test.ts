@@ -57,7 +57,7 @@ const supervisorEnv = (home: string) => {
 }
 
 const startSupervisor = (cwd: string, home: string) => {
-  mkdirSync(`${cwd}/.claude`)
+  mkdirSync(`${cwd}/.claude`, { recursive: true })
   writeFileSync(`${cwd}/.claude/watcher.env`, 'GH=false\nGH_PARALLEL=0\nOWNER=owner\nREPO=owner/repo\n')
   const supervisor = Bun.spawn([process.execPath, `${import.meta.dir}/codex-watch.ts`, '--supervise'], { cwd, env: supervisorEnv(home), stderr: 'ignore', stdin: 'ignore', stdout: 'ignore' })
   cleanups.push(() => { supervisor.kill() })
@@ -82,5 +82,14 @@ describe('the Codex supervisor on a bad setting (#527)', () => {
     await untilRetrying(reads)
     Bun.spawnSync([process.execPath, `${import.meta.dir}/codex-watch.ts`, '--stop'], { cwd, env: supervisorEnv(home) })
     expect(await within(supervisor.exited)).toBe(64)
+  }, WAIT_MS * 3)
+
+  it('lets a restart take over while its report is retried', async () => {
+    const [cwd, home] = [tempDir(), tempDir()]
+    const { reads } = fakeDaemon(home, cwd, 'notLoaded')
+    startSupervisor(cwd, home)
+    await untilRetrying(reads)
+    // Holding the lock here, the first would make this one die on it (#529).
+    expect(await within(startSupervisor(cwd, home).exited)).toBe('still running')
   }, WAIT_MS * 3)
 })
