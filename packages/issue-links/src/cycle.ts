@@ -81,7 +81,7 @@ const addCyclesThrough = (start: string, next: (issue: string) => readonly strin
  * issue to the issues it is blocked by. Each cycle starts at its issue that comes first in
  * `blockersOf`, and the walk from an issue goes only through issues after it, so a cycle is listed
  * once, cycles sharing issues each on their own, and two paths to one blocker (a diamond) are none.
- * At most MAX_CYCLES. The work grows with the links and the cycles listed, not with the paths (#548).
+ * At most MAX_CYCLES. The work is a walk over the links from each issue, plus the cycles listed, not every path (#548).
  */
 export const findCycles = (blockersOf: ReadonlyMap<string, readonly string[]>): string[][] => {
   const order = new Map([...blockersOf.keys()].map((issue, at) => [issue, at]))
