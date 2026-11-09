@@ -51,18 +51,21 @@
  *                                    tries again on every look)
  *   PR #<n>: QUESTION_CLEARED        with CLEAR_QUESTION_LABEL=1 (off by default, #371): the owner's latest review
  *                                    approves the PR, on any commit, or it merged or closed, and the watcher
- *                                    took QUESTION_LABEL (`question` by default) off, with its `GH` token.
+ *                                    took QUESTION_LABEL (`question` by default) off, with its `GH` token,
+ *                                    which it does only where GitHub confirms that token is a bot's.
  *                                    QUESTION_CLEAR_FAILED: it couldn't, or couldn't confirm that token is a
  *                                    bot's, so the label stays (it tries again, with backoff)
  *   PR #<n>: ACTIVITY                new comments, reviews (also a pending review's comments), review comments
  *   PR #<n>: MERGED                  a subscribed watcher only (#349): the PR merged, and says so if that
- *                                    completed the subscription; an all-events watcher reports DEPLOYED instead
+ *                                    completed the subscription; an all-events watcher goes on to the deploy
+ *                                    run and reports its result
  *   PR #<n>: DEPLOYED / DEPLOY_FAILED  merged, and the deploy run on main finished
  *   PR #<n>: CLOSED                  closed without merging
  *   PR #<n>: QUEUED / DEQUEUED       entered the merge queue, or left it without merging (#251)
- *   PR #<n>: NOT_QUEUED              approved, CI green, merge state CLEAN and auto-merge on, yet still outside
- *                                    the merge queue after some minutes (#305): it names the mutation that
- *                                    queues it; once per head commit
+ *   PR #<n>: NOT_QUEUED              only where the branch has a merge queue: open, no draft and not parked,
+ *                                    approved, CI green, merge state CLEAN and auto-merge on, yet still outside
+ *                                    the queue after a fixed wait (#305): it names the mutation that queues
+ *                                    it; once per head commit
  *   MAIN_ADVANCED                    main got a new commit (a merge, whoever made it)
  *   MAIN_PASSED / MAIN_FAILED        the newest CI run on main passed, or failed whichever PR caused it
  *   MAIN_SLOW                        the newest CI run on main hangs
