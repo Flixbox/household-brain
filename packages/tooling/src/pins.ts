@@ -10,7 +10,7 @@ export interface Pin {
 
 const PINNED = /^(?<action>[^\s@]+)@(?<sha>[0-9a-f]{40})$/iu
 // A `uses` entry and its version comment. YAML drops comments, so this reads the text (#546); never a line a comment or another key holds.
-const USES_ENTRY = /^[ \t-]*["']?uses["']?[ \t]*:\s*(?:&\S+\s+)?(?<rest>.*)$/gmu
+const USES_ENTRY = /^[ \t-]*["']?uses["']?[ \t]*:\s*(?:&\S+\s+)?(?<rest>\S.*)$/gmu
 const VERSIONED = /^["']?(?<value>[^\s"'#]+)["']?[ \t]+#[ \t]*(?<tag>v\S+)/u
 
 /** Every `uses` value at any depth of a parsed workflow. */
