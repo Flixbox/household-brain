@@ -8,16 +8,43 @@ export interface Pin {
   tag: string | null
 }
 
-// Any spacing YAML allows, and optional quotes, but on one line: a comment below a pin isn't its version (#546).
-const PINNED = /uses:[ \t]+["']?(?<action>[^\s@"']+)@(?<sha>[0-9a-f]{40})["']?(?:[ \t]+#[ \t]*(?<tag>v\S+))?/gu
+const PINNED = /^(?<action>[^\s@]+)@(?<sha>[0-9a-f]{40})$/iu
+// A `uses` entry and its version comment. YAML drops comments, so this reads the text (#546); never a line a comment or another key holds.
+const USES_ENTRY = /^[ \t-]*["']?uses["']?[ \t]*:\s*(?:&\S+\s+)?(?<rest>\S.*)$/gmu
+const VERSIONED = /^["']?(?<value>[^\s"'#]+)["']?[ \t]+#[ \t]*(?<tag>v\S+)/u
 
-/** Every action a workflow pins by commit, once each. */
+/** Every `uses` value at any depth of a parsed workflow. */
+const usesValues = (node: unknown): string[] => {
+  if (Array.isArray(node)) {
+    return node.flatMap(item => usesValues(item))
+  }
+  if (typeof node !== 'object' || node === null) {
+    return []
+  }
+  return Object.entries(node).flatMap(([key, value]) => (key === 'uses' && typeof value === 'string' ? [value] : usesValues(value)))
+}
+
+/** The commented version of each `uses` value. */
+const versionsOf = (workflow: string): Map<string, string> =>
+  new Map([...workflow.matchAll(USES_ENTRY)].flatMap(({ groups }) => {
+    const entry = VERSIONED.exec(groups?.rest ?? '')?.groups
+    return entry ? [[entry.value ?? '', entry.tag ?? ''] as const] : []
+  }))
+
+/**
+ * Every action a workflow pins by commit, once each. Reads the workflow as YAML, so no spelling of
+ * `uses` skips the age check (#554), and throws on one that isn't valid YAML.
+ */
 export const pinnedActions = (workflow: string): Pin[] => {
   const pins = new Map<string, Pin>()
-  for (const { groups } of workflow.matchAll(PINNED)) {
-    const action = groups?.action ?? ''
-    const sha = groups?.sha ?? ''
-    pins.set(`${action}@${sha}`, { action, repo: action.split('/').slice(0, 2).join('/'), sha, tag: groups?.tag ?? null })
+  const versions = versionsOf(workflow)
+  for (const value of usesValues(Bun.YAML.parse(workflow))) {
+    const groups = PINNED.exec(value)?.groups
+    if (groups) {
+      const action = groups.action ?? ''
+      const sha = (groups.sha ?? '').toLowerCase()
+      pins.set(`${action}@${sha}`, { action, repo: action.split('/').slice(0, 2).join('/'), sha, tag: versions.get(value) ?? null })
+    }
   }
   return [...pins.values()]
 }
