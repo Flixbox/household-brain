@@ -130,7 +130,7 @@ test('a replacement that comes later still reports the deploy (#417)', async () 
   expect(result.output).not.toContain('deploy-failed abc 2')
 }, 30_000)
 
-test('a deploy is read from main's push run, not another run of the same commit (#549)', async () => {
+test('a deploy is read from the push run on main, not another run of the same commit (#549)', async () => {
   const result = await looks('merge-group', 'deploy')
   expect(result.output).toContain('DEPLOYED: live (run 6)')
   expect(result.output).not.toContain('(run 4)')
