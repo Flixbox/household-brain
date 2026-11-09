@@ -58,6 +58,22 @@ const finishedEvent = ({ pr, sha, label, run, jobs, repo }: RunContext): Event |
   }
 }
 
+/** Publishing jobs by their name: `deploy` here, `pages` on Pages sites. */
+const DEPLOY_JOB = /\b(?:deploy\w*|pages)\b/iu
+
+/** The names in `jobLines`' lines of the jobs not finished yet. */
+const pendingJobs = (jobs: readonly string[]): string[] => jobs
+  .filter(line => !/: completed \S*$/u.test(line))
+  .map(line => line.replace(/: \S+ \S*$/u, '').trim())
+
+/** Cancelling helps a hang, but only interrupts a deploy that takes its time (#551). */
+const slowAdvice = (jobs: readonly string[]): string => {
+  const pending = pendingJobs(jobs)
+  return pending.length > 0 && pending.every(name => DEPLOY_JOB.test(name))
+    ? `Only deploy jobs are still pending (${pending.join(', ')}): leave it running.`
+    : 'Cancel it and read the logs.'
+}
+
 /** A PR's (or its deploy's) CI run: finished, or running longer than the limit. */
 export const runEvent = (context: RunContext): Event | typeof FOLLOW_NEWER | null => {
   const { pr, sha, label, run, jobs, limitSeconds } = context
@@ -67,7 +83,7 @@ export const runEvent = (context: RunContext): Event | typeof FOLLOW_NEWER | nul
   return run.ageSeconds > limitSeconds
     ? {
       key: `pr-${pr} ci-slow ${run.id} ${run.attempt}`,
-      lines: [`CI_SLOW: run ${run.id} (${label}, ${short(sha)}) still ${run.status} after ${Math.floor(run.ageSeconds / 60)} min. Cancel it and read the logs.`, ...jobs],
+      lines: [`CI_SLOW: run ${run.id} (${label}, ${short(sha)}) still ${run.status} after ${Math.floor(run.ageSeconds / 60)} min. ${slowAdvice(jobs)}`, ...jobs],
     }
     : null
 }
