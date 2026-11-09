@@ -79,7 +79,8 @@ describe('findCycles (#334)', () => {
       counter.reads += 1
       return read(issue)
     }
-    return { blockersOf, counter, limit: links.length ** 2 }
+    // A walk from each issue reads each issue at most twice: once to walk on, once to wait on its blockers.
+    return { blockersOf, counter, limit: 2 * links.length ** 2 }
   }
 
   it('reads a graph of many diamonds a bounded number of times, with no cycle to stop at (#548)', () => {
