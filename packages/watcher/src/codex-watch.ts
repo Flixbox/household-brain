@@ -27,6 +27,7 @@ const directSettings = `${process.cwd()}/.claude/watcher.env`
 const selection = selectionKey(process.env.WATCHER_SUBSCRIPTIONS ?? '')
 const baseIdentity = `${process.cwd()}:${target}`
 const identity = selection === '' ? baseIdentity : `${baseIdentity}:${selection}`
+const LOCK_PORT = 20_000 + Number(Bun.hash(identity) % 30_000n)
 const stopFile = `${WATCHERS_DIR}/codex-${Bun.hash(identity).toString(36)}.stop`
 if (process.argv.includes('--stop')) {
   await Bun.write(stopFile, 'stop')
@@ -77,14 +78,17 @@ const watchOnce = async (): Promise<{ code: number, errors: string }> => {
   return { code, errors: errors.seen.tail.trim() }
 }
 
+// Connecting, never binding: a probe that bound the port could make a starting successor lose it.
+const successorRuns = async (): Promise<boolean> => Bun.connect({ hostname: '127.0.0.1', port: LOCK_PORT, socket: { data: () => null, open: socket => { socket.end() } } }).then(() => true, () => false)
+
 const deliverReport = async (event: Notification): Promise<boolean> => withCodexSocket(async request => notifyCodex(request, { cwd: process.cwd(), threadId: target }, event)).then(() => true, () => false)
 
 /** The session is told once; a thread that isn't ready yet gets a little while before only the log has it. */
 const reportStopped = async (errors: string): Promise<void> => {
   const event = { id: crypto.randomUUID(), lines: [`WATCHER_STOPPED: the watcher refused its settings and isn't being rearmed. Fix them, then start the Codex adapter again. Its error: ${errors}`] }
   for (let attempt = 0; attempt < REPORT_ATTEMPTS; attempt += 1) {
-    // A session that ended can't be told, and the lock must not outlive it.
-    if (await Bun.file(stopFile).exists() || await deliverReport(event)) { return }
+    // A session that ended can't be told; a successor speaks for itself, and this report would be stale.
+    if (await Bun.file(stopFile).exists() || await successorRuns() || await deliverReport(event)) { return }
     await Bun.sleep(REPORT_PAUSE_MS)
   }
   process.stderr.write('project-watcher: could not tell the session the watcher stopped\n')
@@ -105,8 +109,7 @@ const afterWatcher = async ({ code, errors }: { code: number, errors: string }, 
 
 const supervise = async (): Promise<never> => {
   // The same thread/project can start this from a hook and a skill, or after compaction. One wins.
-  const port = 20_000 + Number(Bun.hash(identity) % 30_000n)
-  const lock = Bun.listen({ exclusive: true, hostname: '127.0.0.1', port, socket: { data: socket => { socket.end() } } })
+  const lock = Bun.listen({ exclusive: true, hostname: '127.0.0.1', port: LOCK_PORT, socket: { data: socket => { socket.end() } } })
   process.on('exit', () => { lock.stop() })
   await Bun.file(stopFile).delete().catch(() => null)
   for (;;) {
