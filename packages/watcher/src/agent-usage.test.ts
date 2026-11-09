@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'bun:test'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { codexCache, usageProvider } from './agent-usage'
+import { usageLockPort } from './claude-usage'
 import { codexAnswer } from './codex-usage'
 
 const dirs: string[] = []
@@ -37,6 +38,12 @@ describe('an invalid lock port (#521)', () => {
     expect(exitCode).toBe(0)
     expect(asked).toBe(true)
   }, 15_000)
+
+  it('uses a valid port as given and the picked one when none is set', () => {
+    expect(usageLockPort('PORT_FOR_TEST', '/cache', { PORT_FOR_TEST: '1' })).toBe(1)
+    expect(usageLockPort('PORT_FOR_TEST', '/cache', { PORT_FOR_TEST: '65535' })).toBe(65_535)
+    expect(usageLockPort('PORT_FOR_TEST', '/cache', {})).toBeGreaterThanOrEqual(10_000)
+  })
 })
 
 describe('the active agent usage provider (#338)', () => {
