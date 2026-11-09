@@ -44,6 +44,12 @@ const FAKE = String.raw`
       console.log('HTTP/2.0 304 Not Modified\r\nEtag: "e' + attempt + '"\r\n\r\n')
       process.exit(1)
     }
+    if (scenario === 'merge-group') {
+      const pushRuns = attempt === 2 ? [{ conclusion: 'success', id: 6, run_attempt: 1, run_started_at: Temporal.Now.instant().toString(), status: 'completed' }] : []
+      const queueRuns = [{ conclusion: 'success', id: 4, run_attempt: 1, run_started_at: Temporal.Now.instant().toString(), status: 'completed' }]
+      console.log('HTTP/2.0 200 OK\r\nEtag: "e' + attempt + '"\r\n\r\n' + JSON.stringify({ workflow_runs: args.includes('event=push') ? pushRuns : queueRuns }))
+      process.exit(0)
+    }
     const newer = args.includes('head_sha=def')
     const finished = scenario === 'cancelled' || scenario === 'replaced' ? 'cancelled' : 'success'
     const conclusion = status === 'completed' ? (newer ? 'success' : finished) : null
@@ -121,6 +127,12 @@ test('a replacement that comes later still reports the deploy (#417)', async () 
   expect(result.views).toBe(3)
   expect(result.output).toContain('"pr-7 deployed def"')
   expect(result.output).not.toContain('deploy-failed abc 2')
+}, 30_000)
+
+test('a deploy is read from the push run, not the merge-group run of the same commit (#549)', async () => {
+  const result = await looks('merge-group', 'deploy')
+  expect(result.output).toContain('DEPLOYED: live (run 6)')
+  expect(result.output).not.toContain('(run 4)')
 }, 30_000)
 
 test('a run that finished is reported with its jobs as they are now, not a shared answer from before (#493)', async () => {
