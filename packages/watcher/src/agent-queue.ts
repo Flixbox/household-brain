@@ -256,23 +256,27 @@ const askAsBot = (self: string): void => {
   }
 }
 
+/** What it did about the PR, or exits 1 through `refuseFor` when it may not be queued yet. */
+const act = async ({ facts, owner, pr, repo }: { facts: PrFacts, owner: string, pr: number, repo: string }): Promise<string> => {
+  const name = `${repo}#${pr}`
+  const atHead = `${name} at ${facts.head.slice(0, 7)}.`
+  if (autoMergeStuck(facts, owner, Temporal.Now.instant())) {
+    return `${await unstick(repo, facts)} ${atHead}`
+  }
+  if (facts.state === 'OPEN' && (facts.autoMerge || facts.queued)) {
+    return `${name} is already ${facts.queued ? 'in the merge queue' : 'set to auto-merge'}.`
+  }
+  refuseFor(name, blockersOf(facts, owner))
+  return `${await queue(repo, facts)} ${atHead}`
+}
+
 const main = async (): Promise<void> => {
   const { pr, repo } = argsOf()
   // The owner first: its read can wait out a rate limit, and the facts must be as of the decision (#428).
   const owner = await ownerOf(repo)
   const facts = await readFacts(repo, pr)
   askAsBot(facts.self)
-  if (autoMergeStuck(facts, owner, Temporal.Now.instant())) {
-    process.stdout.write(`${await unstick(repo, facts)} ${repo}#${pr} at ${facts.head.slice(0, 7)}.\n`)
-    return
-  }
-  if (facts.state === 'OPEN' && (facts.autoMerge || facts.queued)) {
-    const where = facts.queued ? 'in the merge queue' : 'set to auto-merge'
-    process.stdout.write(`${repo}#${pr} is already ${where}.\n`)
-    return
-  }
-  refuseFor(`${repo}#${pr}`, blockersOf(facts, owner))
-  process.stdout.write(`${await queue(repo, facts)} ${repo}#${pr} at ${facts.head.slice(0, 7)}.\n`)
+  process.stdout.write(`${await act({ facts, owner, pr, repo })}\n`)
 }
 
 if (import.meta.main) {
