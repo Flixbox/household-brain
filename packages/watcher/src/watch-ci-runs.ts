@@ -41,7 +41,7 @@ const reportRun = async ({ check, jobs, run }: { check: RunCheck, jobs: string[]
 
 /** A finished or slow CI run of `sha`: a PR's head, or a merged PR's commit on main (`deploy`). */
 export const checkRun = async (check: RunCheck): Promise<void> => {
-  const found = await (check.label === 'deploy' ? pushRunOf(check.sha) : runOf(check.sha)).catch(() => UNKNOWN)
+  const found = await (check.label === 'deploy' ? pushRunOf(check.sha) : runOf(check.sha)).catch((): typeof UNKNOWN => UNKNOWN)
   if (found === null && check.label === 'deploy') {
     await followContaining(check)
     return
