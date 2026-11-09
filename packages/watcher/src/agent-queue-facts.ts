@@ -59,7 +59,7 @@ export interface PrFacts {
   self: string
   /**
    * When the last thing GitHub would act on happened, as near as it tells (ISO 8601, UTC): the latest
-   * of the auto-merge request, a review or its dismissal, a label, the last push and a check finishing. '' when none is known (#544).
+   * of the auto-merge request, a review or its dismissal, a label, the last push and a check finishing. '' when none is known (#544). GitHub gives no time for a thread being resolved, so that isn't in it.
    */
   settledAt: string
   state: string
