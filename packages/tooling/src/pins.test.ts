@@ -49,6 +49,11 @@ describe('pinnedActions', () => {
     expect(pinnedActions(`# uses: actions/checkout@${SHA}\nrun: |\n  uses: actions/cache@${SHA}\n`)).toEqual([])
   })
 
+  it('takes no version from another line that names the pin', () => {
+    const workflow = `steps:\n  - uses: actions/checkout@${SHA}\n  - run: echo actions/checkout@${SHA} # v1.2.3\n`
+    expect(pinnedActions(workflow)).toEqual([{ action: 'actions/checkout', repo: 'actions/checkout', sha: SHA, tag: null }])
+  })
+
   it('refuses a workflow that is not valid YAML', () => {
     expect(() => pinnedActions('uses: [')).toThrow()
   })

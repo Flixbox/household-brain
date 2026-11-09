@@ -9,7 +9,8 @@ export interface Pin {
 }
 
 const PINNED = /^(?<action>[^\s@]+)@(?<sha>[0-9a-fA-F]{40})$/u
-const VERSION = /^["']?[ \t]+#[ \t]*(?<tag>v\S+)/u
+// A `uses` entry and its version comment. YAML drops comments, so this reads the text (#546); never a line a comment or another key holds.
+const COMMENTED = /^[ \t-]*["']?uses["']?[ \t]*:\s*(?:&\S+\s+)?["']?(?<value>[^\s"'#]+)["']?[ \t]+#[ \t]*(?<tag>v\S+)/gmu
 
 /** Every `uses` value at any depth of a parsed workflow. */
 const usesValues = (node: unknown): string[] => {
@@ -22,15 +23,9 @@ const usesValues = (node: unknown): string[] => {
   return Object.entries(node).flatMap(([key, value]) => (key === 'uses' && typeof value === 'string' ? [value] : usesValues(value)))
 }
 
-/** The version commented behind a value, on its own line (#546). YAML drops comments, so this reads the text. */
-const versionOf = (workflow: string, value: string): string | null => {
-  const versions = workflow.split('\n').filter(line => !line.trimStart().startsWith('#')).flatMap(line => {
-    const at = line.indexOf(value)
-    const tag = at === -1 ? null : (VERSION.exec(line.slice(at + value.length))?.groups?.tag ?? null)
-    return tag === null ? [] : [tag]
-  })
-  return versions.at(-1) ?? null
-}
+/** The commented version of each `uses` value. */
+const versionsOf = (workflow: string): Map<string, string> =>
+  new Map([...workflow.matchAll(COMMENTED)].map(({ groups }) => [groups?.value ?? '', groups?.tag ?? ''] as const))
 
 /**
  * Every action a workflow pins by commit, once each. Reads the workflow as YAML, so no spelling of
@@ -38,12 +33,13 @@ const versionOf = (workflow: string, value: string): string | null => {
  */
 export const pinnedActions = (workflow: string): Pin[] => {
   const pins = new Map<string, Pin>()
+  const versions = versionsOf(workflow)
   for (const value of usesValues(Bun.YAML.parse(workflow))) {
     const groups = PINNED.exec(value)?.groups
     if (groups) {
       const action = groups.action ?? ''
       const sha = (groups.sha ?? '').toLowerCase()
-      pins.set(`${action}@${sha}`, { action, repo: action.split('/').slice(0, 2).join('/'), sha, tag: versionOf(workflow, value) })
+      pins.set(`${action}@${sha}`, { action, repo: action.split('/').slice(0, 2).join('/'), sha, tag: versions.get(value) ?? null })
     }
   }
   return [...pins.values()]
