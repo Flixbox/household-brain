@@ -142,20 +142,20 @@ describe.each(['bash', 'windows'] as const)('agent-gh (%s)', wrapper => {
   })
 })
 
-describe('agent-gh-token owner (#538)', () => {
-  const tokenScript = path.join(import.meta.dir, 'agent-gh-token')
+const tokenScript = path.join(import.meta.dir, 'agent-gh-token')
 
+const mint = (repo: string) => {
+  const env = { GH_REPO: repo, HOME: home, LC_ALL: 'C.UTF-8', PATH: `${bin}:${process.env.PATH ?? ''}` }
+  const result = Bun.spawnSync([tokenScript], { cwd: home, env })
+  return { code: result.exitCode, stderr: result.stderr.toString(), stdout: result.stdout.toString() }
+}
+
+describe('agent-gh-token owner (#538)', () => {
   // A token cached under each spelling, so the owner decides the outcome without any key or network.
   const cached = (repo: string, token: string) => {
     const folder = path.join(home, '.cache', 'agent-gh')
     mkdirSync(folder, { recursive: true })
     writeFileSync(path.join(folder, repo), `${token}\n`)
-  }
-
-  const mint = (repo: string) => {
-    const env = { GH_REPO: repo, HOME: home, LC_ALL: 'C.UTF-8', PATH: process.env.PATH ?? '' }
-    const result = Bun.spawnSync([tokenScript], { cwd: home, env })
-    return { code: result.exitCode, stderr: result.stderr.toString(), stdout: result.stdout.toString() }
   }
 
   test.each([
@@ -179,5 +179,49 @@ describe('agent-gh-token owner (#538)', () => {
     expect(code).not.toBe(0)
     expect(stdout).toBe('')
     expect(stderr).toContain(`no agent bot for ${owner}/repo`)
+  })
+})
+
+describe('agent-gh-token request time limit (#542)', () => {
+  // The curl stub answers both requests like GitHub, except that call number `timesOutOn` runs out of
+  // time as curl does (exit 28, no output), if it was given a limit. Without one it answers, as a
+  // request that hangs would never time out. openssl is a stub too, so no key is involved.
+  const stubRequests = (timesOutOn: number) => {
+    script(path.join(bin, 'openssl'), 'cat > /dev/null\nprintf signature')
+    script(path.join(bin, 'curl'), `echo "$*" >> "$HOME/curl-calls"
+call=$(wc -l < "$HOME/curl-calls")
+if [[ $call == ${timesOutOn} && " $* " == *" --max-time "* ]]; then
+  exit 28
+fi
+cat > /dev/null
+if [[ $call == 1 ]]; then echo '{"id":7}'; else echo '{"token":"minted-token"}'; fi`)
+    const conf = path.join(home, '.config', 'household-brain-agent')
+    mkdirSync(conf, { recursive: true })
+    writeFileSync(path.join(conf, 'app-id'), '1\n')
+  }
+
+  const curlCalls = () => readFileSync(path.join(home, 'curl-calls'), 'utf8').trim().split('\n')
+  const cachedToken = () => path.join(home, '.cache', 'agent-gh', 'Flixbox_repo')
+
+  test('both requests have a time limit, and a token still comes through', () => {
+    stubRequests(0)
+    expect(mint('Flixbox/repo')).toMatchObject({ code: 0, stdout: 'minted-token\n' })
+    const calls = curlCalls()
+    expect(calls).toHaveLength(2)
+    for (const call of calls) {
+      expect(call).toMatch(/--max-time \d+/u)
+    }
+  })
+
+  test.each([
+    ['the installation lookup', 1],
+    ['the token request', 2],
+  ])('%s timing out fails with no token on stdout', (_name, timesOutOn) => {
+    stubRequests(timesOutOn)
+    const { code, stdout } = mint('Flixbox/repo')
+    expect(code).not.toBe(0)
+    expect(stdout).toBe('')
+    expect(existsSync(cachedToken())).toBe(false)
+    expect(curlCalls()).toHaveLength(timesOutOn)
   })
 })
