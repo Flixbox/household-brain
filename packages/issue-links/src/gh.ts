@@ -1,5 +1,8 @@
-/** Asking GitHub through the `gh` CLI. GH: the `gh` to ask with (e.g. a bot's wrapper, GH=agent-gh); plain gh by default. */
-const GH = process.env.GH ?? 'gh'
+/**
+ * Asking GitHub through the `gh` CLI. GH: the `gh` to ask with; by default the bot's `agent-gh` (#532),
+ * which stops rather than act as the owner. GH=gh only for someone running this by hand on purpose.
+ */
+const GH = process.env.GH ?? 'agent-gh'
 
 /** What a call answers, read as JSON (null for an empty answer); it fails with gh's own message. */
 export const ghJson = async (args: string[]): Promise<unknown> => {

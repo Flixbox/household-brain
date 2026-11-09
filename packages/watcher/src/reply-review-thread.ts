@@ -13,8 +13,9 @@
  * more after waiting: `retry-after` when GitHub sends it, else until `x-ratelimit-reset` when
  * `x-ratelimit-remaining` is 0, else a minute. Never more than once, so agents don't hammer a limit.
  *
- * Settings as the watcher's (`--env-file=.claude/watcher.env` reads them): `GH`, the `gh` to ask with
- * (the bot's `agent-gh`), and `REPO`, by default the repository of the current folder.
+ * Settings as the watcher's (`--env-file=.claude/watcher.env` reads them): `GH`, the `gh` to ask with,
+ * by default the bot's `agent-gh` (#532), which stops rather than act as the owner (GH=gh only for
+ * someone running this by hand on purpose), and `REPO`, by default the repository of the current folder.
  */
 import { hasText, isRecord, textOf } from './read'
 import { type Json, record, records } from './watch-text'
@@ -104,11 +105,14 @@ export const threadsFrom = (page: unknown): Thread[] => records(record(page).nod
   id: textOf(node.id),
 }))
 
-const GH = process.env.GH ?? 'gh'
+const GH = process.env.GH ?? 'agent-gh'
+
+/** A GraphQL call names no repository, so `agent-gh` is told REPO's to pick its bot (#532); without REPO it reads the folder's. */
+const ghEnv = hasText(process.env.REPO) ? { ...process.env, GH_REPO: process.env.REPO } : process.env
 
 /** What `gh` prints for `args`, and its exit code. */
 const run = async (args: readonly string[]): Promise<{ code: number, out: string }> => {
-  const call = Bun.spawn([GH, ...args], { stderr: 'inherit', stdout: 'pipe' })
+  const call = Bun.spawn([GH, ...args], { env: ghEnv, stderr: 'inherit', stdout: 'pipe' })
   const out = await new Response(call.stdout).text()
   return { code: await call.exited, out }
 }
