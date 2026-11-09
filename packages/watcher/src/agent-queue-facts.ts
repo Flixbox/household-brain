@@ -59,7 +59,7 @@ export interface PrFacts {
   self: string
   /**
    * When the last thing GitHub would act on happened, as near as it tells (ISO 8601, UTC): the latest
-   * of the auto-merge request, a review, a label, the last push and a check finishing. '' when none is known (#544).
+   * of the auto-merge request, a review or its dismissal, a label, the last push and a check finishing. '' when none is known (#544).
    */
   settledAt: string
   state: string
@@ -119,7 +119,7 @@ const lastPushOf = ({ branch, contexts, events, head }: { branch: string, contex
 const settlingTimes = (fields: Json, contexts: unknown, events: readonly Json[]): string[] => [
   textOf(at(fields, 'autoMergeRequest', 'enabledAt')),
   ...records(at(fields, 'reviews', 'nodes')).map(review => textOf(review.submittedAt)),
-  ...events.filter(event => LABEL_EVENTS.has(textOf(event.kind))).map(event => textOf(event.createdAt)),
+  ...events.filter(event => LABEL_EVENTS.has(textOf(event.kind)) || event.kind === 'ReviewDismissedEvent').map(event => textOf(event.createdAt)),
   ...records(at(contexts, 'nodes')).map(node => textOf(node.completedAt, textOf(node.createdAt))),
 ]
 

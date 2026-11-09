@@ -141,8 +141,8 @@ export const autoMergeStuck = (facts: PrFacts, owner: string, now: Temporal.Inst
 // `kind: __typename` aliases GraphQL's type name to the name clearedAt reads (actors too: `Bot`).
 const LABEL_FIELDS = 'createdAt actor{kind: __typename login} label{name}'
 const PR_QUERY = `query($owner:String!,$name:String!,$pr:Int!){viewer{login} repository(owner:$owner,name:$name){pullRequest(number:$pr){
-  id headRefOid headRefName isMergeQueueEnabled timelineItems(itemTypes:[LABELED_EVENT,UNLABELED_EVENT,HEAD_REF_FORCE_PUSHED_EVENT],last:100){pageInfo{hasPreviousPage} nodes{kind: __typename
-    ... on LabeledEvent{${LABEL_FIELDS}} ... on UnlabeledEvent{${LABEL_FIELDS}} ... on HeadRefForcePushedEvent{createdAt}}}
+  id headRefOid headRefName isMergeQueueEnabled timelineItems(itemTypes:[LABELED_EVENT,UNLABELED_EVENT,HEAD_REF_FORCE_PUSHED_EVENT,REVIEW_DISMISSED_EVENT],last:100){pageInfo{hasPreviousPage} nodes{kind: __typename
+    ... on LabeledEvent{${LABEL_FIELDS}} ... on UnlabeledEvent{${LABEL_FIELDS}} ... on HeadRefForcePushedEvent{createdAt} ... on ReviewDismissedEvent{createdAt}}}
   state isDraft isInMergeQueue mergeStateStatus autoMergeRequest{enabledAt} labels(first:100){nodes{name} pageInfo{hasNextPage}}
   reviews(last:100){nodes{author{login} state submittedAt} pageInfo{hasPreviousPage}} comments(last:100){nodes{body createdAt} pageInfo{hasPreviousPage startCursor}} reviewThreads(first:100){nodes{isResolved} pageInfo{hasNextPage}}
   commits(last:1){nodes{commit{committedDate statusCheckRollup{contexts(first:100){pageInfo{hasNextPage} nodes{

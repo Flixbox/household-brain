@@ -246,6 +246,7 @@ test.each([
   ['not CLEAN yet', { mergeStateStatus: 'BLOCKED' }],
   ['a request only seconds old', { autoMergeRequest: { enabledAt: secondsAgo() } }],
   ['an old request whose approval came seconds ago', approvedAt(secondsAgo())],
+  ['an old request whose last change request was dismissed seconds ago', { timelineItems: { nodes: [{ createdAt: secondsAgo(), kind: 'ReviewDismissedEvent' }], pageInfo: { hasPreviousPage: false } } }],
 ] as const)('auto-merge is left as it is, and nothing is written: %s (#544)', async (_name, change) => {
   const result = await stuckRun(change)
   expect(result.code).toBe(0)
