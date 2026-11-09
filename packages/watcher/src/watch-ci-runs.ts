@@ -1,7 +1,7 @@
 /* oxlint-disable eslint/no-await-in-loop -- a run's replacements are tried one after another, on purpose */
 /** What the project watcher does with a CI run of a commit (watch-main.ts asks, for each PR it follows). */
 import { FOLLOW_NEWER, type MainRun, type Run, cancelledDeployEvent, replacementCandidates, runEvent } from './watch-events'
-import { REPO, containsCommit, jobLines, mainRuns, runOf } from './watch-github'
+import { REPO, containsCommit, jobLines, mainRuns, newestMainRun, pushRunOf, runOf } from './watch-github'
 import { holdsLagging, isSettled, keepJobs, keptJobs, settle } from './watch-ci-cache'
 import { report } from './watch-output'
 
@@ -41,13 +41,29 @@ const reportRun = async ({ check, jobs, run }: { check: RunCheck, jobs: string[]
 
 /** A finished or slow CI run of `sha`: a PR's head, or a merged PR's commit on main (`deploy`). */
 export const checkRun = async (check: RunCheck): Promise<void> => {
-  const run = await runOf(check.sha).catch(() => null)
+  const found = await (check.label === 'deploy' ? pushRunOf(check.sha) : runOf(check.sha)).catch((): typeof UNKNOWN => UNKNOWN)
+  if (found === null && check.label === 'deploy') {
+    await followContaining(check)
+    return
+  }
+  const run = found === UNKNOWN ? null : found
   if (run && isSettled(check, run)) {
     return
   }
   // Jobs that can't be read yet: the result waits a look rather than coming out without them.
   const jobs = run ? keptJobs(run) ?? await jobLines(run, holdsLagging).catch(() => null) : null
   await (run && jobs ? reportRun({ check, jobs, run }) : Promise.resolve())
+}
+
+/**
+ * A merged commit with no push run (#549): the merge queue pushes a batch at once, and only its tip
+ * gets a run, which deploys the whole batch. So follow the newest run on main if its commit contains
+ * this one; main is linear, so no older run can. If it doesn't, the commit's own run hasn't started.
+ */
+const followContaining = async ({ limitSeconds, pr, sha }: RunCheck): Promise<void> => {
+  const newest = await newestMainRun().catch(() => null)
+  const contains = newest && newest.sha !== sha ? await containsCommit(newest.sha, sha).catch(() => false) : false
+  await (newest && contains ? checkRun({ label: 'deploy', limitSeconds, pr, sha: newest.sha }) : Promise.resolve())
 }
 
 /**

@@ -66,11 +66,20 @@ const runFrom = (value: Json): Run => ({
 
 const RUN_FIELDS = 'databaseId,attempt,startedAt,status,conclusion'
 
-/** The CI run of a commit; null when there is none yet. */
-export const runOf = async (sha: string, fresh = false): Promise<Run | null> => {
-  const [run] = records(record(await ghRest(`repos/${REPO}/actions/workflows/${WORKFLOW}/runs?head_sha=${sha}&per_page=1`, GH, fresh)).workflow_runs)
+const newestRun = async (filter: string, fresh: boolean): Promise<Run | null> => {
+  const [run] = records(record(await ghRest(`repos/${REPO}/actions/workflows/${WORKFLOW}/runs?${filter}&per_page=1`, GH, fresh)).workflow_runs)
   return run ? runFrom({ attempt: run.run_attempt, conclusion: run.conclusion, databaseId: run.id, startedAt: run.run_started_at, status: run.status }) : null
 }
+
+/** The CI run of a commit; null when there is none yet. */
+export const runOf = async (sha: string, fresh = false): Promise<Run | null> => newestRun(`head_sha=${sha}`, fresh)
+
+/**
+ * The run that deploys a merged commit (#549); null until it has started. The merge queue's run has
+ * the same commit and never deploys, and it is the only run of that commit until the push run starts.
+ * Only main's: a push of the same commit to another branch doesn't deploy either.
+ */
+export const pushRunOf = async (sha: string): Promise<Run | null> => newestRun(`head_sha=${sha}&event=push&branch=main`, false)
 
 /**
  * The newest CI runs on main, newest first, with their commits. A hundred, one page of GitHub's list
