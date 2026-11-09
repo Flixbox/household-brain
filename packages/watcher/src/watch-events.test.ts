@@ -24,10 +24,10 @@ describe('runEvent', () => {
   describe('what a slow run advises (#551)', () => {
     const slowLines = (jobs: string[]) => {
       const outcome = runEvent({ ...context, jobs, label: 'pr', run: run({ ageSeconds: 1500, conclusion: '', status: 'in_progress' }) })
-      return outcome && typeof outcome === 'object' ? outcome.lines : []
+      return typeof outcome === 'object' && outcome !== null ? outcome.lines : []
     }
 
-    it.each([
+    it.each<[string[], string]>([
       [['  web-e2e: completed success', '  pages: in_progress '], 'pages'],
       [['  Test: completed success', '  Deploy to Firebase: waiting '], 'Deploy to Firebase'],
       [['  Test: completed success', '  pages: queued ', '  deploy: in_progress '], 'pages, deploy'],
@@ -37,7 +37,7 @@ describe('runEvent', () => {
       expect(line).not.toContain('Cancel')
     })
 
-    it.each([
+    it.each<[string[]]>([
       [['  web-e2e: in_progress ', '  pages: queued ']],
       [['  web-e2e: in_progress ', '  Test: completed success']],
       [['  web-e2e: completed success']],
