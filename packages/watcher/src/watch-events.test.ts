@@ -21,6 +21,32 @@ describe('runEvent', () => {
       .toMatchObject({ key: 'pr-12 ci-slow 7 1', lines: [expect.stringContaining('still in_progress after 25 min'), '  Lint: completed success'] })
   })
 
+  describe('what a slow run advises (#551)', () => {
+    const slowLines = (jobs: string[]) => {
+      const outcome = runEvent({ ...context, jobs, label: 'pr', run: run({ ageSeconds: 1500, conclusion: '', status: 'in_progress' }) })
+      return outcome && typeof outcome === 'object' ? outcome.lines : []
+    }
+
+    it.each([
+      [['  web-e2e: completed success', '  pages: in_progress '], 'pages'],
+      [['  Test: completed success', '  Deploy to Firebase: waiting '], 'Deploy to Firebase'],
+      [['  Test: completed success', '  pages: queued ', '  deploy: in_progress '], 'pages, deploy'],
+    ])('names the deploys and does not say to cancel when only they are pending: %j', (jobs, names) => {
+      const [line] = slowLines(jobs)
+      expect(line).toContain(`Only deploy jobs are still pending (${names})`)
+      expect(line).not.toContain('Cancel')
+    })
+
+    it.each([
+      [['  web-e2e: in_progress ', '  pages: queued ']],
+      [['  web-e2e: in_progress ', '  Test: completed success']],
+      [['  web-e2e: completed success']],
+      [[]],
+    ])('says to cancel while anything else is pending, or nothing is: %j', jobs => {
+      expect(slowLines(jobs)[0]).toContain('Cancel it and read the logs.')
+    })
+  })
+
   it('reports a deploy, and follows a newer run when it was cancelled', () => {
     expect(runEvent({ ...context, label: 'deploy', run: run() })).toMatchObject({ key: `pr-12 deployed ${SHA}` })
     expect(runEvent({ ...context, label: 'deploy', run: run({ conclusion: 'failure' }) })).toMatchObject({ key: `pr-12 deploy-failed ${SHA} 1` })
