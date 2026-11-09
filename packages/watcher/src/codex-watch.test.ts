@@ -19,12 +19,13 @@ const tempDir = (): string => {
 }
 
 /** The local Codex daemon, as far as the supervisor talks to it. */
-const fakeDaemon = (home: string, cwd: string, status: string) => {
+const fakeDaemon = (home: string, cwd: string, initial: string) => {
+  const thread = { status: initial }
   const delivered: string[] = []
   const reads: string[] = []
   const results: Record<string, (params: unknown) => unknown> = {
     initialize: () => ({}),
-    'thread/read': () => { reads.push(status); return { thread: { canAcceptDirectInput: true, cwd, id: THREAD, status: { type: status } } } },
+    'thread/read': () => { reads.push(thread.status); return { thread: { canAcceptDirectInput: true, cwd, id: THREAD, status: { type: thread.status } } } },
     'turn/start': params => { delivered.push(JSON.stringify(params)); return {} },
   }
   mkdirSync(`${home}/app-server-control`)
@@ -41,7 +42,7 @@ const fakeDaemon = (home: string, cwd: string, status: string) => {
     },
   })
   cleanups.push(() => { server.stop(true).catch(() => null) })
-  return { delivered, reads }
+  return { delivered, reads, thread }
 }
 
 const within = async (ending: Promise<number>) => Promise.race([ending, Bun.sleep(WAIT_MS).then(() => 'still running')])
@@ -56,12 +57,27 @@ const supervisorEnv = (home: string) => {
   return { ...inherited, CODEX_HOME: home, CODEX_THREAD_ID: THREAD, WATCHER_SUBSCRIPTIONS: '', XDG_STATE_HOME: home }
 }
 
-const startSupervisor = (cwd: string, home: string) => {
+const BAD_SETTINGS = 'GH=false\nGH_PARALLEL=0\nOWNER=owner\nREPO=owner/repo\n'
+const GOOD_SETTINGS = 'GH=false\nOWNER=owner\nREPO=owner/repo\n'
+
+const startSupervisor = (cwd: string, home: string, settings = BAD_SETTINGS) => {
   mkdirSync(`${cwd}/.claude`, { recursive: true })
-  writeFileSync(`${cwd}/.claude/watcher.env`, 'GH=false\nGH_PARALLEL=0\nOWNER=owner\nREPO=owner/repo\n')
+  writeFileSync(`${cwd}/.claude/watcher.env`, settings)
   const supervisor = Bun.spawn([process.execPath, `${import.meta.dir}/codex-watch.ts`, '--supervise'], { cwd, env: supervisorEnv(home), stderr: 'ignore', stdin: 'ignore', stdout: 'ignore' })
   cleanups.push(() => { supervisor.kill() })
   return supervisor
+}
+
+const stopSupervisor = (cwd: string, home: string) => {
+  Bun.spawnSync([process.execPath, `${import.meta.dir}/codex-watch.ts`, '--stop'], { cwd, env: supervisorEnv(home) })
+}
+
+/** The owner fixed the settings and restarted; then the thread becomes ready for the old report. */
+const restartFixed = async (cwd: string, home: string, thread: { status: string }) => {
+  const successor = startSupervisor(cwd, home, GOOD_SETTINGS)
+  await Bun.sleep(1000)
+  thread.status = 'idle'
+  return successor
 }
 
 describe('the Codex supervisor on a bad setting (#527)', () => {
@@ -80,7 +96,7 @@ describe('the Codex supervisor on a bad setting (#527)', () => {
     const { reads } = fakeDaemon(home, cwd, 'notLoaded')
     const supervisor = startSupervisor(cwd, home)
     await untilRetrying(reads)
-    Bun.spawnSync([process.execPath, `${import.meta.dir}/codex-watch.ts`, '--stop'], { cwd, env: supervisorEnv(home) })
+    stopSupervisor(cwd, home)
     expect(await within(supervisor.exited)).toBe(64)
   }, WAIT_MS * 3)
 
@@ -92,4 +108,16 @@ describe('the Codex supervisor on a bad setting (#527)', () => {
     // Holding the lock here, the first would make this one die on it (#529).
     expect(await within(startSupervisor(cwd, home).exited)).toBe('still running')
   }, WAIT_MS * 3)
+
+  it('drops its old report once a successor runs', async () => {
+    const [cwd, home] = [tempDir(), tempDir()]
+    const daemon = fakeDaemon(home, cwd, 'notLoaded')
+    const first = startSupervisor(cwd, home)
+    await untilRetrying(daemon.reads)
+    const successor = await restartFixed(cwd, home, daemon.thread)
+    expect(await within(first.exited)).toBe(64)
+    expect(daemon.delivered).toEqual([])
+    stopSupervisor(cwd, home)
+    expect(await within(successor.exited)).toBe(0)
+  }, WAIT_MS * 4)
 })
