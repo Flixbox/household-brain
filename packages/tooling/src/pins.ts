@@ -10,7 +10,8 @@ export interface Pin {
 
 const PINNED = /^(?<action>[^\s@]+)@(?<sha>[0-9a-f]{40})$/iu
 // A `uses` entry and its version comment. YAML drops comments, so this reads the text (#546); never a line a comment or another key holds.
-const COMMENTED = /^[ \t-]*["']?uses["']?[ \t]*:\s*(?:&\S+\s+)?["']?(?<value>[^\s"'#]+)["']?[ \t]+#[ \t]*(?<tag>v\S+)/gmu
+const USES_ENTRY = /^[ \t-]*["']?uses["']?[ \t]*:\s*(?:&\S+\s+)?(?<rest>.*)$/gmu
+const VERSIONED = /^["']?(?<value>[^\s"'#]+)["']?[ \t]+#[ \t]*(?<tag>v\S+)/u
 
 /** Every `uses` value at any depth of a parsed workflow. */
 const usesValues = (node: unknown): string[] => {
@@ -25,7 +26,10 @@ const usesValues = (node: unknown): string[] => {
 
 /** The commented version of each `uses` value. */
 const versionsOf = (workflow: string): Map<string, string> =>
-  new Map([...workflow.matchAll(COMMENTED)].map(({ groups }) => [groups?.value ?? '', groups?.tag ?? ''] as const))
+  new Map([...workflow.matchAll(USES_ENTRY)].flatMap(({ groups }) => {
+    const entry = VERSIONED.exec(groups?.rest ?? '')?.groups
+    return entry ? [[entry.value ?? '', entry.tag ?? ''] as const] : []
+  }))
 
 /**
  * Every action a workflow pins by commit, once each. Reads the workflow as YAML, so no spelling of
