@@ -49,24 +49,32 @@ const publishedAt = async (spec: string): Promise<Temporal.Instant | null> => {
 const bunfig: { install?: { minimumReleaseAge?: number, minimumReleaseAgeExcludes?: string[] } } = Bun.TOML.parse(await Bun.file('bunfig.toml').text())
 const install = bunfig.install ?? {}
 const excluded = new Set(install.minimumReleaseAgeExcludes)
+const minimumAge = install.minimumReleaseAge
+if (typeof minimumAge !== 'number' || !Number.isFinite(minimumAge)) {
+  process.stdout.write('::error::bunfig.toml has no install.minimumReleaseAge to check against (#94).\n')
+  process.exit(1)
+}
 
 const [base] = process.argv.slice(2)
 if (!hasText(base)) {
   throw new Error('Usage: bun packages/tooling/src/check-package-age.ts <base-ref>')
 }
 const before = await $`git show ${base}:bun.lock`.quiet().nothrow()
-// The change that brought bun.lock (#140) moved pnpm-checked versions over unchanged.
-const known = before.exitCode === 0 ? lockedVersions(before.stdout.toString()) : null
+if (before.exitCode !== 0) {
+  process.stdout.write(`::error::Can't read bun.lock at ${base}: ${before.stderr.toString().trim()}\n`)
+  process.exit(1)
+}
+const known = lockedVersions(before.stdout.toString())
 const now = lockedVersions(await Bun.file('bun.lock').text())
-const added = known ? [...now].filter(spec => !known.has(spec) && !excluded.has(nameAndVersion(spec)[0])) : []
+const added = [...now].filter(spec => !known.has(spec) && !excluded.has(nameAndVersion(spec)[0]))
 
 const young = (await Promise.all(added.map(async spec => ({ published: await publishedAt(spec), spec }))))
-  .filter(({ published }) => published === null || tooYoung(published, install.minimumReleaseAge ?? 0))
+  .filter(({ published }) => published === null || tooYoung(published, minimumAge))
 
-process.stdout.write(`${known ? added.length : 'No'} package versions to check against ${base}${known ? '' : ' (it has no bun.lock)'}\n`)
+process.stdout.write(`${added.length} package versions to check against ${base}\n`)
 if (young.length > 0) {
   for (const { spec, published } of young) {
-    process.stdout.write(`::error::${spec} was published ${published ? published.toString() : 'at an unknown time'}, less than ${install.minimumReleaseAge}s ago (#94). Wait and re-run.\n`)
+    process.stdout.write(`::error::${spec} was published ${published ? published.toString() : 'at an unknown time'}, less than ${minimumAge}s ago (#94). Wait and re-run.\n`)
   }
   process.exit(1)
 }
