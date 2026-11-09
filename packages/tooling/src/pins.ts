@@ -8,7 +8,7 @@ export interface Pin {
   tag: string | null
 }
 
-const PINNED = /^(?<action>[^\s@]+)@(?<sha>[0-9a-fA-F]{40})$/u
+const PINNED = /^(?<action>[^\s@]+)@(?<sha>[0-9a-f]{40})$/iu
 // A `uses` entry and its version comment. YAML drops comments, so this reads the text (#546); never a line a comment or another key holds.
 const COMMENTED = /^[ \t-]*["']?uses["']?[ \t]*:\s*(?:&\S+\s+)?["']?(?<value>[^\s"'#]+)["']?[ \t]+#[ \t]*(?<tag>v\S+)/gmu
 
