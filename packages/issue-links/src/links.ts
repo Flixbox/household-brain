@@ -48,7 +48,15 @@ export const block = async (issue: IssueRef, blocker: IssueRef): Promise<string>
   if (refKey(issue) === refKey(blocker)) {
     throw new Error(`${refText(issue)} can't be blocked by itself`)
   }
-  const cycle = await blockingPath(refKey(blocker), refKey(issue), async key => (await blockersOf(fromKey(key))).map(known => refKey(known)))
+  // Keys are lower case, but agent-gh picks the bot from the owner as GitHub spells it (#532).
+  const spelled = new Map([issue, blocker].map(ref => [refKey(ref), ref] as const))
+  const cycle = await blockingPath(refKey(blocker), refKey(issue), async key => {
+    const found = await blockersOf(spelled.get(key) ?? fromKey(key))
+    for (const ref of found) {
+      spelled.set(refKey(ref), ref)
+    }
+    return found.map(known => refKey(known))
+  })
   if (cycle) {
     throw new Error(`refused: ${refText(issue)} blocked by ${refText(blocker)} would close a cycle: ${[refKey(issue), ...cycle].join(' → ')}`)
   }
