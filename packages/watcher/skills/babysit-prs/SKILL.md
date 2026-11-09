@@ -216,7 +216,7 @@ approved one whose auto-merge is still off and that isn't in the merge queue, no
 | `NEW_PR` | A pull request appeared (a dependency bot's too). Review it like any other; for a dependency bump, check what CI can't see. Reviewing it is fine; answering its author's comments isn't (see `ACTIVITY`). |
 | `CI_PASSED` | Report it. |
 | `CI_FAILED` | Read the failing job (`gh run view <run> --log-failed`), reproduce locally, fix, push once. |
-| `CI_SLOW` | Something hangs. Cancel the run, read its logs, fix the hang **and** the missing time limit. |
+| `CI_SLOW` | Something hangs. Cancel the run, read its logs, fix the hang **and** the missing time limit. When it says only deploy jobs are pending, leave the run alone: a deploy isn't interrupted for being slow. |
 | `CONFLICT` | Merge the default branch in and resolve the conflict, run the checks, push once, reply on the pull request. Never rebase a pushed branch. |
 | `MAIN_MOVED` | The default branch moved under the pull request. Merge it in, run the checks, push once, so what gets merged is what was tested. Once for each new head of the default branch. Where branches are kept current one at a time, in a merge line, wait for your turn. |
 | `APPROVED` | The owner approved: only `OWNER`'s approval counts, never a bot's or anyone else's (#277), here, in the open-PR list, `READY_TO_MERGE` and `REMINDER`. If the review's findings are fixed, read the pull request for unanswered comments, then queue it with the command the event names, `agent-queue <owner/name> <n>` (#356), alone in its own call (see "Queueing" below). A plain approval comes only as this; one with text also comes as `ACTIVITY`: answer it first. For a PR already in the merge queue, the event says so: there is no auto-merge to enable. |
