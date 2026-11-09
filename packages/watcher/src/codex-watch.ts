@@ -79,7 +79,7 @@ const watchOnce = async (): Promise<{ code: number, errors: string }> => {
 }
 
 // Connecting, never binding: a probe that bound the port could make a starting successor lose it.
-const successorRuns = async (): Promise<boolean> => Bun.connect({ hostname: '127.0.0.1', port: LOCK_PORT, socket: { data: () => null, open: socket => { socket.end() } } }).then(() => true, () => false)
+const successorRuns = async (): Promise<boolean> => Bun.connect({ hostname: '127.0.0.1', port: LOCK_PORT, socket: { data: socket => { socket.end() }, open: socket => { socket.end() } } }).then(() => true, () => false)
 
 const deliverReport = async (event: Notification): Promise<boolean> => withCodexSocket(async request => notifyCodex(request, { cwd: process.cwd(), threadId: target }, event)).then(() => true, () => false)
 
