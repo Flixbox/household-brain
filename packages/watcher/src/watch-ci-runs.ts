@@ -1,7 +1,7 @@
 /* oxlint-disable eslint/no-await-in-loop -- a run's replacements are tried one after another, on purpose */
 /** What the project watcher does with a CI run of a commit (watch-main.ts asks, for each PR it follows). */
 import { FOLLOW_NEWER, type MainRun, type Run, cancelledDeployEvent, replacementCandidates, runEvent } from './watch-events'
-import { REPO, containsCommit, jobLines, mainRuns, runOf } from './watch-github'
+import { REPO, containsCommit, jobLines, mainRuns, pushRunOf, runOf } from './watch-github'
 import { holdsLagging, isSettled, keepJobs, keptJobs, settle } from './watch-ci-cache'
 import { report } from './watch-output'
 
@@ -41,7 +41,7 @@ const reportRun = async ({ check, jobs, run }: { check: RunCheck, jobs: string[]
 
 /** A finished or slow CI run of `sha`: a PR's head, or a merged PR's commit on main (`deploy`). */
 export const checkRun = async (check: RunCheck): Promise<void> => {
-  const run = await runOf(check.sha).catch(() => null)
+  const run = await (check.label === 'deploy' ? pushRunOf(check.sha) : runOf(check.sha)).catch(() => null)
   if (run && isSettled(check, run)) {
     return
   }
