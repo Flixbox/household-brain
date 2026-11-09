@@ -58,8 +58,8 @@ const finishedEvent = ({ pr, sha, label, run, jobs, repo }: RunContext): Event |
   }
 }
 
-/** Publishing jobs by their name: `deploy` here, `pages` on Pages sites. */
-const DEPLOY_JOB = /\b(?:deploy\w*|pages)\b/iu
+/** Publishing jobs by their name: `deploy` anywhere in it, or exactly `pages` (`Build pages` builds). */
+const DEPLOY_JOB = /\bdeploy\w*\b|^pages$/iu
 
 /** The names in `jobLines`' lines of the jobs not finished yet. */
 const pendingJobs = (jobs: readonly string[]): string[] => jobs

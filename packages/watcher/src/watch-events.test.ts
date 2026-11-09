@@ -40,6 +40,7 @@ describe('runEvent', () => {
     it.each<[string[]]>([
       [['  web-e2e: in_progress ', '  pages: queued ']],
       [['  web-e2e: in_progress ', '  Test: completed success']],
+      [['  Build pages: in_progress ']],
       [['  web-e2e: completed success']],
       [[]],
     ])('says to cancel while anything else is pending, or nothing is: %j', jobs => {
