@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'bun:test'
+import { afterAll, describe, expect, it } from 'bun:test'
+import { chmod, mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { answerFrom, rateLimitWait, threadIdOf, threadsFrom } from './reply-review-thread'
 
 const NOW = 1_800_000_000
@@ -68,5 +70,36 @@ describe('threadIdOf (#297)', () => {
 
   it('finds none for a comment no thread holds', () => {
     expect(threadIdOf('99', threads)).toBeNull()
+  })
+})
+
+describe('the gh it posts with (#532)', () => {
+  const dirs: string[] = []
+
+  afterAll(async () => {
+    await Promise.all(dirs.map(async dir => rm(dir, { force: true, recursive: true })))
+  })
+
+  /** A stand-in for a `gh`: it logs its name and the repository it was told, and answers that the reply was posted. */
+  const standIn = (name: string, home: string) => String.raw`#!/bin/sh
+echo "${name} repo=$GH_REPO" >> "${home}/calls"
+printf 'HTTP/2.0 200 OK\n\n{"data":{"addPullRequestReviewThreadReply":{"comment":{"url":"posted"}}}}\n'
+`
+
+  it('is the bot, told the repository, when GH is unset and the folder is no clone', async () => {
+    const home = await mkdtemp(`${tmpdir()}/reply-review-thread-`)
+    dirs.push(home)
+    await Promise.all(['agent-gh', 'gh'].map(async name => {
+      await Bun.write(`${home}/${name}`, standIn(name, home))
+      await chmod(`${home}/${name}`, 0o755)
+    }))
+    const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => name !== 'GH' && name !== 'GH_REPO'))
+    const child = Bun.spawn([process.execPath, `${import.meta.dir}/reply-review-thread.ts`, '7', 'PRRT_x', 'Resolved: done'], {
+      cwd: home, env: { ...env, PATH: home, REPO: 'Coarisfinia/two' }, stderr: 'pipe', stdout: 'pipe',
+    })
+    const [output, code] = await Promise.all([new Response(child.stdout).text(), child.exited])
+    expect(output.trim()).toBe('posted')
+    expect(code).toBe(0)
+    expect((await Bun.file(`${home}/calls`).text()).trim().split('\n')).toEqual(['agent-gh repo=Coarisfinia/two'])
   })
 })
