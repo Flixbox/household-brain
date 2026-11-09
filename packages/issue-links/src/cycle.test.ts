@@ -62,7 +62,7 @@ describe('findCycles (#334)', () => {
 
   /** A chain of diamonds from `#d0`, in walking order, that ends in the given blockers (#548). */
   const diamonds = (count: number, last: string[]): [string, string[]][] => [
-    ...Array.from({ length: count }, (_, at): [string, string[]][] => [
+    ...Array.from({ length: count }, (_item, at): [string, string[]][] => [
       [`#d${at}`, [`#l${at}`, `#r${at}`]],
       [`#l${at}`, [`#d${at + 1}`]],
       [`#r${at}`, [`#d${at + 1}`]],
