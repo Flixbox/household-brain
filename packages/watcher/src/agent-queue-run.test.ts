@@ -63,6 +63,13 @@ const FAKE = String.raw`
     console.log('HTTP/2.0 200 OK\nContent-Type: application/json\n\n' + JSON.stringify({ data: { enablePullRequestAutoMerge: { clientMutationId: null } } }))
     process.exit(0)
   }
+  for (const mutation of ['enqueuePullRequest', 'mergePullRequest']) {
+    if (joined.includes(mutation)) {
+      const refusal = process.env.FAKE_WRITE_ERROR ?? ''
+      console.log('HTTP/2.0 200 OK\n\n' + JSON.stringify(refusal === '' ? { data: { [mutation]: { clientMutationId: null } } } : { data: null, errors: [{ message: refusal }] }))
+      process.exit(0)
+    }
+  }
   if (joined.includes('viewer{login}')) {
     const refusedFile = process.env.FIXTURE_HOME + '/refused'
     if (process.env.FAKE_REFUSE === '1' && !existsSync(refusedFile)) {
@@ -192,3 +199,62 @@ test('a queueing call that hangs fails, and is never reported as queued (#540)',
   expect(result.output).toBe('')
   expect(result.ms).toBeLessThan(5000)
 }, HUNG_CALL_TEST_MS)
+
+const writes = (calls: readonly string[]) => calls.filter(call => /enqueuePullRequest|enablePullRequestAutoMerge|mergePullRequest|disablePullRequestAutoMerge/u.test(call))
+const ALREADY = 'owner/repo#7 is already set to auto-merge.'
+/** Approved, green and CLEAN, its auto-merge request and everything else hours old, and not in the merge queue (#544). */
+const STUCK = { ...READY_PR, autoMergeRequest: { enabledAt: T0 }, isMergeQueueEnabled: true, mergeStateStatus: 'CLEAN' }
+const stuckRun = async (change: Record<string, unknown> = {}, extra: Record<string, string> = {}) => runFromNonClone('agent-bot[bot]', { FAKE_PR: JSON.stringify({ ...STUCK, ...change }), ...extra })
+const secondsAgo = () => Temporal.Now.instant().toString()
+const approvedAt = (when: string) => ({ reviews: { nodes: [{ author: { login: 'owner' }, state: 'APPROVED', submittedAt: when }], pageInfo: { hasPreviousPage: false } } })
+
+test('a stuck auto-merge request gets the PR into the merge queue, pinned to the head it checked (#544)', async () => {
+  const result = await stuckRun()
+  expect({ code: result.code, error: result.error, output: result.output }).toEqual({ code: 0, error: '', output: 'Added to the merge queue (its auto-merge request was stuck): owner/repo#7 at c0ffee1.\n' })
+  const [write, ...others] = writes(result.calls)
+  expect(others).toEqual([])
+  expect(write).toContain('enqueuePullRequest')
+  expect(write).toContain('expectedHeadOid:$head')
+  expect(write).toContain('head=c0ffee1')
+})
+
+test('a stuck request GitHub refuses to queue fails, saying so, not as if it had succeeded (#544)', async () => {
+  const result = await stuckRun({}, { FAKE_WRITE_ERROR: 'Pull request is not mergeable' })
+  expect(result.code).not.toBe(0)
+  expect(result.output).toBe('')
+  expect(result.error).toContain('still not in the merge queue')
+  expect(result.error).toContain('Pull request is not mergeable')
+})
+
+test('a stuck request on a branch without a merge queue is merged, as a clean PR is (#544)', async () => {
+  const result = await stuckRun({ isMergeQueueEnabled: false })
+  expect(result.code).toBe(0)
+  expect(result.output).toBe('Merged (squash, its auto-merge request was stuck): owner/repo#7 at c0ffee1.\n')
+  const [write, ...others] = writes(result.calls)
+  expect(others).toEqual([])
+  expect(write).toContain('mergePullRequest')
+  expect(write).toContain('expectedHeadOid:$head')
+})
+
+const PENDING_CHECKS = { commits: { nodes: [{ commit: { committedDate: T0, statusCheckRollup: { contexts: { nodes: [
+  { checkSuite: { branch: { name: 'feature' }, createdAt: T0, workflowRun: { event: 'pull_request' } }, conclusion: null, name: 'checks', status: 'IN_PROGRESS' },
+], pageInfo: { hasNextPage: false } } } } }] } }
+
+test.each([
+  ['still waiting for CI', PENDING_CHECKS],
+  ['still waiting for the approval', { reviews: { nodes: [], pageInfo: { hasPreviousPage: false } } }],
+  ['not CLEAN yet', { mergeStateStatus: 'BLOCKED' }],
+  ['a request only seconds old', { autoMergeRequest: { enabledAt: secondsAgo() } }],
+  ['an old request whose approval came seconds ago', approvedAt(secondsAgo())],
+] as const)('auto-merge is left as it is, and nothing is written: %s (#544)', async (_name, change) => {
+  const result = await stuckRun(change)
+  expect(result.code).toBe(0)
+  expect(result.output).toContain(ALREADY)
+  expect(writes(result.calls)).toEqual([])
+})
+
+test('a PR in the merge queue stays as it is (#544)', async () => {
+  const result = await stuckRun({ isInMergeQueue: true })
+  expect(result.output).toBe('owner/repo#7 is already in the merge queue.\n')
+  expect(writes(result.calls)).toEqual([])
+})
