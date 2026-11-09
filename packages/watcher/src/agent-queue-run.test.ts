@@ -87,14 +87,14 @@ const runFromNonClone = async (viewer: string, extra: Record<string, string> = {
   await Bun.write(gh, `#!/bin/sh\nexec "${process.execPath}" "${home}/fake.ts" "$@"\n`)
   await Bun.spawn(['chmod', '+x', gh]).exited
   const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => name !== 'GH_REPO' && name !== 'OWNER'))
-  const started = Date.now()
+  const started = Temporal.Now.instant().epochMilliseconds
   const child = Bun.spawn([process.execPath, `${import.meta.dir}/agent-queue.ts`, 'owner/repo', '7'], {
     cwd: home,
     env: { ...env, FAKE_PR: JSON.stringify(READY_PR), FAKE_VIEWER: viewer, FIXTURE_HOME: home, GH: gh, ...extra },
     stderr: 'pipe', stdout: 'pipe',
   })
   const [output, error, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
-  const ms = Date.now() - started
+  const ms = Temporal.Now.instant().epochMilliseconds - started
   const calls = (await Bun.file(`${home}/calls`).text().catch(() => '')).split('\n').filter(line => line !== '')
   return { calls, code, error, ms, output }
 }

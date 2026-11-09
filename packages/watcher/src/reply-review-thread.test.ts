@@ -110,12 +110,12 @@ printf 'HTTP/2.0 200 OK\n\n{"data":{"addPullRequestReviewThreadReply":{"comment"
     dirs.push(home)
     await Bun.write(`${home}/hung-gh`, `#!/bin/sh\necho called >> "${home}/calls"\nsleep 6 2>/dev/null\n`)
     await chmod(`${home}/hung-gh`, 0o755)
-    const started = Date.now()
+    const started = Temporal.Now.instant().epochMilliseconds
     const child = Bun.spawn([process.execPath, `${import.meta.dir}/reply-review-thread.ts`, '7', 'PRRT_x', 'Resolved: done'], {
       cwd: home, env: { ...process.env, AGENT_GH_TIMEOUT_SECONDS: limit, GH: `${home}/hung-gh`, REPO: 'owner/repo' }, stderr: 'pipe', stdout: 'pipe',
     })
     const [output, error, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
-    return { called: await Bun.file(`${home}/calls`).exists(), code, error, ms: Date.now() - started, output }
+    return { called: await Bun.file(`${home}/calls`).exists(), code, error, ms: Temporal.Now.instant().epochMilliseconds - started, output }
   }
 
   it('fails with a message saying so when the call hangs, within its limit (#540)', async () => {
