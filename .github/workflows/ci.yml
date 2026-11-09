@@ -57,10 +57,19 @@ jobs:
       - run: bun run test
       - run: bun run build
       - name: Production build has no emulator wiring
+        run: bun packages/tooling/src/check-no-emulator-wiring.ts apps/web/dist
+      # Planted for the fail-first run of #534; removed in the next commit.
+      - name: 'Planted (#534): the check against a missing, an empty and an emulator build'
         run: |
-          if grep -rlE 'e2eSignIn|127\.0\.0\.1:(9099|8080)' apps/web/dist/; then
-            echo '::error::The production build contains emulator code'; exit 1
-          fi
+          set +e
+          if grep -rlE 'e2eSignIn|127\.0\.0\.1:(9099|8080)' apps/web/dist-missing/; then echo 'old check: failed'; else echo 'old check on a missing build: passes'; fi
+          bun packages/tooling/src/check-no-emulator-wiring.ts apps/web/dist-missing; missing=$?
+          mkdir -p apps/web/dist-empty
+          bun packages/tooling/src/check-no-emulator-wiring.ts apps/web/dist-empty; empty=$?
+          bun run nx run @household-brain/web:build:e2e
+          bun packages/tooling/src/check-no-emulator-wiring.ts apps/web/dist-e2e; emulators=$?
+          echo "exit codes: missing=$missing empty=$empty emulators=$emulators"
+          exit $((missing + empty + emulators))
       # Serwist (like Workbox) refuses a precache list with the same URL twice, and then no new version installs (#136).
       - name: Service worker precaches each file once
         run: |
@@ -191,10 +200,7 @@ jobs:
       # shared, and production must not depend on what some other run stored in it.
       - run: bun run build --skip-nx-cache
       - name: Production build has no emulator wiring
-        run: |
-          if grep -rlE 'e2eSignIn|127\.0\.0\.1:(9099|8080)' apps/web/dist/; then
-            echo '::error::The production build contains emulator code'; exit 1
-          fi
+        run: bun packages/tooling/src/check-no-emulator-wiring.ts apps/web/dist
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: web-dist
