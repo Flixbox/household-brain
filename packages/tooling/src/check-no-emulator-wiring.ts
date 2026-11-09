@@ -39,7 +39,7 @@ export const checkBuild = async (dir: string) => {
 }
 
 if (import.meta.main) {
-  const [, , dir] = process.argv
+  const [dir] = process.argv.slice(2)
   if (typeof dir === 'undefined') {
     process.stderr.write('Usage: check-no-emulator-wiring <build folder>\n')
     process.exit(2)
