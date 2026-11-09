@@ -1,10 +1,17 @@
-/* oxlint-disable import/no-nodejs-modules, eslint/no-await-in-loop -- the supervisor writes its log and waits for each watcher to stop before rearming */
+/* oxlint-disable import/no-nodejs-modules, eslint/no-await-in-loop -- the supervisor writes its log, waits for each watcher to stop before rearming, and retries its one report in turn */
 /** Codex lifecycle adapter. It supervises the existing watcher, never a second event classifier. */
 import { SUBSCRIPTIONS_COMPLETE, selectionKey } from './watch-subscription-model'
 import { openSync } from 'node:fs'
 import { WATCHERS_DIR } from './watch-files'
 import { hasText, isRecord } from './read'
+import { type Notification, notifyCodex } from './codex-notify'
 import { withCodexSocket } from './codex-socket'
+
+// The watcher's exit for a setting it refuses at the start (#527): the same settings fail the same way.
+const BAD_SETTING = 64
+const ERROR_TAIL = 2000
+const REPORT_ATTEMPTS = 24
+const REPORT_PAUSE_MS = 5000
 
 const hookTarget = async (): Promise<string> => {
   const input: unknown = JSON.parse(await Bun.stdin.text())
@@ -43,16 +50,55 @@ const stopOnSessionEnd = (watcher: Bun.Subprocess) => setInterval(() => {
   }).catch(() => null)
 }, 1000)
 
-const watchOnce = async (): Promise<number> => {
+/** Passes the watcher's stderr on to the log, and keeps its end for a report. */
+const followErrors = (watcher: Bun.Subprocess<'ignore', 'inherit', 'pipe'>) => {
+  const seen = { tail: '' }
+  const done = (async () => {
+    for await (const chunk of watcher.stderr.pipeThrough(new TextDecoderStream())) {
+      process.stderr.write(chunk)
+      seen.tail = `${seen.tail}${chunk}`.slice(-ERROR_TAIL)
+    }
+  })().catch(() => null)
+  return { done, seen }
+}
+
+const watchOnce = async (): Promise<{ code: number, errors: string }> => {
   const watcher = Bun.spawn([process.execPath, `--env-file=${settings}`, `${import.meta.dir}/watch-project.ts`, '--follow'], {
     cwd: checkout,
     env: { ...process.env, CODEX_THREAD_ID: target, CODEX_WATCH_CWD: process.cwd(), CODEX_WATCH_THREAD: target, WATCHER_ID: `codex-${target}` },
-    stderr: 'inherit', stdin: 'ignore', stdout: 'inherit',
+    stderr: 'pipe', stdin: 'ignore', stdout: 'inherit',
   })
+  const errors = followErrors(watcher)
   const ended = stopOnSessionEnd(watcher)
   const code = await watcher.exited
   clearInterval(ended)
-  return code
+  // Bounded: something the watcher started may hold the pipe open after the watcher has gone.
+  await Promise.race([errors.done, Bun.sleep(1000)])
+  return { code, errors: errors.seen.tail.trim() }
+}
+
+const deliverReport = async (event: Notification): Promise<boolean> => withCodexSocket(async request => notifyCodex(request, { cwd: process.cwd(), threadId: target }, event)).then(() => true, () => false)
+
+/** The session is told once; a thread that isn't ready yet gets a little while before only the log has it. */
+const reportStopped = async (errors: string): Promise<void> => {
+  const event = { id: crypto.randomUUID(), lines: [`WATCHER_STOPPED: the watcher refused its settings and isn't being rearmed. Fix them, then start the Codex adapter again. Its error: ${errors}`] }
+  for (let attempt = 0; attempt < REPORT_ATTEMPTS; attempt += 1) {
+    // A session that ended can't be told, and the lock must not outlive it.
+    if (await Bun.file(stopFile).exists() || await deliverReport(event)) { return }
+    await Bun.sleep(REPORT_PAUSE_MS)
+  }
+  process.stderr.write('project-watcher: could not tell the session the watcher stopped\n')
+}
+
+const afterWatcher = async ({ code, errors }: { code: number, errors: string }): Promise<void> => {
+  if (code === SUBSCRIPTIONS_COMPLETE) { process.exit(0) }
+  if (code === BAD_SETTING) {
+    process.stderr.write('project-watcher: bad setting; not rearming\n')
+    await reportStopped(errors)
+    process.exit(BAD_SETTING)
+  }
+  process.stderr.write('project-watcher: watcher stopped; rearming\n')
+  await Bun.sleep(1000)
 }
 
 const supervise = async (): Promise<never> => {
@@ -62,10 +108,7 @@ const supervise = async (): Promise<never> => {
   process.on('exit', () => { lock.stop() })
   await Bun.file(stopFile).delete().catch(() => null)
   for (;;) {
-    const code = await watchOnce()
-    if (code === SUBSCRIPTIONS_COMPLETE) { process.exit(0) }
-    process.stderr.write('project-watcher: watcher stopped; rearming\n')
-    await Bun.sleep(1000)
+    await afterWatcher(await watchOnce())
   }
 }
 
