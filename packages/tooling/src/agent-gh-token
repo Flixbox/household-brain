@@ -19,12 +19,16 @@ repo=${repo#github.com/}
 owner=${repo%%/*}
 name=${repo#*/}
 
-case $owner in
-  Coarisfinia)
+# GitHub ignores case in owner names (#538). Only ASCII letters fold, so no look-alike reaches a bot,
+# and the owner takes its canonical spelling, so every spelling shares one cached token.
+case $(LC_ALL=C tr '[:upper:]' '[:lower:]' <<<"$owner") in
+  coarisfinia)
+    owner=Coarisfinia
     conf=coarisfinia-agent
     permissions='{"contents":"write","pull_requests":"write","issues":"write","workflows":"write","actions":"write","merge_queues":"write","checks":"read","statuses":"read","metadata":"read"}'
     ;;
-  Flixbox)
+  flixbox)
+    owner=Flixbox
     conf=household-brain-agent
     permissions=''
     ;;
