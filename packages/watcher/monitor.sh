@@ -10,6 +10,7 @@ if [ ! -f "$settings" ]; then
 fi
 # Bun's own install (~/.bun/bin) first: the session's PATH may lack it, or hold an older Bun from
 # another package manager, without the Temporal the watcher needs.
+# 2>&1: only stdout becomes notifications, and a refused setting is said on stderr (#527).
 bun="${BUN_INSTALL:-$HOME/.bun}/bin/bun"
 [ -x "$bun" ] || bun=bun
-exec "$bun" --env-file="$settings" "$(dirname "$0")/src/watch-project.ts" --follow
+exec "$bun" --env-file="$settings" "$(dirname "$0")/src/watch-project.ts" --follow 2>&1
