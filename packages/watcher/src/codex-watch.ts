@@ -90,6 +90,17 @@ const reportStopped = async (errors: string): Promise<void> => {
   process.stderr.write('project-watcher: could not tell the session the watcher stopped\n')
 }
 
+const afterWatcher = async ({ code, errors }: { code: number, errors: string }): Promise<void> => {
+  if (code === SUBSCRIPTIONS_COMPLETE) { process.exit(0) }
+  if (code === BAD_SETTING) {
+    process.stderr.write('project-watcher: bad setting; not rearming\n')
+    await reportStopped(errors)
+    process.exit(BAD_SETTING)
+  }
+  process.stderr.write('project-watcher: watcher stopped; rearming\n')
+  await Bun.sleep(1000)
+}
+
 const supervise = async (): Promise<never> => {
   // The same thread/project can start this from a hook and a skill, or after compaction. One wins.
   const port = 20_000 + Number(Bun.hash(identity) % 30_000n)
@@ -97,15 +108,7 @@ const supervise = async (): Promise<never> => {
   process.on('exit', () => { lock.stop() })
   await Bun.file(stopFile).delete().catch(() => null)
   for (;;) {
-    const { code, errors } = await watchOnce()
-    if (code === SUBSCRIPTIONS_COMPLETE) { process.exit(0) }
-    if (code === BAD_SETTING) {
-      process.stderr.write('project-watcher: bad setting; not rearming\n')
-      await reportStopped(errors)
-      process.exit(BAD_SETTING)
-    }
-    process.stderr.write('project-watcher: watcher stopped; rearming\n')
-    await Bun.sleep(1000)
+    await afterWatcher(await watchOnce())
   }
 }
 
