@@ -1,6 +1,7 @@
 /** What the project watcher reports, decided from what GitHub answered (pure, so it is tested). */
 import { isRecord } from './read'
 import { ciResultKey, ciState } from './watch-ci-state'
+import { slowAdvice } from './watch-ci-slow'
 
 export interface Event {
   /** Scoped agents do not wake for housekeeping such as non-conflicting main movement. */
@@ -67,7 +68,7 @@ export const runEvent = (context: RunContext): Event | typeof FOLLOW_NEWER | nul
   return run.ageSeconds > limitSeconds
     ? {
       key: `pr-${pr} ci-slow ${run.id} ${run.attempt}`,
-      lines: [`CI_SLOW: run ${run.id} (${label}, ${short(sha)}) still ${run.status} after ${Math.floor(run.ageSeconds / 60)} min. Cancel it and read the logs.`, ...jobs],
+      lines: [`CI_SLOW: run ${run.id} (${label}, ${short(sha)}) still ${run.status} after ${Math.floor(run.ageSeconds / 60)} min. ${slowAdvice(jobs)}`, ...jobs],
     }
     : null
 }
