@@ -30,7 +30,8 @@
  *
  * Settings: `GH`, the `gh` to ask with, `agent-gh` (the bot) by default; `OWNER`, whose approval
  * counts, by default the repository's owner or, for an organisation, its one human admin (#295).
- * `CLEARED_LABEL` and `BOT_REVIEW_LABEL` as for the watcher. A variable set before the command keeps
+ * `CLEARED_LABEL` and `BOT_REVIEW_LABEL` as for the watcher. `AGENT_GH_TIMEOUT_SECONDS`, how long one call
+ * may take (120 by default): one that runs out fails the command, which queues nothing after it (#540). A variable set before the command keeps
  * the allow rule from matching, so the defaults are what agents use.
  */
 import { type Ask, type Check, type PrFacts, type ReviewStance, factsFrom } from './agent-queue-facts'

@@ -5,6 +5,7 @@
  */
 import { type Answer, answerFrom, rateLimitWait } from './reply-review-thread'
 import { record, records } from './watch-text'
+import { ghCall } from './gh-call'
 import { textOf } from './read'
 
 export const GH = process.env.GH ?? 'agent-gh'
@@ -15,10 +16,9 @@ export const GH = process.env.GH ?? 'agent-gh'
  */
 const envFor = (repo: string) => ({ ...process.env, GH_REPO: repo })
 
-/** What `gh api -i` prints for `args`, whatever its exit code: the answer says what went wrong. */
+/** What `gh api -i` prints for `args`, whatever its exit code: the answer says what went wrong. Throws when it runs out of time (#540). */
 const ghAnswer = async (repo: string, args: readonly string[]): Promise<string> => {
-  const call = Bun.spawn([GH, ...args], { env: envFor(repo), stderr: 'inherit', stdout: 'pipe' })
-  const [out] = await Promise.all([new Response(call.stdout).text(), call.exited])
+  const { out } = await ghCall(GH, args, envFor(repo))
   return out
 }
 
