@@ -1,6 +1,7 @@
 /** What the project watcher reports, decided from what GitHub answered (pure, so it is tested). */
 import { isRecord } from './read'
 import { ciResultKey, ciState } from './watch-ci-state'
+import { slowAdvice } from './watch-ci-slow'
 
 export interface Event {
   /** Scoped agents do not wake for housekeeping such as non-conflicting main movement. */
@@ -56,22 +57,6 @@ const finishedEvent = ({ pr, sha, label, run, jobs, repo }: RunContext): Event |
     key: ciResultKey('failed', { pr, sha }, run),
     lines: [`CI_FAILED for ${short(sha)} (run ${run.id}): ${run.conclusion}. gh run view ${run.id} --repo ${repo} --log-failed`, ...jobs],
   }
-}
-
-/** Publishing jobs by their name: `deploy` anywhere in it, or exactly `pages` (`Build pages` builds). */
-const DEPLOY_JOB = /\bdeploy\w*\b|^pages$/iu
-
-/** The names in `jobLines`' lines of the jobs not finished yet. */
-const pendingJobs = (jobs: readonly string[]): string[] => jobs
-  .filter(line => !/: completed \S*$/u.test(line))
-  .map(line => line.replace(/: \S+ \S*$/u, '').trim())
-
-/** Cancelling helps a hang, but only interrupts a deploy that takes its time (#551). */
-const slowAdvice = (jobs: readonly string[]): string => {
-  const pending = pendingJobs(jobs)
-  return pending.length > 0 && pending.every(name => DEPLOY_JOB.test(name))
-    ? `Only deploy jobs are still pending (${pending.join(', ')}): leave it running.`
-    : 'Cancel it and read the logs.'
 }
 
 /** A PR's (or its deploy's) CI run: finished, or running longer than the limit. */
