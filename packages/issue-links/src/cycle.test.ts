@@ -59,4 +59,42 @@ describe('findCycles (#334)', () => {
     expect(findCycles(edges({ '#1': ['#2', '#3'], '#2': ['#4'], '#3': ['#4'], '#4': ['#9'] }))).toEqual([])
     expect(findCycles(edges({}))).toEqual([])
   })
+
+  /** A chain of diamonds from `#d0`, in walking order, that ends in the given blockers (#548). */
+  const diamonds = (count: number, last: string[]): [string, string[]][] => [
+    ...Array.from({ length: count }, (_item, at): [string, string[]][] => [
+      [`#d${at}`, [`#l${at}`, `#r${at}`]],
+      [`#l${at}`, [`#d${at + 1}`]],
+      [`#r${at}`, [`#d${at + 1}`]],
+    ]).flat(),
+    [`#d${count}`, last],
+  ]
+
+  /** The links as a map that counts how often it is read: a synchronous walk can't be timed out. */
+  const counted = (links: [string, string[]][]) => {
+    const blockersOf = new Map(links)
+    const read = blockersOf.get.bind(blockersOf)
+    const counter = { reads: 0 }
+    blockersOf.get = issue => {
+      counter.reads += 1
+      return read(issue)
+    }
+    // A walk from each issue reads each issue at most twice: once to walk on, once to wait on its blockers.
+    return { blockersOf, counter, limit: 2 * links.length ** 2 }
+  }
+
+  it('reads a graph of many diamonds a bounded number of times, with no cycle to stop at (#548)', () => {
+    const { blockersOf, counter, limit } = counted(diamonds(20, []))
+    expect(findCycles(blockersOf)).toEqual([])
+    expect(counter.reads).toBeLessThanOrEqual(limit)
+  })
+
+  it('does not retry dead ends behind a real cycle, and still reports it (#548)', () => {
+    // Every way through the diamonds comes back to #x, already on the path from #s: only #x → #s closes #s's cycle.
+    const { blockersOf, counter, limit } = counted([['#s', ['#x']], ['#x', ['#d0', '#s']], ...diamonds(20, ['#x'])])
+    const cycles = findCycles(blockersOf)
+    expect(cycles[0]).toEqual(['#s', '#x', '#s'])
+    expect(cycles).toHaveLength(MAX_CYCLES)
+    expect(counter.reads).toBeLessThanOrEqual(limit)
+  })
 })
