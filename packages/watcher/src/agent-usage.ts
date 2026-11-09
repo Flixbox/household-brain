@@ -1,5 +1,5 @@
 /** Select the current agent's allowance; Claude and Codex never share cached answers (#338). */
-import { type Usage, readUsage, usageText, weekReset } from './claude-usage'
+import { type Usage, readUsage, usageLockPort, usageText, weekReset } from './claude-usage'
 import { askCodex } from './codex-usage'
 import { hasText } from './read'
 
@@ -32,8 +32,9 @@ export interface AgentUsage extends Usage {
 /** Both providers use the same debounce, lock, stale marker and backoff, with separate cache files. */
 export const readAgentUsage = async (provider = usageProvider()): Promise<AgentUsage> => {
   const file = codexCache()
-  const lockPort = Number(process.env.CODEX_USAGE_LOCK_PORT ?? 10_000 + (Bun.hash.crc32(file) % 10_000))
-  const usage = provider === 'codex' ? await readUsage({ ask: askCodex, file, lockPort }) : await readUsage()
+  const usage = provider === 'codex'
+    ? await readUsage({ ask: askCodex, file, lockPort: usageLockPort('CODEX_USAGE_LOCK_PORT', file) })
+    : await readUsage()
   return { ...usage, provider }
 }
 

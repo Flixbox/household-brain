@@ -93,7 +93,8 @@ default branch's CI, new issues, the owner's comments on issues, and issues clos
   - `ACTIVITY_GH`: the owner's `gh`, plain `gh` by default. It is asked only for the owner's pending
     (unsubmitted) review, which only their own login sees, and for the comments of a PR `GH` couldn't
     read; `GH` reads the rest (#403). Set to the same as `GH`, one read covers both.
-  - `GH_TIMEOUT_SECONDS`: how long one `gh` call may take (30 by default); a slower one counts as a
+  - `GH_TIMEOUT_SECONDS`: how long one `gh` call may take (30 by default; anything but a whole number from 1 to 3600, a
+    blank value included, stops the watcher at the start); a slower one counts as a
     failed read and is tried again next look, so one slow endpoint doesn't hold up the rest. A `GH`
     wrapper has to answer within it too, also when it first makes a token: one that never does
     never gets a token cached, and every call fails (`LOOKUPS_FAILING`).
@@ -101,7 +102,8 @@ default branch's CI, new issues, the owner's comments on issues, and issues clos
     default; a watcher started again with the same id goes on where the last one stopped). Without
     either, every watcher of the repository shares one record and they split the events.
   - `GH_SHARE_SECONDS`: how long a `gh` answer is shared with the other watchers on this machine (20
-    by default, at most 3600; 0 shares none): watchers asking the same question within it ask GitHub once, so
+    by default, at most 3600; 0 shares none; anything else, a blank value included, stops the watcher
+    at the start): watchers asking the same question within it ask GitHub once, so
     several watchers cost hardly more than one.
   - `GH_PARALLEL`: how many `gh` calls run at once (2 by default); the pull requests are checked in
     parallel, and the cap keeps the bursts within GitHub's rate limits.

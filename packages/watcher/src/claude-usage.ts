@@ -133,6 +133,32 @@ const takeLock = (port: number): (() => void) | null => {
 
 const now = (): number => Temporal.Now.instant().epochMilliseconds
 
+const isPort = (value: string): boolean => /^\d+$/u.test(value) && Number(value) >= 1 && Number(value) <= 65_535
+
+const reportedSettings = new Set<string>()
+
+/**
+ * The lock's port: `setting` from the environment (set it only if another program listens on the port
+ * picked from the cache's path), else that picked port. A setting that is no port can't be bound, which
+ * `takeLock` can't tell from a held lock (#521), so it is reported, once per process since the watcher
+ * reads often, and the picked port used.
+ */
+export const usageLockPort = (setting: string, file: string, env: Record<string, string | undefined> = process.env): number => {
+  const picked = 10_000 + (Bun.hash.crc32(file) % 10_000)
+  const value = env[setting]
+  if (typeof value === 'undefined') {
+    return picked
+  }
+  if (isPort(value)) {
+    return Number(value)
+  }
+  if (!reportedSettings.has(setting)) {
+    reportedSettings.add(setting)
+    process.stderr.write(`${setting} must be a whole number from 1 to 65535: ignoring it and using port ${picked}\n`)
+  }
+  return picked
+}
+
 interface Options {
   ask?: () => Promise<Asked>
   file?: string
@@ -160,12 +186,11 @@ const askHolding = async (release: () => void, ask: () => Promise<Asked>, file: 
  * The usage, asked again only when the cache allows it. Never fails: anything going wrong leaves the
  * last numbers known, or none.
  */
-export const readUsage = async ({ ask = askEndpoint, file = CACHE_FILE, lockPort = Number(process.env.CLAUDE_USAGE_LOCK_PORT ?? 10_000 + (Bun.hash.crc32(file) % 10_000)) }: Options = {}, waitedMs = 0): Promise<Usage> => {
+export const readUsage = async ({ ask = askEndpoint, file = CACHE_FILE, lockPort = usageLockPort('CLAUDE_USAGE_LOCK_PORT', file) }: Options = {}, waitedMs = 0): Promise<Usage> => {
   const cached = await readCache(file)
   if (now() < nextAskAt(cached) || waitedMs >= LONGEST_WAIT_MS) {
     return cached
   }
-  // CLAUDE_USAGE_LOCK_PORT: set it only if another program listens on the port picked from the cache's path.
   const release = takeLock(lockPort)
   if (release !== null) {
     return askHolding(release, ask, file)
