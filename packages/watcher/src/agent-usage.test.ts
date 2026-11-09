@@ -1,6 +1,50 @@
-import { describe, expect, it } from 'bun:test'
+/* oxlint-disable import/no-nodejs-modules -- a temporary folder for each run; node:fs/promises and node:os are built into Bun */
+import { afterEach, describe, expect, it } from 'bun:test'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { codexCache, usageProvider } from './agent-usage'
+import { usageLockPort } from './claude-usage'
 import { codexAnswer } from './codex-usage'
+
+const dirs: string[] = []
+afterEach(async () => {
+  await Promise.all(dirs.splice(0).map(async dir => rm(dir, { force: true, recursive: true })))
+})
+
+/** `agent-usage` as its own process, with no login or Codex to reach; stopped well before the 20 s a held lock waits. */
+const usageRun = async (provider: string, setting: string, port: string) => {
+  const dir = await mkdtemp(`${tmpdir()}/agent-usage-`)
+  dirs.push(dir)
+  const cache = `${dir}/cache.json`
+  const run = Bun.spawn([process.execPath, `${import.meta.dir}/agent-usage.ts`], {
+    env: { AGENT_USAGE_PROVIDER: provider, CLAUDE_CONFIG_DIR: dir, CLAUDE_USAGE_CACHE: cache, CODEX_HOME: dir, CODEX_USAGE_CACHE: cache, HOME: dir, [setting]: port },
+    stderr: 'pipe',
+    stdout: 'ignore',
+    timeout: 10_000,
+  })
+  const [stderr, exitCode] = await Promise.all([new Response(run.stderr).text(), run.exited])
+  return { asked: await Bun.file(cache).exists(), exitCode, stderr }
+}
+
+describe('an invalid lock port (#521)', () => {
+  it.each([
+    ['claude', 'CLAUDE_USAGE_LOCK_PORT', 'abc'],
+    ['codex', 'CODEX_USAGE_LOCK_PORT', '99999'],
+    ['claude', 'CLAUDE_USAGE_LOCK_PORT', '0'],
+    ['codex', 'CODEX_USAGE_LOCK_PORT', '1.5'],
+  ])('%s: %s=%s is reported and still lets the read ask', async (provider, setting, port) => {
+    const { asked, exitCode, stderr } = await usageRun(provider, setting, port)
+    expect(stderr).toContain(setting)
+    expect(exitCode).toBe(0)
+    expect(asked).toBe(true)
+  }, 15_000)
+
+  it('uses a valid port as given and the picked one when none is set', () => {
+    expect(usageLockPort('PORT_FOR_TEST', '/cache', { PORT_FOR_TEST: '1' })).toBe(1)
+    expect(usageLockPort('PORT_FOR_TEST', '/cache', { PORT_FOR_TEST: '65535' })).toBe(65_535)
+    expect(usageLockPort('PORT_FOR_TEST', '/cache', {})).toBeGreaterThanOrEqual(10_000)
+  })
+})
 
 describe('the active agent usage provider (#338)', () => {
   it('selects Codex in Codex and keeps Claude as the default outside it', () => {
