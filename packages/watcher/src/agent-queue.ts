@@ -21,7 +21,11 @@
  * push (#327, #331); no review
  * thread is open; no reviewer's latest review requests changes; and no review bot's review asked for,
  * with the `bot-review` label or a `@<bot> review` comment, is still to come (#324, #325). Otherwise it prints what blocks it and exits 1.
- * A PR with auto-merge on, or in the merge queue, is left as it is (exit 0). Whether a PR is
+ * A PR with auto-merge on, or in the merge queue, is left as it is (exit 0), unless its request is
+ * stuck (#544): every rule above holds, GitHub calls it CLEAN, it isn't in the queue, and nothing has
+ * happened on it for NOT_QUEUED_MINUTES, the watcher's own wait, so GitHub has had its time. Then it
+ * is added to the queue (or merged, on a branch without one), pinned to the head it checked; when GitHub
+ * refuses that, the command fails and says so. Whether a PR is
  * user-facing it can't tell: an agent queues a user-facing PR only after the owner's approval, as
  * before, and the label goes only on PRs that aren't.
  *
@@ -41,6 +45,7 @@ import { at, record, records } from './watch-text'
 import { BOT_REVIEW_LABEL } from './watch-bot-review-events'
 import { bare } from './watch-review-events'
 import { checksPassed } from './watch-ci-state'
+import { NOT_QUEUED_MINUTES } from './watch-queue-events'
 import { ownerOf } from './agent-queue-owner'
 import { textOf } from './read'
 
@@ -124,15 +129,24 @@ export const blockersOf = (facts: PrFacts, owner: string): string[] => {
   ]
 }
 
+/**
+ * Whether GitHub should have queued this PR by now and hasn't (#544). Waiting for checks or an approval
+ * is what an auto-merge request is for, and a few minutes' delay is GitHub being slow: counted from
+ * `settledAt`, not the request, as an old request whose approval just came is as young as the approval.
+ */
+export const autoMergeStuck = (facts: PrFacts, owner: string, now: Temporal.Instant): boolean =>
+  facts.autoMerge && !facts.queued && facts.mergeState === 'CLEAN' && facts.settledAt !== '' && blockersOf(facts, owner).length === 0
+  && Temporal.Instant.from(facts.settledAt).until(now).total('minutes') >= NOT_QUEUED_MINUTES
+
 // `kind: __typename` aliases GraphQL's type name to the name clearedAt reads (actors too: `Bot`).
 const LABEL_FIELDS = 'createdAt actor{kind: __typename login} label{name}'
 const PR_QUERY = `query($owner:String!,$name:String!,$pr:Int!){viewer{login} repository(owner:$owner,name:$name){pullRequest(number:$pr){
-  id headRefOid headRefName isMergeQueueEnabled timelineItems(itemTypes:[LABELED_EVENT,UNLABELED_EVENT,HEAD_REF_FORCE_PUSHED_EVENT],last:100){pageInfo{hasPreviousPage} nodes{kind: __typename
-    ... on LabeledEvent{${LABEL_FIELDS}} ... on UnlabeledEvent{${LABEL_FIELDS}} ... on HeadRefForcePushedEvent{createdAt}}}
-  state isDraft isInMergeQueue autoMergeRequest{enabledAt} labels(first:100){nodes{name} pageInfo{hasNextPage}}
+  id headRefOid headRefName isMergeQueueEnabled timelineItems(itemTypes:[LABELED_EVENT,UNLABELED_EVENT,HEAD_REF_FORCE_PUSHED_EVENT,REVIEW_DISMISSED_EVENT],last:100){pageInfo{hasPreviousPage} nodes{kind: __typename
+    ... on LabeledEvent{${LABEL_FIELDS}} ... on UnlabeledEvent{${LABEL_FIELDS}} ... on HeadRefForcePushedEvent{createdAt} ... on ReviewDismissedEvent{createdAt}}}
+  state isDraft isInMergeQueue mergeStateStatus autoMergeRequest{enabledAt} labels(first:100){nodes{name} pageInfo{hasNextPage}}
   reviews(last:100){nodes{author{login} state submittedAt} pageInfo{hasPreviousPage}} comments(last:100){nodes{body createdAt} pageInfo{hasPreviousPage startCursor}} reviewThreads(first:100){nodes{isResolved} pageInfo{hasNextPage}}
   commits(last:1){nodes{commit{committedDate statusCheckRollup{contexts(first:100){pageInfo{hasNextPage} nodes{
-    ... on CheckRun{name status conclusion checkSuite{createdAt branch{name} workflowRun{event}}} ... on StatusContext{context state}}}}}}}}}}`
+    ... on CheckRun{name status conclusion completedAt checkSuite{createdAt branch{name} workflowRun{event}}} ... on StatusContext{context state createdAt}}}}}}}}}}`
 
 const COMMENTS_QUERY = `query($owner:String!,$name:String!,$pr:Int!,$before:String!){repository(owner:$owner,name:$name){pullRequest(number:$pr){
   comments(last:100,before:$before){nodes{body createdAt} pageInfo{hasPreviousPage startCursor}}}}}`
@@ -210,6 +224,19 @@ const queue = async (repo: string, facts: PrFacts): Promise<string> => {
   return 'Merged (squash, it was ready):'
 }
 
+const ENQUEUE = 'mutation($id:ID!,$head:GitObjectID!){enqueuePullRequest(input:{pullRequestId:$id,expectedHeadOid:$head}){clientMutationId}}'
+
+/** Gets a PR whose auto-merge request is stuck (#544) into the queue, or merged on a branch without one, and says which. Throws with GitHub's reasons when it refuses. */
+const unstick = async (repo: string, facts: PrFacts): Promise<string> => {
+  const mutation = facts.mergeQueue ? ENQUEUE : MERGE_NOW
+  const { errors } = await mutate({ mutation, repo, variables: [`id=${facts.id}`, `head=${facts.head}`] })
+  if (errors !== '') {
+    const stuck = `Its auto-merge request is stuck: CLEAN, approved and green, but ${facts.mergeQueue ? 'still not in the merge queue' : 'still not merged'}.`
+    throw new Error(`${stuck} GitHub refused to ${facts.mergeQueue ? 'queue' : 'merge'} it: ${errors}`)
+  }
+  return facts.mergeQueue ? 'Added to the merge queue (its auto-merge request was stuck):' : 'Merged (squash, its auto-merge request was stuck):'
+}
+
 /** Says why it isn't queued, and exits 1, when `blockers` holds anything. */
 const refuseFor = (name: string, blockers: readonly string[]): void => {
   if (blockers.length > 0) {
@@ -229,19 +256,27 @@ const askAsBot = (self: string): void => {
   }
 }
 
+/** What it did about the PR, or exits 1 through `refuseFor` when it may not be queued yet. */
+const act = async ({ facts, owner, pr, repo }: { facts: PrFacts, owner: string, pr: number, repo: string }): Promise<string> => {
+  const name = `${repo}#${pr}`
+  const atHead = `${name} at ${facts.head.slice(0, 7)}.`
+  if (autoMergeStuck(facts, owner, Temporal.Now.instant())) {
+    return `${await unstick(repo, facts)} ${atHead}`
+  }
+  if (facts.state === 'OPEN' && (facts.autoMerge || facts.queued)) {
+    return `${name} is already ${facts.queued ? 'in the merge queue' : 'set to auto-merge'}.`
+  }
+  refuseFor(name, blockersOf(facts, owner))
+  return `${await queue(repo, facts)} ${atHead}`
+}
+
 const main = async (): Promise<void> => {
   const { pr, repo } = argsOf()
   // The owner first: its read can wait out a rate limit, and the facts must be as of the decision (#428).
   const owner = await ownerOf(repo)
   const facts = await readFacts(repo, pr)
   askAsBot(facts.self)
-  if (facts.state === 'OPEN' && (facts.autoMerge || facts.queued)) {
-    const where = facts.queued ? 'in the merge queue' : 'set to auto-merge'
-    process.stdout.write(`${repo}#${pr} is already ${where}.\n`)
-    return
-  }
-  refuseFor(`${repo}#${pr}`, blockersOf(facts, owner))
-  process.stdout.write(`${await queue(repo, facts)} ${repo}#${pr} at ${facts.head.slice(0, 7)}.\n`)
+  process.stdout.write(`${await act({ facts, owner, pr, repo })}\n`)
 }
 
 if (import.meta.main) {
