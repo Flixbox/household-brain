@@ -103,4 +103,33 @@ printf 'HTTP/2.0 200 OK\n\n{"data":{"addPullRequestReviewThreadReply":{"comment"
     expect(code).toBe(0)
     expect((await Bun.file(`${home}/calls`).text()).trim().split('\n')).toEqual(['agent-gh repo=Coarisfinia/two'])
   })
+
+  /** Runs the command with a `GH` that hangs in a child, which outlives it and holds its stdout (#540). */
+  const runHung = async (limit: string) => {
+    const home = await mkdtemp(`${tmpdir()}/reply-review-thread-`)
+    dirs.push(home)
+    await Bun.write(`${home}/hung-gh`, `#!/bin/sh\necho called >> "${home}/calls"\nsleep 6 2>/dev/null\n`)
+    await chmod(`${home}/hung-gh`, 0o755)
+    const started = Date.now()
+    const child = Bun.spawn([process.execPath, `${import.meta.dir}/reply-review-thread.ts`, '7', 'PRRT_x', 'Resolved: done'], {
+      cwd: home, env: { ...process.env, AGENT_GH_TIMEOUT_SECONDS: limit, GH: `${home}/hung-gh`, REPO: 'owner/repo' }, stderr: 'pipe', stdout: 'pipe',
+    })
+    const [output, error, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+    return { called: await Bun.file(`${home}/calls`).exists(), code, error, ms: Date.now() - started, output }
+  }
+
+  it('fails with a message saying so when the call hangs, within its limit (#540)', async () => {
+    const result = await runHung('1')
+    expect(result.error).toContain('ran out of time after 1 s')
+    expect(result.code).not.toBe(0)
+    expect(result.output).toBe('')
+    expect(result.ms).toBeLessThan(5000)
+  }, 15_000)
+
+  it('refuses a limit that would be no limit, before asking anything (#540)', async () => {
+    const result = await runHung('0')
+    expect(result.error).toContain('AGENT_GH_TIMEOUT_SECONDS')
+    expect(result.code).toBe(64)
+    expect(result.called).toBe(false)
+  }, 15_000)
 })

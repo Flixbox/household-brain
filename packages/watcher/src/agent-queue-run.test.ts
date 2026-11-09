@@ -44,6 +44,11 @@ const FAKE = String.raw`
     process.exit(1)
   }
   const joined = args.join(' ')
+  if (process.env.FAKE_HANG && joined.includes(process.env.FAKE_HANG)) {
+    // A child of the wrapper, as a real gh under a wrapper script: it outlives a killed parent and holds its stdout (#540).
+    Bun.spawnSync(['sleep', '6'], { stderr: 'ignore', stdout: 'inherit' })
+    process.exit(0)
+  }
   const path = args.find(arg => arg.startsWith('repos/')) ?? ''
   if (args.includes('-i') && path !== '') {
     const script = JSON.parse(process.env.FAKE_REST ?? '{}')[path] ?? [{ body: { owner: { type: 'User' } } }]
@@ -82,14 +87,16 @@ const runFromNonClone = async (viewer: string, extra: Record<string, string> = {
   await Bun.write(gh, `#!/bin/sh\nexec "${process.execPath}" "${home}/fake.ts" "$@"\n`)
   await Bun.spawn(['chmod', '+x', gh]).exited
   const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => name !== 'GH_REPO' && name !== 'OWNER'))
+  const started = Date.now()
   const child = Bun.spawn([process.execPath, `${import.meta.dir}/agent-queue.ts`, 'owner/repo', '7'], {
     cwd: home,
     env: { ...env, FAKE_PR: JSON.stringify(READY_PR), FAKE_VIEWER: viewer, FIXTURE_HOME: home, GH: gh, ...extra },
     stderr: 'pipe', stdout: 'pipe',
   })
   const [output, error, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+  const ms = Date.now() - started
   const calls = (await Bun.file(`${home}/calls`).text().catch(() => '')).split('\n').filter(line => line !== '')
-  return { calls, code, error, output }
+  return { calls, code, error, ms, output }
 }
 
 test('agent-queue passes its repository to every agent-gh call, so it works outside a clone (#365)', async () => {
@@ -166,3 +173,22 @@ test("an answer that doesn't say what owns the repository counts as unread (#428
   expect(result.code).toBe(1)
   expect(merges(result.calls)).toEqual([])
 })
+
+const OUT_OF_TIME = 'ran out of time after 1 s'
+const HUNG_CALL_TEST_MS = 15_000
+
+test('a read that hangs fails with a message saying so, within its limit, and nothing is queued (#540)', async () => {
+  const result = await runFromNonClone('agent-bot[bot]', { AGENT_GH_TIMEOUT_SECONDS: '1', FAKE_HANG: 'viewer{login}' })
+  expect(result.error).toContain(OUT_OF_TIME)
+  expect(result.code).not.toBe(0)
+  expect(result.ms).toBeLessThan(5000)
+  expect(merges(result.calls)).toEqual([])
+}, HUNG_CALL_TEST_MS)
+
+test('a queueing call that hangs fails, and is never reported as queued (#540)', async () => {
+  const result = await runFromNonClone('agent-bot[bot]', { AGENT_GH_TIMEOUT_SECONDS: '1', FAKE_HANG: 'enablePullRequestAutoMerge' })
+  expect(result.error).toContain(OUT_OF_TIME)
+  expect(result.code).not.toBe(0)
+  expect(result.output).toBe('')
+  expect(result.ms).toBeLessThan(5000)
+}, HUNG_CALL_TEST_MS)
