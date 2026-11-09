@@ -6,6 +6,7 @@
   "license": "Unlicense",
   "bin": {
     "check-action-age": "./src/check-action-age.ts",
+    "check-no-emulator-wiring": "./src/check-no-emulator-wiring.ts",
     "check-package-age": "./src/check-package-age.ts",
     "e2e-hosting-config": "./src/e2e-hosting-config.ts",
     "pr-gif": "./src/pr-gif.ts",
