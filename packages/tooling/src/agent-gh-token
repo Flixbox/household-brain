@@ -54,9 +54,11 @@ payload=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' $((now - 60)) $((now + 540)) "
 signature=$(printf '%s.%s' "$header" "$payload" | openssl dgst -sha256 -sign "$CONF/app.pem" -binary | b64url)
 jwt="$header.$payload.$signature"
 
-# The JWT goes in through stdin, so it never shows up in the process list.
+# The JWT goes in through stdin, so it never shows up in the process list. The time limit is per request
+# (#542): a killed wrapper can leave a hung curl holding its caller's stderr open, and pipefail turns
+# curl's timeout into a failure with no token.
 api() {
-  printf 'Authorization: Bearer %s\n' "$jwt" | curl -fsS -H @- -H "Accept: application/vnd.github+json" \
+  printf 'Authorization: Bearer %s\n' "$jwt" | curl -fsS --max-time 20 -H @- -H "Accept: application/vnd.github+json" \
     -H "X-GitHub-Api-Version: 2022-11-28" "$@"
 }
 
