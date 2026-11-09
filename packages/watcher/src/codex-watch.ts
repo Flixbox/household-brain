@@ -90,10 +90,12 @@ const reportStopped = async (errors: string): Promise<void> => {
   process.stderr.write('project-watcher: could not tell the session the watcher stopped\n')
 }
 
-const afterWatcher = async ({ code, errors }: { code: number, errors: string }): Promise<void> => {
+const afterWatcher = async ({ code, errors }: { code: number, errors: string }, releaseLock: () => void): Promise<void> => {
   if (code === SUBSCRIPTIONS_COMPLETE) { process.exit(0) }
   if (code === BAD_SETTING) {
     process.stderr.write('project-watcher: bad setting; not rearming\n')
+    // A restart during the retries must find the lock free, or it dies on it and no watcher is left (#529).
+    releaseLock()
     await reportStopped(errors)
     process.exit(BAD_SETTING)
   }
@@ -108,7 +110,7 @@ const supervise = async (): Promise<never> => {
   process.on('exit', () => { lock.stop() })
   await Bun.file(stopFile).delete().catch(() => null)
   for (;;) {
-    await afterWatcher(await watchOnce())
+    await afterWatcher(await watchOnce(), () => { lock.stop() })
   }
 }
 
