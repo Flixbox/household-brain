@@ -48,6 +48,8 @@ export interface PrFacts {
    * '' when no such suite is there: then it can't be told, and a label doesn't clear the PR.
    */
   lastPush: string
+  /** GitHub's merge state (`CLEAN`, `BLOCKED`, `BEHIND`…); '' when it didn't say. */
+  mergeState: string
   /** Whether the base branch merges through a merge queue (it takes its own merge method). */
   mergeQueue: boolean
   openThreads: number
@@ -55,6 +57,11 @@ export interface PrFacts {
   reviews: readonly ReviewStance[]
   /** The login asking (the bot, under `agent-gh`), from GraphQL's `viewer`: a label it put on counts. */
   self: string
+  /**
+   * When the last thing GitHub would act on happened, as near as it tells (ISO 8601, UTC): the latest
+   * of the auto-merge request, a review, a label, the last push and a check finishing. '' when none is known (#544).
+   */
+  settledAt: string
   state: string
   truncated: boolean
 }
@@ -108,12 +115,21 @@ const lastPushOf = ({ branch, contexts, events, head }: { branch: string, contex
   return latest([textOf(at(head, 'commit', 'committedDate')), ...forced, pushed])
 }
 
+/** The times in `settledAt`, but for the last push, which is passed in as it is worked out already. */
+const settlingTimes = (fields: Json, contexts: unknown, events: readonly Json[]): string[] => [
+  textOf(at(fields, 'autoMergeRequest', 'enabledAt')),
+  ...records(at(fields, 'reviews', 'nodes')).map(review => textOf(review.submittedAt)),
+  ...events.filter(event => LABEL_EVENTS.has(textOf(event.kind))).map(event => textOf(event.createdAt)),
+  ...records(at(contexts, 'nodes')).map(node => textOf(node.completedAt, textOf(node.createdAt))),
+]
+
 /** The facts in GitHub's answer for one `pullRequest` (`PR_QUERY`), asked as `self`. */
 export const factsFrom = (pr: unknown, self: string): PrFacts => {
   const [head] = records(at(pr, 'commits', 'nodes'))
   const contexts = at(head, 'commit', 'statusCheckRollup', 'contexts')
   const events = records(at(pr, 'timelineItems', 'nodes'))
   const fields = record(pr)
+  const lastPush = lastPushOf({ branch: textOf(fields.headRefName), contexts, events, head })
   return {
     asked: asksIn(records(at(pr, 'comments', 'nodes'))),
     autoMerge: isRecord(fields.autoMergeRequest),
@@ -123,12 +139,14 @@ export const factsFrom = (pr: unknown, self: string): PrFacts => {
     id: textOf(fields.id),
     labelEvents: events.filter(event => LABEL_EVENTS.has(textOf(event.kind))),
     labels: records(at(pr, 'labels', 'nodes')).map(label => textOf(label.name)),
-    lastPush: lastPushOf({ branch: textOf(fields.headRefName), contexts, events, head }),
+    lastPush,
+    mergeState: textOf(fields.mergeStateStatus),
     mergeQueue: fields.isMergeQueueEnabled === true,
     openThreads: records(at(pr, 'reviewThreads', 'nodes')).filter(thread => thread.isResolved !== true).length,
     queued: fields.isInMergeQueue === true,
     reviews: records(at(pr, 'reviews', 'nodes')).map(review => ({ at: textOf(review.submittedAt), login: actor(review.author), state: textOf(review.state) })),
     self,
+    settledAt: latest([...settlingTimes(fields, contexts, events), lastPush]),
     state: textOf(fields.state),
     truncated: truncatedIn(pr, contexts),
   }

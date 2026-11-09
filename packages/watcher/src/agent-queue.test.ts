@@ -24,10 +24,12 @@ const READY: PrFacts = {
   labels: [],
   lastPush: T0,
   mergeQueue: false,
+  mergeState: 'CLEAN',
   openThreads: 0,
   queued: false,
   reviews: [{ at: T1, login: OWNER, state: 'APPROVED' }],
   self: SELF,
+  settledAt: T0,
   state: 'OPEN',
   truncated: false,
 }
