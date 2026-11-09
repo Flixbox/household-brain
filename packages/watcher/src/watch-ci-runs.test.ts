@@ -37,12 +37,17 @@ const FAKE = String.raw`
   const scenario = process.env.SCENARIO
   const status = scenario === 'running' || (scenario === 'finishing' && attempt === 1) ? 'in_progress' : 'completed'
   const jobsDone = scenario !== 'stuck' && (!['finishing', 'lagging'].includes(scenario) || attempt === 2)
-  const replaced = scenario === 'replaced' && attempt === 2
+  const batched = ['batched', 'unrelated'].includes(scenario)
+  const replaced = batched || (scenario === 'replaced' && attempt === 2)
   if (args.startsWith('api -i')) {
     if (scenario === 'refused' && attempt === 2) { process.exit(1) }
     if (args.includes('If-None-Match: "e' + attempt + '"')) {
       console.log('HTTP/2.0 304 Not Modified\r\nEtag: "e' + attempt + '"\r\n\r\n')
       process.exit(1)
+    }
+    if (batched && args.includes('head_sha=abc')) {
+      console.log('HTTP/2.0 200 OK\r\nEtag: "e' + attempt + '"\r\n\r\n' + JSON.stringify({ workflow_runs: [] }))
+      process.exit(0)
     }
     if (scenario === 'merge-group') {
       const pushRuns = attempt === 2 ? [{ conclusion: 'success', id: 6, run_attempt: 1, run_started_at: Temporal.Now.instant().toString(), status: 'completed' }] : []
@@ -62,7 +67,7 @@ const FAKE = String.raw`
     console.log(JSON.stringify(replaced ? [{ attempt: 1, conclusion: 'success', databaseId: 6, headSha: 'def', startedAt: Temporal.Now.instant().toString(), status: 'completed' }] : []))
     process.exit(0)
   }
-  if (args.includes('/compare/')) { console.log(JSON.stringify({ status: 'ahead' })); process.exit(0) }
+  if (args.includes('/compare/')) { console.log(JSON.stringify({ status: scenario === 'unrelated' ? 'behind' : 'ahead' })); process.exit(0) }
   if (args.startsWith('pr list')) { console.log('[]'); process.exit(0) }
   if (args.includes('mergeQueue{id}')) { console.log(''); process.exit(0) }
   console.log('{}')
@@ -135,6 +140,17 @@ test('a deploy is read from the push run on main, not another run of the same co
   expect(result.output).toContain('DEPLOYED: live (run 6)')
   expect(result.output).not.toContain('(run 4)')
   expect(result.output).not.toContain('(run 8)')
+}, 30_000)
+
+test('a commit merged in a batch, with no push run of its own, reports the run on main that contains it (#549)', async () => {
+  const result = await looks('batched', 'deploy')
+  expect(result.output).toContain('DEPLOYED: live (run 6)')
+  expect(result.output).toContain('"pr-7 deployed def"')
+}, 30_000)
+
+test('a run on main that does not contain the commit is not taken for its deploy (#549)', async () => {
+  const result = await looks('unrelated', 'deploy')
+  expect(result.output).not.toContain('DEPLOYED')
 }, 30_000)
 
 test('a run that finished is reported with its jobs as they are now, not a shared answer from before (#493)', async () => {
