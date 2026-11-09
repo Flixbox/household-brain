@@ -63,7 +63,7 @@
  *   PR #<n>: CLOSED                  closed without merging
  *   PR #<n>: QUEUED / DEQUEUED       entered the merge queue, or left it without merging (#251)
  *   PR #<n>: NOT_QUEUED              only where the branch has a merge queue: open, no draft and not parked,
- *                                    approved, CI green, merge state CLEAN and auto-merge on, yet still outside
+ *                                    owner-approved, CI green, merge state CLEAN and auto-merge on, yet still outside
  *                                    the queue after a fixed wait (#305): it names the mutation that queues
  *                                    it; once per head commit
  *   MAIN_ADVANCED                    main got a new commit (a merge, whoever made it)
