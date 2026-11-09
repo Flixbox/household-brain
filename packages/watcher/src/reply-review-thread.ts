@@ -15,10 +15,12 @@
  *
  * Settings as the watcher's (`--env-file=.claude/watcher.env` reads them): `GH`, the `gh` to ask with,
  * by default the bot's `agent-gh` (#532), which stops rather than act as the owner (GH=gh only for
- * someone running this by hand on purpose), and `REPO`, by default the repository of the current folder.
+ * someone running this by hand on purpose), `REPO`, by default the repository of the current folder, and
+ * `AGENT_GH_TIMEOUT_SECONDS`, how long one call may take (120 by default, #540).
  */
 import { hasText, isRecord, textOf } from './read'
 import { type Json, record, records } from './watch-text'
+import { ghCall } from './gh-call'
 
 /** A `gh api -i` answer: the HTTP status, the headers (names in lower case) and the parsed body. */
 export interface Answer {
@@ -110,12 +112,8 @@ const GH = process.env.GH ?? 'agent-gh'
 /** A GraphQL call names no repository, so `agent-gh` is told REPO's to pick its bot (#532); without REPO it reads the folder's. */
 const ghEnv = hasText(process.env.REPO) ? { ...process.env, GH_REPO: process.env.REPO } : process.env
 
-/** What `gh` prints for `args`, and its exit code. */
-const run = async (args: readonly string[]): Promise<{ code: number, out: string }> => {
-  const call = Bun.spawn([GH, ...args], { env: ghEnv, stderr: 'inherit', stdout: 'pipe' })
-  const out = await new Response(call.stdout).text()
-  return { code: await call.exited, out }
-}
+/** What `gh` prints for `args`, and its exit code; throws when it runs out of time (#540). */
+const run = async (args: readonly string[]): Promise<{ code: number, out: string }> => ghCall(GH, args, ghEnv)
 
 /** What is at `keys` inside an answer; an empty object where something on the way is missing. */
 const at = (value: unknown, ...keys: string[]): Json => keys.reduce((inside: Json, key) => record(inside[key]), record(value))
