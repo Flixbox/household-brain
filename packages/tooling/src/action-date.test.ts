@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { dateOf, type GitHubRead } from './action-date'
+import { type GitHubRead, dateOf } from './action-date'
 import { pinnedActions } from './pins'
 
 const SHA = 'a'.repeat(40)
@@ -10,7 +10,7 @@ const FRESH = '2026-11-12T00:00:00Z'
 /** A GitHub that answers only the paths it is given. */
 const fake = (answers: Record<string, Record<string, unknown>>): GitHubRead => async path => answers[path] ?? null
 
-const commit = (sha: string, date: string): Record<string, unknown> => ({ sha, commit: { committer: { date } } })
+const commit = (sha: string, date: string): Record<string, unknown> => ({ commit: { committer: { date } }, sha })
 
 const pin = { action: 'actions/checkout', repo: 'actions/checkout', sha: SHA, tag: 'v7.0.1' }
 
@@ -49,8 +49,8 @@ describe('dateOf', () => {
     const workflow = `steps:\n  - uses: actions/checkout@${SHA} # v7.0.1\n  - run: |\n      uses: actions/checkout@${SHA} # v1.0.0\n`
     const [scripted] = pinnedActions(workflow)
     const github = fake({
-      'repos/actions/checkout/commits/refs/tags/v7.0.1': commit(SHA, FRESH),
       'repos/actions/checkout/commits/refs/tags/v1.0.0': commit(OTHER, OLD),
+      'repos/actions/checkout/commits/refs/tags/v7.0.1': commit(SHA, FRESH),
       'repos/actions/checkout/releases/tags/v1.0.0': { published_at: OLD },
       [`repos/actions/checkout/commits/${SHA}`]: commit(SHA, FRESH),
     })
