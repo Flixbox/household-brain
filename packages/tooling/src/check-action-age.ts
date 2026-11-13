@@ -6,21 +6,15 @@
  *
  *   bun packages/tooling/src/check-action-age.ts [min-hours=48]    from the repository root; GH_TOKEN reads public repos
  */
-import { hasText, recordOf } from '@household-brain/core/lib/read'
 import { Glob } from 'bun'
 import { hoursSince, tooYoung } from './age'
-import { dateOf } from './action-date'
+import { dateOf, gitHubRest } from './action-date'
 import { pinnedActions } from './pins'
 
 const [minHours = '48'] = process.argv.slice(2)
 const MINIMUM_SECONDS = Number(minHours) * 60 * 60
 
-const github = async (path: string): Promise<Record<string, unknown> | null> => {
-  const response = await fetch(`https://api.github.com/${path}`, {
-    headers: { Accept: 'application/vnd.github+json', ...hasText(process.env.GH_TOKEN) ? { Authorization: `Bearer ${process.env.GH_TOKEN}` } : {} },
-  })
-  return response.ok ? recordOf(await response.json()) : null
-}
+const github = gitHubRest(process.env.GH_TOKEN ?? null)
 
 const workflows = await Promise.all([...new Glob('.github/workflows/*.{yml,yaml}').scanSync('.')].map(async path => Bun.file(path).text()))
 // One YAML document per file: joined plainly, their top-level keys would collide.

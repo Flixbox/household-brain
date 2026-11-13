@@ -1,8 +1,21 @@
-import { hasText } from '@household-brain/core/lib/read'
+import { hasText, recordOf } from '@household-brain/core/lib/read'
 import type { Pin } from './pins'
 
 /** A GitHub REST read: the JSON object at `path`, or null when the request fails. */
 export type GitHubRead = (path: string) => Promise<Record<string, unknown> | null>
+
+/** The part of `fetch` a GitHub read uses, so a test can answer in its place. */
+export type Fetch = (url: string, init: RequestInit) => Promise<Response>
+
+/** Reads GitHub's REST API, signed with `token` when there is one. */
+export const gitHubRest =
+  (token: string | null, fetchFrom: Fetch = fetch): GitHubRead =>
+    async path => {
+      const response = await fetchFrom(`https://api.github.com/${path}`, {
+        headers: { Accept: 'application/vnd.github+json', ...hasText(token) ? { Authorization: `Bearer ${token}` } : {} },
+      })
+      return response.ok ? recordOf(await response.json()) : null
+    }
 
 export type Dated = { published: Temporal.Instant } | { error: string }
 
