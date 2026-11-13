@@ -1,4 +1,5 @@
 import { hasText, recordOf } from '@household-brain/core/lib/read'
+import { stringify } from '@household-brain/core/lib/stringify'
 import type { Pin } from './pins'
 
 /**
@@ -74,6 +75,6 @@ export const dateOf = async (pin: Pin, github: GitHubRead): Promise<Dated> => {
   try {
     return await datePin(pin, github)
   } catch (error) {
-    return { error: `Couldn't read ${pin.action} ${pin.tag ?? pin.sha.slice(0, 7)}: ${error instanceof Error ? error.message : String(error)}` }
+    return { error: `Couldn't read ${pin.action} ${pin.tag ?? pin.sha.slice(0, 7)}: ${stringify(error)}` }
   }
 }
