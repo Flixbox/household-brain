@@ -103,7 +103,7 @@ const httpDate = (text: string): Temporal.Instant | null => {
 }
 
 /** How far the local clock may run ahead of GitHub's, taken off local time when an answer has no `Date` (#581). */
-const LOCAL_CLOCK_MARGIN = { seconds: 30 }
+const LOCAL_CLOCK_MARGIN = { seconds: 120 }
 
 /**
  * When GitHub got the write (#579), by its own clock, so a local clock that is off doesn't matter: the
