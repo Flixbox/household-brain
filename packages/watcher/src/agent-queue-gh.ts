@@ -31,9 +31,20 @@ const limitsOf = (answer: Answer): string => {
   return `HTTP ${answer.status}; ${limits.join(', ')}`
 }
 
+/** An answer, and when the call that got it was sent (#581): after any rate-limit wait. */
+interface SentAnswer extends Answer {
+  sent: Temporal.Instant
+}
+
+/** GitHub's answer to one `gh api -i` call with these `args`, and when it was sent. */
+const sentAnswer = async (repo: string, args: readonly string[]): Promise<SentAnswer> => {
+  const sent = Temporal.Now.instant()
+  return { ...answerFrom(await ghAnswer(repo, args)), sent }
+}
+
 /** GitHub's answer to a `gh api -i` call with these `args`; a rate limit is logged, and waited out once. */
-const limitedAnswer = async (repo: string, args: readonly string[], retried = false): Promise<Answer> => {
-  const answer = answerFrom(await ghAnswer(repo, args))
+const limitedAnswer = async (repo: string, args: readonly string[], retried = false): Promise<SentAnswer> => {
+  const answer = await sentAnswer(repo, args)
   const wait = rateLimitWait(answer, Math.floor(Temporal.Now.instant().epochMilliseconds / 1000))
   if (wait === null) {
     return answer
@@ -48,7 +59,7 @@ const limitedAnswer = async (repo: string, args: readonly string[], retried = fa
 }
 
 /** GitHub's answer to a GraphQL call with these `gh api` fields, a rate limit waited out once. */
-const graphqlAnswer = async (repo: string, fields: readonly string[]): Promise<Answer> =>
+const graphqlAnswer = async (repo: string, fields: readonly string[]): Promise<SentAnswer> =>
   limitedAnswer(repo, ['api', 'graphql', '-i', ...fields])
 
 /** GitHub's answer to a REST read of `path` (one page: `gh api -i` can't paginate and parse), a rate limit waited out once. */
@@ -91,14 +102,20 @@ const httpDate = (text: string): Temporal.Instant | null => {
   return Temporal.ZonedDateTime.from({ day: part('day'), hour: part('hour'), minute: part('minute'), month, second: part('second'), timeZone: 'UTC', year: part('year') }).toInstant()
 }
 
+/** How far the local clock may run ahead of GitHub's, taken off local time when an answer has no `Date` (#581). */
+const LOCAL_CLOCK_MARGIN = { seconds: 30 }
+
 /**
  * When GitHub got the write (#579), by its own clock, so a local clock that is off doesn't matter: the
- * answer's `Date` less the time the call took, less a second for the header's rounding; local time when
- * the answer has no date.
+ * answer's `Date` less the time the call that got it took (not a rate-limit wait before it, #581), less
+ * a second for the header's rounding. When the answer has no date, local time, less a margin for a local
+ * clock running ahead (#581).
  */
-const sentAt = (answer: Answer, sent: Temporal.Instant): Temporal.Instant => {
-  const answered = httpDate(answer.headers.get('date') ?? '')
-  return answered === null ? sent : answered.subtract({ milliseconds: Math.ceil(sent.until(Temporal.Now.instant()).total('milliseconds')) + 1000 })
+const sentAt = ({ headers, sent }: SentAnswer): Temporal.Instant => {
+  const answered = httpDate(headers.get('date') ?? '')
+  return answered === null
+    ? sent.subtract(LOCAL_CLOCK_MARGIN)
+    : answered.subtract({ milliseconds: Math.ceil(sent.until(Temporal.Now.instant()).total('milliseconds')) + 1000 })
 }
 
 /**
@@ -159,10 +176,9 @@ const checkLanded = async ({ enables, pr, repo, since, status }: { enables: bool
 
 /** A GraphQL mutation's data and what GitHub refused; a 5xx is tried once more, unless the write went through anyway (#577). */
 export const mutate = async ({ mutation, pr, repo, variables }: { mutation: string, pr: number, repo: string, variables: readonly string[] }, retried = false): Promise<{ data: unknown, errors: string }> => {
-  const sent = Temporal.Now.instant()
   const answer = await graphqlAnswer(repo, ['-f', `query=${mutation}`, ...variables.flatMap(variable => ['-f', variable])])
   if (answer.status >= 500 && !retried) {
-    await checkLanded({ enables: mutation.includes('enablePullRequestAutoMerge'), pr, repo, since: sentAt(answer, sent), status: answer.status })
+    await checkLanded({ enables: mutation.includes('enablePullRequestAutoMerge'), pr, repo, since: sentAt(answer), status: answer.status })
     return mutate({ mutation, pr, repo, variables }, true)
   }
   return { data: at(answer.body, 'data'), errors: errorsOf(answer) }

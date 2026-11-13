@@ -69,3 +69,20 @@ test('after a 5xx it waits before reading the PR again, so a write GitHub is sti
   expect(result.code).toBe(0)
   expect(result.ms).toBeGreaterThanOrEqual(1000)
 })
+
+test('a 5xx without a Date header still finds a squash committed a little before the local clock (#581)', async () => {
+  // The local clock runs ahead of GitHub's: the squash's commit date is a few seconds before the write, by the local clock.
+  const landed = { date: Temporal.Now.instant().subtract({ seconds: 10 }).toString(), headline: 'The change (#7)', oid: 'fb7bb5f0', tree: HEAD_TREE }
+  const result = await runFromNonClone('agent-bot[bot]', { ...NO_WAIT, FAKE_AUTO_NO_DATE: '1', FAKE_LANDED: afterServerError('OPEN', [OTHER, landed]) })
+  expect(result.code).toBe(3)
+  expect(result.error).toContain('owner/repo#7 landed on main as fb7bb5f0')
+  expect(autoMerges(result.calls)).toHaveLength(1)
+})
+
+test('after a rate-limit wait, a 5xx counts only commits after the try GitHub answered with it (#581)', async () => {
+  // The first try is refused for a rate limit and waited out; a commit naming the PR lands during that wait, before the try that got the 5xx.
+  const during = { date: Temporal.Now.instant().add({ milliseconds: 1500 }).toString(), headline: 'Cherry-picked from (#7)', oid: 'ccccccc3', tree: 'tree-other' }
+  const result = await runFromNonClone('agent-bot[bot]', { ...NO_WAIT, FAKE_AUTO_LIMIT: '5', FAKE_LANDED: afterServerError('OPEN', [OTHER, during]) })
+  expect({ code: result.code, output: result.output }).toEqual({ code: 0, output: 'Auto-merge (squash) is on for owner/repo#7 at c0ffee1.\n' })
+  expect(autoMerges(result.calls)).toHaveLength(3)
+}, 20_000)

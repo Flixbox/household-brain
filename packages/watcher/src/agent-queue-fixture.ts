@@ -72,8 +72,16 @@ const FAKE = String.raw`
     const seen = process.env.FIXTURE_HOME + '/seen-auto'
     const turn = existsSync(seen) ? Number(readFileSync(seen, 'utf8')) : 0
     writeFileSync(seen, String(turn + 1))
-    if (turn === 0 && process.env.FAKE_AUTO_STATUS) {
-      console.log('HTTP/2.0 ' + process.env.FAKE_AUTO_STATUS + ' X\nDate: ' + httpDate() + '\n\n' + JSON.stringify({ message: 'Server Error' }))
+    // FAKE_AUTO_LIMIT: the first write is refused for a rate limit, Retry-After that many seconds; the 5xx comes next.
+    const limited = process.env.FAKE_AUTO_LIMIT ? 1 : 0
+    if (turn === 0 && limited === 1) {
+      console.log('HTTP/2.0 403 Forbidden\nRetry-After: ' + process.env.FAKE_AUTO_LIMIT + '\n\n' + JSON.stringify({ message: 'You have exceeded a secondary rate limit' }))
+      process.exit(1)
+    }
+    if (turn === limited && process.env.FAKE_AUTO_STATUS) {
+      // FAKE_AUTO_NO_DATE: the 5xx comes without a Date header.
+      const date = process.env.FAKE_AUTO_NO_DATE ? '' : 'Date: ' + httpDate() + '\n'
+      console.log('HTTP/2.0 ' + process.env.FAKE_AUTO_STATUS + ' X\n' + date + '\n' + JSON.stringify({ message: 'Server Error' }))
       process.exit(1)
     }
     console.log('HTTP/2.0 200 OK\nContent-Type: application/json\n\n' + JSON.stringify({ data: { enablePullRequestAutoMerge: { clientMutationId: null } } }))
