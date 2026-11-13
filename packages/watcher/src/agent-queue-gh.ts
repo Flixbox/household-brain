@@ -114,7 +114,7 @@ const squashOf = (pullRequest: unknown, pr: number): string => {
 }
 
 /** Exit code when the PR's squash landed but GitHub left it open (#579), apart from the other failures' 2. */
-export const LANDED_EXIT = 3
+const LANDED_EXIT = 3
 
 /**
  * What the write did, as far as the re-read shows (#579); '' when it didn't
