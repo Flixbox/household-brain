@@ -13,8 +13,26 @@ const committedAt = (commit: unknown): string | null =>
     ? text(commit.committer.date)
     : null
 
-/** When the pin's tag was released, else when its commit was made. */
-export const dateOf = async ({ action, repo, sha, tag }: Pin, github: GitHubRead): Promise<Dated> => {
+/**
+ * Why the pin's version comment can't date it, or null when its tag points at the pinned commit. The
+ * comment is only text (#556): a fresh commit commented with an old release, or a script line
+ * repeating the pin with another version, would otherwise borrow that release's date.
+ */
+const tagMismatch = async ({ action, repo, sha }: Pin, tag: string, github: GitHubRead): Promise<string | null> => {
+  const tagged = text((await github(`repos/${repo}/commits/refs/tags/${tag}`))?.sha)?.toLowerCase()
+  if (!hasText(tagged)) {
+    return `${action} has no tag ${tag} for the pinned ${sha.slice(0, 7)}`
+  }
+  return tagged === sha ? null : `${action} ${tag} points at ${tagged.slice(0, 7)}, not at the pinned ${sha.slice(0, 7)}`
+}
+
+/** When the pin's tag was released, else when its commit was made. A tag must point at the pinned commit. */
+export const dateOf = async (pin: Pin, github: GitHubRead): Promise<Dated> => {
+  const { action, repo, sha, tag } = pin
+  const mismatch = hasText(tag) ? await tagMismatch(pin, tag, github) : null
+  if (hasText(mismatch)) {
+    return { error: mismatch }
+  }
   const release = hasText(tag) ? text((await github(`repos/${repo}/releases/tags/${tag}`))?.published_at) : null
   if (hasText(release)) {
     return { published: Temporal.Instant.from(release) }
