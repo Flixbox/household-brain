@@ -9,9 +9,11 @@ export interface Pin {
 }
 
 const PINNED = /^(?<action>[^\s@]+)@(?<sha>[0-9a-f]{40})$/iu
-// A `uses` entry and its version comment. YAML drops comments, so this reads the text (#546); never a line a comment or another key holds.
-const USES_ENTRY = /^[ \t-]*["']?uses["']?[ \t]*:\s*(?:&\S+\s+)?(?<rest>\S.*)$/gmu
-const VERSIONED = /^["']?(?<value>[^\s"'#]+)["']?[ \t]+#[ \t]*(?<tag>v\S+)/u
+// A line that looks like a `uses` entry and its version comment. YAML drops comments, so this reads the text (#546); never a line a comment or another key holds.
+const USES_ENTRY = /^[ \t-]*["']?uses["']?[ \t]*:\s*(?:&\S+\s+)?(?<rest>\S.*)$/dgmu
+const VERSIONED = /^["']?(?<value>[^\s"'#]+)["']?[ \t]+#[ \t]*(?<tag>v\S+)/du
+// Stands in for a value to test whether YAML reads it as a `uses` entry.
+const PROBE = 'uses-entry-probe'
 
 /** Every `uses` value at any depth of a parsed workflow. */
 const usesValues = (node: unknown): string[] => {
@@ -24,11 +26,17 @@ const usesValues = (node: unknown): string[] => {
   return Object.entries(node).flatMap(([key, value]) => (key === 'uses' && typeof value === 'string' ? [value] : usesValues(value)))
 }
 
-/** The commented version of each `uses` value. */
+/** Whether YAML reads the value at `start` as a `uses` entry, not as part of a script or another string (#567). */
+const isUsesEntry = (workflow: string, start: number, value: string): boolean =>
+  usesValues(Bun.YAML.parse(`${workflow.slice(0, start)}${PROBE}${workflow.slice(start + value.length)}`)).includes(PROBE)
+
+/** The commented version of each `uses` entry. */
 const versionsOf = (workflow: string): Map<string, string> =>
-  new Map([...workflow.matchAll(USES_ENTRY)].flatMap(({ groups }) => {
-    const entry = VERSIONED.exec(groups?.rest ?? '')?.groups
-    return entry ? [[entry.value ?? '', entry.tag ?? ''] as const] : []
+  new Map([...workflow.matchAll(USES_ENTRY)].flatMap(match => {
+    const entry = VERSIONED.exec(match.groups?.rest ?? '')
+    const value = entry?.groups?.value ?? ''
+    const start = (match.indices?.groups?.rest?.[0] ?? 0) + (entry?.indices?.groups?.value?.[0] ?? 0)
+    return entry && isUsesEntry(workflow, start, value) ? [[value, entry.groups?.tag ?? ''] as const] : []
   }))
 
 /**
