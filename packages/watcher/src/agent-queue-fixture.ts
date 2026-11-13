@@ -65,7 +65,7 @@ const FAKE = String.raw`
     const turn = existsSync(seen) ? Number(readFileSync(seen, 'utf8')) : 0
     writeFileSync(seen, String(turn + 1))
     if (turn === 0 && process.env.FAKE_AUTO_STATUS) {
-      console.log('HTTP/2.0 ' + process.env.FAKE_AUTO_STATUS + ' X\n\n' + JSON.stringify({ message: 'Server Error' }))
+      console.log('HTTP/2.0 ' + process.env.FAKE_AUTO_STATUS + ' X\nDate: ' + new Date().toUTCString() + '\n\n' + JSON.stringify({ message: 'Server Error' }))
       process.exit(1)
     }
     console.log('HTTP/2.0 200 OK\nContent-Type: application/json\n\n' + JSON.stringify({ data: { enablePullRequestAutoMerge: { clientMutationId: null } } }))
@@ -79,7 +79,14 @@ const FAKE = String.raw`
     }
   }
   if (joined.includes('history(first:')) {
-    console.log('HTTP/2.0 200 OK\n\n' + JSON.stringify({ data: { repository: { pullRequest: JSON.parse(process.env.FAKE_LANDED ?? 'null') } } }))
+    // As GitHub's history(since:), when asked with one: only the commits committed since then (#579).
+    const since = args.find(arg => arg.startsWith('since='))?.slice('since='.length) ?? ''
+    const pullRequest = JSON.parse(process.env.FAKE_LANDED ?? 'null')
+    const history = pullRequest?.baseRef?.target?.history
+    if (since !== '' && history) {
+      history.nodes = history.nodes.filter(commit => Date.parse(commit.committedDate) >= Date.parse(since))
+    }
+    console.log('HTTP/2.0 200 OK\n\n' + JSON.stringify({ data: { repository: { pullRequest } } }))
     process.exit(0)
   }
   if (joined.includes('viewer{login}')) {
