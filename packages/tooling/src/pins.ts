@@ -32,13 +32,26 @@ const versionsOf = (workflow: string): Map<string, string> =>
   }))
 
 /**
+ * Every `uses` value but a local `./` action or workflow, which needs no pin. Throws on one that isn't
+ * a full commit SHA (a tag, branch, short SHA or Docker image): the age check couldn't date it (#559).
+ */
+const pinnedValues = (workflow: unknown): string[] => {
+  const values = usesValues(workflow).filter(value => !value.startsWith('./'))
+  const unpinned = values.filter(value => !PINNED.test(value))
+  if (unpinned.length > 0) {
+    throw new Error(`Actions not pinned to a full commit SHA: ${unpinned.join(', ')}`)
+  }
+  return values
+}
+
+/**
  * Every action a workflow pins by commit, once each. Reads the workflow as YAML, so no spelling of
- * `uses` skips the age check (#554), and throws on one that isn't valid YAML.
+ * `uses` skips the age check (#554), and throws on one that isn't valid YAML or isn't pinned (#559).
  */
 export const pinnedActions = (workflow: string): Pin[] => {
   const pins = new Map<string, Pin>()
   const versions = versionsOf(workflow)
-  for (const value of usesValues(Bun.YAML.parse(workflow))) {
+  for (const value of pinnedValues(Bun.YAML.parse(workflow))) {
     const groups = PINNED.exec(value)?.groups
     if (groups) {
       const action = groups.action ?? ''
