@@ -1,7 +1,7 @@
 /* oxlint-disable eslint/no-await-in-loop -- a run's replacements are tried one after another, on purpose */
 /** What the project watcher does with a CI run of a commit (watch-main.ts asks, for each PR it follows). */
 import { FOLLOW_NEWER, type MainRun, type Run, cancelledDeployEvent, replacementCandidates, runEvent } from './watch-events'
-import { REPO, containsCommit, jobLines, mainRuns, newestMainRun, pushRunOf, runOf } from './watch-github'
+import { REPO, containsCommit, jobLines, mainRuns, pushRunOf, runOf } from './watch-github'
 import { holdsLagging, isSettled, keepJobs, keptJobs, settle } from './watch-ci-cache'
 import { report } from './watch-output'
 
@@ -57,13 +57,39 @@ export const checkRun = async (check: RunCheck): Promise<void> => {
 
 /**
  * A merged commit with no push run (#549): the merge queue pushes a batch at once, and only its tip
- * gets a run, which deploys the whole batch. So follow the newest run on main if its commit contains
- * this one; main is linear, so no older run can. If it doesn't, the commit's own run hasn't started.
+ * gets a run, which deploys the whole batch. That is the oldest run on main whose commit contains this
+ * one (#558): a later run deploys later batches, and can fail for its own reasons. Main is linear, so
+ * the runs that contain it are the newest ones, up to that run; a binary search finds it with a few
+ * compare calls, each answered once (`containsCommit` remembers). None contains it: its run hasn't
+ * started. A question that fails reports nothing: the next look asks again.
  */
 const followContaining = async ({ limitSeconds, pr, sha }: RunCheck): Promise<void> => {
-  const newest = await newestMainRun().catch(() => null)
-  const contains = newest && newest.sha !== sha ? await containsCommit(newest.sha, sha).catch(() => false) : false
-  await (newest && contains ? checkRun({ label: 'deploy', limitSeconds, pr, sha: newest.sha }) : Promise.resolve())
+  const runs = await mainRuns().catch(() => null)
+  const deploying = runs ? await oldestContaining(runs.filter(main => main.sha !== sha).toSorted((first, second) => first.run.id - second.run.id), sha) : UNKNOWN
+  await (deploying && deploying !== UNKNOWN ? checkRun({ label: 'deploy', limitSeconds, pr, sha: deploying.sha }) : Promise.resolve())
+}
+
+/**
+ * The oldest of `runs` (oldest first) whose commit contains `sha`; those after it contain it too. The
+ * newest is asked first: while it doesn't contain `sha`, none does, and one call says so.
+ */
+const oldestContaining = async (runs: readonly MainRun[], sha: string): Promise<MainRun | null | typeof UNKNOWN> => {
+  const newest = runs.at(-1)
+  const any = newest ? await containsCommit(newest.sha, sha).catch(() => UNKNOWN) : false
+  if (any !== true) {
+    return any === UNKNOWN ? UNKNOWN : null
+  }
+  let [low, high] = [0, runs.length - 1]
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2)
+    const candidate = runs[middle]
+    const contains = candidate ? await containsCommit(candidate.sha, sha).catch(() => UNKNOWN) : UNKNOWN
+    if (contains === UNKNOWN) {
+      return UNKNOWN
+    }
+    [low, high] = contains ? [low, middle] : [middle + 1, high]
+  }
+  return runs[low] ?? null
 }
 
 /**
