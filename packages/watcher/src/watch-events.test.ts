@@ -121,10 +121,10 @@ describe('approvedBy (#286)', () => {
 
 describe('mainRunEvent', () => {
   it('reports main passing, failing or hanging, and ignores a cancelled run', () => {
-    expect(mainRunEvent({ limitSeconds: 1200, repo: 'owner/repo', run: run() })).toMatchObject({ key: 'main-passed 7 1' })
-    expect(mainRunEvent({ limitSeconds: 1200, repo: 'owner/repo', run: run({ conclusion: 'failure' }) })).toMatchObject({ key: 'main-failed 7 1' })
-    expect(mainRunEvent({ limitSeconds: 1200, repo: 'owner/repo', run: run({ ageSeconds: 1300, conclusion: '', status: 'queued' }) })).toMatchObject({ key: 'main-slow 7 1' })
-    expect(mainRunEvent({ limitSeconds: 1200, repo: 'owner/repo', run: run({ conclusion: 'cancelled' }) })).toBeNull()
+    expect(mainRunEvent({ jobs: [], limitSeconds: 1200, repo: 'owner/repo', run: run() })).toMatchObject({ key: 'main-passed 7 1' })
+    expect(mainRunEvent({ jobs: [], limitSeconds: 1200, repo: 'owner/repo', run: run({ conclusion: 'failure' }) })).toMatchObject({ key: 'main-failed 7 1' })
+    expect(mainRunEvent({ jobs: [], limitSeconds: 1200, repo: 'owner/repo', run: run({ ageSeconds: 1300, conclusion: '', status: 'queued' }) })).toMatchObject({ key: 'main-slow 7 1' })
+    expect(mainRunEvent({ jobs: [], limitSeconds: 1200, repo: 'owner/repo', run: run({ conclusion: 'cancelled' }) })).toBeNull()
   })
 })
 

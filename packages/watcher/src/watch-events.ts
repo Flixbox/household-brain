@@ -97,8 +97,14 @@ export const cancelledDeployEvent = ({ pr, sha, run, jobs }: Pick<RunContext, 'p
   lines: [`DEPLOY_FAILED: run ${run.id} on main was cancelled, and no newer run replaces it: re-run it`, ...jobs],
 })
 
-/** The newest CI run on main, whichever PR it came from. */
-export const mainRunEvent = ({ run, limitSeconds, repo }: { run: Run, limitSeconds: number, repo: string }): Event | null => {
+/** Whether a run is still going past the limit, so it is reported as slow. */
+export const isSlow = (run: Run, limitSeconds: number): boolean => run.status !== 'completed' && run.ageSeconds > limitSeconds
+
+/** The key of a slow main run's report: once reported, its jobs aren't asked for again. */
+export const mainSlowKey = (run: Run): string => `main-slow ${run.id} ${run.attempt}`
+
+/** The newest CI run on main, whichever PR it came from; `jobs` are its job lines, which a slow run names (#557). */
+export const mainRunEvent = ({ jobs, limitSeconds, repo, run }: { jobs: readonly string[], limitSeconds: number, repo: string, run: Run }): Event | null => {
   if (run.status === 'completed') {
     if (run.conclusion === 'cancelled') {
       return null
@@ -110,8 +116,11 @@ export const mainRunEvent = ({ run, limitSeconds, repo }: { run: Run, limitSecon
         lines: [`MAIN_FAILED: CI run ${run.id} on main ended ${run.conclusion}. Fix main first (follow-up PR). gh run view ${run.id} --repo ${repo} --log-failed`],
       }
   }
-  return run.ageSeconds > limitSeconds
-    ? { key: `main-slow ${run.id} ${run.attempt}`, lines: [`MAIN_SLOW: CI run ${run.id} on main still ${run.status} after ${Math.floor(run.ageSeconds / 60)} min. Cancel it and read the logs.`] }
+  return isSlow(run, limitSeconds)
+    ? {
+      key: mainSlowKey(run),
+      lines: [`MAIN_SLOW: CI run ${run.id} on main still ${run.status} after ${Math.floor(run.ageSeconds / 60)} min. ${slowAdvice(jobs)}`, ...jobs],
+    }
     : null
 }
 

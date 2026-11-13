@@ -4,11 +4,7 @@ import { type Run, mainRunEvent } from './watch-events'
 const slowRun: Run = { ageSeconds: 1300, attempt: 1, conclusion: '', id: 7, status: 'in_progress' }
 
 describe('what a hanging main advises (#557)', () => {
-  const slowMain = (jobs: string[]) => {
-    // Built apart from the call, so the test compiles before mainRunEvent takes the jobs.
-    const args = { jobs, limitSeconds: 1200, repo: 'owner/repo', run: slowRun }
-    return mainRunEvent(args)?.lines ?? []
-  }
+  const slowMain = (jobs: string[]) => mainRunEvent({ jobs, limitSeconds: 1200, repo: 'owner/repo', run: slowRun })?.lines ?? []
 
   it('names the pending deploys, lists the jobs and does not say to cancel', () => {
     const jobs = ['  web-e2e: completed success', '  pages: in_progress ', '  dev-release: queued ']
