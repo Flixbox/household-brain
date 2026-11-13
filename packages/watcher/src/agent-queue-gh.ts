@@ -36,10 +36,15 @@ interface SentAnswer extends Answer {
   sent: Temporal.Instant
 }
 
+/** GitHub's answer to one `gh api -i` call with these `args`, and when it was sent. */
+const sentAnswer = async (repo: string, args: readonly string[]): Promise<SentAnswer> => {
+  const sent = Temporal.Now.instant()
+  return { ...answerFrom(await ghAnswer(repo, args)), sent }
+}
+
 /** GitHub's answer to a `gh api -i` call with these `args`; a rate limit is logged, and waited out once. */
 const limitedAnswer = async (repo: string, args: readonly string[], retried = false): Promise<SentAnswer> => {
-  const sent = Temporal.Now.instant()
-  const answer = { ...answerFrom(await ghAnswer(repo, args)), sent }
+  const answer = await sentAnswer(repo, args)
   const wait = rateLimitWait(answer, Math.floor(Temporal.Now.instant().epochMilliseconds / 1000))
   if (wait === null) {
     return answer
