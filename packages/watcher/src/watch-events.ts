@@ -1,7 +1,7 @@
 /** What the project watcher reports, decided from what GitHub answered (pure, so it is tested). */
 import { isRecord } from './read'
 import { ciResultKey, ciState } from './watch-ci-state'
-import { slowAdvice } from './watch-ci-slow'
+import { isSlow, mainSlowKey, slowAdvice } from './watch-ci-slow'
 
 export interface Event {
   /** Scoped agents do not wake for housekeeping such as non-conflicting main movement. */
@@ -97,12 +97,6 @@ export const cancelledDeployEvent = ({ pr, sha, run, jobs }: Pick<RunContext, 'p
   lines: [`DEPLOY_FAILED: run ${run.id} on main was cancelled, and no newer run replaces it: re-run it`, ...jobs],
 })
 
-/** Whether a run is still going past the limit, so it is reported as slow. */
-export const isSlow = (run: Run, limitSeconds: number): boolean => run.status !== 'completed' && run.ageSeconds > limitSeconds
-
-/** The key of a slow main run's report: once reported, its jobs aren't asked for again. */
-export const mainSlowKey = (run: Run): string => `main-slow ${run.id} ${run.attempt}`
-
 /** The newest CI run on main, whichever PR it came from; `jobs` are its job lines, which a slow run names (#557). */
 export const mainRunEvent = ({ jobs, limitSeconds, repo, run }: { jobs: readonly string[], limitSeconds: number, repo: string, run: Run }): Event | null => {
   if (run.status === 'completed') {
@@ -116,12 +110,8 @@ export const mainRunEvent = ({ jobs, limitSeconds, repo, run }: { jobs: readonly
         lines: [`MAIN_FAILED: CI run ${run.id} on main ended ${run.conclusion}. Fix main first (follow-up PR). gh run view ${run.id} --repo ${repo} --log-failed`],
       }
   }
-  return isSlow(run, limitSeconds)
-    ? {
-      key: mainSlowKey(run),
-      lines: [`MAIN_SLOW: CI run ${run.id} on main still ${run.status} after ${Math.floor(run.ageSeconds / 60)} min. ${slowAdvice(jobs)}`, ...jobs],
-    }
-    : null
+  const slow = `MAIN_SLOW: CI run ${run.id} on main still ${run.status} after ${Math.floor(run.ageSeconds / 60)} min. ${slowAdvice(jobs)}`
+  return isSlow(run, limitSeconds) ? { key: mainSlowKey(run), lines: [slow, ...jobs] } : null
 }
 
 export interface OpenPr {

@@ -1,7 +1,8 @@
 /* oxlint-disable import/max-dependencies -- this file is where the watcher's parts meet; pacing adds one */
 /* oxlint-disable eslint/no-await-in-loop -- each poller's looks run one after another, on purpose */
 /** The project watcher's looks, started by watch-project.ts once it has read which code it runs (#265). */
-import { type Activity, type Run, isSlow, mainRunEvent, mainSlowKey, queueCommand } from './watch-events'
+import { type Activity, type Run, mainRunEvent, queueCommand } from './watch-events'
+import { isSlow, mainSlowKey } from './watch-ci-slow'
 import { type PrState, REPO, jobLines, mainAhead, mainHead, newestMainRun, prStates } from './watch-github'
 import { checkRun } from './watch-ci-runs'
 import { APPROVED_DRAFT_NOTE, checkApproval, checkWriter, resolveAsked } from './watch-approval'
