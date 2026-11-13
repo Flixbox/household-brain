@@ -45,6 +45,14 @@ const FAKE = String.raw`
     process.exit(1)
   }
   const joined = args.join(' ')
+  // Now, as an HTTP Date header has it: "Fri, 13 Nov 2026 21:07:46 GMT".
+  const httpDate = () => {
+    const now = Temporal.Now.zonedDateTimeISO('UTC')
+    const two = value => String(value).padStart(2, '0')
+    const day = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][now.dayOfWeek - 1]
+    const month = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][now.month - 1]
+    return day + ', ' + two(now.day) + ' ' + month + ' ' + now.year + ' ' + two(now.hour) + ':' + two(now.minute) + ':' + two(now.second) + ' GMT'
+  }
   if (process.env.FAKE_HANG && joined.includes(process.env.FAKE_HANG)) {
     // A child of the wrapper, as a real gh under a wrapper script: it outlives a killed parent and holds its stdout (#540).
     Bun.spawnSync(['sleep', '6'], { stderr: 'ignore', stdout: 'inherit' })
@@ -65,7 +73,7 @@ const FAKE = String.raw`
     const turn = existsSync(seen) ? Number(readFileSync(seen, 'utf8')) : 0
     writeFileSync(seen, String(turn + 1))
     if (turn === 0 && process.env.FAKE_AUTO_STATUS) {
-      console.log('HTTP/2.0 ' + process.env.FAKE_AUTO_STATUS + ' X\n\n' + JSON.stringify({ message: 'Server Error' }))
+      console.log('HTTP/2.0 ' + process.env.FAKE_AUTO_STATUS + ' X\nDate: ' + httpDate() + '\n\n' + JSON.stringify({ message: 'Server Error' }))
       process.exit(1)
     }
     console.log('HTTP/2.0 200 OK\nContent-Type: application/json\n\n' + JSON.stringify({ data: { enablePullRequestAutoMerge: { clientMutationId: null } } }))
@@ -79,7 +87,14 @@ const FAKE = String.raw`
     }
   }
   if (joined.includes('history(first:')) {
-    console.log('HTTP/2.0 200 OK\n\n' + JSON.stringify({ data: { repository: { pullRequest: JSON.parse(process.env.FAKE_LANDED ?? 'null') } } }))
+    // As GitHub's history(since:), when asked with one: only the commits committed since then (#579).
+    const since = args.find(arg => arg.startsWith('since='))?.slice('since='.length) ?? ''
+    const pullRequest = JSON.parse(process.env.FAKE_LANDED ?? 'null')
+    const history = pullRequest?.baseRef?.target?.history
+    if (since !== '' && history) {
+      history.nodes = history.nodes.filter(commit => Temporal.Instant.compare(Temporal.Instant.from(commit.committedDate), Temporal.Instant.from(since)) >= 0)
+    }
+    console.log('HTTP/2.0 200 OK\n\n' + JSON.stringify({ data: { repository: { pullRequest } } }))
     process.exit(0)
   }
   if (joined.includes('viewer{login}')) {
