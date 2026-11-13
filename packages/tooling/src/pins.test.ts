@@ -53,6 +53,17 @@ describe('pinnedActions', () => {
     expect(pinnedActions(workflow)).toEqual([{ action: 'actions/checkout', repo: 'actions/checkout', sha: SHA, tag: null }])
   })
 
+  // A script repeating the pin with another tag on the same commit passed #565's tag check (#567).
+  it('takes no version from a script line that repeats the pin', () => {
+    const workflow = `steps:\n  - uses: actions/checkout@${SHA} # v7.0.1\n  - run: |\n      uses: actions/checkout@${SHA} # v6.0.0\n`
+    expect(pinnedActions(workflow)).toEqual([{ action: 'actions/checkout', repo: 'actions/checkout', sha: SHA, tag: 'v7.0.1' }])
+  })
+
+  it('takes no version from a script when the entry has none', () => {
+    const workflow = `steps:\n  - uses: actions/checkout@${SHA}\n  - run: >-\n      uses: actions/checkout@${SHA} # v6.0.0\n`
+    expect(pinnedActions(workflow)).toEqual([{ action: 'actions/checkout', repo: 'actions/checkout', sha: SHA, tag: null }])
+  })
+
   it('refuses a workflow that is not valid YAML', () => {
     expect(() => pinnedActions('uses: [')).toThrow()
   })
