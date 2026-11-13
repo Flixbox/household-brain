@@ -67,7 +67,13 @@ export const checkRun = async (check: RunCheck): Promise<void> => {
 const followContaining = async ({ limitSeconds, pr, sha }: RunCheck): Promise<void> => {
   const runs = await mainRuns().catch(() => null)
   const deploying = runs ? await oldestContaining(runs.filter(main => main.sha !== sha).toSorted((first, second) => first.run.id - second.run.id), sha) : UNKNOWN
-  await (deploying && deploying !== UNKNOWN ? checkRun({ label: 'deploy', limitSeconds, pr, sha: deploying.sha }) : Promise.resolve())
+  await (deploying !== null && deploying !== UNKNOWN ? checkRun({ label: 'deploy', limitSeconds, pr, sha: deploying.sha }) : Promise.resolve())
+}
+
+/** Whether the commit of `runs[index]` contains `sha`; false when there is no such run. */
+const containsAt = async (runs: readonly MainRun[], index: number, sha: string): Promise<boolean | typeof UNKNOWN> => {
+  const run = runs[index]
+  return run ? containsCommit(run.sha, sha).catch((): typeof UNKNOWN => UNKNOWN) : false
 }
 
 /**
@@ -75,22 +81,26 @@ const followContaining = async ({ limitSeconds, pr, sha }: RunCheck): Promise<vo
  * newest is asked first: while it doesn't contain `sha`, none does, and one call says so.
  */
 const oldestContaining = async (runs: readonly MainRun[], sha: string): Promise<MainRun | null | typeof UNKNOWN> => {
-  const newest = runs.at(-1)
-  const any = newest ? await containsCommit(newest.sha, sha).catch(() => UNKNOWN) : false
+  const any = await containsAt(runs, runs.length - 1, sha)
   if (any !== true) {
     return any === UNKNOWN ? UNKNOWN : null
   }
-  let [low, high] = [0, runs.length - 1]
+  const index = await firstContainingIndex(runs, sha, runs.length - 1)
+  return index === UNKNOWN ? UNKNOWN : runs[index] ?? null
+}
+
+/** The index of the first of `runs` whose commit contains `sha`, searched below `last`, whose commit does. */
+const firstContainingIndex = async (runs: readonly MainRun[], sha: string, last: number): Promise<number | typeof UNKNOWN> => {
+  let [low, high] = [0, last]
   while (low < high) {
     const middle = Math.floor((low + high) / 2)
-    const candidate = runs[middle]
-    const contains = candidate ? await containsCommit(candidate.sha, sha).catch(() => UNKNOWN) : UNKNOWN
+    const contains = await containsAt(runs, middle, sha)
     if (contains === UNKNOWN) {
       return UNKNOWN
     }
     [low, high] = contains ? [low, middle] : [middle + 1, high]
   }
-  return runs[low] ?? null
+  return low
 }
 
 /**
