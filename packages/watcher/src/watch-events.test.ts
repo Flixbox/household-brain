@@ -31,6 +31,7 @@ describe('runEvent', () => {
       [['  web-e2e: completed success', '  pages: in_progress '], 'pages'],
       [['  Test: completed success', '  Deploy to Firebase: waiting '], 'Deploy to Firebase'],
       [['  Test: completed success', '  pages: queued ', '  deploy: in_progress '], 'pages, deploy'],
+      [['  pages: completed success', '  dev-release: in_progress '], 'dev-release'],
     ])('names the deploys and does not say to cancel when only they are pending: %j', (jobs, names) => {
       const [line] = slowLines(jobs)
       expect(line).toContain(`Only deploy jobs are still pending (${names})`)
@@ -124,6 +125,27 @@ describe('mainRunEvent', () => {
     expect(mainRunEvent({ limitSeconds: 1200, repo: 'owner/repo', run: run({ conclusion: 'failure' }) })).toMatchObject({ key: 'main-failed 7 1' })
     expect(mainRunEvent({ limitSeconds: 1200, repo: 'owner/repo', run: run({ ageSeconds: 1300, conclusion: '', status: 'queued' }) })).toMatchObject({ key: 'main-slow 7 1' })
     expect(mainRunEvent({ limitSeconds: 1200, repo: 'owner/repo', run: run({ conclusion: 'cancelled' }) })).toBeNull()
+  })
+
+  describe('what a hanging main advises (#557)', () => {
+    const slowMain = (jobs: string[]) => {
+      // Built apart from the call, so the test compiles before mainRunEvent takes the jobs.
+      const args = { jobs, limitSeconds: 1200, repo: 'owner/repo', run: run({ ageSeconds: 1300, conclusion: '', status: 'in_progress' }) }
+      return mainRunEvent(args)?.lines ?? []
+    }
+
+    it('names the pending deploys, lists the jobs and does not say to cancel', () => {
+      const jobs = ['  web-e2e: completed success', '  pages: in_progress ', '  dev-release: queued ']
+      const [line, ...rest] = slowMain(jobs)
+      expect(line).toContain('MAIN_SLOW: CI run 7 on main still in_progress after 21 min.')
+      expect(line).toContain('Only deploy jobs are still pending (pages, dev-release)')
+      expect(line).not.toContain('Cancel')
+      expect(rest).toEqual(jobs)
+    })
+
+    it('says to cancel while anything else is pending', () => {
+      expect(slowMain(['  web-e2e: in_progress ', '  pages: queued '])[0]).toContain('Cancel it and read the logs.')
+    })
   })
 })
 
