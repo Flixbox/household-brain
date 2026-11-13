@@ -58,7 +58,8 @@ export const checkRun = async (check: RunCheck): Promise<void> => {
 /**
  * A merged commit with no push run (#549): the merge queue pushes a batch at once, and only its tip
  * gets a run, which deploys the whole batch. That is the oldest run on main whose commit contains this
- * one (#558): a later run deploys later batches, and can fail for its own reasons. Main is linear, so
+ * one (#558): a later run deploys later batches, and can fail for its own reasons. Main is linear, and
+ * its push runs start in push order (the deploy job's queue and `followNewer` rely on that too), so
  * the runs that contain it are the newest ones, up to that run; a binary search finds it with a few
  * compare calls, each answered once (`containsCommit` remembers). None contains it: its run hasn't
  * started. A question that fails reports nothing: the next look asks again.
