@@ -54,17 +54,17 @@ describe('dateOf', () => {
     expect(await dateOf(pin, github)).toEqual({ error: `actions/checkout has no tag v7.0.1 for the pinned ${SHA.slice(0, 7)}` })
   })
 
-  // The version comment is read from the text, so a script line repeating the pin can set it (#555's clearing review).
-  it('refuses a version a script line gave the pin', async () => {
+  // A script line repeating the pin once gave it another version, here an old release (#555's clearing review, #567).
+  it('dates a pin by its own entry, never by a version a script line gives it', async () => {
     const workflow = `steps:\n  - uses: actions/checkout@${SHA} # v7.0.1\n  - run: |\n      uses: actions/checkout@${SHA} # v1.0.0\n`
-    const [scripted] = pinnedActions(workflow)
+    const [entry] = pinnedActions(workflow)
     const github = fake({
       'repos/actions/checkout/commits/refs/tags/v1.0.0': commit(OTHER, OLD),
       'repos/actions/checkout/commits/refs/tags/v7.0.1': commit(SHA, FRESH),
       'repos/actions/checkout/releases/tags/v1.0.0': { published_at: OLD },
       [`repos/actions/checkout/commits/${SHA}`]: commit(SHA, FRESH),
     })
-    expect(scripted).toBeDefined()
-    expect(await dateOf(scripted ?? pin, github)).toHaveProperty('error')
+    expect(entry?.tag).toBe('v7.0.1')
+    expect(await dateOf(entry ?? pin, github)).toEqual({ published: Temporal.Instant.from(FRESH) })
   })
 })
