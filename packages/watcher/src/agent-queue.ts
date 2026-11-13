@@ -25,7 +25,9 @@
  * stuck (#544): every rule above holds, GitHub calls it CLEAN, it isn't in the queue, and nothing has
  * happened on it for NOT_QUEUED_MINUTES, the watcher's own wait, so GitHub has had its time. Then it
  * is added to the queue (or merged, on a branch without one), pinned to the head it checked; when GitHub
- * refuses that, the command fails and says so. Whether a PR is
+ * refuses that, the command fails and says so. A write GitHub answers with a 5xx is checked before it is
+ * tried once more (#577): a merged PR says so, and one whose squash is on its base branch while GitHub
+ * still calls it open fails, saying where it landed, so it is closed rather than queued again. Whether a PR is
  * user-facing it can't tell: an agent queues a user-facing PR only after the owner's approval, as
  * before, and the label goes only on PRs that aren't.
  *
@@ -40,7 +42,7 @@
  */
 import { type Ask, type Check, type PrFacts, type ReviewStance, factsFrom } from './agent-queue-facts'
 import { CLEARED_LABEL, clearedAt } from './watch-cleared-events'
-import { GH, errorsOf, graphqlAnswer } from './agent-queue-gh'
+import { GH, askGraphql, mutate } from './agent-queue-gh'
 import { at, record, records } from './watch-text'
 import { BOT_REVIEW_LABEL } from './watch-bot-review-events'
 import { bare } from './watch-review-events'
@@ -151,31 +153,19 @@ const PR_QUERY = `query($owner:String!,$name:String!,$pr:Int!){viewer{login} rep
 const COMMENTS_QUERY = `query($owner:String!,$name:String!,$pr:Int!,$before:String!){repository(owner:$owner,name:$name){pullRequest(number:$pr){
   comments(last:100,before:$before){nodes{body createdAt} pageInfo{hasPreviousPage startCursor}}}}}`
 
-/** The `data` of a GraphQL answer to `query` for the PR, with `extra` variables (strings). */
-const ask = async ({ extra = [], pr, query, repo }: { extra?: readonly string[], pr: number, query: string, repo: string }): Promise<unknown> => {
-  const [owner = '', name = ''] = repo.split('/')
-  const fields = ['-f', `query=${query}`, '-f', `owner=${owner}`, '-f', `name=${name}`, '-F', `pr=${pr}`, ...extra.flatMap(variable => ['-f', variable])]
-  const answer = await graphqlAnswer(repo, fields)
-  const errors = errorsOf(answer)
-  if (errors !== '') {
-    throw new Error(`${GH} api graphql failed: ${errors}`)
-  }
-  return at(answer.body, 'data')
-}
-
 /** The PR's comments before the page `comments` (oldest first), a hundred at a time, so no `@<bot> review` is missed. */
 const earlierComments = async (repo: string, pr: number, comments: unknown): Promise<unknown[]> => {
   if (at(comments, 'pageInfo', 'hasPreviousPage') !== true) {
     return []
   }
   const before = textOf(at(comments, 'pageInfo', 'startCursor'))
-  const page = at(await ask({ extra: [`before=${before}`], pr, query: COMMENTS_QUERY, repo }), 'repository', 'pullRequest', 'comments')
+  const page = at(await askGraphql({ extra: [`before=${before}`], pr, query: COMMENTS_QUERY, repo }), 'repository', 'pullRequest', 'comments')
   return [...await earlierComments(repo, pr, page), ...records(at(page, 'nodes'))]
 }
 
 /** The PR's facts, asked of GitHub in one GraphQL call, and more for comments past the first hundred. */
 const readFacts = async (repo: string, pr: number): Promise<PrFacts> => {
-  const data = await ask({ pr, query: PR_QUERY, repo })
+  const data = await askGraphql({ pr, query: PR_QUERY, repo })
   const answer = record(at(data, 'repository', 'pullRequest'))
   const nodes = [...await earlierComments(repo, pr, answer.comments), ...records(at(answer, 'comments', 'nodes'))]
   return factsFrom({ ...answer, comments: { nodes } }, textOf(at(data, 'viewer', 'login')))
@@ -192,12 +182,6 @@ const argsOf = (): { pr: number, repo: string } => {
   return { pr, repo }
 }
 
-/** A GraphQL mutation's data and what GitHub refused. */
-const mutate = async ({ mutation, repo, variables }: { mutation: string, repo: string, variables: readonly string[] }): Promise<{ data: unknown, errors: string }> => {
-  const answer = await graphqlAnswer(repo, ['-f', `query=${mutation}`, ...variables.flatMap(variable => ['-f', variable])])
-  return { data: at(answer.body, 'data'), errors: errorsOf(answer) }
-}
-
 // One mutation each (#357): `gh pr merge --auto` reads the PR again first and kept running into the
 // rate limit. `expectedHeadOid` pins the head that was checked: a push since makes GitHub refuse it.
 const autoMergeMutation = (method: string) => `mutation($id:ID!,$head:GitObjectID!){enablePullRequestAutoMerge(input:{pullRequestId:$id,expectedHeadOid:$head${method}}){clientMutationId}}`
@@ -208,16 +192,16 @@ const MERGE_NOW = 'mutation($id:ID!,$head:GitObjectID!){mergePullRequest(input:{
  * did. A PR GitHub would merge at once can't get auto-merge ("clean status"): it is merged, squashed,
  * as `gh pr merge --auto` does. Throws with GitHub's reasons when it refuses.
  */
-const queue = async (repo: string, facts: PrFacts): Promise<string> => {
+const queue = async (repo: string, pr: number, facts: PrFacts): Promise<string> => {
   const variables = [`id=${facts.id}`, `head=${facts.head}`]
-  const auto = await mutate({ mutation: autoMergeMutation(facts.mergeQueue ? '' : ',mergeMethod:SQUASH'), repo, variables })
+  const auto = await mutate({ mutation: autoMergeMutation(facts.mergeQueue ? '' : ',mergeMethod:SQUASH'), pr, repo, variables })
   if (auto.errors === '') {
     return facts.mergeQueue ? 'Set to join the merge queue:' : 'Auto-merge (squash) is on for'
   }
   if (!/clean status/iu.test(auto.errors)) {
     throw new Error(`GitHub refused auto-merge: ${auto.errors}`)
   }
-  const now = await mutate({ mutation: MERGE_NOW, repo, variables })
+  const now = await mutate({ mutation: MERGE_NOW, pr, repo, variables })
   if (now.errors !== '') {
     throw new Error(`GitHub refused the merge: ${now.errors}`)
   }
@@ -227,9 +211,9 @@ const queue = async (repo: string, facts: PrFacts): Promise<string> => {
 const ENQUEUE = 'mutation($id:ID!,$head:GitObjectID!){enqueuePullRequest(input:{pullRequestId:$id,expectedHeadOid:$head}){clientMutationId}}'
 
 /** Gets a PR whose auto-merge request is stuck (#544) into the queue, or merged on a branch without one, and says which. Throws with GitHub's reasons when it refuses. */
-const unstick = async (repo: string, facts: PrFacts): Promise<string> => {
+const unstick = async (repo: string, pr: number, facts: PrFacts): Promise<string> => {
   const mutation = facts.mergeQueue ? ENQUEUE : MERGE_NOW
-  const { errors } = await mutate({ mutation, repo, variables: [`id=${facts.id}`, `head=${facts.head}`] })
+  const { errors } = await mutate({ mutation, pr, repo, variables: [`id=${facts.id}`, `head=${facts.head}`] })
   if (errors !== '') {
     const stuck = `Its auto-merge request is stuck: CLEAN, approved and green, but ${facts.mergeQueue ? 'still not in the merge queue' : 'still not merged'}.`
     throw new Error(`${stuck} GitHub refused to ${facts.mergeQueue ? 'queue' : 'merge'} it: ${errors}`)
@@ -261,13 +245,13 @@ const act = async ({ facts, owner, pr, repo }: { facts: PrFacts, owner: string, 
   const name = `${repo}#${pr}`
   const atHead = `${name} at ${facts.head.slice(0, 7)}.`
   if (autoMergeStuck(facts, owner, Temporal.Now.instant())) {
-    return `${await unstick(repo, facts)} ${atHead}`
+    return `${await unstick(repo, pr, facts)} ${atHead}`
   }
   if (facts.state === 'OPEN' && (facts.autoMerge || facts.queued)) {
     return `${name} is already ${facts.queued ? 'in the merge queue' : 'set to auto-merge'}.`
   }
   refuseFor(name, blockersOf(facts, owner))
-  return `${await queue(repo, facts)} ${atHead}`
+  return `${await queue(repo, pr, facts)} ${atHead}`
 }
 
 const main = async (): Promise<void> => {
