@@ -17,11 +17,21 @@ const pin = { action: 'actions/checkout', repo: 'actions/checkout', sha: SHA, ta
 describe('dateOf', () => {
   it('dates a pin by its release when the tag points at the pinned commit', async () => {
     const github = fake({
+      'repos/actions/checkout/commits/refs/tags/v7.0.1': commit(SHA, OLD),
+      'repos/actions/checkout/releases/tags/v7.0.1': { published_at: FRESH },
+      [`repos/actions/checkout/commits/${SHA}`]: commit(SHA, OLD),
+    })
+    expect(await dateOf(pin, github)).toEqual({ published: Temporal.Instant.from(FRESH) })
+  })
+
+  // A release tag moved onto a fresh commit points at the pin but keeps its old release date (#565's review).
+  it('dates a pin by its commit when that is younger than the release', async () => {
+    const github = fake({
       'repos/actions/checkout/commits/refs/tags/v7.0.1': commit(SHA, FRESH),
       'repos/actions/checkout/releases/tags/v7.0.1': { published_at: OLD },
       [`repos/actions/checkout/commits/${SHA}`]: commit(SHA, FRESH),
     })
-    expect(await dateOf(pin, github)).toEqual({ published: Temporal.Instant.from(OLD) })
+    expect(await dateOf(pin, github)).toEqual({ published: Temporal.Instant.from(FRESH) })
   })
 
   it('dates a pin without a version comment by its commit', async () => {
