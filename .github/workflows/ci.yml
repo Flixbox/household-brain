@@ -90,9 +90,9 @@ jobs:
     # so nothing is installed per run (installing them was slow and once hung).
     # Its version must equal @playwright/test in package.json; the first step checks that.
     container:
-      image: mcr.microsoft.com/playwright:v1.64.1-noble@sha256:47b510dd9230bf0b9bfc9b20102241e577ea7a99334ab4c3ca19f19770e9b8ea
+      image: mcr.microsoft.com/playwright:v1.65.0-noble@sha256:9beb546099e11f52d62e505537914870e01a67e0e6b00ae41da4775324e73dbe
     env:
-      PLAYWRIGHT_IMAGE_VERSION: 1.64.1
+      PLAYWRIGHT_IMAGE_VERSION: 1.65.0
       NX_CLOUD_ACCESS_TOKEN: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.NX_CLOUD_ACCESS_TOKEN || secrets.NX_CLOUD_READ_TOKEN }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -109,7 +109,7 @@ jobs:
             echo "::error::@playwright/test is $wanted but the CI image is $PLAYWRIGHT_IMAGE_VERSION: update container.image in ci.yml"
             exit 1
           fi
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
         with:
           distribution: temurin
           java-version: '21' # Firestore emulator
