@@ -65,8 +65,8 @@ export const checkRun = async (check: RunCheck): Promise<void> => {
  * started. A question that fails reports nothing: the next look asks again.
  */
 const followContaining = async ({ limitSeconds, pr, sha }: RunCheck): Promise<void> => {
-  const runs = await mainRuns().catch(() => null)
-  const deploying = runs ? await oldestContaining(runs.filter(main => main.sha !== sha).toSorted((first, second) => first.run.id - second.run.id), sha) : UNKNOWN
+  const runs = await mainRuns(MAIN_RUNS).catch(() => null)
+  const deploying = runs ? await oldestContaining(runs.filter(main => main.sha !== sha).toSorted((first, second) => first.run.id - second.run.id), sha, runs.length < MAIN_RUNS) : UNKNOWN
   await (deploying !== null && deploying !== UNKNOWN ? checkRun({ label: 'deploy', limitSeconds, pr, sha: deploying.sha }) : Promise.resolve())
 }
 
@@ -76,17 +76,22 @@ const containsAt = async (runs: readonly MainRun[], index: number, sha: string):
   return run ? containsCommit(run.sha, sha).catch((): typeof UNKNOWN => UNKNOWN) : false
 }
 
+/** How many of main's newest runs a batch-merged commit's deploy is looked for in: one page of GitHub's list. */
+const MAIN_RUNS = 100
+
 /**
  * The oldest of `runs` (oldest first) whose commit contains `sha`; those after it contain it too. The
- * newest is asked first: while it doesn't contain `sha`, none does, and one call says so.
+ * newest is asked first: while it doesn't contain `sha`, none does, and one call says so. When the
+ * oldest contains it too and older runs weren't read (`complete` false), the run that deployed it may
+ * be one of those: unknown, so nothing is reported rather than a later batch's run.
  */
-const oldestContaining = async (runs: readonly MainRun[], sha: string): Promise<MainRun | null | typeof UNKNOWN> => {
+const oldestContaining = async (runs: readonly MainRun[], sha: string, complete: boolean): Promise<MainRun | null | typeof UNKNOWN> => {
   const any = await containsAt(runs, runs.length - 1, sha)
   if (any !== true) {
     return any === UNKNOWN ? UNKNOWN : null
   }
   const index = await firstContainingIndex(runs, sha, runs.length - 1)
-  return index === UNKNOWN ? UNKNOWN : runs[index] ?? null
+  return index === UNKNOWN || (index === 0 && !complete) ? UNKNOWN : runs[index] ?? null
 }
 
 /** The index of the first of `runs` whose commit contains `sha`, searched below `last`, whose commit does. */
