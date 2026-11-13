@@ -9,7 +9,6 @@ describe('pinnedActions', () => {
       - uses: actions/checkout@${SHA} # v7.0.1
       - uses: actions/checkout@${SHA} # v7.0.1
       - uses: github/codeql-action/init@${SHA}
-      - uses: actions/setup-node@v4
     `
     expect(pinnedActions(workflow)).toEqual([
       { action: 'actions/checkout', repo: 'actions/checkout', sha: SHA, tag: 'v7.0.1' },
@@ -60,5 +59,28 @@ describe('pinnedActions', () => {
 
   it('takes no version from a comment on the next line', () => {
     expect(pinnedActions(`uses: actions/checkout@${SHA}\n# v7.0.1`)).toEqual([{ action: 'actions/checkout', repo: 'actions/checkout', sha: SHA, tag: null }])
+  })
+
+  // A ref that isn't a full commit SHA can't be dated, so it fails instead of skipping the 48-hour check (#559).
+  it.each([
+    'uses: actions/setup-node@v4',
+    'uses: actions/setup-node@main',
+    'uses: actions/setup-node@3d3c42e',
+    `uses: actions/setup-node@${SHA}0`,
+    'uses: actions/setup-node',
+    'uses: docker://alpine:3.20',
+    `uses: docker://alpine@sha256:${'b'.repeat(64)}`,
+  ])('refuses a ref that is not a full commit SHA: %s', workflow => {
+    expect(() => pinnedActions(workflow)).toThrow('not pinned to a full commit SHA')
+  })
+
+  it('names every unpinned ref, beside the pinned ones', () => {
+    expect(() => pinnedActions(`- uses: actions/checkout@${SHA}\n- uses: actions/setup-node@v4\n- uses: actions/cache@main\n`))
+      .toThrow('actions/setup-node@v4, actions/cache@main')
+  })
+
+  it('takes a local action or workflow without a pin', () => {
+    expect(pinnedActions(`- uses: ./.github/actions/setup\n- uses: ./.github/workflows/build.yml\n- uses: actions/checkout@${SHA}\n`))
+      .toEqual([{ action: 'actions/checkout', repo: 'actions/checkout', sha: SHA, tag: null }])
   })
 })
