@@ -43,6 +43,25 @@ export const holdsLagging = (run: RunId): boolean => {
   return looks <= LAGGING_LOOKS
 }
 
+/**
+ * How many reads in a row of a running run's jobs may fail before it goes on without them (#570): a
+ * slow run is then reported with no job list rather than never.
+ */
+const FAILED_READS = 3
+const failedReads = new Map<string, number>()
+
+/** Counts a failed read of this run's jobs; true once FAILED_READS have failed in a row. */
+export const givesUpJobs = (run: RunId): boolean => {
+  const failed = (failedReads.get(attemptOf(run)) ?? 0) + 1
+  failedReads.set(attemptOf(run), failed)
+  return failed >= FAILED_READS
+}
+
+/** This run's jobs were read: its failed reads start again from none. */
+export const jobsRead = (run: RunId): void => {
+  failedReads.delete(attemptOf(run))
+}
+
 /** Whether this is the run already finished with at this place. */
 export const isSettled = (place: RunPlace, { attempt, id }: RunId): boolean => {
   const known = settled.get(placeOf(place))

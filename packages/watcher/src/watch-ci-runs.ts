@@ -1,9 +1,11 @@
 /* oxlint-disable eslint/no-await-in-loop -- a run's replacements are tried one after another, on purpose */
 /** What the project watcher does with a CI run of a commit (watch-main.ts asks, for each PR it follows). */
-import { FOLLOW_NEWER, type MainRun, type Run, cancelledDeployEvent, replacementCandidates, runEvent } from './watch-events'
-import { REPO, containsCommit, jobLines, mainRuns, pushRunOf, runOf } from './watch-github'
-import { holdsLagging, isSettled, keepJobs, keptJobs, settle } from './watch-ci-cache'
-import { report } from './watch-output'
+import { FOLLOW_NEWER, type MainRun, type Run, cancelledDeployEvent, mainRunEvent, replacementCandidates, runEvent } from './watch-events'
+import { REPO, containsCommit, jobLines, mainRuns, newestMainRun, pushRunOf, runOf } from './watch-github'
+import { givesUpJobs, holdsLagging, isSettled, jobsRead, keepJobs, keptJobs, settle } from './watch-ci-cache'
+import { isSlow, mainSlowKey } from './watch-ci-slow'
+import { report, reportedLines } from './watch-output'
+import { subscriptions } from './watch-state'
 
 interface RunCheck {
   label: 'pr' | 'deploy'
@@ -25,6 +27,17 @@ const firstContaining = async (candidates: readonly MainRun[], sha: string): Pro
   }
   return null
 }
+
+/**
+ * A run's jobs; null while they can't be read, so the result waits a look. A running run's are none
+ * once their reads have failed a few times in a row (#570): its CI_SLOW or MAIN_SLOW comes out
+ * without them instead of never. A finished run's result still waits for them.
+ */
+const readJobs = async (run: Run, holds: (lagging: Run) => boolean): Promise<string[] | null> =>
+  jobLines(run, holds).then(jobs => {
+    jobsRead(run)
+    return jobs
+  }, () => (run.status !== 'completed' && givesUpJobs(run) ? [] : null))
 
 /** Reports what the run came to; a run that completed is then finished with (#401). */
 const reportRun = async ({ check, jobs, run }: { check: RunCheck, jobs: string[], run: Run }): Promise<void> => {
@@ -51,7 +64,7 @@ export const checkRun = async (check: RunCheck): Promise<void> => {
     return
   }
   // Jobs that can't be read yet: the result waits a look rather than coming out without them.
-  const jobs = run ? keptJobs(run) ?? await jobLines(run, holdsLagging).catch(() => null) : null
+  const jobs = run ? keptJobs(run) ?? await readJobs(run, holdsLagging) : null
   await (run && jobs ? reportRun({ check, jobs, run }) : Promise.resolve())
 }
 
@@ -121,4 +134,21 @@ const followNewer = async ({ jobs, limitSeconds, pr, run, sha }: { jobs: string[
     return
   }
   await (replacement ? checkRun({ label: 'deploy', limitSeconds, pr, sha: replacement.sha }) : report(cancelledDeployEvent({ jobs, pr, run, sha }), pr))
+}
+
+/**
+ * The jobs MAIN_SLOW names (#557), asked for only for a slow run not reported yet, and only by a
+ * watcher that reports it: a scoped one drops main's events, so it would ask on every look (#570).
+ * Null when they can't be read: the report waits for the next look, as CI_SLOW's does.
+ */
+const slowJobs = async (run: Run, limitSeconds: number): Promise<string[] | null> => {
+  const ask = subscriptions.accepts({}) && isSlow(run, limitSeconds) && !(await reportedLines()).includes(mainSlowKey(run))
+  return ask ? readJobs(run, () => false) : []
+}
+
+/** The newest CI run on main, whichever PR it came from: passed, failed or slow. */
+export const checkMainRun = async (limitSeconds: number): Promise<void> => {
+  const newest = await newestMainRun().catch(() => null)
+  const jobs = newest && await slowJobs(newest.run, limitSeconds)
+  await report(newest && jobs && mainRunEvent({ jobs, limitSeconds, repo: REPO, run: newest.run }))
 }
