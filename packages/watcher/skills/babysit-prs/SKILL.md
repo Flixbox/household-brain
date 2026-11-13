@@ -277,7 +277,9 @@ review asked for, by label or `@<bot> [full] review`, and not yet given), queues
 `enablePullRequestAutoMerge` mutation pinned to the head it checked, #357), and otherwise prints
 what blocks it and exits 1. A PR in the merge queue, or with a request that isn't stuck (#544), it
 leaves alone; a stuck one it adds to the queue, or merges where the branch has none, and exits 2 if
-GitHub refuses. It can't tell whether a PR is user-facing: that stays yours to judge, as above.
+GitHub refuses. When GitHub answers its write with a 5xx and the PR's squash landed on main anyway while
+the PR stays open, it exits 3 (#577, #579): close the PR as landed, don't queue it again. It can't tell
+whether a PR is user-facing: that stays yours to judge, as above.
 
 - **Exactly that form, alone in its own Bash call:** no `cd … &&` before it, no `| tail` or
   `2>&1` after it, no second command after `;`, no variable set in front of it. Claude Code's

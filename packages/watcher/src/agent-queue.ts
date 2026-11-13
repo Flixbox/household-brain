@@ -25,9 +25,11 @@
  * stuck (#544): every rule above holds, GitHub calls it CLEAN, it isn't in the queue, and nothing has
  * happened on it for NOT_QUEUED_MINUTES, the watcher's own wait, so GitHub has had its time. Then it
  * is added to the queue (or merged, on a branch without one), pinned to the head it checked; when GitHub
- * refuses that, the command fails and says so. A write GitHub answers with a 5xx is checked before it is
- * tried once more (#577): a merged PR says so, and one whose squash is on its base branch while GitHub
- * still calls it open fails, saying where it landed, so it is closed rather than queued again. Whether a PR is
+ * refuses that, the command fails and says so. A write GitHub answers with a 5xx is checked, after a
+ * few seconds, before it is tried once more (#577, #579): a PR merged, in the merge queue or (after
+ * an auto-merge write) set to auto-merge says so and exits 0, and one whose squash landed on its base
+ * branch since the write while GitHub still calls it open exits 3, saying where it landed, so it is
+ * closed rather than queued again. Any other failure exits 2. Whether a PR is
  * user-facing it can't tell: an agent queues a user-facing PR only after the owner's approval, as
  * before, and the label goes only on PRs that aren't.
  *
@@ -37,7 +39,8 @@
  * Settings: `GH`, the `gh` to ask with, `agent-gh` (the bot) by default; `OWNER`, whose approval
  * counts, by default the repository's owner or, for an organisation, its one human admin (#295).
  * `CLEARED_LABEL` and `BOT_REVIEW_LABEL` as for the watcher. `AGENT_GH_TIMEOUT_SECONDS`, how long one call
- * may take (120 by default): one that runs out fails the command, which queues nothing after it (#540). A variable set before the command keeps
+ * may take (120 by default): one that runs out fails the command, which queues nothing after it (#540).
+ * `AGENT_QUEUE_5XX_WAIT_SECONDS`, the wait after a 5xx (5 by default, #579). A variable set before the command keeps
  * the allow rule from matching, so the defaults are what agents use.
  */
 import { type Ask, type Check, type PrFacts, type ReviewStance, factsFrom } from './agent-queue-facts'
