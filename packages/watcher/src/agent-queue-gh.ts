@@ -72,39 +72,12 @@ export const askGraphql = async ({ extra = [], pr, query, repo }: { extra?: read
   return at(answer.body, 'data')
 }
 
-const LANDED_QUERY = `query($owner:String!,$name:String!,$pr:Int!,$since:GitTimestamp!){repository(owner:$owner,name:$name){pullRequest(number:$pr){
-  state mergeCommit{oid} autoMergeRequest{enabledAt} isInMergeQueue commits(last:1){nodes{commit{tree{oid}}}}
-  baseRef{target{... on Commit{history(first:20,since:$since){nodes{oid messageHeadline tree{oid}}}}}}}}}`
-
-/** How long to wait after a 5xx before reading the PR again (#579), so a write GitHub is still finishing shows. */
-const waitSeconds = (): number => Number(process.env.AGENT_QUEUE_5XX_WAIT_SECONDS ?? 5)
-
-/** "Fri, 13 Nov 2026 21:07:46 GMT", the form of an HTTP `Date` header, as an instant; null when it isn't one. */
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-const httpDate = (text: string): Temporal.Instant | null => {
-  const match = /(\d{1,2}) (\w{3}) (\d{4}) (\d{2}):(\d{2}):(\d{2}) GMT/u.exec(text)
-  const month = MONTHS.indexOf(match?.[2] ?? '') + 1
-  if (match === null || month === 0) {
-    return null
-  }
-  const [day, year, hour, minute, second] = [match[1], match[3], match[4], match[5], match[6]].map(Number)
-  return Temporal.ZonedDateTime.from({ day, hour, minute, month, second, timeZone: 'UTC', year }).toInstant()
-}
+const LANDED_QUERY = `query($owner:String!,$name:String!,$pr:Int!){repository(owner:$owner,name:$name){pullRequest(number:$pr){
+  state mergeCommit{oid} commits(last:1){nodes{commit{tree{oid}}}} baseRef{target{... on Commit{history(first:20){nodes{oid messageHeadline tree{oid}}}}}}}}}`
 
 /**
- * When GitHub got the write (#579), by its own clock, so a local clock that is off doesn't matter: the
- * answer's `Date` less the time the call took, less a second for the header's rounding; local time when
- * the answer has no date.
- */
-const sentAt = (answer: Answer, sent: Temporal.Instant): Temporal.Instant => {
-  const answered = httpDate(answer.headers.get('date') ?? '')
-  return answered === null ? sent : answered.subtract({ milliseconds: Math.ceil(sent.until(Temporal.Now.instant()).total('milliseconds')) + 1000 })
-}
-
-/**
- * The commit on the base branch, committed since the write was sent, that is the PR's squash (#577,
- * #579): the head's tree, or a headline ending in `(#<pr>)` as GitHub's squash titles do; '' when none
- * is. An older commit with the head's tree (a PR reverting main to it) or naming the PR isn't the write's.
+ * The commit among the base branch's newest twenty that is the PR's squash (#577): the head's tree, or a
+ * headline ending in `(#<pr>)` as GitHub's squash titles do; '' when none is.
  */
 const squashOf = (pullRequest: unknown, pr: number): string => {
   const tree = textOf(at(records(at(pullRequest, 'commits', 'nodes'))[0], 'commit', 'tree', 'oid'))
@@ -113,43 +86,31 @@ const squashOf = (pullRequest: unknown, pr: number): string => {
   return textOf(squash?.oid)
 }
 
-/** Exit code when the PR's squash landed but GitHub left it open (#579), apart from the other failures' 2. */
-export const LANDED_EXIT = 3
-
 /**
  * After a write GitHub answered with a 5xx (#577), whether it went through anyway: GitHub once answered a
- * merge with a 502, landed the squash on main and left the PR open (#574). It waits a little first
- * (#579). Exits 0 when the PR is merged, in the merge queue, or (after an auto-merge write, `enables`)
- * set to auto-merge; exits LANDED_EXIT when it is still open but its squash is on the base branch, so
- * the caller closes it instead of queueing it again; returns, to try once more, when none is so.
+ * merge with a 502, landed the squash on main and left the PR open (#574). Exits when the PR is merged
+ * (0), and throws when it is still open but its squash is on the base branch, so the caller closes it instead of queueing it
+ * again; returns, to try once more, when neither is.
  */
-const checkLanded = async ({ enables, pr, repo, since, status }: { enables: boolean, pr: number, repo: string, since: Temporal.Instant, status: number }): Promise<void> => {
+const checkLanded = async (repo: string, pr: number, status: number): Promise<void> => {
   const name = `${repo}#${pr}`
-  await Bun.sleep(waitSeconds() * 1000)
-  const pullRequest = record(at(await askGraphql({ extra: [`since=${since.toString()}`], pr, query: LANDED_QUERY, repo }), 'repository', 'pullRequest'))
-  const first = `(GitHub answered HTTP ${status} first)`
+  const pullRequest = record(at(await askGraphql({ pr, query: LANDED_QUERY, repo }), 'repository', 'pullRequest'))
   if (pullRequest.state === 'MERGED') {
-    process.stdout.write(`Merged: ${name} is merged as ${textOf(at(pullRequest, 'mergeCommit', 'oid'))} ${first}.\n`)
-    process.exit(0)
-  }
-  if (pullRequest.state === 'OPEN' && (pullRequest.isInMergeQueue === true || (enables && pullRequest.autoMergeRequest != null))) {
-    process.stdout.write(`${name} is ${pullRequest.isInMergeQueue === true ? 'in the merge queue' : 'set to auto-merge'} ${first}.\n`)
+    process.stdout.write(`Merged: ${name} is merged as ${textOf(at(pullRequest, 'mergeCommit', 'oid'))} (GitHub answered HTTP ${status} first).\n`)
     process.exit(0)
   }
   const landed = pullRequest.state === 'OPEN' ? squashOf(pullRequest, pr) : ''
   if (landed !== '') {
-    process.stderr.write(`Not queued again: ${name} landed on main as ${landed}, but GitHub didn't mark the PR merged (it answered HTTP ${status}). Close the PR as landed.\n`)
-    process.exit(LANDED_EXIT)
+    throw new Error(`Not queued again: ${name} landed on main as ${landed}, but GitHub didn't mark the PR merged (it answered HTTP ${status}). Close the PR as landed.`)
   }
   process.stderr.write(`GitHub answered HTTP ${status}, and ${name} isn't on main: trying once more.\n`)
 }
 
 /** A GraphQL mutation's data and what GitHub refused; a 5xx is tried once more, unless the write went through anyway (#577). */
 export const mutate = async ({ mutation, pr, repo, variables }: { mutation: string, pr: number, repo: string, variables: readonly string[] }, retried = false): Promise<{ data: unknown, errors: string }> => {
-  const sent = Temporal.Now.instant()
   const answer = await graphqlAnswer(repo, ['-f', `query=${mutation}`, ...variables.flatMap(variable => ['-f', variable])])
   if (answer.status >= 500 && !retried) {
-    await checkLanded({ enables: mutation.includes('enablePullRequestAutoMerge'), pr, repo, since: sentAt(answer, sent), status: answer.status })
+    await checkLanded(repo, pr, answer.status)
     return mutate({ mutation, pr, repo, variables }, true)
   }
   return { data: at(answer.body, 'data'), errors: errorsOf(answer) }

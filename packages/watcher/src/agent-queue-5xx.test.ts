@@ -7,7 +7,7 @@ const HEAD_TREE = 'tree-of-head'
 /** A commit date long before the run, and one after its write: only the latter can be the write's squash (#579). */
 const BEFORE = '2026-11-01T09:00:00Z'
 const AFTER = Temporal.Now.instant().add({ hours: 1 }).toString()
-type Commit = { date?: string, headline: string, oid: string, tree: string }
+interface Commit { date?: string, headline: string, oid: string, tree: string }
 /** What the PR and the top of its base branch look like after a write GitHub answered with a 5xx (#577): `commits`, newest first. */
 const afterServerError = (state: string, commits: readonly Commit[], { autoMerge = false, mergeCommit = null, queued = false }: { autoMerge?: boolean, mergeCommit?: string | null, queued?: boolean } = {}) => JSON.stringify({
   autoMergeRequest: autoMerge ? { enabledAt: BEFORE } : null,
