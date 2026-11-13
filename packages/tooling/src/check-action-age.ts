@@ -30,18 +30,15 @@ if (pins.length === 0) {
   throw new Error('No pinned actions found in .github/workflows')
 }
 
-const results = await Promise.all(pins.map(async pin => ({ pin, dated: await dateOf(pin, github) })))
-for (const { pin, dated } of results) {
+const results = await Promise.all(pins.map(async pin => ({ dated: await dateOf(pin, github), pin })))
+for (const { dated, pin } of results) {
   const label = `${pin.action} ${pin.tag ?? pin.sha.slice(0, 7)}`
   if ('error' in dated) {
     process.stdout.write(`::error::${dated.error}\n`)
-    continue
-  }
-  const { published } = dated
-  if (tooYoung(published, MINIMUM_SECONDS)) {
-    process.stdout.write(`::error::${label} is ${hoursSince(published)} h old (published ${published.toString()}); the minimum is ${minHours} h. Re-run once it is old enough.\n`)
+  } else if (tooYoung(dated.published, MINIMUM_SECONDS)) {
+    process.stdout.write(`::error::${label} is ${hoursSince(dated.published)} h old (published ${dated.published.toString()}); the minimum is ${minHours} h. Re-run once it is old enough.\n`)
   } else {
-    process.stdout.write(`${label}: ${hoursSince(published)} h old\n`)
+    process.stdout.write(`${label}: ${hoursSince(dated.published)} h old\n`)
   }
 }
 if (results.some(({ dated }) => 'error' in dated || tooYoung(dated.published, MINIMUM_SECONDS))) {
