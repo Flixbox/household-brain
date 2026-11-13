@@ -12,12 +12,12 @@ export type GitHubRead = (path: string) => Promise<Record<string, unknown> | nul
 export type Fetch = (url: string, init: RequestInit) => Promise<Response>
 
 /** A GitHub answer other than a success or a 404, with its status for a caller that expects one. */
-export class GitHubAnswered extends Error {
+class GitHubAnsweredError extends Error {
   public readonly status: number
 
   public constructor(status: number, path: string) {
     super(`GitHub answered ${status} for ${path}`)
-    this.name = 'GitHubAnswered'
+    this.name = 'GitHubAnsweredError'
     this.status = status
   }
 }
@@ -33,7 +33,7 @@ export const gitHubRest =
         return null
       }
       if (!response.ok) {
-        throw new GitHubAnswered(response.status, path)
+        throw new GitHubAnsweredError(response.status, path)
       }
       return recordOf(await response.json())
     }
@@ -55,7 +55,7 @@ const readTag = async (repo: string, tag: string, github: GitHubRead): Promise<R
   try {
     return await github(`repos/${repo}/commits/refs/tags/${tag}`)
   } catch (error) {
-    if (error instanceof GitHubAnswered && error.status === 422) {
+    if (error instanceof GitHubAnsweredError && error.status === 422) {
       return null
     }
     throw error
