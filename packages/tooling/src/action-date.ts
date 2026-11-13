@@ -26,17 +26,23 @@ const tagMismatch = async ({ action, repo, sha }: Pin, tag: string, github: GitH
   return tagged === sha ? null : `${action} ${tag} points at ${tagged.slice(0, 7)}, not at the pinned ${sha.slice(0, 7)}`
 }
 
-/** When the pin's tag was released, else when its commit was made. A tag must point at the pinned commit. */
+const later = (first: Temporal.Instant, second: Temporal.Instant): Temporal.Instant => (Temporal.Instant.compare(first, second) > 0 ? first : second)
+
+/**
+ * When the pin's tag was released or its commit was made, whichever is later: a release tag moved
+ * onto a fresh commit keeps its old release date. A tag must point at the pinned commit.
+ */
 export const dateOf = async (pin: Pin, github: GitHubRead): Promise<Dated> => {
   const { action, repo, sha, tag } = pin
   const mismatch = hasText(tag) ? await tagMismatch(pin, tag, github) : null
   if (hasText(mismatch)) {
     return { error: mismatch }
   }
-  const release = hasText(tag) ? text((await github(`repos/${repo}/releases/tags/${tag}`))?.published_at) : null
-  if (hasText(release)) {
-    return { published: Temporal.Instant.from(release) }
-  }
   const committed = committedAt((await github(`repos/${repo}/commits/${sha}`))?.commit)
-  return hasText(committed) ? { published: Temporal.Instant.from(committed) } : { error: `Couldn't date ${action} ${tag ?? sha.slice(0, 7)}` }
+  if (!hasText(committed)) {
+    return { error: `Couldn't date ${action} ${tag ?? sha.slice(0, 7)}` }
+  }
+  const release = hasText(tag) ? text((await github(`repos/${repo}/releases/tags/${tag}`))?.published_at) : null
+  const commitDate = Temporal.Instant.from(committed)
+  return { published: hasText(release) ? later(Temporal.Instant.from(release), commitDate) : commitDate }
 }
