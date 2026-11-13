@@ -89,10 +89,14 @@ export const mainRuns = async (limit = 100): Promise<MainRun[]> =>
   records(await gh(['run', 'list', '--repo', REPO, '--workflow', WORKFLOW, '--branch', 'main', '--event', 'push', '--limit', String(limit), '--json', `${RUN_FIELDS},headSha`]))
     .map(run => ({ run: runFrom(run), sha: textOf(run.headSha) }))
 
-/** Whether commit `newer` contains commit `older`: it is the same commit, or `older` is one of its ancestors. */
+const containing = new Map<string, boolean>()
+
+/** Whether commit `newer` contains `older` (is it, or descends from it); kept, as ancestry never changes (#558). */
 export const containsCommit = async (newer: string, older: string): Promise<boolean> => {
-  const status = textOf(record(await gh(['api', `repos/${REPO}/compare/${older}...${newer}?per_page=1`])).status)
-  return status === 'ahead' || status === 'identical'
+  const range = `${older}...${newer}`
+  const status = containing.has(range) ? null : textOf(record(await gh(['api', `repos/${REPO}/compare/${range}?per_page=1`])).status)
+  if (status !== null) { containing.set(range, status === 'ahead' || status === 'identical') }
+  return containing.get(range) === true
 }
 
 /** The newest CI run on main, and its commit. */
