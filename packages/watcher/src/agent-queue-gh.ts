@@ -89,7 +89,7 @@ const squashOf = (pullRequest: unknown, pr: number): string => {
 /**
  * After a write GitHub answered with a 5xx (#577), whether it went through anyway: GitHub once answered a
  * merge with a 502, landed the squash on main and left the PR open (#574). Exits when the PR is merged
- * (0), and throws when its squash is on the base branch, so the caller closes it instead of queueing it
+ * (0), and throws when it is still open but its squash is on the base branch, so the caller closes it instead of queueing it
  * again; returns, to try once more, when neither is.
  */
 const checkLanded = async (repo: string, pr: number, status: number): Promise<void> => {
@@ -99,7 +99,7 @@ const checkLanded = async (repo: string, pr: number, status: number): Promise<vo
     process.stdout.write(`Merged: ${name} is merged as ${textOf(at(pullRequest, 'mergeCommit', 'oid'))} (GitHub answered HTTP ${status} first).\n`)
     process.exit(0)
   }
-  const landed = squashOf(pullRequest, pr)
+  const landed = pullRequest.state === 'OPEN' ? squashOf(pullRequest, pr) : ''
   if (landed !== '') {
     throw new Error(`Not queued again: ${name} landed on main as ${landed}, but GitHub didn't mark the PR merged (it answered HTTP ${status}). Close the PR as landed.`)
   }
