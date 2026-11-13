@@ -87,8 +87,8 @@ const httpDate = (text: string): Temporal.Instant | null => {
   if (month === 0) {
     return null
   }
-  const [day, year, hour, minute, second] = [groups.day, groups.year, groups.hour, groups.minute, groups.second].map(Number)
-  return Temporal.ZonedDateTime.from({ day, hour, minute, month, second, timeZone: 'UTC', year }).toInstant()
+  const part = (key: string) => Number(groups[key])
+  return Temporal.ZonedDateTime.from({ day: part('day'), hour: part('hour'), minute: part('minute'), month, second: part('second'), timeZone: 'UTC', year: part('year') }).toInstant()
 }
 
 /**
