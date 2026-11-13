@@ -5,7 +5,7 @@
  * with a 5xx is checked before it is tried once more (#577).
  */
 import { type Answer, answerFrom, rateLimitWait } from './reply-review-thread'
-import { at, record, records } from './watch-text'
+import { type Json, at, record, records } from './watch-text'
 import { ghCall } from './gh-call'
 import { textOf } from './read'
 
@@ -82,12 +82,12 @@ const waitSeconds = (): number => Number(process.env.AGENT_QUEUE_5XX_WAIT_SECOND
 /** "Fri, 13 Nov 2026 21:07:46 GMT", the form of an HTTP `Date` header, as an instant; null when it isn't one. */
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const httpDate = (text: string): Temporal.Instant | null => {
-  const match = /(\d{1,2}) (\w{3}) (\d{4}) (\d{2}):(\d{2}):(\d{2}) GMT/u.exec(text)
-  const month = MONTHS.indexOf(match?.[2] ?? '') + 1
-  if (match === null || month === 0) {
+  const groups = /(?<day>\d{1,2}) (?<mon>\w{3}) (?<year>\d{4}) (?<hour>\d{2}):(?<minute>\d{2}):(?<second>\d{2}) GMT/u.exec(text)?.groups ?? {}
+  const month = MONTHS.indexOf(groups.mon ?? '') + 1
+  if (month === 0) {
     return null
   }
-  const [day, year, hour, minute, second] = [match[1], match[3], match[4], match[5], match[6]].map(Number)
+  const [day, year, hour, minute, second] = [groups.day, groups.year, groups.hour, groups.minute, groups.second].map(Number)
   return Temporal.ZonedDateTime.from({ day, hour, minute, month, second, timeZone: 'UTC', year }).toInstant()
 }
 
@@ -117,6 +117,24 @@ const squashOf = (pullRequest: unknown, pr: number): string => {
 export const LANDED_EXIT = 3
 
 /**
+ * What the write did, as far as the re-read shows (#579); '' when it didn't
+ * go through. An auto-merge request counts only after an auto-merge write (`enables`): the other
+ * writes run on PRs that already have one.
+ */
+const doneAs = ({ enables, name, pullRequest }: { enables: boolean, name: string, pullRequest: Json }): string => {
+  if (pullRequest.state === 'MERGED') {
+    return `Merged: ${name} is merged as ${textOf(at(pullRequest, 'mergeCommit', 'oid'))}`
+  }
+  if (pullRequest.state !== 'OPEN') {
+    return ''
+  }
+  if (pullRequest.isInMergeQueue === true) {
+    return `${name} is in the merge queue`
+  }
+  return enables && textOf(at(pullRequest, 'autoMergeRequest', 'enabledAt')) !== '' ? `${name} is set to auto-merge` : ''
+}
+
+/**
  * After a write GitHub answered with a 5xx (#577), whether it went through anyway: GitHub once answered a
  * merge with a 502, landed the squash on main and left the PR open (#574). It waits a little first
  * (#579). Exits 0 when the PR is merged, in the merge queue, or (after an auto-merge write, `enables`)
@@ -127,19 +145,14 @@ const checkLanded = async ({ enables, pr, repo, since, status }: { enables: bool
   const name = `${repo}#${pr}`
   await Bun.sleep(waitSeconds() * 1000)
   const pullRequest = record(at(await askGraphql({ extra: [`since=${since.toString()}`], pr, query: LANDED_QUERY, repo }), 'repository', 'pullRequest'))
-  const first = `(GitHub answered HTTP ${status} first)`
-  if (pullRequest.state === 'MERGED') {
-    process.stdout.write(`Merged: ${name} is merged as ${textOf(at(pullRequest, 'mergeCommit', 'oid'))} ${first}.\n`)
-    process.exit(0)
-  }
-  if (pullRequest.state === 'OPEN' && (pullRequest.isInMergeQueue === true || (enables && pullRequest.autoMergeRequest != null))) {
-    process.stdout.write(`${name} is ${pullRequest.isInMergeQueue === true ? 'in the merge queue' : 'set to auto-merge'} ${first}.\n`)
-    process.exit(0)
-  }
-  const landed = pullRequest.state === 'OPEN' ? squashOf(pullRequest, pr) : ''
-  if (landed !== '') {
-    process.stderr.write(`Not queued again: ${name} landed on main as ${landed}, but GitHub didn't mark the PR merged (it answered HTTP ${status}). Close the PR as landed.\n`)
-    process.exit(LANDED_EXIT)
+  const done = doneAs({ enables, name, pullRequest })
+  const landed = done === '' && pullRequest.state === 'OPEN' ? squashOf(pullRequest, pr) : ''
+  if (done !== '' || landed !== '') {
+    const [out, line, code] = done === ''
+      ? [process.stderr, `Not queued again: ${name} landed on main as ${landed}, but GitHub didn't mark the PR merged (it answered HTTP ${status}). Close the PR as landed.`, LANDED_EXIT]
+      : [process.stdout, `${done} (GitHub answered HTTP ${status} first).`, 0]
+    out.write(`${line}\n`)
+    process.exit(code)
   }
   process.stderr.write(`GitHub answered HTTP ${status}, and ${name} isn't on main: trying once more.\n`)
 }
