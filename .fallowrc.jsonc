@@ -6,6 +6,12 @@
   // `pwa-build` loads the app's config by name and compiles the service worker by path.
   // agent-gh.ts is compiled into the Windows agent-gh.exe on its own (#358).
   "entry": ["apps/web/pwa.config.ts", "packages/pwa/src/sw.ts", "packages/tooling/src/agent-gh.ts"],
+  // A binary no installed package provides fails lint, not just warns (#575): a warning in a passing
+  // run goes unread.
+  "rules": { "unlisted-binaries": "error" },
+  // Binaries the owner installs outside node_modules (Homebrew or scoop); fallow already knows `git`
+  // and the like. `codex` runs Codex's app-server in packages/watcher/src/codex-rpc.ts.
+  "ignoreBinaries": ["codex"],
   "boundaries": {
     "zones": [
       { "name": "app", "patterns": ["apps/web/**"] },
