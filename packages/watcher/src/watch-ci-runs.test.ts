@@ -37,7 +37,7 @@ const FAKE = String.raw`
   const scenario = process.env.SCENARIO
   const status = scenario === 'running' || (scenario === 'finishing' && attempt === 1) ? 'in_progress' : 'completed'
   const jobsDone = scenario !== 'stuck' && (!['finishing', 'lagging'].includes(scenario) || attempt === 2)
-  const batched = ['batched', 'unrelated'].includes(scenario)
+  const batched = ['batched', 'unrelated', 'busy'].includes(scenario)
   const replaced = batched || (scenario === 'replaced' && attempt === 2)
   if (args.startsWith('api -i')) {
     if (scenario === 'refused' && attempt === 2) { process.exit(1) }
@@ -56,6 +56,10 @@ const FAKE = String.raw`
       console.log('HTTP/2.0 200 OK\r\nEtag: "e' + attempt + '"\r\n\r\n' + JSON.stringify({ workflow_runs: args.includes('event=push') ? (args.includes('branch=main') ? pushRuns : otherBranch) : queueRuns }))
       process.exit(0)
     }
+    if (scenario === 'busy' && args.includes('head_sha=ghi')) {
+      console.log('HTTP/2.0 200 OK\r\nEtag: "e' + attempt + '"\r\n\r\n' + JSON.stringify({ workflow_runs: [{ conclusion: 'failure', id: 9, run_attempt: 1, run_started_at: Temporal.Now.instant().toString(), status: 'completed' }] }))
+      process.exit(0)
+    }
     const newer = args.includes('head_sha=def')
     const finished = scenario === 'cancelled' || scenario === 'replaced' ? 'cancelled' : 'success'
     const conclusion = status === 'completed' ? (newer ? 'success' : finished) : null
@@ -63,11 +67,17 @@ const FAKE = String.raw`
     process.exit(0)
   }
   if (args.startsWith('run view')) { console.log(JSON.stringify({ jobs: [{ conclusion: jobsDone ? 'success' : null, name: 'Lint', status: jobsDone ? 'completed' : 'in_progress' }] })); process.exit(0) }
+  if (args.startsWith('run list') && scenario === 'busy') {
+    // Newest first: a later batch that failed, the batch that deployed abc, and a run from before abc.
+    const run = (databaseId, headSha, conclusion) => ({ attempt: 1, conclusion, databaseId, headSha, startedAt: Temporal.Now.instant().toString(), status: 'completed' })
+    console.log(JSON.stringify([run(9, 'ghi', 'failure'), run(6, 'def', 'success'), run(3, 'old', 'success')]))
+    process.exit(0)
+  }
   if (args.startsWith('run list')) {
     console.log(JSON.stringify(replaced ? [{ attempt: 1, conclusion: 'success', databaseId: 6, headSha: 'def', startedAt: Temporal.Now.instant().toString(), status: 'completed' }] : []))
     process.exit(0)
   }
-  if (args.includes('/compare/')) { console.log(JSON.stringify({ status: scenario === 'unrelated' ? 'behind' : 'ahead' })); process.exit(0) }
+  if (args.includes('/compare/')) { console.log(JSON.stringify({ status: scenario === 'unrelated' || args.includes('abc...old') ? 'behind' : 'ahead' })); process.exit(0) }
   if (args.startsWith('pr list')) { console.log('[]'); process.exit(0) }
   if (args.includes('mergeQueue{id}')) { console.log(''); process.exit(0) }
   console.log('{}')
@@ -146,6 +156,13 @@ test('a commit merged in a batch, with no push run of its own, reports the run o
   const result = await looks('batched', 'deploy')
   expect(result.output).toContain('DEPLOYED: live (run 6)')
   expect(result.output).toContain('"pr-7 deployed def"')
+}, 30_000)
+
+test('a batch-merged commit reports the oldest run on main that contains it, not a later one (#558)', async () => {
+  const result = await looks('busy', 'deploy')
+  expect(result.output).toContain('DEPLOYED: live (run 6)')
+  expect(result.output).not.toContain('run 9')
+  expect(result.output).not.toContain('(run 3)')
 }, 30_000)
 
 test('a run on main that does not contain the commit is not taken for its deploy (#549)', async () => {
