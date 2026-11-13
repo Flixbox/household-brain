@@ -37,7 +37,7 @@ const FAKE = String.raw`
   const scenario = process.env.SCENARIO
   const status = scenario === 'running' || (scenario === 'finishing' && attempt === 1) ? 'in_progress' : 'completed'
   const jobsDone = scenario !== 'stuck' && (!['finishing', 'lagging'].includes(scenario) || attempt === 2)
-  const batched = ['batched', 'unrelated', 'busy'].includes(scenario)
+  const batched = ['batched', 'unrelated', 'busy', 'saturated'].includes(scenario)
   const replaced = batched || (scenario === 'replaced' && attempt === 2)
   if (args.startsWith('api -i')) {
     if (scenario === 'refused' && attempt === 2) { process.exit(1) }
@@ -71,6 +71,11 @@ const FAKE = String.raw`
     // Newest first: a later batch that failed, the batch that deployed abc, and a run from before abc.
     const run = (databaseId, headSha, conclusion) => ({ attempt: 1, conclusion, databaseId, headSha, startedAt: Temporal.Now.instant().toString(), status: 'completed' })
     console.log(JSON.stringify([run(9, 'ghi', 'failure'), run(6, 'def', 'success'), run(3, 'old', 'success')]))
+    process.exit(0)
+  }
+  if (args.startsWith('run list') && scenario === 'saturated') {
+    // A full page of runs that all contain abc: the one that deployed it may be older still.
+    console.log(JSON.stringify(Array.from({ length: 100 }, (_, index) => ({ attempt: 1, conclusion: 'success', databaseId: 200 - index, headSha: 'r' + index, startedAt: Temporal.Now.instant().toString(), status: 'completed' }))))
     process.exit(0)
   }
   if (args.startsWith('run list')) {
@@ -163,6 +168,11 @@ test('a batch-merged commit reports the oldest run on main that contains it, not
   expect(result.output).toContain('DEPLOYED: live (run 6)')
   expect(result.output).not.toContain('run 9')
   expect(result.output).not.toContain('(run 3)')
+}, 30_000)
+
+test('a batch-merged commit is not given a deploy when every run read contains it, as an older one may have deployed it (#558)', async () => {
+  const result = await looks('saturated', 'deploy')
+  expect(result.output).not.toContain('DEPLOYED')
 }, 30_000)
 
 test('a run on main that does not contain the commit is not taken for its deploy (#549)', async () => {
