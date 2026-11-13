@@ -106,3 +106,22 @@ describe('dateOf when a read fails', () => {
     expect(await dateOf(pin, github)).toEqual({ error: "Couldn't read actions/checkout v7.0.1: GitHub answered 403 for repos/actions/checkout/releases/tags/v7.0.1" })
   })
 })
+
+describe('dateOf when GitHub answers 422', () => {
+  // GitHub answers a missing tag's commit read with 422, not 404, which read as "Couldn't read" (#573).
+  it('refuses a tag GitHub answers 422 for as a tag the repository does not have', async () => {
+    expect(await dateOf(pin, gitHubRest(null, answering(422)))).toEqual({ error: `actions/checkout has no tag v7.0.1 for the pinned ${SHA.slice(0, 7)}` })
+  })
+
+  it('still refuses a pin whose commit read GitHub answers 422 for as unreadable', async () => {
+    expect(await dateOf({ ...pin, tag: null }, gitHubRest(null, answering(422)))).toEqual({
+      error: `Couldn't read actions/checkout ${SHA.slice(0, 7)}: GitHub answered 422 for repos/actions/checkout/commits/${SHA}`,
+    })
+  })
+
+  it('still refuses a pin whose tag read fails otherwise as unreadable', async () => {
+    expect(await dateOf(pin, gitHubRest(null, answering(500)))).toEqual({
+      error: "Couldn't read actions/checkout v7.0.1: GitHub answered 500 for repos/actions/checkout/commits/refs/tags/v7.0.1",
+    })
+  })
+})
