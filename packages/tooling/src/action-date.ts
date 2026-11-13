@@ -1,7 +1,10 @@
 import { hasText, recordOf } from '@household-brain/core/lib/read'
 import type { Pin } from './pins'
 
-/** A GitHub REST read: the JSON object at `path`, or null when the request fails. */
+/**
+ * A GitHub REST read: the JSON object at `path`, or null when nothing is there (a 404). Any other
+ * failure throws, so a 403 or a rate limit isn't mistaken for "no release" (#568).
+ */
 export type GitHubRead = (path: string) => Promise<Record<string, unknown> | null>
 
 /** The part of `fetch` a GitHub read uses, so a test can answer in its place. */
@@ -14,7 +17,13 @@ export const gitHubRest =
       const response = await fetchFrom(`https://api.github.com/${path}`, {
         headers: { Accept: 'application/vnd.github+json', ...hasText(token) ? { Authorization: `Bearer ${token}` } : {} },
       })
-      return response.ok ? recordOf(await response.json()) : null
+      if (response.status === 404) {
+        return null
+      }
+      if (!response.ok) {
+        throw new Error(`GitHub answered ${response.status} for ${path}`)
+      }
+      return recordOf(await response.json())
     }
 
 export type Dated = { published: Temporal.Instant } | { error: string }
@@ -41,11 +50,7 @@ const tagMismatch = async ({ action, repo, sha }: Pin, tag: string, github: GitH
 
 const later = (first: Temporal.Instant, second: Temporal.Instant): Temporal.Instant => (Temporal.Instant.compare(first, second) > 0 ? first : second)
 
-/**
- * When the pin's tag was released or its commit was made, whichever is later: a release tag moved
- * onto a fresh commit keeps its old release date. A tag must point at the pinned commit.
- */
-export const dateOf = async (pin: Pin, github: GitHubRead): Promise<Dated> => {
+const datePin = async (pin: Pin, github: GitHubRead): Promise<Dated> => {
   const { action, repo, sha, tag } = pin
   const mismatch = hasText(tag) ? await tagMismatch(pin, tag, github) : null
   if (hasText(mismatch)) {
@@ -58,4 +63,17 @@ export const dateOf = async (pin: Pin, github: GitHubRead): Promise<Dated> => {
   const release = hasText(tag) ? text((await github(`repos/${repo}/releases/tags/${tag}`))?.published_at) : null
   const commitDate = Temporal.Instant.from(committed)
   return { published: hasText(release) ? later(Temporal.Instant.from(release), commitDate) : commitDate }
+}
+
+/**
+ * When the pin's tag was released or its commit was made, whichever is later: a release tag moved
+ * onto a fresh commit keeps its old release date. A tag must point at the pinned commit, and a read
+ * that fails refuses the pin rather than dating it by what was read (#568).
+ */
+export const dateOf = async (pin: Pin, github: GitHubRead): Promise<Dated> => {
+  try {
+    return await datePin(pin, github)
+  } catch (error) {
+    return { error: `Couldn't read ${pin.action} ${pin.tag ?? pin.sha.slice(0, 7)}: ${error instanceof Error ? error.message : String(error)}` }
+  }
 }

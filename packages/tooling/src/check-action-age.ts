@@ -2,7 +2,8 @@
  * Fails when a workflow pins a GitHub Action release younger than 48 hours (#102), as Bun's
  * minimumReleaseAge and check-package-age.ts do for packages (#94). Each
  * `uses: owner/repo@<sha> # vX.Y.Z` is dated by its release or its commit, whichever is later, and
- * fails when the tag doesn't point at that commit (#556). Re-run it once the release is old enough.
+ * fails when the tag doesn't point at that commit (#556) or a GitHub read other than a 404 fails
+ * (#568). Re-run it once the release is old enough.
  *
  *   bun packages/tooling/src/check-action-age.ts [min-hours=48]    from the repository root; GH_TOKEN reads public repos
  */
