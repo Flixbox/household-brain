@@ -100,7 +100,7 @@ const FAKE = String.raw`
   console.log('{}')
 `
 
-const looks = async (scenario: string, label = 'pr', reported: readonly string[] = [], selection = '') => {
+const looks = async (scenario: string, label = 'pr', { reported = [], selection = '' }: { reported?: readonly string[], selection?: string } = {}) => {
   const home = await mkdtemp(`${tmpdir()}/watch-ci-runs-`)
   dirs.push(home)
   const gh = `${home}/gh`
@@ -127,7 +127,7 @@ test('a finished, reported run is not asked for again, and its rerun is (#401)',
 }, 30_000)
 
 test('a result recorded before the run id is not reported again, and takes the new key (#486)', async () => {
-  const result = await looks('passed', 'pr', ['pr-7 ci-passed abc'])
+  const result = await looks('passed', 'pr', { reported: ['pr-7 ci-passed abc'] })
   // Attempt 1 is the recorded one; only attempt 2 is news.
   expect(result.output.match(/CI_PASSED for/gu)).toHaveLength(1)
   expect(result.output).toContain('"pr-7 ci-passed abc 5 1"')
@@ -221,7 +221,7 @@ test('a slow run on main has its jobs read once, for MAIN_SLOW (#557)', async ()
 }, 30_000)
 
 test('a scoped watcher, which never reports MAIN_SLOW, does not read the slow run\'s jobs (#570)', async () => {
-  const result = await looks('main-slow', 'main', [], 'pr:7')
+  const result = await looks('main-slow', 'main', { selection: 'pr:7' })
   expect(result.views).toBe(0)
   expect(result.output).not.toContain('MAIN_SLOW')
 }, 30_000)
