@@ -1,9 +1,10 @@
 /* oxlint-disable eslint/no-await-in-loop -- a run's replacements are tried one after another, on purpose */
 /** What the project watcher does with a CI run of a commit (watch-main.ts asks, for each PR it follows). */
-import { FOLLOW_NEWER, type MainRun, type Run, cancelledDeployEvent, replacementCandidates, runEvent } from './watch-events'
-import { REPO, containsCommit, jobLines, mainRuns, pushRunOf, runOf } from './watch-github'
+import { FOLLOW_NEWER, type MainRun, type Run, cancelledDeployEvent, mainRunEvent, replacementCandidates, runEvent } from './watch-events'
+import { REPO, containsCommit, jobLines, mainRuns, newestMainRun, pushRunOf, runOf } from './watch-github'
 import { holdsLagging, isSettled, keepJobs, keptJobs, settle } from './watch-ci-cache'
-import { report } from './watch-output'
+import { isSlow, mainSlowKey } from './watch-ci-slow'
+import { report, reportedLines } from './watch-output'
 
 interface RunCheck {
   label: 'pr' | 'deploy'
@@ -121,4 +122,20 @@ const followNewer = async ({ jobs, limitSeconds, pr, run, sha }: { jobs: string[
     return
   }
   await (replacement ? checkRun({ label: 'deploy', limitSeconds, pr, sha: replacement.sha }) : report(cancelledDeployEvent({ jobs, pr, run, sha }), pr))
+}
+
+/**
+ * The jobs MAIN_SLOW names (#557), asked for only for a slow run not reported yet. Null when they
+ * can't be read: the report waits for the next look, as CI_SLOW's does, rather than advise blind.
+ */
+const slowJobs = async (run: Run, limitSeconds: number): Promise<string[] | null> => {
+  const ask = isSlow(run, limitSeconds) && !(await reportedLines()).includes(mainSlowKey(run))
+  return ask ? jobLines(run, () => false).catch(() => null) : []
+}
+
+/** The newest CI run on main, whichever PR it came from: passed, failed or slow. */
+export const checkMainRun = async (limitSeconds: number): Promise<void> => {
+  const newest = await newestMainRun().catch(() => null)
+  const jobs = newest && await slowJobs(newest.run, limitSeconds)
+  await report(newest && jobs && mainRunEvent({ jobs, limitSeconds, repo: REPO, run: newest.run }))
 }

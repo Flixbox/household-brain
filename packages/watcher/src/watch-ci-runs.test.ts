@@ -7,10 +7,10 @@ const dirs: string[] = []
 afterEach(async () => { await Promise.all(dirs.splice(0).map(async dir => rm(dir, { force: true, recursive: true }))) })
 
 const LOOKS = `
-  import { checkRun } from '${import.meta.dir}/watch-ci-runs'
+  import { checkMainRun, checkRun } from '${import.meta.dir}/watch-ci-runs'
   import { mkdir } from 'node:fs/promises'
   import { reportedLines } from '${import.meta.dir}/watch-output'
-  const look = async () => checkRun({ label: process.env.LABEL, limitSeconds: 1200, pr: 7, sha: 'abc' })
+  const look = async () => process.env.LABEL === 'main' ? checkMainRun(1200) : checkRun({ label: process.env.LABEL, limitSeconds: 1200, pr: 7, sha: 'abc' })
   await look()
   await look()
   await look()
@@ -39,6 +39,18 @@ const FAKE = String.raw`
   const jobsDone = scenario !== 'stuck' && (!['finishing', 'lagging'].includes(scenario) || attempt === 2)
   const batched = ['batched', 'unrelated', 'busy', 'saturated'].includes(scenario)
   const replaced = batched || (scenario === 'replaced' && attempt === 2)
+  // Started past the limit, still going, and its jobs either listed or never readable (#570).
+  const longAgo = Temporal.Now.instant().subtract({ minutes: 30 }).toString()
+  const unreadable = ['unreadable', 'main-unreadable'].includes(scenario)
+  if (args.startsWith('run view') && unreadable) { process.exit(1) }
+  if (args.startsWith('run list') && scenario.startsWith('main-')) {
+    console.log(JSON.stringify([{ attempt: 1, conclusion: '', databaseId: 5, headSha: 'abc', startedAt: longAgo, status: 'in_progress' }]))
+    process.exit(0)
+  }
+  if (args.startsWith('api -i') && scenario === 'unreadable') {
+    console.log('HTTP/2.0 200 OK\r\n\r\n' + JSON.stringify({ workflow_runs: [{ conclusion: null, id: 5, run_attempt: 1, run_started_at: longAgo, status: 'in_progress' }] }))
+    process.exit(0)
+  }
   if (args.startsWith('api -i')) {
     if (scenario === 'refused' && attempt === 2) { process.exit(1) }
     if (args.includes('If-None-Match: "e' + attempt + '"')) {
@@ -88,7 +100,7 @@ const FAKE = String.raw`
   console.log('{}')
 `
 
-const looks = async (scenario: string, label = 'pr', reported: readonly string[] = []) => {
+const looks = async (scenario: string, label = 'pr', reported: readonly string[] = [], selection = '') => {
   const home = await mkdtemp(`${tmpdir()}/watch-ci-runs-`)
   dirs.push(home)
   const gh = `${home}/gh`
@@ -97,7 +109,7 @@ const looks = async (scenario: string, label = 'pr', reported: readonly string[]
   await Bun.write(gh, `#!/bin/sh\nexec "${process.execPath}" "${home}/fake.ts" "$@"\n`)
   await Bun.spawn(['chmod', '+x', gh]).exited
   const child = Bun.spawn([process.execPath, '-e', LOOKS], {
-    env: { ...process.env, AGENT_USAGE_PROVIDER: 'claude', CLAUDE_CONFIG_DIR: home, CODEX_THREAD_ID: '', FIXTURE_HOME: home, GH: gh, GH_SHARE_SECONDS: scenario === 'finishing' ? '60' : '0', LABEL: label, OWNER: 'owner', REPO: 'owner/repo', SCENARIO: scenario, STATE_DIR: `${home}/state`, WATCHER_SUBSCRIPTIONS: '', XDG_STATE_HOME: home },
+    env: { ...process.env, AGENT_USAGE_PROVIDER: 'claude', CLAUDE_CONFIG_DIR: home, CODEX_THREAD_ID: '', FIXTURE_HOME: home, GH: gh, GH_SHARE_SECONDS: scenario === 'finishing' ? '60' : '0', LABEL: label, OWNER: 'owner', REPO: 'owner/repo', SCENARIO: scenario, STATE_DIR: `${home}/state`, WATCHER_SUBSCRIPTIONS: selection, XDG_STATE_HOME: home },
     stderr: 'pipe', stdout: 'pipe',
   })
   const [output, error, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
@@ -200,4 +212,30 @@ test('a passed run whose jobs never finish is reported after a few looks, with t
   expect(result.views).toBe(4)
   expect(result.output).toContain('CI_PASSED')
   expect(result.output).toContain('Lint: in_progress')
+}, 30_000)
+
+test('a slow run on main has its jobs read once, for MAIN_SLOW (#557)', async () => {
+  const result = await looks('main-slow', 'main')
+  expect(result.views).toBe(1)
+  expect(result.output.match(/MAIN_SLOW: CI run 5 on main/gu)).toHaveLength(1)
+}, 30_000)
+
+test('a scoped watcher, which never reports MAIN_SLOW, does not read the slow run\'s jobs (#570)', async () => {
+  const result = await looks('main-slow', 'main', [], 'pr:7')
+  expect(result.views).toBe(0)
+  expect(result.output).not.toContain('MAIN_SLOW')
+}, 30_000)
+
+test('a slow run on main whose jobs never read is still reported, without them, after a few looks (#570)', async () => {
+  const result = await looks('main-unreadable', 'main')
+  // Failed on three looks, reported on the third, and not asked for again.
+  expect(result.views).toBe(3)
+  expect(result.output).toContain('MAIN_SLOW: CI run 5 on main still in_progress after 30 min. Cancel it and read the logs.')
+  expect(result.output).toContain('"main-slow 5 1"')
+}, 30_000)
+
+test('a slow PR run whose jobs never read is still reported, without them, after a few looks (#570)', async () => {
+  const result = await looks('unreadable')
+  expect(result.output).toContain('CI_SLOW: run 5 (pr, abc) still in_progress after 30 min. Cancel it and read the logs.')
+  expect(result.output).toContain('"pr-7 ci-slow 5 1"')
 }, 30_000)

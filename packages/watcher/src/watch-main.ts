@@ -1,10 +1,9 @@
 /* oxlint-disable import/max-dependencies -- this file is where the watcher's parts meet; pacing adds one */
 /* oxlint-disable eslint/no-await-in-loop -- each poller's looks run one after another, on purpose */
 /** The project watcher's looks, started by watch-project.ts once it has read which code it runs (#265). */
-import { type Activity, type Run, mainRunEvent, queueCommand } from './watch-events'
-import { isSlow, mainSlowKey } from './watch-ci-slow'
-import { type PrState, REPO, jobLines, mainAhead, mainHead, newestMainRun, prStates } from './watch-github'
-import { checkRun } from './watch-ci-runs'
+import { type Activity, queueCommand } from './watch-events'
+import { type PrState, REPO, mainAhead, mainHead, prStates } from './watch-github'
+import { checkMainRun, checkRun } from './watch-ci-runs'
 import { APPROVED_DRAFT_NOTE, checkApproval, checkWriter, resolveAsked } from './watch-approval'
 import { FOLLOW, checkCode, finishSubscriptions, flush, queue, quiet, report, reportLookups, reportUsage, reportedLines } from './watch-output'
 import { addLine, endPr, oneAtATime, readLines, start, startSubscriptions, subscriptions, updateLines, writeLines } from './watch-state'
@@ -39,20 +38,7 @@ const checkActivity = async (pr: number, items: Activity[] | undefined): Promise
   return read
 }
 
-/**
- * The jobs MAIN_SLOW names (#557), asked for only for a slow run not reported yet. Null when they
- * can't be read: the report waits for the next look, as CI_SLOW's does, rather than advise blind.
- */
-const slowJobs = async (run: Run): Promise<string[] | null> => {
-  const ask = isSlow(run, LIMIT_SECONDS) && !(await reportedLines()).includes(mainSlowKey(run))
-  return ask ? jobLines(run, () => false).catch(() => null) : []
-}
-
-const checkMain = async (): Promise<void> => {
-  const newest = await newestMainRun().catch(() => null)
-  const jobs = newest && await slowJobs(newest.run)
-  await report(newest && jobs && mainRunEvent({ jobs, limitSeconds: LIMIT_SECONDS, repo: REPO, run: newest.run }))
-}
+const checkMain = async (): Promise<void> => checkMainRun(LIMIT_SECONDS)
 
 /** A new commit on main, so it never moves on unnoticed. The one it was at on the first run isn't news. */
 const checkMainHead = async (): Promise<void> => {
