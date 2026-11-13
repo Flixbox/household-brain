@@ -86,3 +86,14 @@ test('after a rate-limit wait, a 5xx counts only commits after the try GitHub an
   expect({ code: result.code, output: result.output }).toEqual({ code: 0, output: 'Auto-merge (squash) is on for owner/repo#7 at c0ffee1.\n' })
   expect(autoMerges(result.calls)).toHaveLength(3)
 }, 20_000)
+
+test.each([
+  ["a commit with the head's tree", { headline: 'An older change', oid: 'ccccccc3', tree: HEAD_TREE }],
+  ['a commit naming the PR', { headline: 'Cherry-picked from (#7)', oid: 'ccccccc3', tree: 'tree-other' }],
+] as const)('a 5xx without a Date header still leaves out %s committed well before the 30 s margin (#583)', async (_name, older) => {
+  // A minute before the local clock: past the margin for a clock running ahead, so it can't be the write's squash.
+  const before = { ...older, date: Temporal.Now.instant().subtract({ minutes: 1 }).toString() }
+  const result = await runFromNonClone('agent-bot[bot]', { ...NO_WAIT, FAKE_AUTO_NO_DATE: '1', FAKE_LANDED: afterServerError('OPEN', [OTHER, before]) })
+  expect({ code: result.code, output: result.output }).toEqual({ code: 0, output: 'Auto-merge (squash) is on for owner/repo#7 at c0ffee1.\n' })
+  expect(autoMerges(result.calls)).toHaveLength(2)
+})
