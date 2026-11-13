@@ -31,6 +31,7 @@ describe('runEvent', () => {
       [['  web-e2e: completed success', '  pages: in_progress '], 'pages'],
       [['  Test: completed success', '  Deploy to Firebase: waiting '], 'Deploy to Firebase'],
       [['  Test: completed success', '  pages: queued ', '  deploy: in_progress '], 'pages, deploy'],
+      [['  pages: completed success', '  dev-release: in_progress '], 'dev-release'],
     ])('names the deploys and does not say to cancel when only they are pending: %j', (jobs, names) => {
       const [line] = slowLines(jobs)
       expect(line).toContain(`Only deploy jobs are still pending (${names})`)
@@ -120,10 +121,10 @@ describe('approvedBy (#286)', () => {
 
 describe('mainRunEvent', () => {
   it('reports main passing, failing or hanging, and ignores a cancelled run', () => {
-    expect(mainRunEvent({ limitSeconds: 1200, repo: 'owner/repo', run: run() })).toMatchObject({ key: 'main-passed 7 1' })
-    expect(mainRunEvent({ limitSeconds: 1200, repo: 'owner/repo', run: run({ conclusion: 'failure' }) })).toMatchObject({ key: 'main-failed 7 1' })
-    expect(mainRunEvent({ limitSeconds: 1200, repo: 'owner/repo', run: run({ ageSeconds: 1300, conclusion: '', status: 'queued' }) })).toMatchObject({ key: 'main-slow 7 1' })
-    expect(mainRunEvent({ limitSeconds: 1200, repo: 'owner/repo', run: run({ conclusion: 'cancelled' }) })).toBeNull()
+    expect(mainRunEvent({ jobs: [], limitSeconds: 1200, repo: 'owner/repo', run: run() })).toMatchObject({ key: 'main-passed 7 1' })
+    expect(mainRunEvent({ jobs: [], limitSeconds: 1200, repo: 'owner/repo', run: run({ conclusion: 'failure' }) })).toMatchObject({ key: 'main-failed 7 1' })
+    expect(mainRunEvent({ jobs: [], limitSeconds: 1200, repo: 'owner/repo', run: run({ ageSeconds: 1300, conclusion: '', status: 'queued' }) })).toMatchObject({ key: 'main-slow 7 1' })
+    expect(mainRunEvent({ jobs: [], limitSeconds: 1200, repo: 'owner/repo', run: run({ conclusion: 'cancelled' }) })).toBeNull()
   })
 })
 
