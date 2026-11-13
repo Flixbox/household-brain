@@ -11,6 +11,17 @@ export type GitHubRead = (path: string) => Promise<Record<string, unknown> | nul
 /** The part of `fetch` a GitHub read uses, so a test can answer in its place. */
 export type Fetch = (url: string, init: RequestInit) => Promise<Response>
 
+/** A GitHub answer other than a success or a 404, with its status for a caller that expects one. */
+export class GitHubAnswered extends Error {
+  public readonly status: number
+
+  public constructor(status: number, path: string) {
+    super(`GitHub answered ${status} for ${path}`)
+    this.name = 'GitHubAnswered'
+    this.status = status
+  }
+}
+
 /** Reads GitHub's REST API, signed with `token` when there is one. */
 export const gitHubRest =
   (token: string | null, fetchFrom: Fetch = fetch): GitHubRead =>
@@ -22,7 +33,7 @@ export const gitHubRest =
         return null
       }
       if (!response.ok) {
-        throw new Error(`GitHub answered ${response.status} for ${path}`)
+        throw new GitHubAnswered(response.status, path)
       }
       return recordOf(await response.json())
     }
@@ -37,12 +48,27 @@ const committedAt = (commit: unknown): string | null =>
     : null
 
 /**
+ * The commit a tag points at, or null when the repository has no such tag: GitHub answers a missing
+ * tag's commit read with 422, not 404 (#573). Every other failure still throws.
+ */
+const readTag = async (repo: string, tag: string, github: GitHubRead): Promise<Record<string, unknown> | null> => {
+  try {
+    return await github(`repos/${repo}/commits/refs/tags/${tag}`)
+  } catch (error) {
+    if (error instanceof GitHubAnswered && error.status === 422) {
+      return null
+    }
+    throw error
+  }
+}
+
+/**
  * Why the pin's version comment can't date it, or null when its tag points at the pinned commit. The
  * comment is only text (#556): a fresh commit commented with an old release, or a script line
  * repeating the pin with another version, would otherwise borrow that release's date.
  */
 const tagMismatch = async ({ action, repo, sha }: Pin, tag: string, github: GitHubRead): Promise<string | null> => {
-  const tagged = text((await github(`repos/${repo}/commits/refs/tags/${tag}`))?.sha)?.toLowerCase()
+  const tagged = text((await readTag(repo, tag, github))?.sha)?.toLowerCase()
   if (!hasText(tagged)) {
     return `${action} has no tag ${tag} for the pinned ${sha.slice(0, 7)}`
   }
