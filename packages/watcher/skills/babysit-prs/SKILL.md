@@ -7,7 +7,7 @@ description: Watch a GitHub repository's pull requests, CI runs, deploys and iss
 
 You own a pull request from the moment you open it until it is merged and deployed. The project
 watcher tells you when something needs you; this is what to do with what it says. The repository's
-own notes (its `AGENTS.md` or `CLAUDE.md`) come first where they say more: which login to use,
+own notes (its `AGENTS.md`) come first where they say more: which login to use,
 how merging works there, how to check a deploy.
 
 ## Running it
