@@ -9,9 +9,16 @@ afterAll(async () => {
   await Promise.all(dirs.map(async dir => rm(dir, { force: true, recursive: true })))
 })
 
-/** A stand-in for a `gh`: it logs its name and arguments, and answers as GitHub would for a chain of one blocker. */
+/**
+ * A stand-in for a `gh`: it logs its name, its GH_REPO and its arguments, and answers as GitHub would
+ * for a chain of one blocker. Like the real `agent-gh` outside a clone (#590), it fails without GH_REPO.
+ */
 const standIn = (name: string, home: string) => String.raw`#!/bin/sh
-echo "${name} $*" >> "${home}/calls"
+echo "${name} GH_REPO=$GH_REPO $*" >> "${home}/calls"
+if [ "${name}" = agent-gh ] && [ -z "$GH_REPO" ]; then
+  echo 'agent-gh-token: set GH_REPO=owner/repo, or run it inside a clone' >&2
+  exit 1
+fi
 case "$*" in
   *repos/Coarisfinia/two/issues/2/dependencies/blocked_by) echo '[[{"number":3,"repository_url":"https://api.github.com/repos/Coarisfinia/three"}]]' ;;
   *dependencies/blocked_by*) echo '[[]]' ;;
@@ -51,5 +58,25 @@ describe('the gh it asks with (#532)', () => {
     expect(endpoints).toContain('repos/Coarisfinia/three/issues/3/dependencies/blocked_by')
     expect(endpoints).toContain('repos/Flixbox/one/issues/1/dependencies/blocked_by')
     expect(endpoints.filter(endpoint => endpoint.startsWith('repos/flixbox') || endpoint.startsWith('repos/coarisfinia'))).toEqual([])
+  })
+})
+
+describe('the repository each call acts on (#590)', () => {
+  const commandLines: string[][] = [
+    ['block', 'Flixbox/one#1', 'Coarisfinia/two#2'],
+    ['unblock', 'Flixbox/one#1', 'Coarisfinia/two#2'],
+    ['links', 'Flixbox/one#1'],
+    ['audit', 'Flixbox/one'],
+  ]
+  test.each(commandLines)('%s works outside a clone: every call names its repository in GH_REPO, as GitHub spells it', async (...args: string[]) => {
+    const { calls, code, error } = await runCli(...args)
+    expect(error).toBe('')
+    expect(code).toBe(0)
+    expect(calls.length).toBeGreaterThan(0)
+    for (const call of calls) {
+      const [, given = '', ...rest] = call.split(' ')
+      const endpoint = rest.find(word => word.startsWith('repos/')) ?? ''
+      expect(given).toBe(`GH_REPO=${endpoint.split('/').slice(1, 3).join('/')}`)
+    }
   })
 })
