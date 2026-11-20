@@ -11,7 +11,7 @@ const GH = process.env.GH ?? 'agent-gh'
  * the call that finds the current folder's repository goes without one.
  */
 export const ghJson = async (args: string[], repo = ''): Promise<unknown> => {
-  const env = repo === '' ? process.env : { ...process.env, GH_REPO: repo }
+  const env = { ...process.env, GH_REPO: repo }
   const call = Bun.spawn([GH, ...args], { env, stderr: 'pipe', stdout: 'pipe', timeout: 60_000 })
   const [output, error, code] = await Promise.all([new Response(call.stdout).text(), new Response(call.stderr).text(), call.exited])
   if (code !== 0) {

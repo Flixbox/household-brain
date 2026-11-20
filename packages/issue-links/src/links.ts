@@ -27,7 +27,7 @@ const issuesIn = (answer: unknown): IssueRef[] =>
   })
 
 /** The issues `issue` is blocked by. */
-const blockersOf = async (issue: IssueRef): Promise<IssueRef[]> => issuesIn(await ghJson(['api', '--paginate', '--slurp', `${path(issue)}/dependencies/blocked_by`], issue.repo))
+const blockersOf = async (issue: IssueRef): Promise<IssueRef[]> => issuesIn(await ghJson(['api', '--paginate', '--slurp', `${path(issue)}/dependencies/blocked_by`]))
 
 /** The issues `issue` blocks. */
 const blockedIssuesOf = async (issue: IssueRef): Promise<IssueRef[]> => issuesIn(await ghJson(['api', '--paginate', '--slurp', `${path(issue)}/dependencies/blocking`], issue.repo))
