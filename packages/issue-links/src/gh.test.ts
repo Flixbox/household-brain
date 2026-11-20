@@ -66,7 +66,7 @@ describe('the repository each call acts on (#590)', () => {
     ['block', 'Flixbox/one#1', 'Coarisfinia/two#2'],
     ['unblock', 'Flixbox/one#1', 'Coarisfinia/two#2'],
     ['links', 'Flixbox/one#1'],
-    ['audit', 'Flixbox/one'],
+    ['audit', '--repo', 'Flixbox/one'],
   ]
   test.each(commandLines)('%s works outside a clone: every call names its repository in GH_REPO, as GitHub spells it', async (...args: string[]) => {
     const { calls, code, error } = await runCli(...args)
