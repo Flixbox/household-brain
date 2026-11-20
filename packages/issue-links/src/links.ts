@@ -12,7 +12,7 @@ const path = ({ number, repo }: IssueRef) => `repos/${repo}/issues/${number}`
 
 /** The issue's id, which the dependency calls take instead of its number. */
 const idOf = async (issue: IssueRef): Promise<number> => {
-  const answer = await ghJson(['api', path(issue)])
+  const answer = await ghJson(['api', path(issue)], issue.repo)
   if (!isRecord(answer) || typeof answer.id !== 'number') {
     throw new Error(`${refText(issue)}: no such issue`)
   }
@@ -27,10 +27,10 @@ const issuesIn = (answer: unknown): IssueRef[] =>
   })
 
 /** The issues `issue` is blocked by. */
-const blockersOf = async (issue: IssueRef): Promise<IssueRef[]> => issuesIn(await ghJson(['api', '--paginate', '--slurp', `${path(issue)}/dependencies/blocked_by`]))
+const blockersOf = async (issue: IssueRef): Promise<IssueRef[]> => issuesIn(await ghJson(['api', '--paginate', '--slurp', `${path(issue)}/dependencies/blocked_by`], issue.repo))
 
 /** The issues `issue` blocks. */
-const blockedIssuesOf = async (issue: IssueRef): Promise<IssueRef[]> => issuesIn(await ghJson(['api', '--paginate', '--slurp', `${path(issue)}/dependencies/blocking`]))
+const blockedIssuesOf = async (issue: IssueRef): Promise<IssueRef[]> => issuesIn(await ghJson(['api', '--paginate', '--slurp', `${path(issue)}/dependencies/blocking`], issue.repo))
 
 /** An issue back from its key (`owner/name#n`); GitHub takes the name in any case. */
 const fromKey = (key: string): IssueRef => {
@@ -63,7 +63,7 @@ export const block = async (issue: IssueRef, blocker: IssueRef): Promise<string>
   if (has(await blockersOf(issue), blocker)) {
     return `${refText(issue)} is already blocked by ${refText(blocker)}`
   }
-  await ghJson(['api', '--method', 'POST', `${path(issue)}/dependencies/blocked_by`, '-F', `issue_id=${await idOf(blocker)}`])
+  await ghJson(['api', '--method', 'POST', `${path(issue)}/dependencies/blocked_by`, '-F', `issue_id=${await idOf(blocker)}`], issue.repo)
   return `${refText(issue)} is now blocked by ${refText(blocker)}`
 }
 
@@ -72,7 +72,7 @@ export const unblock = async (issue: IssueRef, blocker: IssueRef): Promise<strin
   if (!has(await blockersOf(issue), blocker)) {
     return `${refText(issue)} isn't blocked by ${refText(blocker)}`
   }
-  await ghJson(['api', '--method', 'DELETE', `${path(issue)}/dependencies/blocked_by/${await idOf(blocker)}`])
+  await ghJson(['api', '--method', 'DELETE', `${path(issue)}/dependencies/blocked_by/${await idOf(blocker)}`], issue.repo)
   return `${refText(issue)} is no longer blocked by ${refText(blocker)}`
 }
 
@@ -86,7 +86,7 @@ export const linksOf = async (issue: IssueRef): Promise<string> => {
 
 /** The open issues of `repo` (no pull requests), each with whether an open issue blocks it. */
 const openIssuesOf = async (repo: string): Promise<{ blocked: boolean, ref: IssueRef }[]> => {
-  const answer = await ghJson(['api', '--paginate', '--slurp', `repos/${repo}/issues?state=open&per_page=100`])
+  const answer = await ghJson(['api', '--paginate', '--slurp', `repos/${repo}/issues?state=open&per_page=100`], repo)
   return (Array.isArray(answer) ? answer.flat() : []).flatMap((item: unknown) => {
     const ref = isRecord(item) && !isRecord(item.pull_request) ? refOf({ number: item.number, repository_url: item.repository_url }) : null
     const summary = isRecord(item) && isRecord(item.issue_dependencies_summary) ? item.issue_dependencies_summary : {}
