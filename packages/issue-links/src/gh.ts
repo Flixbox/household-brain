@@ -4,9 +4,15 @@
  */
 const GH = process.env.GH ?? 'agent-gh'
 
-/** What a call answers, read as JSON (null for an empty answer); it fails with gh's own message. */
-export const ghJson = async (args: string[]): Promise<unknown> => {
-  const call = Bun.spawn([GH, ...args], { stderr: 'pipe', stdout: 'pipe', timeout: 60_000 })
+/**
+ * What a call answers, read as JSON (null for an empty answer); it fails with gh's own message.
+ * `repo` is the `owner/name` the call acts on, spelled as GitHub spells it (#532): it goes into
+ * GH_REPO, so `agent-gh` picks its bot and token without a clone to read it from (#590). Only
+ * the call that finds the current folder's repository goes without one.
+ */
+export const ghJson = async (args: string[], repo?: string): Promise<unknown> => {
+  const env = repo === undefined ? process.env : { ...process.env, GH_REPO: repo }
+  const call = Bun.spawn([GH, ...args], { env, stderr: 'pipe', stdout: 'pipe', timeout: 60_000 })
   const [output, error, code] = await Promise.all([new Response(call.stdout).text(), new Response(call.stderr).text(), call.exited])
   if (code !== 0) {
     throw new Error(error.trim() || `${GH} ${args.join(' ')}: exit ${code}`)
