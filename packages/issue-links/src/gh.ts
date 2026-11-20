@@ -10,8 +10,8 @@ const GH = process.env.GH ?? 'agent-gh'
  * GH_REPO, so `agent-gh` picks its bot and token without a clone to read it from (#590). Only
  * the call that finds the current folder's repository goes without one.
  */
-export const ghJson = async (args: string[], repo?: string): Promise<unknown> => {
-  const env = repo === undefined ? process.env : { ...process.env, GH_REPO: repo }
+export const ghJson = async (args: string[], repo = ''): Promise<unknown> => {
+  const env = repo === '' ? process.env : { ...process.env, GH_REPO: repo }
   const call = Bun.spawn([GH, ...args], { env, stderr: 'pipe', stdout: 'pipe', timeout: 60_000 })
   const [output, error, code] = await Promise.all([new Response(call.stdout).text(), new Response(call.stderr).text(), call.exited])
   if (code !== 0) {
