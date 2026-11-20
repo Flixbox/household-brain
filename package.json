@@ -27,7 +27,7 @@
   "devDependencies": {
     "@firebase/rules-unit-testing": "6.0.0",
     "@nx/playwright": "24.0.6",
-    "@playwright/test": "1.65.0",
+    "@playwright/test": "1.65.1",
     "@stylistic/eslint-plugin": "6.0.1",
     "@types/bun": "1.4.4",
     "@types/react": "19.3.0",
@@ -36,13 +36,13 @@
     "eslint-plugin-playwright": "2.12.2",
     "eslint-plugin-regexp": "3.3.3",
     "eslint-plugin-sonarjs": "4.2.2",
-    "fallow": "3.42.0",
-    "firebase": "13.2.0",
-    "firebase-tools": "15.35.0",
+    "fallow": "3.43.2",
+    "firebase": "13.4.0",
+    "firebase-tools": "15.36.0",
     "npm-package-json-lint": "11.0.1",
     "nx": "24.0.6",
-    "oxlint": "1.93.0",
-    "oxlint-tsgolint": "7.0.2006",
+    "oxlint": "1.94.0",
+    "oxlint-tsgolint": "7.0.2007",
     "typescript": "7.0.2"
   },
   "nx": {
