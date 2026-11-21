@@ -10,8 +10,9 @@
   // run goes unread.
   "rules": { "unlisted-binaries": "error" },
   // Binaries the owner installs outside node_modules (Homebrew or scoop); fallow already knows `git`
-  // and the like. `codex` runs Codex's app-server in packages/watcher/src/codex-rpc.ts.
-  "ignoreBinaries": ["codex"],
+  // and the like. `codex` runs Codex's app-server in packages/watcher/src/codex-rpc.ts; `agy` reads
+  // Antigravity usage in packages/watcher/src/antigravity-usage.ts.
+  "ignoreBinaries": ["agy", "codex"],
   "boundaries": {
     "zones": [
       { "name": "app", "patterns": ["apps/web/**"] },
