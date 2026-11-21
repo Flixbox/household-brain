@@ -23,13 +23,15 @@ const bucketWindow = (buckets: readonly unknown[], window: string): unknown => {
   return reset === null ? null : { resets_at: reset, utilization: (1 - bucket.remaining_fraction) * 100 }
 }
 
+const isGeminiGroup = (entry: unknown): entry is Record<string, unknown> => isRecord(entry) && entry.name === 'Gemini Models'
+
 const geminiBuckets = (response: unknown): readonly unknown[] | null => {
   if (!isRecord(response) || response.status !== 'SUCCESS' || !isRecord(response.command)
     || response.command.name !== 'usage' || !isRecord(response.command.data)
     || !Array.isArray(response.command.data.groups)) {
     return null
   }
-  const group = response.command.data.groups.find(entry => isRecord(entry) && entry.name === 'Gemini Models')
+  const group = response.command.data.groups.find(isGeminiGroup)
   return isRecord(group) && Array.isArray(group.buckets) ? group.buckets : null
 }
 
